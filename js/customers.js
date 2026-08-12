@@ -636,7 +636,15 @@
         const amt=(c.estAmount!=null&&c.estAmount!=='')?('¥'+Number(c.estAmount).toLocaleString()):'—';
         const dt=_doneDate(c)||'日付未定';
         let loa='';
-        if(c.needLoaner){ const l=(state.loaners||[]).find(x=>x.id===c.loanerId); loa='<i data-ic=van data-ics=16></i>代車'+(l?('（'+l.name+'）'):''); }
+        /* 🔴 v1.83.0（ゆうた指定）**過去の入庫＝終わった貸出は「〇/〇〜〇/〇」も出す。**
+           ＝いつからいつまで代車を貸していたかが、履歴として要る情報。
+           ⚠ 期間の書き方は loaner-free.js の `pitLoanerPeriodOf` 1本（ここで組み立てない）。 */
+        if(c.needLoaner){
+          const l=(state.loaners||[]).find(x=>x.id===c.loanerId);
+          const nm=(window.pitLoanerModel?pitLoanerModel(c.loanerId):'')||(l?(l.name||'代車'):'');
+          const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
+          loa='<i data-ic=van data-ics=16></i>代車'+(nm?('（'+nm+'）'):'')+(pr?(' '+pr):'');
+        }
         h+='<div class="cm-hrow"><div class="cm-hdt">'+esc(dt)+'</div>'+
            '<div class="cm-hmid"><b>'+esc(wl)+'</b>'+(c.plate?' ・ '+esc(c.plate):'')+(c.frontStaff?' ・ 担当 '+esc(c.frontStaff):'')+(loa?' ・ <span style="color:#1db97a">'+esc(loa)+'</span>':'')+'<div class="cm-hsub">'+esc(st)+(c.menu?' ・ '+esc(String(c.menu).split('\n')[0]):'')+'</div></div>'+
            '<div class="cm-hamt">'+esc(amt)+'</div></div>';
@@ -861,7 +869,14 @@
         const wl=wt?wt.label:(c.workType||'—'); const wc=wt?wt.color:'#64748b';
         const amt=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(c.estAmount!=null&&c.estAmount!==''?Number(c.estAmount):null);
         const amtStr=(amt!=null&&isFinite(amt))?yen(amt):'—';
-        let loa=''; if(c.needLoaner){ const l=(state.loaners||[]).find(x=>x.id===c.loanerId); loa=' ・ <span class="cd-loa"><i data-ic=van data-ics=16></i>代車'+(l?('（'+esc(l.name)+'）'):'')+'</span>'; }
+        /* 🔴 v1.83.0 同上＝来店履歴にも借りていた期間を出す */
+        let loa='';
+        if(c.needLoaner){
+          const l=(state.loaners||[]).find(x=>x.id===c.loanerId);
+          const nm=(window.pitLoanerModel?pitLoanerModel(c.loanerId):'')||(l?(l.name||'代車'):'');
+          const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
+          loa=' ・ <span class="cd-loa"><i data-ic=van data-ics=16></i>代車'+(nm?('（'+esc(nm)+'）'):'')+(pr?(' '+esc(pr)):'')+'</span>';
+        }
         const menuTxt=c.menu?esc(String(c.menu).split('\n')[0]):'';
         // ステータスバッジ：予約→予約カレンダー／返車済み→実績カレンダー（行クリックは予約詳細）
         const isResv=(c.status==='reserved'), isRet=(c.status==='returned');

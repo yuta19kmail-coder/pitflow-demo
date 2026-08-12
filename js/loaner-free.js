@@ -206,7 +206,33 @@
     return { has: true, back: false, at: '', due: due, rem: rem, level: levelOf(rem) };
   }
 
+  /* ------------------------------------------------------------------
+     ⑥ 貸していた期間の文字（v1.83.0・ゆうた指定）
+     -------------------------------------------------------------------
+     🗣「**アーカイブの代車は 〇/〇〜〇/〇 みたいな表記で**」
+     ＝**終わった貸出は「あと何日」ではなく「いつからいつまで借りていたか」**が知りたい情報。
+     🔴 日付の書き方（8/2〜8/7）を画面ごとに組み立てないこと。ここ1本。
+     ⚠ 元にするのは**貸出（loanerAssigns）の実際の期間**。無ければカードの予定を使う。
+        ＝返却確定・自動返却で縮んだ（伸びた）実際の期間が出る。
+     ------------------------------------------------------------------ */
+  function _md(ds) {
+    if (!ds) return '';
+    var p = String(ds).split('-');
+    return p.length === 3 ? (+p[1] + '/' + +p[2]) : String(ds);
+  }
+  /* その予約の貸出期間 { from, to, text }。text は '8/2〜8/7'（1日だけなら '8/2'） */
+  function periodOf(c) {
+    if (!c || !c.needLoaner) return { from: '', to: '', text: '' };
+    var a = arr(w.state && w.state.loanerAssigns).find(function (x) { return x.cardId === c.id; });
+    var from = (a && a.fromDate) || c.loanerFrom || '';
+    var to   = (a && a.toDate)   || c.loanerTo   || from;
+    if (!from) return { from: '', to: '', text: '' };
+    return { from: from, to: to, text: (to && to !== from) ? (_md(from) + '〜' + _md(to)) : _md(from) };
+  }
+
   /* ---- 公開（この名前で他のファイルから呼ぶ） ---- */
+  w.pitLoanerPeriodOf    = periodOf;
+  w.pitLoanerMD          = _md;
   w.pitLoanerBackOf      = backOf;
   w.pitLoanerRemainOf    = remainOf;
   w.pitLoanerLevelOf     = levelOf;

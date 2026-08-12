@@ -1142,7 +1142,12 @@ function _cfsLgRows(from, to, today, tStr, c, ro){
     /* v1.35.0 日付を押すと、その日の行を点線で囲う（もう一度押すと消える） */
     h += '<tr data-ds="' + ds + '"><td class="cfs-lg-d cfs-lg-dpick' + dCls + (ds === tStr ? ' today' : '') + '" data-lgrow="' + ds + '" title="クリックでこの日の行を目立たせる">' + (d.getMonth()+1) + '/' + d.getDate() + '<span>' + '日月火水木金土'[dow] + '</span></td>';
     loaners.forEach(function (l) {
-      const a = assigns.find(function (x) { return x.loanerId === l.id && x.fromDate <= ds && x.toDate >= ds; });
+      /* 🔴 v1.80.0 ふさがっている理由は loaner-free.js に聞く
+         ＝貸出だけでなく **代車自身の車検・点検（車両管理の予定）でも塞がる**。
+         ⚠ 以前はここで貸出しか見ておらず、車検入庫中の代車が「空き」に見えていた。 */
+      const why = window.pitLoanerBusyWhy ? pitLoanerBusyWhy(l, ds) : null;
+      const a = why ? (why.kind === 'assign' ? why.assign : { _event: why.event })
+                    : assigns.find(function (x) { return x.loanerId === l.id && x.fromDate <= ds && x.toDate >= ds; });
       /* 🔴 v1.35.0 どのマスにも「どの代車の列か」の目印を付ける（貸出中のマスも）。
          列まるごと点線で囲う（エクセルの列選択のような表示）ために要る。
          ⚠ 選択やドラッグに使う data-lgl / data-lgd は**今までどおり空きマスだけ**＝挙動は変えない。 */
@@ -1172,8 +1177,11 @@ function _cfsLgLoaners(c){
   // 代車カレンダーを未表示のセッションでは state.loaners に属性が無く、条件ソートが効かない。
   // （未設定のみ補完＝設定画面で入力済みの実値は上書きしない）
   if (typeof _loEnsureOpts === 'function') _loEnsureOpts();
-  // 緊急車両（emergency）は代車カレンダー専用の特殊列＝予約側・空きカレンダーには出さない（v0.101.5）
-  const ls = (state.loaners || []).filter(function(l){ return !l.emergency; });
+  /* 🔴 v1.80.0 貸せる代車の判定は loaner-free.js の1本
+     （緊急車両は代車カレンダー専用の特殊列＝予約側には出さない・v0.101.5／
+       **引退した代車もここで外れる**＝以前は列に残って選べてしまっていた）。 */
+  const ls = window.pitLoanerUsableList ? pitLoanerUsableList()
+           : (state.loaners || []).filter(function(l){ return !l.emergency; });
   if (window._cfsLgSort === false) return ls;   // ソート無＝元の並び
   const conds = (c && Array.isArray(c.loanerConditions)) ? c.loanerConditions : [];
   const sizes = conds.filter(function(k){ return k === 'height' || k === 'width' || k === 'length'; });
@@ -2099,9 +2107,20 @@ window.pitToKatakana = _toKatakana;
 function loanerSelect(c, key){
   let h = '<select class="cf-input" data-key="' + key + '">';
   h += '<option value="">使用代車を選ぶ</option>';
-  (state.loaners || []).filter(l => !l.emergency).forEach(l => {   // 緊急車両は予約側に出さない（v0.101.5）
+  /* 🔴 v1.80.0 選べる代車は loaner-free.js の1本で決める
+     （緊急車両は予約側に出さない・v0.101.5／**引退した代車も出さない**）。
+     ⚠ ただし、そのカードが既に選んでいる代車は、引退していても一覧に残す
+        ＝黙って選択が外れると「代車が消えた」ことに気づけないため。 */
+  const _sel = (window.pitLoanerUsableList ? pitLoanerUsableList()
+              : (state.loaners || []).filter(l => !l.emergency)).slice();
+  if (c[key] && !_sel.some(l => l.id === c[key])){
+    const cur = (state.loaners || []).find(l => l.id === c[key]);
+    if (cur) _sel.unshift(cur);
+  }
+  _sel.forEach(l => {
     const sel = c[key] === l.id ? ' selected' : '';
-    h += '<option value="' + l.id + '"' + sel + '>' + (window.pitVehLabel ? pitVehLabel(l) : (l.name + ' ' + l.model)) + '</option>';
+    const gone = l.retired ? '（引退）' : '';
+    h += '<option value="' + l.id + '"' + sel + '>' + (window.pitVehLabel ? pitVehLabel(l) : (l.name + ' ' + l.model)) + gone + '</option>';
   });
   h += '</select>';
   return h;
@@ -2406,7 +2425,12 @@ function bindCardFormEvents(root){
   // 🚙 代車ガント：空きマスをクリック→ドラッグで範囲選択→「使用代車＋貸出から/まで」に自動入力（v0.28.0）
   const lgBody = root.querySelector('#cfs-lg-body');
   if (lgBody){
-    const busyAt = (lid, ds) => (state.loanerAssigns || []).some(a => a.loanerId === lid && a.fromDate <= ds && a.toDate >= ds);
+    /* 🔴 v1.80.0 空きの判定は loaner-free.js の1本（代車自身の車検でも塞がる） */
+    const busyAt = (lid, ds) => {
+      const l = (state.loaners || []).find(x => x.id === lid);
+      return window.pitLoanerBusyOn ? pitLoanerBusyOn(l, ds)
+           : (state.loanerAssigns || []).some(a => a.loanerId === lid && a.fromDate <= ds && a.toDate >= ds);
+    };
     const nextDs = (ds) => { const p = ds.split('-'); const d = new Date(+p[0], +p[1]-1, +p[2]); d.setDate(d.getDate()+1); return ymd(d); };
     const rangeFree = (lid, a, b) => {   // a〜b（両端含む）が全部空きか
       let cur = a;

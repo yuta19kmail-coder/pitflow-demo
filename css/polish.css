@@ -1919,3 +1919,17 @@ th.cfs-lg-d{ z-index:3; }
 .rtbd-act.go:hover{ background:#378ADD1a; color:#378ADD; }
 /* その他保存メニューの「承認に回して保存」 */
 .vh-mi.vh-mi-appr b{ color:#378ADD; }
+
+/* ===== 🔴 v1.80.0 二重貸しの印 =====
+   同じ代車・同じ日に貸出が2件以上ある日に「2」の丸を出す。
+   ⚠ 以前は主役の1枚しか描かなかったので、二重になっていても画面では気づけなかった。
+   ⚠ 当日かぶり（返却日＝次の貸出開始日）は二重ではないので印は出ない。 */
+.lo-cell.lo-dup{ box-shadow: inset 0 0 0 2px #ef4444; }
+.lo-dupmark{
+  position:absolute; z-index:5; top:2px; right:2px;
+  min-width:17px; height:17px; padding:0 4px; border-radius:9px;
+  background:#dc2626; color:#fff; border:1px solid #fca5a5;
+  font-size:10.5px; font-weight:800; line-height:15px; text-align:center;
+  cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.lo-dupmark:hover{ background:#ef4444; }

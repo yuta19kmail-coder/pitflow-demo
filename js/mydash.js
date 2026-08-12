@@ -163,9 +163,11 @@
     recs.sort(function (a, b) { return (b.iso || '').localeCompare(a.iso || ''); });
     return recs;
   }
+  /* 🔴 v1.80.0 空きの判定は loaner-free.js の1本（引退・緊急・代車自身の車検を除く）。
+     ⚠ ここで自分で数え直さないこと。以前は引退した代車まで「空き」に数えていた。 */
   function loanerStat(dStr) {
-    var loaners = state.loaners || [], asg = state.loanerAssigns || [];
-    var busy = function (l, ds) { return asg.some(function (a) { return a.loanerId === l.id && a.fromDate <= ds && a.toDate >= ds; }); };
+    var loaners = (window.pitLoanerUsableList ? pitLoanerUsableList() : (state.loaners || []));
+    var busy = function (l, ds) { return window.pitLoanerBusyOn ? pitLoanerBusyOn(l, ds) : false; };
     var freeList = loaners.filter(function (l) { return !busy(l, dStr); });
     return { total: loaners.length, free: freeList.length, busy: loaners.length - freeList.length, freeList: freeList, busyFn: busy, loaners: loaners };
   }

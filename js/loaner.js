@@ -18,10 +18,37 @@ const LO_CAT = { kei:'軽', normal:'普通車', import:'輸入車', commercial:'
 /* ===== 下書きモード（動かした瞬間に突入＝保存はしない。一括実行で確定／破棄／やり直し） ===== */
 let _loDraftOrig = null;   // 下書き開始時のスナップショット {aid:{loanerId,fromDate,toDate}}
 let _loApplySnap = null;   // 直前の一括実行のやり直し用スナップショット
+
+/* 🔴 v1.80.0 下書きの控えを**端末にも残す**。
+   -------------------------------------------------------------------
+   ⚠ 下書き中の変更は state に直接書かれる（保存はしない）が、
+      **別の画面へ移ってそこで保存が走ると、確定していない下書きがそのまま保存される。**
+      さらにリロードすると `_loDraftOrig` は消えるので、**もう元に戻せなかった。**
+   ✅ 控えを端末に残しておけば、リロードしても「破棄」で元に戻せる。
+   ⚠ これは保険。**画面を離れる時には loGuardLeave() で聞く**のが本筋（下を参照）。 */
+const LO_DRAFT_KEY = 'pitflow_loaner_draft_v1';
+function _loDraftSave(){
+  try {
+    if (_loDraftOrig) localStorage.setItem(LO_DRAFT_KEY, JSON.stringify(_loDraftOrig));
+    else localStorage.removeItem(LO_DRAFT_KEY);
+  } catch (e) {}
+}
+function _loDraftRestore(){
+  if (_loDraftOrig) return;
+  try {
+    const raw = localStorage.getItem(LO_DRAFT_KEY);
+    if (!raw) return;
+    const o = JSON.parse(raw);
+    if (o && typeof o === 'object' && Object.keys(o).length) _loDraftOrig = o;
+  } catch (e) {}
+}
+function _loDraftClear(){ _loDraftOrig = null; try { localStorage.removeItem(LO_DRAFT_KEY); } catch (e) {} }
+
 function _loStartDraft(){
   if (_loDraftOrig) return;
   _loDraftOrig = {};
   (state.loanerAssigns || []).forEach(function(a){ _loDraftOrig[a.id] = { loanerId:a.loanerId, fromDate:a.fromDate, toDate:a.toDate }; });
+  _loDraftSave();
 }
 function _loAssignChanged(a){ const o = _loDraftOrig && _loDraftOrig[a.id]; return !!o && (o.loanerId!==a.loanerId || o.fromDate!==a.fromDate || o.toDate!==a.toDate); }
 function _loChangedList(){ return _loDraftOrig ? (state.loanerAssigns||[]).filter(_loAssignChanged) : []; }
@@ -34,8 +61,12 @@ function _loConflictSetFrom(list){
     const arr = byLo[lo].slice().sort(function(x,y){ return x.fromDate < y.fromDate ? -1 : 1; });
     for (let i=0;i<arr.length;i++) for (let j=i+1;j<arr.length;j++){
       if (arr[i].cardId && arr[j].cardId && arr[i].cardId === arr[j].cardId) continue;   // 同一予約は除外
-      // 当日かぶり（返却日＝次の貸出開始日）は重複に数えない（耳で表現）＝境界は>=/<=で許容
-      if (!(arr[j].fromDate >= arr[i].toDate || arr[j].toDate <= arr[i].fromDate)){ bad.add(arr[i].id); bad.add(arr[j].id); }
+      /* 🔴 v1.80.0 ぶつかりの判定は loaner-free.js の pitLoanerOverlap 1本。
+         当日かぶり（返却日＝次の貸出開始日）は重複に数えない（耳で表現）。
+         ⚠ 以前はここと貸出フォーム（_loOverlaps）で決まりが逆だった。 */
+      if (window.pitLoanerOverlap(arr[i].fromDate, arr[i].toDate, arr[j].fromDate, arr[j].toDate)){
+        bad.add(arr[i].id); bad.add(arr[j].id);
+      }
     }
   });
   return bad;
@@ -175,18 +206,31 @@ window.pitVehLabel = function (v, kind) {
 
 function _loEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
 
-/* 代車の装備/寸法（ETC/ナビ/ISO/高さ/幅/長さ/区分/定員）が未設定なら、デモ用に変化を付けて初期化（実車は編集で上書き） */
+/* 代車の装備/寸法が未設定のときの初期化。
+   🔴 v1.80.0 **本番（クラウド保存）では、装備と寸法に勝手な数字を入れない。**
+   -------------------------------------------------------------------
+   ⚠ もともとサンプル画面に変化を付けるための仕組みだった（1台目は高さ150cm、2台目は153cm…）。
+      ところが本番の代車でも、寸法を入力しないと**この架空の数字が書き込まれ**、
+      その値のまま「高さ順に並べ替え」が効いていた＝**実車と違う順番で代車を選んでしまう。**
+   ✅ 本番では未入力のまま（null）にして、並べ替えでは**最後に回す**（loaner.js の並べ替えは
+      null を 99999 として扱う）。入力されていないことが**見て分かる**のが正しい。
+   ⚠ 番号・区分・色は画面の組み立てに要るので、本番でも埋める（架空の数字ではないため）。 */
 function _loEnsureOpts(){
+  const demo = !window.PIT_CLOUD;   /* サンプル・練習用サイト＝見栄えのために埋める */
   (state.loaners || []).forEach(function(l, i){
-    if (l.etc === undefined)  l.etc  = (i % 2 === 0);
-    if (l.navi === undefined) l.navi = (i % 3 !== 0);
-    if (l.iso === undefined)  l.iso  = (i % 4 === 0);
-    if (l.camera === undefined) l.camera = (i % 3 === 0);   /* v1.11.0 バックカメラ */
-    if (l.height === undefined || l.height === null) l.height = 150 + (i % 6) * 3;    // 150〜165cm
-    if (l.width  === undefined || l.width  === null) l.width  = 148 + (i % 5) * 4;    // 148〜164cm
-    if (l.length === undefined || l.length === null) l.length = 340 + (i % 8) * 20;   // 340〜480cm
+    if (demo){
+      if (l.etc === undefined)  l.etc  = (i % 2 === 0);
+      if (l.navi === undefined) l.navi = (i % 3 !== 0);
+      if (l.iso === undefined)  l.iso  = (i % 4 === 0);
+      if (l.camera === undefined) l.camera = (i % 3 === 0);   /* v1.11.0 バックカメラ */
+      if (l.height === undefined || l.height === null) l.height = 150 + (i % 6) * 3;    // 150〜165cm
+      if (l.width  === undefined || l.width  === null) l.width  = 148 + (i % 5) * 4;    // 148〜164cm
+      if (l.length === undefined || l.length === null) l.length = 340 + (i % 8) * 20;   // 340〜480cm
+      if (l.seats === undefined || l.seats === null) l.seats = [4,4,5,5,5,7,8][i % 7];
+    } else {
+      /* 本番＝入っていないものは「未入力」のまま。false で埋めるのも嘘になるので触らない。 */
+    }
     if (l.category === undefined) l.category = ['kei','normal','import','commercial'][i % 4];   /* v1.15.0 商用車 */
-    if (l.seats === undefined || l.seats === null) l.seats = [4,4,5,5,5,7,8][i % 7];
     if (l.number === undefined || l.number === null){ const n = parseInt(String(l.name||'').replace(/[^0-9]/g,''),10); l.number = isNaN(n)?(i+1):n; }
     if (l.color === undefined) l.color = '';
   });
@@ -294,6 +338,11 @@ function pitSyncLoanerAssigns(){
     const before = assigns.length;
     state.loanerAssigns = assigns.filter(function(a){
       if (!a.cardId) return true;   // 手動/緊急
+      /* 🔴 v1.80.0 **返却済みの貸出は消さない。**
+         ⚠ 以前は、返却まで済んだ貸出でも、あとからカードの「代車 不要」を押すと
+            **貸した記録ごと消えていた**（更新の側は `!a.returned` で守っていたのに、削除だけ素通り）。
+            実際に貸した事実は残す＝カレンダーの履歴・トラブル時の確認のため。 */
+      if (a.returned) return true;
       const c = state.cards.find(function(x){ return x.id === a.cardId; });
       return !!(c && c.needLoaner && c.loanerId && c.loanerFrom);
     });
@@ -307,6 +356,10 @@ function renderLoaner(){
   try { if (window.pitRefreshAutoTenken) pitRefreshAutoTenken(); } catch (e) {}   /* v1.14.7：12ヶ月点検の位置を今日基準で貼り直す */
   const grid = document.getElementById('loaner-grid');
   if (!grid) return;
+  /* 🔴 v1.80.0 前回の下書きの控えを端末から拾い直す（リロードしても「破棄」で戻せるように）。
+     ⚠ 同期（pitSyncLoanerAssigns）より**前**に。同期は下書き中は既存の割当に触らない作りなので、
+        先に下書きだと分からせておかないと、下書きの変更が上書きされる。 */
+  _loDraftRestore();
   pitSyncLoanerAssigns();   // カードの代車情報を割当に反映してから描画
   // 代車割当に id が無いとドラッグ移動(data-aid)が効かない＝旧データ/サンプル救済で必ず採番
   (state.loanerAssigns || []).forEach(function(a, i){
@@ -504,17 +557,28 @@ function _loRenderDays(start, n){
           } else {
             labelHtml = (isKari ? '<span class="kari-lo" title="仮予約">仮</span>' : _apr)
               + '<span class="lo-lbl full">'
-              + '<span class="lo-nm">' + _nm + ' 様</span>'
+              + '<span class="lo-nm">' + _loEsc(_nm) + ' 様</span>'   /* 🔴 v1.80.0 エスケープ漏れを修正（省スペース版だけ通っていた） */
               + '<span class="lo-car2"><span class="lo-cartxt">' + (carTxt ? _loEsc(carTxt) : '') + '</span>' + (fixed ? '<span class="lo-fix">固定</span>' : '') + '</span>'
               + (memoTxt ? '<span class="lo-memo">' + _loEsc(memoTxt) + '</span>' : '')
               + '</span>';
           }
         }
-        const isBad = confSet && confSet.has(a.id);
+        /* 🔴 v1.80.0 **その日を覆っている貸出が2件以上ある＝二重貸し。**
+           以前は主役の1枚しか描かず、二重になっていても**画面では気づけなかった**。
+           ⚠ 当日かぶり（返却日＝次の開始日）は二重ではないので数えない
+              ＝実効開始（_loEffStart）がこの日以前のものだけを数える。 */
+        const dupN = covering.filter(function(x){ return _loEffStart(x) <= dStr; }).length;
+        const isDup = dupN > 1;
+        const isBad = (confSet && confSet.has(a.id)) || isDup;
         const isChg = _loAssignChanged(a);
         const hoverAttr = compact ? (' onmouseenter="loInfoHover(this,\'' + (a.id || '') + '\')" onmouseleave="loInfoHide()"') : '';
-        h += '<div class="lo-cell lo-bk' + (isStart ? ' bk-start' : '') + (isEnd ? ' bk-end' : '') + (single ? ' bk-single' : '') + (compact ? ' bk-compact' : ' bk-full') + (fixed ? ' lo-fixed' : '') + (returned ? ' lo-returned' : '') + (isToday ? ' lo-today' : '') + (isBad?' lo-bad':(isChg?' lo-chg':'')) + evCls + dayMods + '"' + attrs
+        h += '<div class="lo-cell lo-bk' + (isStart ? ' bk-start' : '') + (isEnd ? ' bk-end' : '') + (single ? ' bk-single' : '') + (compact ? ' bk-compact' : ' bk-full') + (fixed ? ' lo-fixed' : '') + (returned ? ' lo-returned' : '') + (isToday ? ' lo-today' : '') + (isBad?' lo-bad':(isChg?' lo-chg':'')) + (isDup?' lo-dup':'') + evCls + dayMods + '"' + attrs
            + ' style="--lo-team:' + teamColor + '"><i class="lo-fill"></i>' + gh;
+        /* 🔴 二重貸しの日は「2」の印を出す（押すと何と重なっているかを出す） */
+        if (isDup){
+          h += '<span class="lo-dupmark" title="この日は貸出が ' + dupN + ' 件重なっています"'
+             + ' onclick="event.stopPropagation();loShowDup(\'' + l.id + '\',\'' + dStr + '\')">' + dupN + '</span>';
+        }
         if (isStart){
           h += '<span class="lo-badge ' + (compact ? 'mini' : 'full') + (hand ? ' lo-handoff' : '') + (isChg?' chg':'') + (isKari ? ' lo-kari' : '') + '"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '"' + (card ? ' data-card-id="' + card.id + '"' : '') + ' onclick="loBadgeMenu(event,\'' + (a.id || '') + '\')"' + hoverAttr + '>' + labelHtml + '</span>';
         }
@@ -774,16 +838,58 @@ window.loDraftUndoOne = function(id){
   if (!_loDraftOrig) return;
   const o = _loDraftOrig[id], a = (state.loanerAssigns||[]).find(function(x){return x.id===id;});
   if (o && a){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; }
-  if (!_loChangedList().length) _loDraftOrig = null;   // 全部戻ったら下書き解除
+  if (!_loChangedList().length) _loDraftClear(); else _loDraftSave();   // 全部戻ったら下書き解除
   _loRefresh();
 };
+/* 🔴 v1.80.0 未確定の下書きを持ったまま画面を離れる時に、1回だけ聞く。
+   -------------------------------------------------------------------
+   ⚠ 下書きは state に直接書かれている。よその画面の保存に巻き込まれると
+      「動かしただけのつもり」が本当に変わる。だから**離れる前に決めてもらう**。
+   ・反映する … そのまま一括実行（重複があると実行できないので、その時は残る）
+   ・破棄する … 元に戻して離れる
+   ・ここに残る … 何もしない
+   戻り値 true ＝ 呼び出し側（showView）は**いったん止まる**（答えが返ってからやり直す）。 */
+window.pitLoanerAskLeave = function(nextView){
+  if (!_loDraftOrig) return false;
+  const changed = _loChangedList();
+  if (!changed.length) { _loDraftClear(); return false; }
+  pitAsk('代車の下書きが ' + changed.length + ' 件あります', {
+    detail: 'まだ反映していない変更が残っています。\n'
+          + 'このまま他の画面へ移ると、あとで**気づかないうちに反映されてしまう**ことがあります。\n\n'
+          + '・反映する … いまの下書きをそのまま確定します\n'
+          + '・破棄する … 動かす前の状態に戻します',
+    ok: '反映する', cancel: '破棄する'
+  }).then(function(yes){
+    if (yes) {
+      /* 反映は既存の道（重複チェック・確認つき）をそのまま通す＝写しを作らない */
+      const before = _loChangedList().length;
+      window.loDraftApply();
+      /* 重複で止まった時は下書きが残る＝そのまま代車カレンダーに居てもらう */
+      setTimeout(function(){
+        if (!_loDraftOrig || !_loChangedList().length) showView(nextView);
+      }, 50);
+      if (before) return;
+    } else {
+      (state.loanerAssigns||[]).forEach(function(a){
+        const o = _loDraftOrig && _loDraftOrig[a.id];
+        if (o){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; }
+      });
+      _loDraftClear();
+      if (window.PitDB) PitDB.save();
+      showView(nextView);
+    }
+  });
+  return true;   /* いったん止める */
+};
+
 window.loDraftDiscard = function(){
   if (!_loDraftOrig || !_loChangedList().length) return;
   /* 🔵 v1.75.0 聞くのはアプリ内ダイアログ（pitAsk）＝答えは後から返る。 */
   pitAsk('下書き中の代車変更を全部破棄します。よろしいですか？', { danger:true, ok:'破棄する' }).then(function(yes){
     if (!yes) return;
     (state.loanerAssigns||[]).forEach(function(a){ const o=_loDraftOrig[a.id]; if(o){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; } });
-    _loDraftOrig = null;
+    _loDraftClear();
+    if (window.PitDB) PitDB.save();   /* 🔴 戻した状態をちゃんと保存する（下書きが保存済みだった場合の巻き戻し） */
     _loRefresh();
   });
 };
@@ -807,7 +913,7 @@ window.loDraftApply = function(){
     const card = a.cardId ? (state.cards||[]).find(function(c){return c.id===a.cardId;}) : null;
     if (card){ card.loanerId=a.loanerId; card.loanerFrom=a.fromDate; card.loanerTo=a.toDate; }
   });
-  _loDraftOrig = null;
+  _loDraftClear();
   if (window.PitDB) PitDB.save();
   _loRefresh();
   pitAlert('反映しました（' + changed.length + '件）。直後なら「↩ やり直す」で実行前に戻せます。');
@@ -840,6 +946,22 @@ function _loBadgePopOpen(html){
   p.style.left = Math.max(8, left) + 'px'; p.style.top = top + 'px';
   setTimeout(function(){ document.addEventListener('mousedown', _loBadgePopOutside, true); }, 0);
 }
+/* 🔴 v1.80.0 二重貸しの「2」を押した時＝何と何が重なっているかを出す。
+   ⚠ ここは知らせるだけ。**勝手に直さない**（どちらを動かすかは人が決める）。 */
+window.loShowDup = function(loanerId, ds){
+  const lo = (state.loaners || []).find(function(l){ return l.id === loanerId; });
+  const list = (state.loanerAssigns || []).filter(function(x){
+    return x.loanerId === loanerId && x.fromDate <= ds && x.toDate >= ds && _loEffStart(x) <= ds;
+  });
+  const name = lo ? (window.pitVehLabel ? pitVehLabel(lo) : (lo.name || '代車')) : '代車';
+  pitAlert(_loMD(ds) + ' は貸出が ' + list.length + ' 件重なっています', {
+    detail: name + '\n\n' + _loConflictMsg(list)
+          + '\n\nどちらかの期間をずらすか、別の代車に替えてください。'
+          + '\n（札をドラッグ → 下の「一括実行」で反映します）',
+    ok: '分かりました'
+  });
+};
+
 window.loBadgeMenu = function(ev, aid){
   if (ev){ ev.stopPropagation(); ev.preventDefault(); if (ev.clientX != null) _loPopXY = { x: ev.clientX, y: ev.clientY }; }
   const a = (state.loanerAssigns || []).find(function(x){ return x.id === aid; });
@@ -946,12 +1068,24 @@ function _loModalOpen(html){
 function _loModalClose(){ const m = document.getElementById('lo-modal'); if (m) m.remove(); }
 window.loCloseModal = _loModalClose;
 
-/* 期間重なり判定＋衝突する割当の一覧（貸出ポップアップの衝突警報用） */
-function _loOverlaps(aF, aT, bF, bT){ return !(aT < bF || aF > bT); }
+/* 期間重なり判定＋衝突する割当の一覧（貸出ポップアップの衝突警報用）
+   🔴 v1.80.0 判定は loaner-free.js の1本に寄せた。
+   ⚠ 以前ここだけ **当日かぶり（返却日＝次の貸出開始日）をぶつかり扱い**していて、
+      同じことをしてもカレンダーのドラッグでは通り、この窓では怒られる、という食い違いがあった。 */
 function _loConflictAssigns(loanerId, from, to, excludeAid){
-  return (state.loanerAssigns || []).filter(function(a){
-    return a.loanerId === loanerId && a.id !== excludeAid && _loOverlaps(from, to, a.fromDate, a.toDate);
+  return window.pitLoanerConflicts(loanerId, from, to, { ignoreAssignId: excludeAid });
+}
+/* 期間にかかる「代車自身の予定」（車検入庫・点検など）＝貸出とは別に知らせる */
+function _loConflictEvents(loanerId, from, to){
+  return window.pitLoanerEventsIn(loanerId, from, to);
+}
+/* 代車自身の予定（車検入庫など）の並び＝窓に出す文字 */
+function _loEventMsg(list){
+  const lines = (list || []).slice(0, 3).map(function(e){
+    const t = (typeof FL_EVT_TYPES !== 'undefined' ? FL_EVT_TYPES[e.type] : null) || { label:'予定' };
+    return '・' + _loMD(e.fromDate) + '〜' + _loMD(e.toDate) + '　' + (e.label || t.label);
   });
+  return lines.join('\n') + (list.length > 3 ? ('\n…他 ' + (list.length - 3) + ' 件') : '');
 }
 function _loConflictMsg(list){
   const lines = list.slice(0, 3).map(function(a){
@@ -974,27 +1108,36 @@ window.loAddManualBlock = function(prefill){
     + '<label class="lo-modal-f">代車<select id="lmb-lo">' + opts + '</select></label>'
     + '<label class="lo-modal-f">用途<select id="lmb-pp"><option>車販・乗り換え</option><option>代車（整備外）</option><option>その他</option></select></label>'
     + '<label class="lo-modal-f">お客様名<input id="lmb-cust" placeholder="例：小林"></label>'
+    /* 🔴 v1.80.0 車種の入力欄を足した。
+       ⚠ 札を出す側は前から車種を出そうとしていたのに、入れる場所が無く**必ず空**だった。 */
+    + '<label class="lo-modal-f">お客様の車（任意）<input id="lmb-car" placeholder="例：アクア"></label>'
     + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="lmb-from" value="' + from0 + '"></label><label class="lo-modal-f">まで<input type="date" id="lmb-to" value="' + to0 + '"></label></div>'
     + '<div class="lo-modal-foot"><button onclick="loCloseModal()">キャンセル</button><button class="primary" onclick="loSaveManualBlock()">登録</button></div>'
   );
 };
 window.loSaveManualBlock = function(){
   const g = function(id){ const e = document.getElementById(id); return e ? e.value : ''; };
-  const lo = g('lmb-lo'), pp = g('lmb-pp'), cust = g('lmb-cust').trim(), from = g('lmb-from'), to = g('lmb-to');
+  const lo = g('lmb-lo'), pp = g('lmb-pp'), cust = g('lmb-cust').trim(), car = g('lmb-car').trim(), from = g('lmb-from'), to = g('lmb-to');
   if (!lo || !from || !to){ pitAlert('代車と期間を入れてください'); return; }
   if (to < from){ pitAlert('「まで」は「から」以降にしてください'); return; }
   const conf = _loConflictAssigns(lo, from, to);
+  /* 🔴 v1.80.0 **代車自身の予定（車検入庫・点検）とぶつかっていないかも見る。**
+     ⚠ 以前は貸出しか見ておらず、車検に出す予定の代車をそのまま貸せてしまった。 */
+  const evs = _loConflictEvents(lo, from, to);
   /* 🔵 v1.75.0 重複した時だけ聞く。**続きは _go 1本**（聞く道と聞かない道で写しを作らない）。 */
-  if (conf.length){
+  if (conf.length || evs.length){
+    const parts = [];
+    if (conf.length) parts.push('すでに他の貸出・予約と重複します：\n' + _loConflictMsg(conf));
+    if (evs.length)  parts.push('この代車自身の予定と重なります：\n' + _loEventMsg(evs));
     pitAsk('それでも登録しますか？', { title:'期間が重複します', danger:true, ok:'登録する',
-            detail:'この代車は選んだ期間、すでに他の貸出・予約と重複します：\n\n' + _loConflictMsg(conf) })
+            detail:'この代車は選んだ期間、\n\n' + parts.join('\n\n') })
       .then(function(yes){ if (yes) _go(); });
     return;
   }
   _go();
   function _go(){
   state.loanerAssigns = state.loanerAssigns || [];
-  state.loanerAssigns.push({ id:'la'+Date.now().toString(36), loanerId:lo, cardId:null, customer:(cust||'(貸出)'), purpose:pp, fromDate:from, toDate:to, manual:true });
+  state.loanerAssigns.push({ id:'la'+Date.now().toString(36), loanerId:lo, cardId:null, customer:(cust||'(貸出)'), car:car, purpose:pp, fromDate:from, toDate:to, manual:true });
   if (window.PitDB) PitDB.save();
   _loModalClose(); renderLoaner();
   }

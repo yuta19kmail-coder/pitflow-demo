@@ -51,17 +51,13 @@ function _vdTeam(ds, team){
   if (!v) return { mark: '○' };
   return team === 'import' ? v.import : v.default;
 }
+/* 🔴 v1.80.0 判定は loaner-free.js の1本に寄せた。
+   ここで自前に数え直さないこと（**引退・緊急・代車自身の車検**を外す条件が付いている）。
+   ⚠ 以前はこの関数が自分で数えていて、
+      「引退した代車」「緊急車両」「車検入庫中の代車」まで空きに数えていた
+      ＝**代車ありで入庫できる日が実際より早く出る**（約束したのに代車が無い）。 */
 function _loanerFreeRun(startStr, days){
-  const loaners = state.loaners || [];
-  const assigns = state.loanerAssigns || [];
-  return loaners.some(function(l){
-    for (let j = 0; j < days; j++){
-      const ds = ymd(addDays(_pd(startStr), j));
-      const busy = assigns.some(function(a){ return a.loanerId === l.id && a.fromDate <= ds && a.toDate >= ds; });
-      if (busy) return false;
-    }
-    return true;
-  });
+  return window.pitLoanerFreeRun ? pitLoanerFreeRun(startStr, days) : false;
 }
 function dashEarliestIntake(team, kind, today, holdOverride){
   // holdOverride（作業タイプの概算預かり日数）が来たら、その日数ぶん代車が連続で空く日を最短に（v0.101.4）
@@ -119,14 +115,10 @@ function _dashCalCols(from, to, today, tStr){
 
 // 代車の最短空き（4台のうち1台でも空く最初の日）
 function dashLoanerEarliestFree(today){
-  const loaners = state.loaners || [];
-  if (!loaners.length) return null;
+  /* 🔴 v1.80.0 空きの判定は loaner-free.js（引退・緊急・代車自身の車検を除く） */
+  if (!window.pitLoanerFreeRun) return null;
   for (let i = 0; i < 120; i++){
-    const dStr = ymd(addDays(today, i));
-    const free = loaners.some(function(l){
-      return !(state.loanerAssigns || []).some(function(a){ return a.loanerId === l.id && a.fromDate <= dStr && a.toDate >= dStr; });
-    });
-    if (free) return addDays(today, i);
+    if (pitLoanerFreeRun(ymd(addDays(today, i)), 1)) return addDays(today, i);
   }
   return null;
 }

@@ -313,6 +313,40 @@ window.loToggleSort = function(key){
    ・cardIdで突き合わせ：無ければ作成／あれば日付・代車を更新／代車不要・カード消滅になったら削除。
    ・手動貸出(manual)・緊急(emergency)＝cardId無しは対象外（そのまま残す）。
    ・代車カレンダーで下書き編集中(_loDraftOrig)は既存割当を上書きしない（編集を壊さない）。 */
+/* 🔴 v1.81.0 「車を返したら代車も返ってきた」を自動で反映する（ゆうた指定）。
+   -------------------------------------------------------------------
+   ◎やること
+     ・その貸出を **返却済（灰色）** にする
+     ・**返却日＝車をお客様に引き渡した日** に合わせる
+       → 予定より早く返ってきていれば、そのぶん **代車の枠が空く**（次の人に貸せる）
+       → 予定より遅かったら、そのぶん **枠を伸ばす**（空いていないのに空きに見えるのを防ぐ）
+   ◎やらないこと（手で押した方が必ず勝つ）
+     🔴 すでに「返却確定」が押してあれば **触らない**（イレギュラーの入力が正）
+     🔴 「返却取消」を押した予約も **触らない**（`c.loanerReturned === false` が目印）
+   ⚠ 返した日が分からない予約は触らない（当てずっぽうで日付を入れない）。 */
+function _loCardBackDate(c){
+  return String((c && (c.returnDateFinal || c.returnDate || c.completedAt)) || '');
+}
+function _loAutoReturnByCard(a, c){
+  if (!a || !c) return false;
+  if (a.returned) return false;                 /* 手で確定済み＝そちらが正 */
+  if (c.loanerReturned === false) return false; /* 手で「返却取消」した＝自動で戻さない */
+  if (c.status !== 'returned') return false;    /* まだ車が返っていない */
+  let back = _loCardBackDate(c);
+  if (!back) return false;                      /* 返した日が分からない＝触らない */
+  if (back < a.fromDate) back = a.fromDate;     /* 貸出開始より前にはしない */
+  a.returned = true;
+  a.returnedAt = back;
+  a.autoReturned = true;                        /* 自動で付けた印（人が押したものと見分ける） */
+  if (a.toDate !== back){
+    if (a.toDateBefore == null) a.toDateBefore = a.toDate;   /* 元の予定＝「返却取消」で戻すため */
+    a.toDate = back;                            /* 枠を実際の返却日に合わせる */
+  }
+  c.loanerTo = a.toDate;
+  c.loanerReturned = true;
+  return true;
+}
+
 function pitSyncLoanerAssigns(){
   if (!state.cards) return;
   const assigns = state.loanerAssigns = (state.loanerAssigns || []);
@@ -327,11 +361,18 @@ function pitSyncLoanerAssigns(){
       assigns.push({ id:'la' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
         cardId:c.id, loanerId:c.loanerId, fromDate:c.loanerFrom, toDate:to });
       changed = true;
+      a = assigns[assigns.length - 1];
     } else if (!drafting && !a.returned){
       if (a.loanerId !== c.loanerId || a.fromDate !== c.loanerFrom || a.toDate !== to){
         a.loanerId = c.loanerId; a.fromDate = c.loanerFrom; a.toDate = to; changed = true;
       }
     }
+    /* 🔴 v1.81.0（ゆうた指定）**車を返したら、代車も返ってきたことにする。**
+       🗣「ほとんどの場合、預かる時に貸し出して、返車するときに戻ってくる。
+          代車カレンダー上の返却確定は、**まれなイレギュラー**（代車だけ先に返してもらう等）のために使う」
+       ⚠ 以前は「返却確定」を押した時だけ灰色になったので、
+          **車を引き渡して代車も戻っているのに、代車カレンダーはずっと貸出中に見えていた。** */
+    if (!drafting && _loAutoReturnByCard(a, c)) changed = true;
   });
   // 2) 不要になった割当を削除（カード由来なのに代車不要/カード消滅）。手動・緊急は残す。
   if (!drafting){
@@ -1010,8 +1051,12 @@ window.loUnreturn = function(aid){
   const a = (state.loanerAssigns || []).find(function(x){ return x.id === aid; });
   if (!a) { _loBadgePopClose(); return; }
   a.returned = false; delete a.returnedAt;
+  /* 🔴 v1.81.0 自動で付けた返却を取り消す時は、**縮めた（伸ばした）期間も元に戻す**。
+     ⚠ 戻さないと「取り消したのに枠が短いまま」になり、貸せるはずの日が消える。 */
+  if (a.autoReturned && a.toDateBefore){ a.toDate = a.toDateBefore; }
+  delete a.autoReturned; delete a.toDateBefore;
   const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
-  if (card) card.loanerReturned = false;
+  if (card){ card.loanerReturned = false; card.loanerTo = a.toDate; }
   if (window.PitDB) PitDB.save();
   _loBadgePopClose(); renderLoaner();
 };
@@ -1036,6 +1081,7 @@ window.loReturnConfirm = function(aid){
   pitAsk('返却日 ' + rd + ' で確定します。よろしいですか？', { ok:'確定する' }).then(function(yes){
     if (!yes) return;
     a.returned = true; a.returnedAt = rd;
+    delete a.autoReturned;              /* 🔴 v1.81.0 人が押したもの＝自動の印は外す（こちらが正） */
     if (rd < a.toDate) a.toDate = rd;   // 早く返ってきたらバーを実際の返却日まで縮める
     const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
     if (card){ card.loanerTo = a.toDate; card.loanerReturned = true; }

@@ -181,3 +181,8 @@
 .rp-timeguide .cf-time-quick{ max-width:100%; }
 .rp-timeguide .cf-time-pick{ font-size:14px; padding:5px 8px; background:var(--bg3); border:1px solid var(--border2); border-radius:8px; color:var(--text); }
 .rp-timeguide .cf-chip{ font-size:12px; padding:4px 10px; border-radius:8px; border:1px solid var(--border2); background:var(--bg3); color:var(--text); cursor:pointer; }
+
+/* 🔴 v1.82.0 代車が返ってきている時＝落ち着いた灰色（返却済み） */
+.s-loaner.lv-back{ border-top-color:#8390a6; background:rgba(131,144,166,.10); }
+.s-loaner.lv-back .ph-stat-num{ color:#aab5c6; font-size:15px; }
+.s-loaner.lv-back .ph-meter i{ background:#8390a6; }

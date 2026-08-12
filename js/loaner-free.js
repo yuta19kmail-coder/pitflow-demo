@@ -146,7 +146,70 @@
     });
   }
 
+  /* ------------------------------------------------------------------
+     ⑤ その予約の代車、返ってきているか／あと何日か
+     -------------------------------------------------------------------
+     🔴 v1.82.0（ゆうた指摘）**画面が「日付の引き算」だけで残りを出していた。**
+        🗣「そもそも予約というか実績情報が持ってる代車情報とリンクしてる？
+           実績になってても代車の返却とリンクしてないよな？」
+        そのとおりで、**返却済みなのにカードには「超過5日」と赤く出ていた**
+        （代車カレンダー側は灰色で返却済みになっているのに）。
+        ＝「返ってきたか」を持っているのは**貸出（loanerAssigns）**なのに、
+          画面は**カードの日付**しか見ていなかった。
+     🔴 **代車の残りを出すのは、これ1本。** 画面で `loanerTo` を引き算しない。
+     ⚠ **車は返したのに代車が戻っていない**（イレギュラー）時は、
+        ちゃんと「超過」で赤く出す＝これは知らせるべき事故。消してはいけない。
+     ------------------------------------------------------------------ */
+  function _today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function _diffDays(fromStr, toStr) {
+    return Math.round((_pd(toStr) - _pd(fromStr)) / 86400000);
+  }
+
+  /* 返ってきているか（＋返した日）。貸出が正・カードの印は予備。 */
+  function backOf(c) {
+    if (!c) return { back: false, at: '' };
+    var a = arr(w.state && w.state.loanerAssigns).find(function (x) { return x.cardId === c.id; });
+    if (a && a.returned) return { back: true, at: a.returnedAt || a.toDate || '' };
+    if (c.loanerReturned === true) return { back: true, at: c.loanerTo || '' };
+    return { back: false, at: '' };
+  }
+
+  /* 色の段階。閾値は設定（settings.loanerColors）から。 */
+  function levelOf(rem) {
+    if (rem == null) return 'none';
+    var s = (w.state && w.state.settings && w.state.settings.loanerColors) || {};
+    var g = (s.greenMin != null) ? s.greenMin : 4;
+    var a = (s.amberMin != null) ? s.amberMin : 2;
+    if (rem < 0)  return 'dead';    /* 期限を過ぎている＝まだ戻っていない */
+    if (rem >= g) return 'green';
+    if (rem >= a) return 'amber';
+    return 'red';
+  }
+
+  /* 画面が使う唯一の物差し。
+     戻り値 { has, back, at, due, rem, level }
+       has   … その予約に代車が付いているか
+       back  … 返ってきたか
+       at    … 返した日（back の時）
+       due   … 返却予定日
+       rem   … あと何日（マイナス＝超過／null＝期限未設定）
+       level … 'back' | 'green' | 'amber' | 'red' | 'dead' | 'none' */
+  function remainOf(c) {
+    if (!c || !c.needLoaner) return { has: false, back: false, at: '', due: '', rem: null, level: 'none' };
+    var due = c.loanerTo || c.returnDateFinal || c.returnDate || '';
+    var bk = backOf(c);
+    if (bk.back) return { has: true, back: true, at: bk.at || due, due: bk.at || due, rem: null, level: 'back' };
+    var rem = due ? _diffDays(_today(), due) : null;
+    return { has: true, back: false, at: '', due: due, rem: rem, level: levelOf(rem) };
+  }
+
   /* ---- 公開（この名前で他のファイルから呼ぶ） ---- */
+  w.pitLoanerBackOf      = backOf;
+  w.pitLoanerRemainOf    = remainOf;
+  w.pitLoanerLevelOf     = levelOf;
   w.pitLoanerUsable      = usable;
   w.pitLoanerUsableList  = usableList;
   w.pitLoanerBusyOn      = busyOn;

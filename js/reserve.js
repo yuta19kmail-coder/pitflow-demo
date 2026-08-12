@@ -469,11 +469,16 @@ function cardHtml(c, opts){
     const at = (window.escAttr ? escAttr : function(s){ return String(s==null?'':s); });
     let top = '';
     if (c.needLoaner){
-      var _lrem = (window.loanerRem ? loanerRem(c) : null);
-      var _lk = (window.loanerLevel ? loanerLevel(_lrem) : {key:'amber'}).key;
-      var _LC = { green:'#1db97a', amber:'#f59e0b', red:'#ef4444', none:'#9fa8c7' };
+      /* 🔴 v1.82.0 返ってきたかは loaner-free.js に聞く（ここで日付を引き算しない）。
+         ⚠ 以前は日付だけで見ていたので、**返却済みでも黒（超過）の代車バッジ**が出ていた。 */
+      var _R = window.pitLoanerRemainOf ? pitLoanerRemainOf(c) : null;
+      var _lrem = _R ? _R.rem : (window.loanerRem ? loanerRem(c) : null);
+      var _lk = _R ? _R.level : ((window.loanerLevel ? loanerLevel(_lrem) : {key:'amber'}).key);
+      var _LC = { green:'#1db97a', amber:'#f59e0b', red:'#ef4444', none:'#9fa8c7', back:'#8390a6' };
       // ※古い title（代車期限・入庫区分・預かり日数）は撤去＝情報はホバー情報カード(card-hover.js)に集約
-      if (_lk==='dead'){
+      if (_lk==='back'){
+        top += '<span class="pcm-loaner" style="background:#8390a622;color:#8390a6;border-color:#8390a666;" title="代車は返却済み">代車</span>';
+      } else if (_lk==='dead'){
         top += '<span class="pcm-loaner pcm-dead">代車</span>';
       } else {
         var _lc = _LC[_lk] || '#f59e0b';

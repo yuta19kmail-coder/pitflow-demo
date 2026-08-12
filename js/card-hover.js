@@ -320,12 +320,18 @@
       h += '<div class="ph-stat s-loaner lv-none"><div class="ph-stat-lb">代車</div>'
          + '<div class="ph-stat-num">なし</div><div class="ph-stat-sub">&nbsp;</div></div>';
     } else {
-      var rem = window.loanerRem ? loanerRem(c) : null;
-      var lv  = window.loanerLevel ? loanerLevel(rem).key : 'amber';
-      var due = c.loanerTo || c.returnDateFinal || c.returnDate || '';
-      var dueTxt = due && window.fmtMD ? ('〜'+fmtMD(due)) : '期限未設定';
+      /* 🔴 v1.82.0 返ってきたかは loaner-free.js に聞く（ここで日付を引き算しない）。
+         ⚠ 以前は日付だけで見ていたので、**返却済みの代車が「◯日超過」と赤く**出ていた。 */
+      var R   = window.pitLoanerRemainOf ? pitLoanerRemainOf(c) : null;
+      var back= !!(R && R.back);
+      var rem = R ? R.rem : (window.loanerRem ? loanerRem(c) : null);
+      var lv  = R ? R.level : (window.loanerLevel ? loanerLevel(rem).key : 'amber');
+      var due = (R && R.due) || c.loanerTo || c.returnDateFinal || c.returnDate || '';
+      var dueTxt = back ? (due && window.fmtMD ? (fmtMD(due)+' に返却') : '返却済')
+                        : (due && window.fmtMD ? ('〜'+fmtMD(due)) : '期限未設定');
       var numHtml, pct;
-      if (rem==null){ numHtml='返却日<br>未定'; pct=0; }
+      if (back){ numHtml='返却済'; pct=100; }
+      else if (rem==null){ numHtml='返却日<br>未定'; pct=0; }
       else if (rem<0){ numHtml=Math.abs(rem)+'<span class="u">日超過</span>'; pct=100; }
       else { numHtml='あと'+rem+'<span class="u">日</span>'; pct=Math.max(6,Math.min(100,Math.round(rem/7*100))); }
       h += '<div class="ph-stat s-loaner lv-'+lv+'"><div class="ph-stat-lb">代車リミット</div>'

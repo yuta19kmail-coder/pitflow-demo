@@ -48,17 +48,17 @@
   function workType(c){ return (state.workTypes||[]).find(w=>w.id===c.workType) || null; }
   function dropType(c){ return (state.dropTypes||[]).find(d=>d.id===c.dropType) || null; }
   function teamColor(c){ return c.boardId==='import' ? '#ec4899' : '#1db97a'; }
-  // 代車リミットの色レベル（残り日数→緑/黄/赤/黒）。閾値は設定（loanerColors）で変更可
+  /* 代車リミット。
+     🔴 v1.82.0 中身は loaner-free.js（`pitLoanerRemainOf` / `pitLoanerLevelOf`）に移した。
+        ここは**昔の名前で呼んでいる所のための入口**。新しく書く所は pitLoanerRemainOf を直接使う。
+     ⚠ 以前はここが `loanerTo` を引き算するだけで、**代車が返ってきたかを見ていなかった**。
+        そのため実績（返車済み）のカードでも「超過◯日」と赤く出ていた。 */
   window.loanerLevel = function(rem){
-    if(rem==null) return {key:'none'};
-    var s=(state.settings&&state.settings.loanerColors)||{};
-    var g=(s.greenMin!=null)?s.greenMin:4, a=(s.amberMin!=null)?s.amberMin:2;
-    if(rem<0) return {key:'dead'};
-    if(rem>=g) return {key:'green'};
-    if(rem>=a) return {key:'amber'};
-    return {key:'red'};
+    return { key: (window.pitLoanerLevelOf ? pitLoanerLevelOf(rem) : (rem==null?'none':(rem<0?'dead':'green'))) };
   };
   window.loanerRem = function(c){
+    var r = window.pitLoanerRemainOf ? pitLoanerRemainOf(c) : null;
+    if (r) return r.rem;
     var due = c.loanerTo || c.returnDateFinal || c.returnDate || '';
     if(!due) return null;
     return daysBetween(isoToday(), due);
@@ -220,23 +220,33 @@
 
   function loanerHtml(c){
     const loaner = (state.loaners||[]).find(l=>l.id===c.loanerId);
+    /* 🔴 v1.82.0 返ってきたかは loaner-free.js に聞く（画面で日付を引き算しない） */
+    const R = window.pitLoanerRemainOf ? pitLoanerRemainOf(c) : null;
     /* 🚗 v1.56.0（ゆうた指定）ここは**車種名で出す**（「代車5」ではなく「タント」）。
        🔴 呼び名の作り方は loaner.js の `pitLoanerModel()` に一本化＝**ここで組み立てない**。
           （代車カレンダーの「タント（5）」も同じファイルの `_loName` が持っている） */
     const which = (window.pitLoanerModel ? pitLoanerModel(c.loanerId) : '')
                || (loaner ? (loaner.name||'代車') : (c.loanerId||'代車'));
-    const dueISO = c.loanerTo || c.returnDateFinal || c.returnDate || '';
-    const rem = dueISO ? daysBetween(isoToday(), dueISO) : null;
-    const remTxt = (rem==null) ? '—' : (rem<0 ? '超過'+(-rem)+'日' : 'あと'+rem+'日');
-    const lvKey = (window.loanerLevel ? loanerLevel(rem) : {key:'amber'}).key;
-    const pct = (rem==null) ? 50 : Math.max(8, Math.min(95, 100 - rem*8));
+    const back   = !!(R && R.back);
+    const dueISO = (R && R.due) || c.loanerTo || c.returnDateFinal || c.returnDate || '';
+    const rem    = R ? R.rem : (dueISO ? daysBetween(isoToday(), dueISO) : null);
+    const lvKey  = R ? R.level : (window.loanerLevel ? loanerLevel(rem).key : 'amber');
+    /* 返ってきていれば日数のカウントはやめて「返却済」と言い切る */
+    const remTxt = back ? '返却済'
+                 : (rem==null) ? '—'
+                 : (rem<0 ? '超過'+(-rem)+'日' : 'あと'+rem+'日');
+    const pct = back ? 100 : (rem==null) ? 50 : Math.max(8, Math.min(95, 100 - rem*8));
     let extras = '';
     if (c.loanerFixed) extras += '<span class="cv-loxchip cv-fix">車種固定</span>';
     const lmemo = (c.loanerMemo||'');
     if (lmemo) extras += '<span class="cv-loxmemo">'+esc(lmemo)+'</span>';
+    /* ⚠ **車は返したのに代車が戻っていない**時は、ちゃんと赤く「超過」と出す＝知らせるべき事故。 */
+    const lead = back ? '代車' : '代車 返却まで';
+    const dueTxt = back ? (dueISO ? (fmtMD(dueISO)+' に返却') : '返却済')
+                        : (dueISO ? ('〜 '+fmtMD(dueISO)) : '期限未設定');
     return '<div class="cv-lo cv-lev-'+lvKey+'">'
-      + '<div class="cv-lomain"><div class="cv-loleft"><div class="cv-lorem">代車 返却まで</div><div class="cv-lodays">'+remTxt+'</div></div>'
-      + '<div class="cv-loright"><div class="cv-lodue">'+(dueISO?('〜 '+fmtMD(dueISO)):'期限未設定')+'</div><div class="cv-lowhich">'+esc(which)+'</div>'
+      + '<div class="cv-lomain"><div class="cv-loleft"><div class="cv-lorem">'+lead+'</div><div class="cv-lodays">'+remTxt+'</div></div>'
+      + '<div class="cv-loright"><div class="cv-lodue">'+dueTxt+'</div><div class="cv-lowhich">'+esc(which)+'</div>'
       + '<div class="cv-lometer"><i style="width:'+pct+'%"></i></div></div></div>'
       + (extras ? '<div class="cv-loextras">'+extras+'</div>' : '')
       + '</div>';

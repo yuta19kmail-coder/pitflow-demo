@@ -446,3 +446,11 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-ebnote b{ color:var(--text2); }
 .cv-ebgrid{ display:flex; flex-wrap:wrap; gap:9px; }
 .cv-ebgrid > .cv-fixrow{ flex:1 1 210px; margin-bottom:0; }
+
+/* ===== 🔴 v1.82.0 代車が返ってきている時＝落ち着いた灰色 =====
+   ⚠ 返却済みなのに赤い「超過」が出ていた（画面が日付の引き算しかしていなかった）。
+   ⚠ 代車カレンダーの「返却済」の灰色と同じ色みでそろえる。 */
+.cv-lo.cv-lev-back{ background:rgba(131,144,166,.10); border-color:rgba(131,144,166,.42); }
+.cv-lo.cv-lev-back .cv-lorem{ color:var(--text3); }
+.cv-lo.cv-lev-back .cv-lodays{ color:#aab5c6; }
+.cv-lo.cv-lev-back .cv-lometer i{ background:#8390a6; }

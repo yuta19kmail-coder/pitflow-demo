@@ -248,5 +248,66 @@
     { id:'bn_s5', title:'代車置き場の清掃 完了', body:'', color:'yellow', noteType:'execute',
       deadline:null, memberUids:['hayashi'], doneByUids:[], authorUid:'onishi', status:'done', doneAt: Date.now()-3600000*20, doneByUid:'hayashi', order:4, imageURL:'', replies:[] },
   ];
+  /* ===================================================================
+     🟠 v1.79.0（ゆうた指定）**デモ版は「明らかに架空」の中身にする。**
+     -------------------------------------------------------------------
+     🗣「カード見て混同しないように 名前はデモ山とかデモ田とかにして
+        車もテストA とかテストBとか 実写名を使わないように」
+     🔴 上のカードは1枚ずつ手で書いてある（画面の見え方を作り込んだ見本）。
+        **書き直すのではなく、できあがったカードの「名前・車・番号・電話」だけを後から塗り替える。**
+        ＝見本の並び・工程・金額はそのまま＝デモでも画面がちゃんと埋まる。
+     ⚠ 判定は `pitIsDemo()`（demo-pit.js）1本。demo-pit.js は index.html でこのファイルより前に読む。
+     ⚠ 電話番号は 000-0000-XXXX ＝**練習中に本当にかけてしまう事故**を防ぐ。
+     🔴 塗り替えるのは**見た目の文字だけ**。id・日付・工程・金額には触らない。
+     =================================================================== */
+  if (window.pitIsDemo && window.pitIsDemo()) {
+    (function maskForDemo(){
+      const SEI = ['デモ山','デモ田','デモ川','デモ本','サンプル','テス川','テス田','レンシュウ'];
+      const MEI = [['一郎','イチロウ'],['二郎','ジロウ'],['三郎','サブロウ'],['四郎','シロウ'],
+                   ['五郎','ゴロウ'],['花子','ハナコ'],['桃子','モモコ'],['太郎','タロウ']];
+      const SEI_KANA = { 'デモ山':'デモヤマ','デモ田':'デモタ','デモ川':'デモカワ','デモ本':'デモモト',
+                         'サンプル':'サンプル','テス川':'テスカワ','テス田':'テスタ','レンシュウ':'レンシュウ' };
+      const KOKU_MK = ['デモ自動車','サンプル自動車','テスト自工'];
+      const KOKU    = ['テストA','テストB','テストC','テストD','テストE','テストF','テストG','テストH'];
+      const YUNYU   = [['デモ輸入','テストX'],['デモ輸入','テストY'],['サンプル輸入','テストZ']];
+      const PLACES  = ['デモ','サンプル','テスト','レンシュウ'];
+      const CLS = ['300','500','580','330'];
+      const KANA = ['あ','い','う','か','き','く','さ','す','せ','た'];
+      const pick = (a, i) => a[i % a.length];
+      const d4 = i => String((i * 1379 + 1023) % 10000).padStart(4, '0');
+
+      state.cards.forEach(function (c, i) {
+        /* 法人（office あり）は法人らしさを残す＝画面の作りが変わらないように */
+        if (c.office) {
+          c.office = 'デモ商事(株)'; c.customer = c.office; c.kana = 'デモショウジ';
+          c.sei = ''; c.mei = '';
+        } else if (c.customer) {
+          const sei = pick(SEI, i), mei = pick(MEI, i);
+          c.customer = sei + ' ' + mei[0];
+          c.kana = SEI_KANA[sei] + mei[1];
+          if (c.sei !== undefined) c.sei = sei;
+          if (c.mei !== undefined) c.mei = mei[0];
+        }
+        if (c.maker || c.car) {
+          if (c.boardId === 'import') { const y = pick(YUNYU, i); c.maker = y[0]; c.car = y[1]; }
+          else { c.maker = pick(KOKU_MK, i); c.car = pick(KOKU, i); }
+        }
+        if (c.plate) c.plate = pick(PLACES, i) + ' ' + pick(CLS, i) + ' ' + pick(KANA, i) + ' ' + d4(i);
+        if (c.tel) c.tel = '000-0000-' + d4(i);
+        if (Array.isArray(c.contacts)) c.contacts.forEach(function (t, k) { if (t && t.tel) t.tel = '000-0000-' + d4(i + k + 1); });
+      });
+
+      /* 付箋にも人の名前・車種が書いてある（本文は手書きの見本） */
+      const NOTE = {
+        '代車L7 返却後すぐ洗車'          : 'デモ山様 テストA 入庫前に間に合わせる',
+        '(株)亨子会 警告灯の件 折り返しTEL': '午前中に一報。担当：蓮沼'
+      };
+      (state.boardNotes || []).forEach(function (n) {
+        if (NOTE[n.title] !== undefined) n.body = NOTE[n.title];
+        n.title = n.title.replace('(株)亨子会', 'デモ商事(株)');
+      });
+    })();
+  }
+
   if (!state.boardLabels) state.boardLabels = { red:'緊急', orange:'今日中', yellow:'今週中', green:'連絡', blue:'余裕' };
 })();

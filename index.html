@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.78.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.79.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="css/help.css?v=1">
 <link rel="stylesheet" href="css/mech-summary.css?v=2">
 <link rel="stylesheet" href="css/members.css?v=7">
-<link rel="stylesheet" href="css/news-oplog.css?v=2">
+<link rel="stylesheet" href="css/news-oplog.css?v=3">
 <style id="pit-dev-style">
   /* 「開発中サンプル」バッジ（タイトル横） */
   .pit-dev-badge{
@@ -120,7 +120,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.78.0</div>
+    <div class="login-ver">v1.79.0</div>
   </div>
 </div>
 
@@ -134,7 +134,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.78.0</span>
+    <span class="ver">v1.79.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -830,9 +830,10 @@
    これが立つと js/demo-pit.js が動き、クラウドにはつながりません（firebase-init.js が見ています）。 */
 window.PIT_DEMO = true;</script>
 <script src="js/firebase-init.js?v=9"></script>
+<script src="js/demo-pit.js?v=3"></script><!-- 🟠 v1.77.0 デモ版だけの上乗せ（PIT_DEMO が無ければ何もしない）。🔴 v1.79.0 sample-*.js より前に読む＝サンプルの中身が pitIsDemo() を見て「明らかに架空」に切り替わるため -->
 <!-- ⚠ サンプルの読み込みより前に置くこと。ここで window.PIT_CLOUD が決まり、本番ではサンプルを入れない判断に使う -->
-<script src="js/sample-data.js?v=18"></script>
-<script src="js/sample-fleet.js?v=12"></script>
+<script src="js/sample-data.js?v=19"></script>
+<script src="js/sample-fleet.js?v=13"></script>
 <script src="https://coreflow.kobayashi-motors.com/usage-log.js"></script><!-- 利用状況の記録（CoreFlow集約・自己完結・マスターだけ閲覧） -->
 <script src="js/db-pit.js?v=45"></script>
 <script src="js/return-slot.js?v=4"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
@@ -848,7 +849,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/archive-pit.js?v=2"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
 <script src="js/customers.js?v=42"></script>
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
-<script src="js/sample-customers.js?v=9"></script>
+<script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=30"></script>
 <script src="js/dashboard.js?v=19"></script>
 <script src="js/parking.js?v=8"></script>
@@ -880,7 +881,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/auth-pit.js?v=16"></script>
 <script src="js/members-pit.js?v=14"></script>
 <script src="js/oplog-pit.js?v=1"></script>
-<script src="js/news-pit.js?v=13"></script>
+<script src="js/news-pit.js?v=14"></script>
 <script src="js/launcher.js?v=e62024b3"></script>
 <script src="js/holidays.js?v=1"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>
@@ -892,7 +893,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-hover.js?v=35"></script>
 <script src="js/phase-popup.js?v=14"></script>
 <script src="js/return-popup.js?v=7"></script>
-<script src="js/help-content.js?v=23"></script>
+<script src="js/help-content.js?v=24"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=12"></script>
 <script src="js/main.js?v=12"></script>
@@ -903,7 +904,6 @@ window.PIT_DEMO = true;</script>
 <script src="js/ask-pit.js?v=2"></script><!-- 🔵 v1.75.0 「聞く・知らせる」の入口1本（pitAlert / pitAsk / pitAskText）。ブラウザ純正の alert・confirm・prompt はここ以外で使わない -->
 <script src="js/blank-cards.js?v=5"></script><!-- 空の予約カードを残さない（settings.js / views.js / card-detail.js より後ろ） -->
 <script src="js/reset-pit.js?v=2"></script><!-- 本番データの初期化／デモ版の「まっさらにする」（settings.js より後ろ） -->
-<script src="js/demo-pit.js?v=1"></script><!-- 🟠 v1.77.0 デモ版だけの上乗せ（PIT_DEMO が無ければ何もしない）。ask-pit.js / reset-pit.js より後ろ -->
 <script src="js/import-cloud.js?v=3"></script><!-- 顧客データの取込（本番・分割送信／settings.js より後ろ） -->
 <script src="js/coreflow-sync.js?v=ca024d30"></script><!-- 同期ランプ共通部品（PitFlowではふきだしだけ借りる。sync-pit.js より後ろ） -->
 <script src="js/deeplink-pit.js?v=1"></script><!-- ?card= でカードを直接開く（MHS Todayボードの「詳細を見る」の受け口）。card-detail.js / views.js より後ろ -->

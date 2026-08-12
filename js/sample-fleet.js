@@ -30,28 +30,52 @@
   const DROP = ['drop','drop','drop','wait','sameDay'];  // 基本は預かり
   const ACTIVE = ['check','estim','contact','parts','work'];
 
+  /* ===================================================================
+     🟠 v1.79.0（ゆうた指定）**デモ版は「明らかに架空」の中身にする。**
+     🔴 表の中身を差し替えるだけ。作る手順（baseCard など）は本番と同じものを通す。
+     ⚠ 判定は `pitIsDemo()`（demo-pit.js）1本。demo-pit.js は index.html でこのファイルより前に読む。
+     ⚠ 電話番号は 000-0000-XXXX ＝**練習中に本当にかけてしまう事故**を防ぐ。
+     =================================================================== */
+  const DEMO = {
+    SEI    : ['デモ山','デモ田','デモ川','デモ本','サンプル','テス川','テス田','レンシュウ'],
+    KOKU_MK: ['デモ自動車','サンプル自動車','テスト自工'],
+    KOKU   : ['テストA','テストB','テストC','テストD','テストE','テストF','テストG','テストH'],
+    YUNYU  : [['デモ輸入','テストX'],['デモ輸入','テストY'],['サンプル輸入','テストZ']],
+    PLACES : ['デモ','サンプル','テスト','レンシュウ']
+  };
+  function isDemo() { return !!(window.pitIsDemo && window.pitIsDemo()); }
+  function T() {
+    return isDemo() ? DEMO
+                    : { SEI: SEI, KOKU_MK: KOKU_MK, KOKU: KOKU, YUNYU: YUNYU, PLACES: PLACES };
+  }
+  /* 🟠 デモ版は台数も控えめでよい（ゆうた指定「カード件数は多くなくていい」）。
+     ⚠ 0にはしない＝実績・売上・駐車場の画面が空っぽだと練習にならない。 */
+  const N_PAST   = () => isDemo() ?  30 : 150;   /* 過去実績 */
+  const N_ACTIVE = () => isDemo() ?   8 :  20;   /* いま預かり中 */
+
   const rnd = a => a[Math.floor(Math.random() * a.length)];
   const ri  = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const pad = n => String(n).padStart(2, '0');
   const ymdL = d => d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
   const add = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
   const d4 = () => String(ri(0,9999)).padStart(4,'0');
-  const plate = () => rnd(PLACES) + ' ' + rnd(CLS) + ' ' + rnd(KANA) + ' ' + d4();
+  const plate = () => rnd(T().PLACES) + ' ' + rnd(CLS) + ' ' + rnd(KANA) + ' ' + d4();
   const timeSlot = () => pad(ri(9,17)) + ':' + rnd(['00','30']);
 
   function baseCard(id, imp){
     const workType = rnd(WORK);
     const dropType = rnd(DROP);
-    const yn = imp ? rnd(YUNYU) : null;
+    const t = T();
+    const yn = imp ? rnd(t.YUNYU) : null;
     const MP = imp ? ['山根','蓮沼','箱崎','菅谷'] : ['山田','椎名','専務'];   // メカニックプール（課別）v0.129.0
     return {
       id: 'f' + id,
       boardId: imp ? 'import' : 'default',
       division: imp ? 'div2' : 'div1',   // 国→1課・輸→2課
-      customer: rnd(SEI),
-      tel: '0' + rnd(['90','80','70']) + '-' + d4() + '-' + d4(),
-      maker: imp ? yn[0] : rnd(KOKU_MK),
-      car:   imp ? yn[1] : rnd(KOKU),
+      customer: rnd(t.SEI),
+      tel: isDemo() ? '000-0000-' + d4() : '0' + rnd(['90','80','70']) + '-' + d4() + '-' + d4(),
+      maker: imp ? yn[0] : rnd(t.KOKU_MK),
+      car:   imp ? yn[1] : rnd(t.KOKU),
       plate: plate(),
       workType: workType,
       dropType: dropType,
@@ -77,7 +101,7 @@
     const isImp = () => { _ic++; return (_ic % 5) < 2; };   // 国産:輸入 = 3:2（確実に約6:4）
 
     // 1) 過去実績 約150台（返車完了）
-    for (let i = 0; i < 150; i++){
+    for (let i = 0; i < N_PAST(); i++){
       id++; const imp = isImp();
       const inD = add(today, -ri(2, 175));
       const out = add(inD, ri(0, 5));
@@ -91,7 +115,7 @@
     }
 
     // 2) 現在の預かり 約20台（作業中）
-    for (let i = 0; i < 20; i++){
+    for (let i = 0; i < N_ACTIVE(); i++){
       id++; const imp = isImp();
       const inD = add(today, -ri(0, 6));
       const out = add(today, ri(0, 9));
@@ -145,7 +169,7 @@
         const len = ri(3, 10);
         const to = add(cur, len - 1);
         aid++;
-        assigns.push({ id: 'a' + aid, loanerId: l.id, cardId: null, customer: rnd(SEI), car: rnd(KOKU), fromDate: ymdL(cur), toDate: ymdL(to) });
+        assigns.push({ id: 'a' + aid, loanerId: l.id, cardId: null, customer: rnd(T().SEI), car: rnd(T().KOKU), fromDate: ymdL(cur), toDate: ymdL(to) });
         cur = add(to, 1);
       }
     });

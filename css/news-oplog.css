@@ -150,3 +150,26 @@
   .op-row{ grid-template-columns:1fr; gap:2px; padding:11px 14px }
   .op-label{ white-space:normal }
 }
+
+/* ===== お知らせ・ヘルプの中のリンク（v1.79.0）=====
+   🔴 お知らせ本文もヘルプ本文も innerHTML で描いているので <a> がそのまま効く。
+      ただし何も当てないと**ただの文字に見えて誰も押さない**ので、必ずこの2つを使う。
+   ・ふつうのリンク … .nw-body / .nw-pop-ib / .help-sec の中の <a> に自動で色が付く
+   ・a.nw-btn       … 「ここを押して開く」＝押させたい時。指で押せる大きさ。
+   🔴 .nw-btn は**どこでも使える**ように、入れ物で縛っていない（ヘルプでも同じ見た目にするため）。
+   ⚠ 外に開くリンクは target="_blank" rel="noopener" を付けること
+      （アプリを閉じてしまうと、書きかけの予約が飛ぶ）。 */
+.nw-body a, .nw-pop-ib a, .help-sec a{ color:#38bdf8; text-decoration:underline; text-underline-offset:2px; word-break:break-all }
+.nw-body a:hover, .nw-pop-ib a:hover, .help-sec a:hover{ color:#7dd3fc }
+a.nw-btn{
+  display:inline-flex; align-items:center; gap:7px; margin:4px 0 2px;
+  padding:11px 16px; border-radius:10px; text-decoration:none; word-break:normal;
+  background:#2ea567; color:#fff; font-size:13.5px; font-weight:700;
+  border:1px solid #2ea567; transition:background .15s, transform .1s;
+}
+a.nw-btn:hover{ background:#26935c; color:#fff; text-decoration:none }
+a.nw-btn:active{ transform:scale(.98) }
+/* 🟠 デモ版へのリンクだけオレンジ＝「デモ版」の印と同じ色でそろえる */
+a.nw-btn.is-demo{ background:#f59e0b; border-color:#f59e0b }
+a.nw-btn.is-demo:hover{ background:#d98806 }
+.nw-url{ font-size:11.5px; color:var(--text3); word-break:break-all }

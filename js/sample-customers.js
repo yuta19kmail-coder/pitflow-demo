@@ -27,18 +27,58 @@
   const KANA = ['あ','い','う','え','か','き','く','け','こ','さ','す','せ','そ','た','つ','て','と','な','に','ぬ','の','は','ひ','ふ','ほ','ま','み','む','め','も','や','ゆ','よ','ら','り','る','れ','わ'];
   const FRONT = { div1: ['社長','専務','椎名'], div2: ['チーフ','蓮沼','箱崎','菅谷'] };
 
+  /* ===================================================================
+     🟠 v1.79.0（ゆうた指定）**デモ版（練習用サイト）は「明らかに架空」の中身にする。**
+     -------------------------------------------------------------------
+     🗣「カード見て混同しないように 名前はデモ山とかデモ田とかにして
+        車もテストA とかテストBとか 実写名を使わないように」
+     ◎なぜ
+       本物っぽい名前・車種だと、**練習用のカードを本番のものと見間違える**。
+       「デモ山 一郎／テストA」なら、ひと目で練習用と分かる。
+     🔴 切り替えるのは **この表だけ**。作る手順（genVehicle / genPerson）は本番と同じものを通す。
+        ＝サンプルの作り方を2本に分けない。
+     ⚠ 判定は `pitIsDemo()`（demo-pit.js）1本。だから index.html で
+        **demo-pit.js は sample-*.js より前**に読んでいる。
+     =================================================================== */
+  const DEMO = {
+    SEI: [['デモ山','デモヤマ'],['デモ田','デモタ'],['デモ川','デモカワ'],['デモ本','デモモト'],
+          ['サンプル','サンプル'],['テス川','テスカワ'],['テス田','テスタ'],['レンシュウ','レンシュウ']],
+    MEI: [['一郎','イチロウ'],['二郎','ジロウ'],['三郎','サブロウ'],['四郎','シロウ'],
+          ['五郎','ゴロウ'],['花子','ハナコ'],['桃子','モモコ'],['太郎','タロウ']],
+    MAKERS: {
+      'デモ自動車'   : ['テストA','テストB','テストC','テストD'],
+      'サンプル自動車': ['テストE','テストF','テストG'],
+      'テスト自工'   : ['テストH','テストI','テストJ'],
+      'デモ輸入'     : ['テストX','テストY'],
+      'サンプル輸入' : ['テストZ']
+    },
+    KOKUSAN: ['デモ自動車','サンプル自動車','テスト自工'],   /* これ以外＝輸入（2課）へ */
+    PLACES : ['デモ','サンプル','テスト','レンシュウ']
+  };
+  function isDemo() { return !!(window.pitIsDemo && window.pitIsDemo()); }
+  /* いま使う表（本番のサンプル＝今までどおり／デモ版＝架空） */
+  function T() {
+    return isDemo()
+      ? DEMO
+      : { SEI: SEI, MEI: MEI, MAKERS: MAKERS, KOKUSAN: KOKUSAN, PLACES: PLACES };
+  }
+  /* 🟠 デモ版は件数も少なくてよい（ゆうた指定「カード件数は多くなくていい」）。
+     ⚠ 少なすぎると駐車場・代車・車検予定がスカスカで練習にならないので、この辺り。 */
+  function custCount() { return isDemo() ? 60 : 400; }
+
   const rnd = a => a[Math.floor(Math.random() * a.length)];
   const d = n => String(Math.floor(Math.random() * Math.pow(10, n))).padStart(n, '0');
   let _seq = 0;
   const uid = pre => pre + Date.now().toString(36) + (_seq++).toString(36);
 
   function genVehicle(usedPlate, inherit) {
+    const t = T();
     let plate;
-    do { plate = rnd(PLACES) + ' ' + rnd(CLS) + ' ' + rnd(KANA) + ' ' + d(4); } while (usedPlate[plate]);
+    do { plate = rnd(t.PLACES) + ' ' + rnd(CLS) + ' ' + rnd(KANA) + ' ' + d(4); } while (usedPlate[plate]);
     usedPlate[plate] = 1;
-    const mk = rnd(Object.keys(MAKERS));
-    const car = rnd(MAKERS[mk]);
-    const kokusan = KOKUSAN.indexOf(mk) >= 0;
+    const mk = rnd(Object.keys(t.MAKERS));
+    const car = rnd(t.MAKERS[mk]);
+    const kokusan = t.KOKUSAN.indexOf(mk) >= 0;
     // 既存(inherit)があり、8割は同じ担当/課/区分を継承。輸入/国産はメーカーで決まる
     let boardId, division, frontStaff;
     if (inherit && Math.random() < 0.8) {
@@ -55,12 +95,19 @@
   }
 
   function genPerson(i, usedPlate) {
-    const sei = rnd(SEI), mei = rnd(MEI);
-    const tel1 = (Math.random() < 0.6)
-      ? '0' + rnd(['90','80','70']) + '-' + d(4) + '-' + d(4)
-      : '04' + rnd(['7','3','2']) + '-' + d(3) + '-' + d(4);
+    const t = T();
+    const sei = rnd(t.SEI), mei = rnd(t.MEI);
+    /* 🟠 デモ版は電話番号も「かけられない・実在しない」形にする（000-0000-XXXX）。
+       ⚠ 練習中に本当に発信してしまう事故を防ぐため。桁数は本物と同じにして、見た目の練習にはなるようにする。 */
+    const tel1 = isDemo()
+      ? '000-0000-' + d(4)
+      : (Math.random() < 0.6)
+        ? '0' + rnd(['90','80','70']) + '-' + d(4) + '-' + d(4)
+        : '04' + rnd(['7','3','2']) + '-' + d(3) + '-' + d(4);
     const contacts = [{ tel: tel1, label: '個人携帯', primary: true }];
-    if (Math.random() < 0.3) contacts.push({ tel: '0' + rnd(['90','80']) + '-' + d(4) + '-' + d(4), label: '会社携帯', primary: false });
+    if (Math.random() < 0.3) contacts.push({
+      tel: isDemo() ? '000-0000-' + d(4) : '0' + rnd(['90','80']) + '-' + d(4) + '-' + d(4),
+      label: '会社携帯', primary: false });
     // 台数：1台(70%)/2台(22%)/3台(8%)
     const r = Math.random();
     const n = r < 0.70 ? 1 : (r < 0.92 ? 2 : 3);
@@ -83,10 +130,10 @@
   window.seedSampleCustomers = function (n, replace) {
     if (!Array.isArray(state.customers)) state.customers = [];
     if (replace) state.customers = [];
-    state.customers = state.customers.concat(gen(n || 400));
+    state.customers = state.customers.concat(gen(n || custCount()));
     if (window.PitDB) PitDB.save();
     if (window.renderCustomers) renderCustomers();
-    console.log('[sample-customers] 投入 ' + (n || 400) + ' 人 → 計 ' + state.customers.length);
+    console.log('[sample-customers] 投入 ' + (n || custCount()) + ' 人 → 計 ' + state.customers.length);
   };
   window.clearCustomers = function () {
     pitAsk('顧客の控えを全部削除しますか？', { danger:true, ok:'削除する', detail:'整備ソフトの台帳には影響しません。' }).then(function (yes) {
@@ -103,13 +150,13 @@
        ボタンからの seedSampleCustomers() は残す（練習用サイト・デモ版で使う）。 */
     if (window.PIT_CLOUD) return;
     const cs = Array.isArray(state.customers) ? state.customers : [];
-    if (cs.length === 0) { window.seedSampleCustomers(400, false); return; }
+    if (cs.length === 0) { window.seedSampleCustomers(custCount(), false); return; }
     // ★実データ保護：取り込み(cu_bl_)など「サンプル(cu_s)以外」の顧客が1件でもあれば、絶対に自動入替しない。
     //   （これまでは allSample 判定だけだったが、保険として明示ガードを追加＝予約生成後のリロード等で実顧客が消えるのを防ぐ）
     const hasNonSample = cs.some(r => !(typeof r.id === 'string' && r.id.indexOf('cu_s') === 0));
     if (hasNonSample) return;
     const noVehicles = !cs.some(r => Array.isArray(r.vehicles));                          // 旧型（1台1レコード）
     const noVehDate  = !cs.some(r => (r.vehicles || []).some(v => v.updatedAt));          // 車両に入庫日が無い
-    if (noVehicles || noVehDate) { window.seedSampleCustomers(400, true); }
+    if (noVehicles || noVehDate) { window.seedSampleCustomers(custCount(), true); }
   })();
 })();

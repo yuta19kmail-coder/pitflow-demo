@@ -242,7 +242,10 @@
     if (lmemo) extras += '<span class="cv-loxmemo">'+esc(lmemo)+'</span>';
     /* ⚠ **車は返したのに代車が戻っていない**時は、ちゃんと赤く「超過」と出す＝知らせるべき事故。 */
     const lead = back ? '代車' : '代車 返却まで';
-    const dueTxt = back ? (dueISO ? (fmtMD(dueISO)+' に返却') : '返却済')
+    /* 🔴 v1.83.0（ゆうた指定）**終わった貸出は「〇/〇〜〇/〇」で出す。**
+       ＝「あと何日」ではなく「いつからいつまで借りていたか」が知りたい情報になる。 */
+    const per = window.pitLoanerPeriodOf ? pitLoanerPeriodOf(c) : null;
+    const dueTxt = back ? ((per && per.text) ? per.text : (dueISO ? (fmtMD(dueISO)+' に返却') : '返却済'))
                         : (dueISO ? ('〜 '+fmtMD(dueISO)) : '期限未設定');
     return '<div class="cv-lo cv-lev-'+lvKey+'">'
       + '<div class="cv-lomain"><div class="cv-loleft"><div class="cv-lorem">'+lead+'</div><div class="cv-lodays">'+remTxt+'</div></div>'

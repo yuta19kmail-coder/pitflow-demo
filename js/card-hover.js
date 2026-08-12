@@ -327,7 +327,9 @@
       var rem = R ? R.rem : (window.loanerRem ? loanerRem(c) : null);
       var lv  = R ? R.level : (window.loanerLevel ? loanerLevel(rem).key : 'amber');
       var due = (R && R.due) || c.loanerTo || c.returnDateFinal || c.returnDate || '';
-      var dueTxt = back ? (due && window.fmtMD ? (fmtMD(due)+' に返却') : '返却済')
+      /* 🔴 v1.83.0 終わった貸出は「〇/〇〜〇/〇」（借りていた期間）で出す */
+      var _per = window.pitLoanerPeriodOf ? pitLoanerPeriodOf(c) : null;
+      var dueTxt = back ? ((_per && _per.text) ? _per.text : '返却済')
                         : (due && window.fmtMD ? ('〜'+fmtMD(due)) : '期限未設定');
       var numHtml, pct;
       if (back){ numHtml='返却済'; pct=100; }

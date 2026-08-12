@@ -1035,9 +1035,17 @@ window.loInfoHover = function(el, aid){
   p.className = 'lo-info lo-badge full' + (isKari ? ' lo-kari' : '');   // フルサイズ札と同じ見た目
   p.style.setProperty('--lo-team', teamColor);
   p.style.background = teamColor;
+  /* 🔴 v1.83.0（ゆうた指定）**終わった貸出は「〇/〇〜〇/〇」も出す。**
+     ⚠ 札は狭くて読み取りづらいので、ホバーで期間をはっきり見せる。
+     ⚠ 期間の書き方は loaner-free.js の物差しを借りる（ここで組み立てない）。 */
+  const perTxt = (a.fromDate && a.toDate)
+    ? (window.pitLoanerMD ? (a.toDate !== a.fromDate ? (pitLoanerMD(a.fromDate) + '〜' + pitLoanerMD(a.toDate)) : pitLoanerMD(a.fromDate)) : '')
+    : '';
+  const retTxt = a.returned ? ('返却済' + (perTxt ? '　' + perTxt : '')) : perTxt;
   p.innerHTML = (isKari ? '<span class="kari-lo" title="仮予約">仮</span>' : _apr)
     + '<span class="lo-lbl full"><span class="lo-nm">' + _loEsc(nm) + ' 様</span>'
     + '<span class="lo-car2"><span class="lo-cartxt">' + _loEsc(car) + '</span>' + (fixed ? '<span class="lo-fix">固定</span>' : '') + '</span>'
+    + (retTxt ? '<span class="lo-memo">' + _loEsc(retTxt) + '</span>' : '')
     + (memo ? '<span class="lo-memo">' + _loEsc(memo) + '</span>' : '') + '</span>';
   // ミニ札のあるセルにぴったり重ねる（フルサイズ札の位置＝left/right 4px）
   const cell = el.closest('.lo-cell') || el;

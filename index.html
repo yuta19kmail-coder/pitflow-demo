@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.82.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.83.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -120,7 +120,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.82.0</div>
+    <div class="login-ver">v1.83.0</div>
   </div>
 </div>
 
@@ -134,7 +134,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.82.0</span>
+    <span class="ver">v1.83.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -823,7 +823,7 @@
 <script src="js/coreflow-icons.js?v=4ad44b4e"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
 <script src="js/state.js?v=65"></script>
-<script src="js/loaner-free.js?v=2"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
+<script src="js/loaner-free.js?v=3"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
 <script src="js/theme.js?v=4"></script>
 <script src="js/sync-pit.js?v=3"></script>
 <meta name="app-key" content="pitflow">
@@ -843,12 +843,12 @@ window.PIT_DEMO = true;</script>
 <script src="js/work-content.js?v=13"></script>
 <script src="js/card-detail.js?v=130"></script>
 <script src="js/flow-pit.js?v=4"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
-<script src="js/card-view.js?v=56"></script>
+<script src="js/card-view.js?v=57"></script>
 <script src="js/cover-print.js?v=13"></script>
 <script src="js/avail.js?v=7"></script>
 <script src="js/card-tabs.js?v=13"></script>
 <script src="js/archive-pit.js?v=2"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
-<script src="js/customers.js?v=42"></script>
+<script src="js/customers.js?v=43"></script>
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=30"></script>
@@ -877,12 +877,12 @@ window.PIT_DEMO = true;</script>
 <script src="js/shaken.js?v=18"></script>
 <script src="js/shaken-log.js?v=6"></script>
 <script src="js/outsource.js?v=5"></script>
-<script src="js/loaner.js?v=66"></script>
+<script src="js/loaner.js?v=67"></script>
 <script src="js/fleet.js?v=27"></script>
 <script src="js/auth-pit.js?v=16"></script>
 <script src="js/members-pit.js?v=14"></script>
 <script src="js/oplog-pit.js?v=1"></script>
-<script src="js/news-pit.js?v=17"></script>
+<script src="js/news-pit.js?v=18"></script>
 <script src="js/launcher.js?v=e62024b3"></script>
 <script src="js/holidays.js?v=1"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>
@@ -891,7 +891,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/board-line.js?v=5"></script><!-- タスクボードの区切りライン（task.js / ctxmenu-pit.js から呼ばれる） -->
 <script src="js/myonly-pit.js?v=5"></script><!-- タスクボードの「担当車両」スイッチ（task.js から呼ばれる・views.js より後ろ） -->
 <script src="js/pit-pip.js?v=9"></script>
-<script src="js/card-hover.js?v=36"></script>
+<script src="js/card-hover.js?v=37"></script>
 <script src="js/phase-popup.js?v=14"></script>
 <script src="js/return-popup.js?v=7"></script>
 <script src="js/help-content.js?v=24"></script>

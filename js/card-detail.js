@@ -144,7 +144,11 @@ function _pitCardIsBlankNow(){
   const c = state.cards.find(x => x.id === _editingCardId);
   return !!(c && window.pitIsBlankCard && pitIsBlankCard(c));
 }
-/* 空だったら「作りますか？」と1回だけ聞く。作ってよければ then(true)。 */
+/* 空だったら「作りますか？」と1回だけ聞く。作ってよければ then(true)。
+   ⚠ v1.76.0 以降、**ここまで来ることは実際には無い**。
+      保存はすべて `_pitCardGuard` を通り、空のカードは赤（カナ・TEL・入庫日…）が全部空なので
+      手前で止まる。＝これは**念のための受け皿**。
+   🔴 新しく保存の道を足す時、この受け皿を頼りにしないこと。**関門（_pitCardGuard）で包む。** */
 function _pitAskBlankSave(title){
   if (!_pitCardIsBlankNow()) return Promise.resolve(true);
   const msg = 'まだ何も入力されていません。このまま空の予約を作りますか？';
@@ -272,24 +276,20 @@ function pitSaveAndPrint(){
   if (!_pitSaveOnce()) return;                        /* 🔴 v1.56.1 二度押しを飲み込む */
   const c = state.cards.find(x => x.id === _editingCardId);
   const id = c ? c.id : _editingCardId;
-  /* 🔴 v1.56.1 **中身が空なら、表紙だけ刷って予約は作らない。**
-     ⚠ v1.76.0 の関門より**前**に置く＝「空の表紙を刷りたい」使い方は今までどおり通す。 */
-  if (_pitCardIsBlankNow()){
-    if (id && window.pitPrintCover) pitPrintCover(id);
-    if (window.pitToast) pitToast('まだ何も入っていないので、表紙だけ刷りました（予約は作っていません）');
-    return;
-  }
-  /* 🚦 v1.76.0 赤が空なら止める／黄だけなら1回聞く */
+  /* 🚦 v1.78.0（ゆうた指定）**足りなければ、印刷にも行かせない。**
+     ⚠ v1.76.0 では「まっさらなカードなら表紙だけ刷る」道を関門の**手前**に残していたが、
+        現場で試して**やめた**＝「印刷して保存」を押したのに**紙だけ出る**のが分かりにくい。
+     🔴 これで「印刷して保存」は **関門を通った時だけ刷る**。
+        ＝**刷った＝保存された**が必ず成り立つ（紙が出たのに予約が無い、が起きない）。
+     ⚠ **空の表紙を刷りたい時は「その他保存 ▸ 表紙印刷のみ」。** そちらは今までどおり刷れる。 */
   _pitCardGuard('印刷して保存', function(){ _pitSaveAndPrintGo(c, id); });
 }
 function _pitSaveAndPrintGo(c, id){
   /* 🔴 v1.56.1 押した瞬間に手応えを返す＝本番は描き直しに時間がかかり「効いていない」と見える */
   if (window.pitToast) pitToast('表紙を印刷しています…');
-  /* 🔴 v1.56.1 **中身が空なら、表紙だけ刷って予約は作らない。**
+  /* 🔴 ここへ来られるのは**関門を通った時だけ**（v1.78.0）。
      2026-08-06 の本番で、この道から空の予約が6枚できた（フローが「予約作成→表紙を印刷して保存」だけ）。
-     ⚠ 空の表紙を刷りたい、という使い方はそのまま通す＝余計な確認は出さない。
-     ⚠ 下書きは下書きのまま残す（「表紙印刷のみ」と同じ扱い）＝続きから入力できる。
-     ⚠ v1.76.0 でこの判定は関門の**手前**へ移した（上を参照）。 */
+     いまは v1.76.0 の赤（必須）が空だと手前で止まるので、**空の予約はここまで来ない**。 */
   if (c && c._draft) delete c._draft;   /* v1.17.0：ここで初めて確定＝保存される */
   if (window.pitClearDraftKeep) pitClearDraftKeep();
   if (c && window.logFlow) logFlow(c, '表紙を印刷して保存');

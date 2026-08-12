@@ -20,9 +20,15 @@
          見た目まで変えると 55本の試験が巻き込まれるので**別のスイッチにした**）
 
    ◎ デモ版で足すもの（これだけ）
-     ① 版の横に **「デモ版」** の印（ログイン画面・トップバー）
+     ① 版の横に **「デモ版」** の印＋**トップバーに大きな札**（ログイン画面・全画面）
      ② 開いた最初の1回だけ「これは練習用です」と伝える（この端末に覚える）
      ③ 設定の「まっさらにする」を使えるようにする（→ reset-pit.js 側で見ている）
+     ④ サンプルの中身を**明らかに架空**にする（→ sample-customers.js 側で見ている）
+
+   🔴 読み込む場所（index.html）＝**firebase-init.js の直後**。
+      理由：`sample-*.js` が読み込みのその場で `pitIsDemo()` を見て中身を切り替えるので、
+      **サンプルより前に居ないと間に合わない**。
+      ⚠ `pitAlert`（ask-pit.js）はもっと後ろで読まれるが、案内を出すのは**ログイン後**なので問題ない。
    ======================================== */
 (function () {
   var w = window, d = document;
@@ -42,17 +48,48 @@
   var SEEN_KEY = 'pitflow_demo_welcomed';
 
   /* ---------- ① 「デモ版」の印 ---------- */
+  /* 🔴 v1.79.0（ゆうた指定）「ヘッダーに**大きく**デモ版と分かるように」
+     ＝版の横の小さいバッジだけでは弱い。**トップバーに大きな札**を出す。
+     ⚠ 見間違い（本番のつもりで練習用を触る／その逆）は現場の実害に直結する。
+        ここは**うるさいくらいでちょうどいい**。控えめにしないこと。 */
   function injectCSS() {
     if (d.getElementById('pit-demo-css')) return;
     var st = d.createElement('style');
     st.id = 'pit-demo-css';
     st.textContent =
+      /* 版の横の小さい印（ログイン画面用・トップバーにも残す） */
       '.pit-demo-tag{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:1px 7px;' +
         'border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.04em;line-height:1.7;' +
         'background:rgba(245,158,11,.16);color:#f59e0b;border:1px solid rgba(245,158,11,.45);' +
         'white-space:nowrap;vertical-align:middle}' +
-      '.login-ver .pit-demo-tag{font-size:10px}';
+      '.login-ver .pit-demo-tag{font-size:10px}' +
+      /* 🟠 トップバーの大きな札 */
+      '.pit-demo-flag{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;' +
+        'margin:0 4px 0 10px;padding:6px 14px;border-radius:9px;' +
+        'background:linear-gradient(180deg,#f9b23c,#f59e0b);color:#3a2600;' +
+        'font-size:14px;font-weight:900;letter-spacing:.08em;line-height:1.2;white-space:nowrap;' +
+        'border:1px solid #d98806;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 2px 8px rgba(245,158,11,.35)}' +
+      '.pit-demo-flag .pdf-sub{font-size:10px;font-weight:700;letter-spacing:0;opacity:.75}' +
+      /* 画面が狭い時は「デモ版」の3文字だけ残す＝ボタンを押し出さない */
+      '@media (max-width:900px){.pit-demo-flag{margin-left:6px;padding:5px 9px;font-size:12.5px}' +
+        '.pit-demo-flag .pdf-sub{display:none}}' +
+      /* 🟠 画面のいちばん上に細い帯＝どの画面にいても視界の端に入る */
+      'body.pit-demo-mode{border-top:4px solid #f59e0b}' +
+      'body.pit-demo-mode #topbar{box-shadow:inset 0 2px 0 rgba(245,158,11,.25)}';
     d.head.appendChild(st);
+  }
+
+  /* トップバーの大きな札（版の表示のすぐ後ろに差す） */
+  function bigFlag() {
+    if (d.querySelector('.pit-demo-flag')) return;
+    var ver = d.querySelector('#topbar .ver');
+    if (!ver || !ver.parentNode) return;              /* まだトップバーが無い＝次の見回りで */
+    var f = d.createElement('span');
+    f.className = 'pit-demo-flag';
+    f.innerHTML = 'デモ版 <span class="pdf-sub">練習用・本番ではありません</span>';
+    f.title = 'ここは練習用のデモ版です。本番のデータには一切つながっていません。';
+    ver.parentNode.insertBefore(f, ver.nextSibling);
+    d.body.classList.add('pit-demo-mode');
   }
 
   function tag() {
@@ -72,6 +109,7 @@
       if (el.querySelector('.pit-demo-tag')) return;   /* 二重に付けない */
       el.appendChild(tag());
     });
+    bigFlag();                                          /* 🟠 トップバーの大きな札 */
     /* タイトルにも出す＝タブがいくつも開いている時に取り違えない */
     if (d.title.indexOf('デモ版') < 0) d.title = 'デモ版 ' + d.title;
   }

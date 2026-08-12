@@ -105,6 +105,8 @@
       <h3>🟠 練習用サイト（デモ版）</h3>
       <p>本番とは別に、<strong>いくら触っても大丈夫な練習用のサイト</strong>があります（v1.77.0）。
       新しく入った人の練習、操作の説明、新しい機能を試す時に使ってください。</p>
+      <p><a class="nw-btn is-demo" href="https://yuta19kmail-coder.github.io/pitflow-demo/" target="_blank" rel="noopener">🟠 練習用サイト（デモ版）を開く</a><br>
+      <span class="nw-url">https://yuta19kmail-coder.github.io/pitflow-demo/</span></p>
       <ul>
         <li><strong>本番のデータには一切つながっていません。</strong>何をしても実際の予約やお客様の情報は変わりません。</li>
         <li>お客様・車・電話番号は<strong>すべて架空</strong>のものです。</li>
@@ -113,7 +115,7 @@
           0件から始めたければ 設定 ▸ <strong>ぜんぶ消して、まっさらにする</strong>。</li>
       </ul>
       <div class="help-warn">🔴 <strong>見分け方＝版の横のオレンジの「デモ版」の印。</strong>
-      左上のロゴの右にある版（v1.78.0 など）の横に印が付いていれば練習用、
+      左上のロゴの右にある版（v1.79.0 など）の横に印が付いていれば練習用、
       <strong>付いていなければ本番</strong>です。タブのタイトルにも「デモ版」と出ます。</div>
     `,
 

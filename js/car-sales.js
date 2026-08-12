@@ -1,0 +1,208 @@
+/* ========================================
+   car-sales.js
+   車販作業ビュー（v0.99.42）
+   1Y/3Mのコーティング作業・完TEL時のサービス洗車・ヘッドライト磨き等＝車販部門の仕事を別枠でまとめる。
+   セクション：
+     ① 洗車            ＝洗車対象(needWash)。枠内を「今日（返車日=今日）」「明日（返車日=翌営業日）」の2グループに分割 v0.123.4
+     ② 今週の洗車予定  ＝翌営業日より後〜今週末(日曜)の洗車（日付決定）／別グループ：洗車で返車日未定
+     ③ 車検ヘッドライト磨き ＝headlight フラグ（受注時に車検車へ設定）
+     ④ コーティング依頼 ＝1Y/3Mバッジ＋coatingOK（受注OK）＝返車予定日も表示
+     ⑤ 直近1か月のコーティング予定 ＝1Y/3Mバッジで 予約 or 入庫中（直近1か月）
+     ⑥ その他依頼事項  ＝salesReq フラグ（車販依頼）＝1行メモ表示
+   完了＝各カードの項目別「✓完了」で done フラグ→セクション下部にグレーで残し「↩戻す」可。本体フローは継続。
+   カードは予約/タスクと同じコンパクトカード（クリックで予約詳細）。＝同じ客のカードが二重に存在する設計。
+   ======================================== */
+
+const CS_INTASK = ['check','estim','contact','parts','work','workDone','outsource'];
+
+function _csEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m];}); }
+
+/* 翌営業日（定休・祝日をスキップ） */
+function _csNextBizDay(){
+  let d = new Date(); d.setHours(0,0,0,0);
+  for (let i=0;i<14;i++){
+    d.setDate(d.getDate()+1);
+    const ds = ymd(d);
+    const isClosed = (window.PitCal ? PitCal.isClosed(ds) : false);   /* 🚫 MHSの定休日カレンダー */
+    const isHol = !!(window.Holidays && Holidays.name && Holidays.name(ds));
+    if (!isClosed && !isHol) return d;
+  }
+  return d;
+}
+/* 今週末＝今週の日曜（今日が日曜なら今日）の日付文字列 */
+function _csThisSunday(){
+  let d = new Date(); d.setHours(0,0,0,0);
+  d.setDate(d.getDate() + ((7 - d.getDay()) % 7));   // 次の日曜（今日が日曜なら今日）
+  return ymd(d);
+}
+
+/* 1Y/3M（コーティング）が付いているか */
+function _csHasCoat(c){
+  const ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes
+            : (Array.isArray(c.workAddons) ? c.workAddons.concat(c.workType?[c.workType]:[]) : (c.workType?[c.workType]:[]));
+  return ids.indexOf('coat1y') >= 0 || ids.indexOf('coat3m') >= 0;
+}
+function _csIsShaken(c){
+  const ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType?[c.workType]:[]);
+  return c.workType === 'shaken' || ids.indexOf('shaken') >= 0;
+}
+function _csActive(c){ return c.status !== 'returned' && c.status !== 'scrap'; }
+
+/* カード1枚＋完了ボタン（task=wash/headlight/coating/salesReq・doneは戻すボタン） */
+const CS_DONEFLAG = { wash:'washSalesDone', headlight:'headlightDone', coating:'coatingDone', salesReq:'salesReqDone' };
+function _csCard(c, task, extra){
+  const inner = (typeof cardHtml === 'function') ? cardHtml(c, { compact:true }) : '';
+  const ex = extra ? ('<div class="cs-extra">' + extra + '</div>') : '';
+  if (task){
+    return '<div class="cs-item"><div class="cs-cardwrap">' + inner + ex + '</div>'
+      + '<button class="cs-done" onclick="event.stopPropagation();csDone(\'' + c.id + '\',\'' + task + '\')">✓ 完了</button></div>';
+  }
+  return '<div class="cs-item"><div class="cs-cardwrap">' + inner + ex + '</div></div>';
+}
+function _csDoneCard(c, task){
+  const inner = (typeof cardHtml === 'function') ? cardHtml(c, { compact:true }) : '';
+  return '<div class="cs-item cs-doneitem"><div class="cs-cardwrap">' + inner + '</div>'
+    + '<button class="cs-undo" onclick="event.stopPropagation();csUndo(\'' + c.id + '\',\'' + task + '\')">↩ 戻す</button></div>';
+}
+
+/* セクション枠 */
+function _csSec(title, sub, bodyHtml, doneHtml){
+  let h = '<div class="cs-sec">';
+  h += '<div class="cs-sec-h">' + title + (sub ? ' <small>' + sub + '</small>' : '') + '</div>';
+  h += '<div class="cs-sec-body">' + (bodyHtml || '<div class="cs-empty">なし</div>') + '</div>';
+  if (doneHtml) h += '<div class="cs-done-strip"><div class="cs-done-lb">完了済み</div><div class="cs-done-row">' + doneHtml + '</div></div>';
+  h += '</div>';
+  return h;
+}
+
+function renderCarSales(){
+  const body = document.getElementById('carsales-body');
+  if (!body) return;
+  const cards = state.cards || [];
+  const nextBiz = ymd(_csNextBizDay());
+  const sun = _csThisSunday();
+
+  // 洗車対象＝returnStage（完TEL以降）かつ needWash
+  const washAll = cards.filter(c => c.needWash && c.returnStage && _csActive(c));
+
+  // ① 明日の洗車
+  const washTomorrow = washAll.filter(c => c.returnStage==='returnWait' && c.returnDate === nextBiz);
+  // ② 今週の洗車予定（翌営業日より後〜今週日曜）＋ 返車日未定（区別）
+  const washWeek = washAll.filter(c => c.returnStage==='returnWait' && c.returnDate && c.returnDate > nextBiz && c.returnDate <= sun);
+  const washNoDate = washAll.filter(c => !c.returnDate);
+
+  // ③ 車検ヘッドライト磨き
+  const headlight = cards.filter(c => c.headlight && _csActive(c));
+  // ④ コーティング依頼（1Y/3M＋受注OK）
+  const coatReq = cards.filter(c => _csHasCoat(c) && c.coatingOK && _csActive(c));
+  // ⑤ 直近1か月のコーティング予定（1Y/3Mで 予約 or 入庫中）
+  const monthAhead = (function(){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+31); return ymd(d); })();
+  const todayStr = ymd(new Date());
+  const coatPlan = cards.filter(c => _csHasCoat(c) && _csActive(c) && !c.returnStage && (
+        (c.status==='reserved' && c.reserveDate && c.reserveDate <= monthAhead) ||
+        (CS_INTASK.indexOf(c.status) >= 0)
+      ));
+  // ⑥ その他依頼事項
+  const salesReq = cards.filter(c => c.salesReq && _csActive(c));
+
+  /* 🔴 v1.70.0 物差しは state.js の pitTimeMin 1本（v1.69.0 まで文字くらべで並びが狂っていた）。
+     ⚠ ここは洗車・コーティングの「その日にやる作業」の一覧なので、
+        返車時間が無ければ入庫時刻で見る（カレンダーの「代用しない」とは別の目的）。 */
+  const _tmin = t => (window.pitTimeMin ? pitTimeMin(t) : (t ? 0 : 99999));
+  const sortTime = (a,b) => _tmin(a.returnTime||a.reserveTime||'') - _tmin(b.returnTime||b.reserveTime||'');
+  const sortDate = (a,b) => String(a.returnDate||'9999').localeCompare(String(b.returnDate||'9999'));
+
+  const split = (arr, flag) => ({ open: arr.filter(c=>!c[flag]), done: arr.filter(c=>c[flag]) });
+
+  let h = '<div class="cs-cols">';
+
+  // ① 洗車（今日・明日）＝枠は1つ。中を「今日」「明日」の2グループに分ける v0.123.4
+  {
+    const washToday = washAll.filter(c => c.returnStage==='returnWait' && c.returnDate === todayStr);
+    const st = split(washToday.sort(sortTime), 'washSalesDone');
+    const sm = split(washTomorrow.sort(sortTime), 'washSalesDone');
+    const bodyHtml = '<div class="cs-subh"><i data-ic=sun data-ics=16></i> 今日</div>'
+      + (st.open.length ? st.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>')
+      + '<div class="cs-subh"><i data-ic=moon data-ics=16></i> 明日 <small>（翌営業日 ' + nextBiz.slice(5).replace('-','/') + '）</small></div>'
+      + (sm.open.length ? sm.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>');
+    const doneHtml = st.done.concat(sm.done).map(c=>_csDoneCard(c,'wash')).join('');
+    h += _csSec('<i data-ic=drop data-ics=16></i> 洗車', '今日・明日ぶん', bodyHtml, doneHtml);
+  }
+  // ② 今週の洗車予定（日付決定 ＋ 返車日未定）
+  {
+    const sw = split(washWeek.sort(sortDate), 'washSalesDone');
+    const sn = split(washNoDate.sort(sortTime), 'washSalesDone');
+    let bodyHtml = '<div class="cs-subh"><i data-ic=calendar data-ics=16></i> 予定決定（〜今週日曜）</div>'
+      + (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csRetLabel(c))).join('') : '<div class="cs-empty">なし</div>')
+      + '<div class="cs-subh"><i data-ic=help data-ics=16></i> 洗車で返車日未定</div>'
+      + (sn.open.length ? sn.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>');
+    const doneHtml = sw.done.concat(sn.done).map(c=>_csDoneCard(c,'wash')).join('');
+    h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '', bodyHtml, doneHtml);
+  }
+  // ③ 車検ヘッドライト磨き
+  {
+    const s = split(headlight.sort(sortDate), 'headlightDone');
+    h += _csSec('<i data-ic=search data-ics=16></i> 車検ヘッドライト磨き', '',
+      s.open.map(c=>_csCard(c,'headlight')).join(''),
+      s.done.map(c=>_csDoneCard(c,'headlight')).join(''));
+  }
+  // ④ コーティング依頼
+  {
+    const s = split(coatReq.sort(sortDate), 'coatingDone');
+    h += _csSec('<i data-ic=sparkle data-ics=16></i> コーティング依頼', '受注OK・返車予定日つき',
+      s.open.map(c=>_csCard(c,'coating',_csRetLabel(c))).join(''),
+      s.done.map(c=>_csDoneCard(c,'coating')).join(''));
+  }
+  // ⑤ 直近1か月のコーティング予定（完了なし＝予定一覧）
+  {
+    h += _csSec('<i data-ic=calendar data-ics=16></i> 直近1か月のコーティング予定', '予約・入庫中の1Y/3M',
+      coatPlan.sort((a,b)=>String(a.reserveDate||'9999').localeCompare(String(b.reserveDate||'9999'))).map(c=>_csCard(c,null,_csInLabel(c))).join(''),
+      '');
+  }
+  // ⑥ その他依頼事項
+  {
+    const s = split(salesReq, 'salesReqDone');
+    h += _csSec('<i data-ic=cart data-ics=16></i> その他依頼事項', '車販依頼',
+      s.open.map(c=>_csCard(c,'salesReq', c.salesReqMemo ? ('<i data-ic=pencil data-ics=16></i> '+_csEsc(c.salesReqMemo)) : '')).join(''),
+      s.done.map(c=>_csDoneCard(c,'salesReq')).join(''));
+  }
+
+  h += '</div>';
+  body.innerHTML = h;
+}
+window.renderCarSales = renderCarSales;
+
+/* 返車予定日ラベル */
+function _csRetLabel(c){
+  if (c.returnDate){
+    const d = new Date(c.returnDate+'T00:00:00');
+    if (!isNaN(d)) return '<i data-ic=car data-ics=16></i> 返車 ' + (d.getMonth()+1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）' + (c.returnTime?' '+c.returnTime:'');
+  }
+  return '<i data-ic=car data-ics=16></i> 返車日未定';
+}
+/* 入庫/予約ラベル（コーティング予定用） */
+function _csInLabel(c){
+  if (c.status === 'reserved'){
+    if (c.reserveDate){ const d=new Date(c.reserveDate+'T00:00:00'); if(!isNaN(d)) return '<i data-ic=calendar data-ics=16></i> 入庫予約 '+(d.getMonth()+1)+'/'+d.getDate(); }
+    return '<i data-ic=calendar data-ics=16></i> 予約';
+  }
+  return '<i data-ic=factory data-ics=16></i> 入庫中（' + (window.statusLabel ? statusLabel(c.status) : c.status) + '）';
+}
+
+/* 完了／戻す */
+window.csDone = function(id, task){
+  const c = (state.cards||[]).find(x=>x.id===id); if (!c) return;
+  const f = CS_DONEFLAG[task]; if (!f) return;
+  c[f] = true;
+  if (window.logFlow) logFlow(c, '車販作業 完了（'+task+'）');
+  if (window.PitDB) PitDB.save();
+  renderCarSales();
+  if (window.pitToast) pitToast('✓ 完了にしました');
+};
+window.csUndo = function(id, task){
+  const c = (state.cards||[]).find(x=>x.id===id); if (!c) return;
+  const f = CS_DONEFLAG[task]; if (!f) return;
+  c[f] = false;
+  if (window.PitDB) PitDB.save();
+  renderCarSales();
+};

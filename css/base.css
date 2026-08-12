@@ -1,0 +1,125 @@
+/* ========================================
+   base.css
+   PitFlow - 兄弟感のあるテーマ（CarFlow流用＋ブランド色だけ別）
+   ブランドアクセント: コーポレートグリーン #1f7a4d（自社カラー）／ CarFlow=青 #378ADD ／ StockFlow=紫
+   ======================================== */
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ===== ダークテーマ（デフォルト） ===== */
+:root,
+:root[data-theme="dark"]{
+  --bg:#0f1117;--bg1:#0f1117;--bg2:#1a1d27;--bg3:#222536;--bg4:#2a2e42;
+  --border:#333650;--border2:#444870;
+  --text:#e8eaf6;--text1:#e8eaf6;--text2:#9fa8c7;--text3:#5c6490;
+
+  /* 警告3段（CarFlow と揃える） */
+  --green:#1db97a;--blue:#378ADD;--orange:#f59e0b;--red:#ef4444;
+
+  /* PitFlowブランド色：コーポレートグリーン（自社カラー） */
+  --brand:#26a269;
+  --brand-deep:#1f7a4d;
+  --brand-soft:rgba(38,162,105,.15);
+  --accent:#26a269;
+
+  /* 🔵 v1.74.1 アプリ内ダイアログ（全アプリ共通部品 ui-dialog.js）のボタン色。
+     ⚠ ここで決めておかないと、共通部品の**既定色（ピンク）**のまま出る＝
+        緑のアプリの真ん中にピンクのボタンが出て「バグに見える」。
+        ふきだし・ランプと同じ「部品はアプリのテーマカラーを借りる」決めごとに合わせた。 */
+  --acc:#26a269;
+  --accd:#1f7a4d;
+
+  /* レイアウト変数 */
+  --sidebar:220px;--topbar:54px;--tabs:46px;--action:56px;
+  --r:8px;--r2:12px;
+  --shadow-card:0 3px 12px rgba(0,0,0,.35);
+}
+
+/* ===== ライトテーマ（CarFlowのベージュ系を踏襲・アクセントだけコーポレートグリーン） ===== */
+:root[data-theme="light"]{
+  --bg:#f5f1ea;--bg1:#f5f1ea;--bg2:#fffdf8;--bg3:#ece5d6;--bg4:#ddd4bf;
+  --border:#c8bfa8;--border2:#a89d80;
+  /* 🔴 v1.56.2（ゆうた報告）**--text1 を書き忘れていた。**
+     ライトだけ --text1 が**ダークの値（ほぼ白 #e8eaf6）のまま残り**、明るい背景に白文字＝見えなかった。
+     予約詳細カードの **電話・予約時内容の本文・タブ名・代車の残り日数**、ほか
+     駐車場／付箋／作業内容／検索／顧客詳細まで **全38か所**が同じ穴。
+     ⚠ ダーク（base.css）とリキッド2つ（topbar.css）には元から入っていたので、ライトだけ漏れていた。
+     🔴 **テーマを1つ足したら、--text / --text1 / --text2 / --text3 を必ず4つとも書くこと。**
+        書き忘れても画面は落ちないので、誰も気づかない。 */
+  --text:#2a2620;--text1:#2a2620;--text2:#5a4f3f;--text3:#8a7d65;
+
+  --green:#057a5b;--blue:#1e5fc2;--orange:#9a4a05;--red:#a31818;
+
+  --brand:#1f7a4d;
+  --brand-deep:#155e3a;
+  --brand-soft:rgba(31,122,77,.12);
+  --accent:#1f7a4d;
+
+  /* 🔵 v1.74.1 アプリ内ダイアログのボタン色（上のダークと同じ理由） */
+  --acc:#1f7a4d;
+  --accd:#155e3a;
+
+  --sidebar:220px;--topbar:54px;--tabs:46px;--action:56px;
+  --r:8px;--r2:12px;
+  --shadow-card:0 2px 8px rgba(80,60,30,.12);
+}
+
+html,body{
+  height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic Medium","Meiryo",sans-serif;
+  font-size:14px;
+  overflow:hidden;
+}
+
+button{
+  cursor:pointer;
+  font-family:inherit;
+  border:none;
+  background:none;
+  color:inherit;
+}
+
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* スクロールバー */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg1)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:var(--border2)}
+
+/* ユーティリティ */
+.hidden{display:none !important}
+.flex{display:flex}
+.flex-col{display:flex;flex-direction:column}
+.flex1{flex:1}
+.gap-4{gap:4px}.gap-8{gap:8px}.gap-12{gap:12px}
+.center{display:flex;align-items:center;justify-content:center}
+.muted{color:var(--text2)}
+.tiny{font-size:11px;color:var(--text3)}
+
+/* ===== 日付・時刻の入力欄：カレンダー／時計のボタンをテーマに合わせる（v1.27.0） =====
+   🔴 ブラウザ標準のボタン（📅の絵）は色を直接は指定できない。`color-scheme` で
+      「いまどっち向きの画面か」をブラウザに伝えると、**ダークでは白っぽく・ライトでは黒く**
+      描き分けてくれる。これが無いと常に黒で描かれ、ダークで真っ黒のボタンになる。
+   ⚠ 押して開くカレンダーの中身も同じ向きになる（ダークなら暗い配色）。
+   ⚠ 入力欄だけに付ける＝ページ全体のスクロールバーや他の部品は今までどおり。
+   ・既定（data-theme 未設定）＝ダーク。liquid の2つも同じ扱い。 */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"]{ color-scheme: dark; }
+
+:root[data-theme="light"] input[type="date"],
+:root[data-theme="light"] input[type="time"],
+:root[data-theme="light"] input[type="datetime-local"],
+:root[data-theme="light"] input[type="month"],
+:root[data-theme="light"] input[type="week"],
+:root[data-theme="light-liquid"] input[type="date"],
+:root[data-theme="light-liquid"] input[type="time"],
+:root[data-theme="light-liquid"] input[type="datetime-local"],
+:root[data-theme="light-liquid"] input[type="month"],
+:root[data-theme="light-liquid"] input[type="week"]{ color-scheme: light; }

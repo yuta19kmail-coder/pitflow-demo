@@ -1,0 +1,39 @@
+# 資料は GitHub に上げない（社内メモ）
+資料/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Logs / Temp
+*.log
+*.tmp
+*.tail
+
+# Firebase（将来用）
+.firebase/
+firebase-debug.log
+.runtimeconfig.json
+
+# Node（将来用）
+node_modules/
+
+# 保存ボタンのテストが書き出す確認用ファイル（v1.19.0）
+test-save.html
+_save-part.js
+shot_save_menu.png
+test-ctx.html
+shot_ctxmenu.png
+
+# MHS連携のテストが書き出す確認用ファイル（v1.22.0）
+test-mhs.html
+shot_mhs_link.png
+_pf_snap_*.tgz
+
+# メーカー・車種の候補テストが書き出す確認用ファイル（v1.23.0）
+test-carname.html
+shot_carname.png

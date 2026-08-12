@@ -1,0 +1,142 @@
+/* =========================================================
+   CoreFlow 見た目の基準（全アプリ共通）
+   ---------------------------------------------------------
+   ボタンの大きさ・角の丸み・すき間・アイコンの大きさを、
+   ここ1か所の数字で決める。各アプリの CSS は var(--ui-…) を使う。
+   ⚠ このファイルは <style> より先に読み込むこと。
+      （各アプリ側で上書きしたい時に上書きできるようにするため）
+   ⚠ 直す時は _shared/ の中を直して、sync-shared.ps1 で全アプリに配ること。
+      アプリの js/ css/ に入っているのは配られたコピー。直接直すと次の配布で消える。
+   ========================================================= */
+:root{
+  /* --- ボタン --- */
+  --ui-btn-h: 30px;        /* 文字つきボタンの高さのめやす */
+  --ui-btn-px: 11px;       /* 文字つきボタンの左右の余白 */
+  --ui-btn-py: 5px;        /* 文字つきボタンの上下の余白 */
+  --ui-btn-fs: 12.5px;     /* 文字つきボタンの文字の大きさ */
+  --ui-ib: 32px;           /* アイコンだけのボタン（正方形） */
+  --ui-ib-sm: 26px;        /* 小さいアイコンボタン（一覧の中など） */
+  --ui-tool: 36px;         /* 道具箱のボタン */
+
+  /* --- アイコン --- */
+  --ui-ic: 18px;           /* ふつう */
+  --ui-ic-sm: 15px;        /* 小さい（一覧の中・チップの中） */
+  --ui-ic-lg: 20px;        /* 大きい（道具箱） */
+
+  /* --- 角の丸み --- */
+  --ui-r-sm: 6px;
+  --ui-r: 8px;
+  --ui-r-lg: 12px;
+
+  /* --- すき間 --- */
+  --ui-gap: 6px;           /* アイコンと文字のあいだ */
+  --ui-gap-btn: 6px;       /* ボタンとボタンのあいだ */
+
+  /* --- 帯の高さ --- */
+  --ui-topbar: 48px;       /* 一番上の帯 */
+  --ui-subbar: 48px;       /* 2段目の帯（ノート名の行など）。道具箱がぴったり収まる高さ */
+}
+
+/* アイコンの土台。IC() が返す <svg class="ic"> に効く。
+   ⚠ display は inline のまま。flex の箱の中では自動で block 扱いになるので、
+     文字と並べても、道具箱のように並べても、どちらでも崩れない。 */
+.ic{ flex:none; pointer-events:none; vertical-align:-.18em; }
+
+/* アイコン＋文字のボタン（使いたいアプリだけ使う） */
+.ui-btn{
+  display:inline-flex; align-items:center; gap:var(--ui-gap);
+  padding:var(--ui-btn-py) var(--ui-btn-px);
+  font-size:var(--ui-btn-fs); border-radius:var(--ui-r);
+  line-height:1.4; white-space:nowrap; cursor:pointer;
+}
+.ui-ib{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:var(--ui-ib); height:var(--ui-ib);
+  border-radius:var(--ui-r); cursor:pointer; padding:0;
+}
+
+/* 指で押す端末では、押せる範囲を広げる（見た目は変えない） */
+@media (pointer:coarse){
+  :root{ --ui-btn-py: 7px; --ui-ib: 36px; --ui-tool: 40px; }
+}
+
+/* =========================================================
+   スクロールの棒（全アプリ共通・細くて控えめ）
+   ---------------------------------------------------------
+   ブラウザ既定の太いグレーの棒は、どのアプリでも浮いて見えるので、
+   ここで一度だけ形を決めて全アプリにそろえる。
+   マウスを乗せた時だけ、そのアプリの色（--acc）になる。
+   ⚠ --acc を決めていないアプリでもグレーで出るので、そのまま使える。
+   ========================================================= */
+:root{
+  --ui-sb: 10px;                              /* 棒の太さ */
+  --ui-sb-thumb: rgba(148,163,184,.35);       /* ふだんの色 */
+}
+*{ scrollbar-width: thin; scrollbar-color: var(--ui-sb-thumb) transparent; }
+::-webkit-scrollbar{ width: var(--ui-sb); height: var(--ui-sb); }
+::-webkit-scrollbar-track{ background: transparent; }
+::-webkit-scrollbar-corner{ background: transparent; }
+::-webkit-scrollbar-thumb{
+  background: var(--ui-sb-thumb);
+  border-radius: 8px;
+  border: 2px solid transparent;   /* 棒を細く見せるための余白 */
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover{
+  background: color-mix(in srgb, var(--acc, #94a3b8) 55%, transparent);
+  background-clip: padding-box;
+}
+
+/* 数字の印（1課・2課・順番など。絵文字の 1️⃣2️⃣ の代わり）
+   ⚠ 色は書かない＝文字色をそのまま継ぐ（線画アイコンと同じ考え方）。 */
+.ic-num{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:17px; height:17px; border:1.6px solid currentColor; border-radius:5px;
+  font-size:11px; font-weight:700; line-height:1; flex:none; vertical-align:-.18em;
+}
+
+/* =========================================================
+   チェックボックス（全アプリ共通・2026-08-02）
+   ---------------------------------------------------------
+   ブラウザ既定の白い箱・青いチェックはどのアプリでも浮くので、
+   MHS v0.81.0 で決めた「枠だけの控えめな四角」をここで標準にした。
+   ふだんは枠線だけ・押すとアプリの色で塗ってチェックが白く出る。
+
+   使い方： <input type="checkbox" class="ui-cb">
+            <input type="checkbox" class="ui-cb sm">   ← 小さい版（一覧の中など）
+
+   ⚠ 色は --acc（無ければ --brand）を使う。どちらも決めていないアプリでも
+      既定のインディゴで出るので、そのまま貼って構わない。
+   ⚠ 文字と並べる時は、囲みの <label> を display:inline-flex; align-items:center に。
+   ========================================================= */
+.ui-cb{
+  appearance:none; -webkit-appearance:none;
+  width:16px; height:16px; flex:0 0 auto; margin:0; padding:0; position:relative;
+  border:1.5px solid var(--text3, #94a3b8); border-radius:5px;
+  background:transparent; opacity:.65; cursor:pointer;
+  transition:opacity .12s, background .12s, border-color .12s;
+}
+.ui-cb:hover{ opacity:1; }
+.ui-cb:checked,.ui-cb:indeterminate{
+  background:var(--acc, var(--brand, #6366f1));
+  border-color:var(--acc, var(--brand, #6366f1));
+  opacity:1;
+}
+.ui-cb:checked::after{
+  content:''; position:absolute; left:4.5px; top:1px; width:3px; height:7.5px;
+  border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg);
+}
+.ui-cb:indeterminate::after{
+  content:''; position:absolute; left:2.5px; top:5.5px; width:8px; height:2px;
+  background:#fff; border-radius:1px;
+}
+.ui-cb:disabled{ opacity:.35; cursor:default; }
+.ui-cb.sm{ width:14px; height:14px; border-radius:4px; }
+.ui-cb.sm:checked::after{ left:3.8px; top:.5px; width:2.5px; height:6.5px; }
+.ui-cb.sm:indeterminate::after{ left:2.2px; top:5px; width:7px; }
+
+/* 指で押す端末では少しだけ大きく（見た目の細さは変えない） */
+@media (pointer:coarse){
+  .ui-cb{ width:18px; height:18px; }
+  .ui-cb:checked::after{ left:5.2px; top:1.5px; width:3.2px; height:8.4px; }
+}

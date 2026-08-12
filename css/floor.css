@@ -1,0 +1,144 @@
+/* ========================================
+   floor.css  -  PIT配置図エディタ v3（v0.48.0）
+   ======================================== */
+
+.pf-launch{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.pf-launch .vh-btn.primary{ font-size:14px; padding:10px 18px; }
+.pf-launch-meta{ font-size:12px; color:var(--text3); }
+
+.pf-overlay{ position:fixed; inset:0; z-index:80; background:var(--bg); display:none; flex-direction:column; }
+.pf-bar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--bg2); }
+.pf-bar-title{ font-size:14px; font-weight:700; color:var(--text); }
+.pf-tools{ display:flex; gap:6px; flex-wrap:wrap; }
+.pf-tool{ font-family:inherit; font-size:12.5px; padding:6px 11px; background:var(--bg3); color:var(--text2); border:1px solid var(--border); border-radius:8px; cursor:pointer; }
+.pf-tool:hover{ color:var(--text); }
+.pf-tool.on{ background:var(--green); color:#fff; border-color:var(--green); }
+.pf-scale-wrap{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text2); margin-left:auto; }
+.pf-scale-wrap input{ width:120px; }
+#pf-scale-lb{ min-width:54px; font-weight:600; color:var(--text); }
+.pf-sample{ font-family:inherit; font-size:12.5px; padding:7px 12px; background:var(--bg3); color:var(--text2); border:1px solid var(--border); border-radius:8px; cursor:pointer; }
+.pf-sample:hover{ color:var(--text); }
+.pf-done{ font-family:inherit; font-size:13px; font-weight:600; padding:8px 16px; background:var(--green); color:#fff; border:none; border-radius:9px; cursor:pointer; }
+.pf-hint{ font-size:12px; color:var(--text3); padding:7px 14px; border-bottom:1px solid var(--border); }
+
+.pf-stage{ flex:1; overflow:auto; padding:20px; touch-action:none; }
+.pf-grid{
+  position:relative; margin:0 auto;
+  background-image:linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-color:var(--bg2); border:1px solid var(--border); border-radius:6px; user-select:none;
+}
+.pf-walls{ position:absolute; inset:0; pointer-events:none; }
+.pf-walls line, .pf-walls [data-attach]{ pointer-events:auto; cursor:pointer; }
+.pf-walls circle{ pointer-events:all; cursor:grab; }
+
+.pf-box{ position:absolute; box-sizing:border-box; border-radius:8px; cursor:grab; overflow:hidden; }
+.pf-box.sel{ box-shadow:0 0 0 3px rgba(245,158,11,.55); z-index:6; }
+.pf-box.locked{ pointer-events:none; opacity:.92; }
+.pf-box:active{ cursor:grabbing; }
+
+.pf-pit{ border:2.5px solid #7b8794; background:rgba(127,140,160,.12); display:flex; flex-direction:column; padding:0; }
+.pf-box-hd{ display:flex; align-items:center; gap:3px; flex:none; padding:0 6px; box-sizing:border-box; }
+.pf-box-nm{ font-size:11px; font-weight:700; color:var(--text); line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; }
+.pf-cap{ position:absolute; right:2px; bottom:2px; font-size:9px; font-weight:700; color:#fff; padding:0 5px; border-radius:999px; pointer-events:none; }
+/* カードは“固定サイズ”（縦横で大きさが変わらない）。箱はカード数にぴったり合わせる。サイズはJS側でinline指定。 */
+.pf-cards{ flex:1; display:flex; min-height:0; overflow:hidden; align-items:flex-start; justify-content:flex-start; }
+.pf-cardcol{ display:flex; flex-direction:column; }
+.pf-cardbar{ flex:none; background:var(--bg3); border:1px solid var(--border); border-radius:3px; }
+.pf-lift-ill{ flex:1; width:100%; min-height:0; color:inherit; }
+.pf-resize{ position:absolute; right:0; bottom:0; width:15px; height:15px; cursor:nwse-resize; background:linear-gradient(135deg, transparent 50%, currentColor 50%); opacity:.55; border-bottom-right-radius:7px; }
+.pf-lock{ pointer-events:auto; cursor:pointer; font-size:11px; line-height:1; flex:none; opacity:.75; }
+.pf-lock.on{ opacity:1; }
+
+.pf-building{ border:2px dashed var(--text3); background:transparent; color:var(--text3); }
+.pf-building .pf-box-tag{ position:absolute; left:5px; top:3px; font-size:10.5px; color:var(--text3); font-weight:700; }
+.pf-building .pf-lock{ position:absolute; right:4px; top:3px; }
+
+.pf-props{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:11px 14px; border-top:1px solid var(--border); background:var(--bg2); min-height:52px; }
+.pf-prop-t{ font-size:12.5px; font-weight:700; color:var(--text2); }
+.pf-prop-empty{ font-size:12px; color:var(--text3); }
+.pf-cap-note{ font-size:11.5px; color:var(--text3); }
+.pf-in{ font-family:inherit; font-size:13px; background:var(--bg3); color:var(--text); border:1px solid var(--border); border-radius:7px; padding:6px 8px; }
+.pf-in-name{ width:130px; }
+.pf-zbtn{ font-family:inherit; font-size:11.5px; color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:6px 9px; cursor:pointer; }
+.pf-zbtn:hover{ color:var(--text); }
+.pf-zbtn.on{ background:var(--green); color:#fff; border-color:var(--green); }
+.pf-del{ font-family:inherit; font-size:12.5px; color:#ef4444; background:transparent; border:1px solid rgba(239,68,68,.4); border-radius:7px; padding:6px 11px; cursor:pointer; margin-left:auto; }
+.pf-del:hover{ background:rgba(239,68,68,.1); }
+
+/* ========================================
+   Pitリスト（読み取り専用・配置図に実カードをはめる）＋ PiP小窓  v0.58.0
+   ======================================== */
+.pitlist-stage{ overflow:auto; padding:18px; background:var(--bg); border:1px solid var(--border); border-radius:8px; max-height:calc(100vh - 200px); }
+.pfv-grid{ margin:0 auto; }
+.pitlist-nofloor{ padding:40px 24px; text-align:center; color:var(--text3); font-size:13px; line-height:1.9; }
+
+/* 読み取り専用の枠＝掴めない見た目。リフト飾りはSVG層なのでクリップされない */
+.pfv-bay{ cursor:default; }
+.pfv-bay.dnd-over{ box-shadow:0 0 0 3px rgba(29,185,122,.55); }
+/* 同枠内の並べ替え：落とす先のスロットを強調 */
+.pfv-card.dnd-over, .pf-cardbar.dnd-over{ outline:2px solid var(--green); outline-offset:-1px; background:rgba(29,185,122,.18); }
+.pfv-card.dnd-dragging{ opacity:.4; }
+.pfv-static{ pointer-events:none; }
+.pfv-over{ position:absolute; right:2px; top:2px; font-size:9px; font-weight:700; color:#fff; background:#ef4444; padding:0 5px; border-radius:999px; pointer-events:none; }
+
+/* スロットにはまる実カード：1行目＝客名＋様／右に車検・代車、2行目＝車種名（横幅たっぷり）／右に担当者 */
+.pfv-card{ box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; gap:2px; padding:2px 5px 2px 7px; background:var(--bg2); border:1px solid var(--border); border-left:3px solid var(--green); border-radius:3px; cursor:grab; overflow:hidden; }
+.pfv-card:hover{ background:var(--bg3); }
+.pfv-card:active{ cursor:grabbing; }
+.pfv-card.dnd-dragging{ opacity:.4; }
+/* 文字サイズはカードの font-size（JSが枠サイズに応じてpx指定・最大13px）に追従＝em指定 */
+/* 枠が小さい時は1行（車種だけ）＝行方向にして中央寄せ */
+.pfv-card.pfv-1line{ flex-direction:row; align-items:center; }
+
+/* カード拡大：クリックでその場にフルカードを前面表示・背面は暗転／もう一度クリックで詳細 */
+.pcz-dim{ position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:120; }
+.pcz-card{ position:fixed; z-index:121; width:158px; font-size:12px; cursor:pointer;
+  box-shadow:0 16px 44px rgba(0,0,0,.6); border-color:rgba(255,255,255,.28);
+  transition:transform .12s ease; transform-origin:center; }
+
+/* 看板：PITボードに配置済みのカードはグレーアウト（ラベルは無し） */
+.pcm.pcm-placed{ opacity:.5; filter:grayscale(.35); }
+.pfv-r{ display:flex; align-items:center; gap:4px; min-width:0; }
+.pfv-cn, .pfv-cc{ flex:1 1 auto; min-width:0; font-size:1em; font-weight:700; color:var(--text); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pfv-badges{ flex:0 0 auto; display:flex; gap:3px; align-items:center; }
+/* バッジはパツパツ＝文字を大きく・余白を詰める */
+.pfv-wt{ flex:0 0 auto; font-size:1em; font-weight:700; padding:0 .32em; border:1px solid; border-radius:.46em; line-height:1.26; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:7em; }
+.pfv-staff{ flex:0 0 auto; font-size:1em; font-weight:700; color:var(--text); background:var(--bg3); border:1px solid var(--border2); border-radius:.46em; padding:0 .4em; line-height:1.26; white-space:nowrap; }
+.pfv-loaner{ flex:0 0 auto; font-size:1em; font-weight:700; color:#f59e0b; background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.55); border-radius:.46em; padding:0 .32em; line-height:1.26; white-space:nowrap; }
+
+/* 図エリア＝図はビューポート高さに合わせてフィット（JS側 availH）。max-heightは保険で広め */
+#view-work .pitlist-stage{ max-height:calc(100vh - 120px); }
+#view-work.tray-open .pitlist-stage{ max-height:calc(100vh - 290px); }
+
+/* 未割当トレイ（折りたたみ式・1課/2課に分割） */
+.pitlist-unassigned{ margin-top:12px; }
+.pitlist-tray-head{ display:flex; align-items:center; gap:9px; font-size:12.5px; font-weight:700; color:var(--text2); padding:9px 13px; background:var(--bg2); border:1px solid var(--border); border-radius:8px; cursor:pointer; user-select:none; }
+.pitlist-tray-head:hover{ color:var(--text); border-color:var(--border2); }
+.ptl-caret{ font-size:10px; color:var(--text3); }
+.pitlist-tray-meta{ font-size:11px; font-weight:400; color:var(--text3); margin-left:auto; }
+.pitlist-tray-cols{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px; }
+.ptl-col{ border:1px solid var(--border); border-radius:8px; background:var(--bg2); overflow:hidden; }
+.ptl-col-h{ font-size:12px; font-weight:700; padding:6px 11px; border-bottom:1px solid var(--border); }
+.ptl-c1 .ptl-col-h{ color:#1db97a; border-bottom-color:rgba(29,185,122,.35); }
+.ptl-c2 .ptl-col-h{ color:#ec4899; border-bottom-color:rgba(236,72,153,.35); }
+.ptl-col-n{ font-weight:400; color:var(--text3); }
+.ptl-col-body{ display:flex; gap:8px; flex-wrap:wrap; align-content:flex-start; min-height:56px; padding:10px; }
+/* トレイのカードはタスクボード（看板列220px−余白16px=204px）と同じ幅を常にキープ＝名前の長短で縮まない・耳/注意タブの被り防止 */
+.ptl-col-body .pit-card.pcm{ flex:0 0 204px; width:204px; max-width:204px; }
+.ptl-col-body.dnd-over{ background:rgba(29,185,122,.1); box-shadow:0 0 0 2px rgba(29,185,122,.35) inset; }
+.ptl-empty{ font-size:11px; color:var(--text3); padding:8px; }
+
+
+/* PiP小窓（最前面・移動/リサイズ可） */
+.pitpip{ position:fixed; top:84px; right:24px; width:733px; height:753px; z-index:90; display:none; flex-direction:column;
+  background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.5); overflow:hidden; }
+.pitpip-bar{ display:flex; align-items:center; gap:6px; padding:8px 10px; background:var(--bg3); border-bottom:1px solid var(--border); cursor:move; user-select:none; touch-action:none; }
+.pitpip-title{ font-size:12.5px; font-weight:700; color:var(--text); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pitpip-tip{ font-size:10px; font-weight:400; color:var(--text3); margin-left:6px; }
+.pitpip-btn{ font-family:inherit; font-size:12.5px; background:transparent; border:none; color:var(--text2); cursor:pointer; padding:3px 7px; border-radius:6px; }
+.pitpip-btn:hover{ background:var(--bg); color:var(--text); }
+/* PiPは全体フィット表示＝スクロールを出さず、縮小した図を中央に置く */
+.pitpip-body{ flex:1; overflow:hidden; padding:8px; display:flex; align-items:center; justify-content:center; }
+.pitpip-body .pf-grid{ margin:0; }
+.pitpip-resize{ position:absolute; right:0; bottom:0; width:16px; height:16px; cursor:nwse-resize; touch-action:none;
+  background:linear-gradient(135deg, transparent 50%, var(--text3) 50%); opacity:.65; border-bottom-right-radius:10px; }

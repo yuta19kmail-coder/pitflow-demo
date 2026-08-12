@@ -1,0 +1,973 @@
+/* ========================================
+   views.css
+   各ビュー個別のスタイル
+   ======================================== */
+
+/* ===== カード共通（全ビューで使う1台=1カード） ===== */
+.pit-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-left:3px solid var(--brand);
+  border-radius:var(--r);
+  padding:8px 10px;
+  cursor:grab;
+  user-select:none;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  box-shadow:var(--shadow-card);
+  transition:transform .08s, box-shadow .08s;
+}
+.pit-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+.pit-card:active{cursor:grabbing}
+.pit-card .pc-line1{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--text2);
+}
+.pit-card .pc-time{font-weight:600;color:var(--brand)}
+.pit-card .pc-customer{
+  font-size:13px;font-weight:600;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.pit-card .pc-car{
+  font-size:11px;color:var(--text2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.pit-card .pc-tags{
+  display:flex;gap:4px;flex-wrap:wrap;margin-top:2px;
+}
+.pit-card .pc-tag{
+  font-size:10px;
+  padding:1px 6px;
+  border-radius:8px;
+  background:var(--bg3);
+  color:var(--text2);
+  border:1px solid var(--border);
+}
+.pit-card .pc-tag.staff{background:var(--brand-soft);color:var(--brand);border-color:var(--brand)}
+.pit-card .pc-tag.urgent{background:rgba(239,68,68,.15);color:var(--red);border-color:var(--red)}
+
+/* ===== 予約ビュー ===== */
+#view-reserve .reserve-grid{
+  display:grid;
+  grid-template-columns:60px 1fr;
+  gap:0;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+}
+#view-reserve .reserve-time-col{
+  background:var(--bg3);
+  border-right:1px solid var(--border);
+}
+#view-reserve .reserve-time-cell{
+  height:48px;
+  padding:4px 8px;
+  font-size:11px;
+  color:var(--text3);
+  border-bottom:1px solid var(--border);
+}
+#view-reserve .reserve-day-col{
+  position:relative;
+  border-bottom:1px solid var(--border);
+}
+#view-reserve .reserve-day-cell{
+  height:48px;
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+#view-reserve .reserve-day-cell.closed{
+  background:repeating-linear-gradient(45deg,var(--bg3),var(--bg3) 10px,var(--bg2) 10px,var(--bg2) 20px);
+  color:var(--text3);
+}
+#view-reserve .reserve-day-cell.cutoff{
+  background:rgba(239,68,68,.05);
+}
+#view-reserve .reserve-event{
+  position:absolute;
+  left:4px;right:4px;
+  background:var(--brand-soft);
+  border-left:3px solid var(--brand);
+  border-radius:4px;
+  padding:4px 6px;
+  font-size:11px;
+  cursor:pointer;
+  overflow:hidden;
+}
+#view-reserve .reserve-event:hover{background:var(--brand)}
+
+/* 予約ビュー：シンプルな日表示モック */
+.reserve-day-list{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:12px;
+}
+.reserve-slot{
+  display:grid;
+  grid-template-columns:80px 1fr;
+  gap:8px;
+  padding:8px;
+  border-bottom:1px solid var(--border);
+}
+.reserve-slot:last-child{border-bottom:none}
+.reserve-slot-time{
+  color:var(--text3);
+  font-size:12px;
+  padding-top:4px;
+}
+.reserve-slot-cards{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+/* 予約・返車「当日」のカードはタスクボードと同じ204px固定（名前の長短で縮まない・耳/注意タブの被り防止） */
+.reserve-slot-cards .pit-card.pcm{ flex:0 0 204px; width:204px; max-width:204px; }
+.reserve-slot.closed .reserve-slot-time::after{
+  content:" 定休";
+  color:var(--red);
+  font-weight:600;
+}
+
+/* 予約ビュー：週グリッド（7日×時間） */
+.reserve-week{
+  display:grid;
+  grid-template-columns:60px repeat(7, 1fr);
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+}
+.reserve-week-cell{
+  background:var(--bg2);
+  padding:4px 6px;
+  font-size:11px;
+  min-height:36px;
+  min-width:0;            /* ★週グリッドのセルが中身（長い車種名）で広がらない＝1fr均等固定。はみ出しは…で省略 */
+  overflow:hidden;
+}
+/* 週ビューのミニカードはセル幅に追従＝はみ出さない（名前/車種は .rwk-name/.rwk-car の…で省略） */
+.reserve-week-cell .rwk-card{ max-width:100%; min-width:0; box-sizing:border-box; }
+.reserve-week-head{
+  background:var(--bg3);
+  font-weight:600;
+  text-align:center;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  padding:6px;
+}
+.reserve-week-head .dow{font-size:10px;color:var(--text3)}
+.reserve-week-head .day{font-size:14px}
+.reserve-week-head.today .day{color:var(--brand)}
+.reserve-week-head.closed{color:var(--red)}
+.reserve-week-time{
+  background:var(--bg3);
+  text-align:right;
+  color:var(--text3);
+  padding-top:6px;
+}
+.reserve-week-cell.closed{
+  background:repeating-linear-gradient(45deg,var(--bg3),var(--bg3) 8px,var(--bg2) 8px,var(--bg2) 16px);
+}
+.reserve-week-event{
+  background:var(--brand-soft);
+  border-left:2px solid var(--brand);
+  border-radius:3px;
+  padding:2px 4px;
+  font-size:10px;
+  cursor:pointer;
+  margin-bottom:2px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.reserve-week-event:hover{background:var(--brand)}
+/* 週ビュー ミニカード（C案）＝列幅に追従。当日タブのタスクカードを縮めた見た目。 */
+.reserve-week-cell{ font-size:11px; }
+.rwk-card{ background:var(--bg2); border:1px solid var(--border2); border-left:4px solid var(--green); border-radius:7px; padding:5px 7px; cursor:grab; min-width:0; margin-bottom:4px; }
+.rwk-card:last-child{ margin-bottom:0; }
+.rwk-card:active{ cursor:grabbing; }
+.rwk-card.rwk-claim{ border-color:#ef4444 !important; box-shadow:0 0 0 1px #ef444455; }
+.rwk-r{ display:flex; align-items:center; gap:5px; min-width:0; }
+.rwk-r + .rwk-r{ margin-top:3px; }
+.rwk-name, .rwk-car{ flex:1 1 auto; min-width:0; font-weight:700; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* v1.34.0 その行の時刻とぴったり同じでない時だけ出す小さな時刻（朝一・09:30・枠外の8:00 など） */
+.rwk-t{ flex:0 0 auto; font-size:10.5px; font-weight:700; color:var(--brand); background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:0 4px; line-height:1.5; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* v1.34.0 週ビューの「時刻未定」行の見出し */
+.reserve-week-time.rwk-tbd-h{ color:#e0a33a; font-weight:700; }
+.rwk-badges{ flex:0 0 auto; display:flex; gap:3px; align-items:center; }
+.rwk-wb, .rwk-lo{ font-size:9.5px; font-weight:700; padding:0 5px; border-radius:4px; line-height:1.55; white-space:nowrap; border:1px solid; }
+.rwk-lo{ background:rgba(245,158,11,.16); color:#f59e0b; border-color:rgba(245,158,11,.55); }
+.rwk-front{ flex:0 0 auto; font-size:10px; font-weight:700; padding:0 6px; border-radius:5px; line-height:1.6; background:var(--bg3); color:var(--text); border:1px solid var(--border2); white-space:nowrap; }
+.reserve-week-event.urgent{
+  background:rgba(239,68,68,.15);
+  border-left-color:var(--red);
+  color:var(--red);
+}
+
+/* 予約ビュー：月カレンダー */
+.reserve-month{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+}
+.reserve-month-cell{
+  background:var(--bg2);
+  min-height:90px;
+  min-width:0;            /* ★長い客名/車種でセル（1fr列）が広がらない＝はみ出しは…で省略 */
+  padding:6px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+/* 日付セル（その月の日）は予約以外をクリックで全件表示＝ポインタ */
+.reserve-month-cell[data-drop]{ cursor:pointer; }
+.reserve-month-cell.dow{
+  background:var(--bg3);
+  min-height:0;
+  text-align:center;
+  padding:6px;
+  font-size:11px;
+  color:var(--text3);
+  font-weight:600;
+}
+.reserve-month-cell.other-month{opacity:.35}
+.reserve-month-cell.today .day-num{
+  background:var(--brand);color:#fff;
+  width:22px;height:22px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;
+}
+.reserve-month-cell.closed{
+  background:repeating-linear-gradient(45deg,var(--bg3),var(--bg3) 10px,var(--bg2) 10px,var(--bg2) 20px);
+}
+.reserve-month-cell .day-num{
+  font-size:11px;color:var(--text2);font-weight:600;
+  margin-bottom:2px;
+}
+.reserve-month-cell.sun .day-num{color:var(--red)}
+.reserve-month-cell.sat .day-num{color:var(--blue)}
+.reserve-month-event{
+  display:flex; align-items:center; gap:4px;
+  background:var(--bg3);                 /* 緑ベースをやめて中立色に（左ラインで国産緑/輸入ピンクを表現） */
+  border:1px solid var(--border);        /* ★枠を常時表示（hoverで消えないように） */
+  border-left:3px solid var(--border2);  /* 色はinlineでチーム色を上書き */
+  border-radius:4px;
+  padding:1px 4px 1px 5px;
+  font-size:10px;
+  color:var(--text);
+  cursor:pointer;
+  overflow:hidden;
+}
+.reserve-month-event:hover{ background:var(--bg4); border-color:var(--border2); }   /* 枠は残す */
+.reserve-month-event .rme-txt{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.reserve-month-event .rme-side{ flex:0 0 auto; display:flex; align-items:center; gap:3px; }
+/* 作業(色付き)＋代 のバッジ＝月リスト(.rml-ev)と2ヶ月チップ(.reserve-month-event)で共通 */
+.rme-wt{ font-weight:700; white-space:nowrap; }
+.rme-loaner{ font-weight:800; color:var(--orange); background:rgba(245,158,11,.16); border:1px solid rgba(245,158,11,.5); border-radius:3px; padding:0 3px; line-height:1.4; }
+/* 月リストのチップ右側（代→作業）。rml-evはnowrapのインラインチップなのでinline-flexで寄せる */
+.rml-side{ display:inline-flex; align-items:center; gap:4px; margin-left:6px; vertical-align:middle; }
+.reserve-month-event.urgent{
+  background:rgba(239,68,68,.15);
+  border-left-color:var(--red);
+  color:var(--red);
+}
+.reserve-month-more{
+  font-size:10px;
+  color:var(--text3);
+  text-align:right;
+  padding-right:2px;
+}
+
+/* 予約ビュー：2ヶ月（月カレンダー2連・v0.26.0 縦積みに変更） */
+.reserve-2month{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:20px;
+}
+.reserve-2month .month-block-title{
+  font-size:14px;font-weight:600;
+  margin-bottom:6px;
+  color:var(--text);
+}
+@media (max-width:768px){
+  .reserve-2month{grid-template-columns:1fr}
+}
+
+/* ===== タスクビュー（看板） ===== */
+#view-task .board-tabs{
+  display:flex;gap:4px;
+  margin-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+#view-task .board-tab{
+  padding:8px 16px;
+  font-size:13px;
+  color:var(--text2);
+  border-bottom:2px solid transparent;
+}
+#view-task .board-tab.active{
+  color:var(--brand);
+  border-bottom-color:var(--brand);
+  font-weight:600;
+}
+/* 看板ビューは縦フレックス＝ヘッダー固定＋看板が残り高さいっぱい
+   → 横スクロールバーがカードの高さでなくウィンドウ下部に固定される */
+#view-task.active, #view-course1.active, #view-course2.active{
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.kanban{
+  display:flex;
+  gap:12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  align-items:flex-start;
+  flex:1 1 auto;
+  min-height:0;
+}
+.kanban-col{
+  flex:0 0 220px;
+  min-width:0;            /* ★中身（長い車種名など）で列が広がらない＝規定220px固定。はみ出しは…で省略 */
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  display:flex;
+  flex-direction:column;
+  max-height:100%;
+}
+.kanban-col-head{
+  padding:10px 12px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:6px;
+  font-size:13px;
+  font-weight:600;
+}
+.kanban-col-head .count{
+  margin-left:auto;
+  font-size:11px;
+  color:var(--text3);
+  background:var(--bg3);
+  padding:1px 8px;
+  border-radius:10px;
+}
+.kanban-col-body{
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  overflow-y:auto;
+  flex:1;
+}
+
+/* ===== 作業ビュー（PIT枠にカードがハマる） ===== */
+#view-work .pit-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:16px;
+}
+#view-work .pit-bay{
+  background:var(--bg2);
+  border:2px dashed var(--border2);
+  border-radius:var(--r2);
+  padding:12px;
+  min-height:200px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  position:relative;
+}
+#view-work .pit-bay-head{
+  display:flex;align-items:center;gap:8px;
+  padding-bottom:8px;
+  border-bottom:1px dashed var(--border);
+  font-weight:600;
+}
+#view-work .pit-bay-head .bay-icon{
+  font-size:18px;
+  color:var(--brand);
+}
+#view-work .pit-bay-head .bay-meta{
+  margin-left:auto;
+  font-size:11px;
+  color:var(--text3);
+}
+#view-work .pit-bay-empty{
+  color:var(--text3);
+  font-size:12px;
+  text-align:center;
+  padding:30px 0;
+}
+
+/* ===== 実績ビュー ===== */
+#view-result .result-cal{
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+}
+#view-result .result-cell{
+  background:var(--bg2);
+  min-height:100px;
+  padding:6px;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+#view-result .result-cell.dow{
+  background:var(--bg3);
+  min-height:0;
+  text-align:center;
+  padding:6px;
+  font-size:11px;
+  color:var(--text3);
+  font-weight:600;
+}
+#view-result .result-cell .day-num{
+  font-size:11px;
+  color:var(--text3);
+  margin-bottom:2px;
+}
+#view-result .result-card{
+  font-size:11px;
+  background:var(--brand-soft);
+  border-left:2px solid var(--brand);
+  padding:2px 4px;
+  border-radius:3px;
+  cursor:pointer;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#view-result .result-card.returned{
+  background:rgba(29,185,122,.15);
+  border-left-color:var(--green);
+}
+
+/* ===== 代車ビュー ===== */
+#view-loaner .loaner-grid{
+  display:grid;
+  grid-template-columns:140px repeat(14,minmax(60px,1fr));
+  gap:1px;
+  background:var(--border);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:auto;
+  font-size:12px;
+}
+#view-loaner .loaner-cell{
+  background:var(--bg2);
+  padding:4px 6px;
+  min-height:36px;
+  position:relative;
+}
+#view-loaner .loaner-head{
+  background:var(--bg3);
+  font-weight:600;
+  text-align:center;
+}
+#view-loaner .loaner-car-name{
+  background:var(--bg3);
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+#view-loaner .loaner-bar{
+  background:var(--brand);
+  color:#fff;
+  border-radius:4px;
+  padding:2px 6px;
+  font-size:10px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* ===== モーダル（カード詳細） ===== */
+.modal-backdrop{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.5);
+  display:none;
+  align-items:center;justify-content:center;
+  z-index:100;
+}
+.modal-backdrop.show{display:flex}
+/* 月/2ヶ月ビューの「その日の全件」ポップアップ */
+.pdp-box{ background:var(--bg2); border:1px solid var(--border); border-radius:12px; width:min(92vw,380px); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.5); }
+.pdp-head{ display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:700; font-size:14px; }
+.pdp-head .pdp-x{ margin-left:auto; background:var(--bg3); border:1px solid var(--border2); color:var(--text2); border-radius:8px; width:28px; height:28px; cursor:pointer; font-size:13px; }
+.pdp-head .pdp-x:hover{ background:var(--bg4); color:var(--text); }
+.pdp-list{ padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; }
+.pdp-list .pit-card.pcm{ width:100%; max-width:100%; box-sizing:border-box; }
+.pdp-empty{ color:var(--text3); text-align:center; padding:24px 0; font-size:13px; }
+.modal-box{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--r2);
+  width:min(640px,92vw);
+  max-height:85dvh;
+  overflow:auto;
+  display:flex;
+  flex-direction:column;
+}
+.modal-head{
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.modal-title{font-size:16px;font-weight:700;flex:1}
+.modal-close{
+  width:30px;height:30px;
+  border-radius:6px;
+  background:var(--bg3);
+}
+.modal-body{padding:16px;display:flex;flex-direction:column;gap:12px}
+.modal-row{
+  display:grid;grid-template-columns:100px 1fr;gap:8px;
+  font-size:13px;
+}
+.modal-row label{color:var(--text3)}
+
+/* ===== レスポンシブ ===== */
+@media (max-width:768px){
+  .kanban-col{flex:0 0 200px}
+  #view-work .pit-grid{grid-template-columns:1fr}
+  #view-loaner .loaner-grid{grid-template-columns:120px repeat(7,minmax(50px,1fr))}
+}
+
+/* ========================================
+   当日ビュー
+   ======================================== */
+#view-today-body{
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+/* ===== 当日ビュー v0.29.0（時間軸・休憩バー・チーム色） ===== */
+.today-head{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:var(--r2);
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  flex-wrap:wrap;
+}
+.today-date{ display:flex; align-items:baseline; gap:8px; }
+.today-date .big{ font-size:24px; font-weight:800; }
+.today-date .dow{ font-size:15px; color:var(--text2); }
+.today-badge{
+  font-size:11px; font-weight:800; color:#fff; background:#1db97a;
+  border-radius:999px; padding:2px 10px; margin-left:4px;
+}
+.today-badge.next{ background:#64748b; }
+
+.today-counts{ display:flex; gap:10px; }
+.count-chip{
+  display:flex; align-items:baseline; gap:6px;
+  border:1px solid var(--border); border-radius:var(--r); padding:6px 14px;
+}
+.count-chip.in{ background:rgba(29,185,122,.10); border-color:#1db97a; }
+.count-chip.out{ background:rgba(59,130,246,.10); border-color:#3b82f6; }
+.count-chip .num{ font-size:24px; font-weight:800; line-height:1; }
+.count-chip.in .num{ color:#1db97a; }
+.count-chip.out .num{ color:#3b82f6; }
+.count-chip .lbl{ font-size:11px; color:var(--text2); font-weight:700; }
+.count-chip .rem{ font-size:12px; font-weight:800; color:var(--red); margin-left:2px; }
+
+.today-nav{ margin-left:auto; display:flex; gap:6px; }
+.tnav-btn{
+  font-size:12px; padding:6px 12px; border:1px solid var(--border);
+  background:var(--bg3); color:var(--text); border-radius:var(--r); cursor:pointer;
+}
+.tnav-btn:hover:not(:disabled){ border-color:#1db97a; }
+.tnav-btn:disabled{ opacity:.4; cursor:default; }
+.count-chip + .full-btn, .full-btn{ align-self:stretch; }
+.full-btn.on{ background:#1db97a; color:#fff; border-color:#1db97a; }
+
+.today-cols{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+.today-col{
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--r);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.today-col-head{
+  padding:10px 14px; font-size:14px; font-weight:800;
+  display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border);
+}
+.today-col-head .ic{ font-size:16px; }
+.today-col-head .cnt{
+  margin-left:auto; font-size:11px; background:var(--bg3);
+  padding:2px 10px; border-radius:10px; color:var(--text2);
+}
+.today-col-head.intake{ color:#1db97a; }
+.today-col-head.return{ color:#3b82f6; }
+.today-col-body{ display:flex; flex-direction:column; }
+.today-empty{ padding:30px 16px; text-align:center; color:var(--text3); font-size:12px; }
+
+/* 行：［チーム色］時間｜担当縦バッジ｜本体｜右タグ（固定幅で全幅揃え） */
+.today-row{
+  display:grid;
+  grid-template-columns:62px 22px 1fr 210px;
+  gap:10px;
+  padding:0 12px 0 14px;
+  height:56px;            /* 固定高さ＝フルビューで左右の行がきっちり揃う */
+  box-sizing:border-box;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  transition:background .1s;
+  border-left:6px solid var(--team);
+  align-items:center;
+  overflow:hidden;
+}
+.today-row:hover{ background:var(--bg3); }
+.today-row.is-urgent{ background:rgba(239,68,68,.06); }
+.today-row.in-break{ background:rgba(234,179,8,.05); }
+
+.tr-time{ color:var(--text); font-weight:800; font-size:15px; white-space:nowrap; }
+.tr-front{
+  writing-mode:vertical-rl; text-orientation:upright;
+  font-size:11px; font-weight:800; color:#fff; border-radius:5px;
+  padding:3px 1px; text-align:center; letter-spacing:1px; align-self:stretch;
+  display:flex; align-items:center; justify-content:center; min-height:34px;
+}
+.tr-front.empty{ background:transparent; }
+
+.tr-main{ min-width:0; }
+.tr-headline{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+.tr-customer{ font-weight:800; font-size:16px; white-space:nowrap; }
+.tr-carname{ font-weight:700; font-size:15px; color:var(--text); white-space:nowrap; }
+.tr-plate{ font-size:12px; color:var(--text2); margin-top:1px; }
+/* ナンバー横の当日メモ（クイック引継ぎ）＝当日ビュー内だけ v0.123.0 */
+.tr-plateline{ display:flex; align-items:center; gap:8px; margin-top:1px; min-width:0; }
+.tr-plateline .tr-plate{ margin-top:0; flex:none; }
+.tr-note{ flex:1; min-width:0; font-size:12px; font-weight:800; color:var(--orange); background:transparent; border:none; border-radius:5px; padding:1px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:text; }
+.tr-note:hover{ background:rgba(255,255,255,.05); }   /* 枠は出さず、ホバー時だけうっすら */
+.tr-note.empty{ color:var(--text3); font-weight:400; opacity:.4; }   /* 未入力は控えめ＝「なにもないエリア」。クリックで入力 */
+.tr-note-input{ flex:1; min-width:0; width:100%; font-size:12px; font-weight:800; color:var(--orange); background:var(--bg2); border:1px solid var(--brand); border-radius:6px; padding:1px 6px; outline:none; font-family:inherit; }
+
+/* 右タグ：固定3スロットで全幅揃え（添え物｜受付タイプ｜作業タイプ）。中身は各スロット幅いっぱい */
+.tr-tags{ display:grid; grid-template-columns:64px 44px 78px; gap:6px; align-items:center; justify-content:end; }/* v0.87.2 受付タイプ枠を30→44px＝「待預」2バッジが詰まらず入る */
+/* 作業バッジ2個（併用）＝1個ぶん幅(78px)の中に横並び。余白・文字を詰めて2段積みにしない。 */
+.tr-tag-work.multi{ flex-wrap:nowrap; gap:2px; overflow:hidden; }
+.tr-tag-work.multi .tag-work{ font-size:10px; padding:1px 4px; flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tr-tag-slot{ display:flex; gap:3px; align-items:center; justify-content:flex-end; min-width:0; }
+.tag-drop{
+  width:100%; height:26px; border-radius:5px;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:800; color:#fff;
+}
+.tag-drop-wait    {background:#64748b}
+.tag-drop-sameDay {background:#f59e0b}
+.tag-drop-drop    {background:#10b981}
+.tag-work{
+  width:100%; height:26px; font-weight:800; border-radius:5px; border:1px solid;
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  overflow:hidden; line-height:1.05;
+}
+.tag-side{
+  position:relative; overflow:visible;
+  font-size:10.5px; font-weight:700; padding:3px 6px; border-radius:5px;
+  background:var(--bg3); color:var(--text2); border:1px solid var(--border); white-space:nowrap;
+}
+.tag-side.consult{ background:rgba(234,179,8,.15); color:#a16207; border-color:#eab308; }
+.tag-side.loaner{ background:rgba(245,158,11,.12); color:#b45309; border-color:#f59e0b; }
+.tag-side.wash{ background:rgba(59,130,246,.1); color:#2563eb; border-color:#3b82f6; }
+/* 洗車 済＝他ビューと同じ赤い「済」スタンプを右上角に v0.123.3 */
+.tag-side.wash.done::after{
+  content:"済"; position:absolute; top:-8px; right:-5px; transform:rotate(-12deg);
+  font-size:9px; font-weight:900; color:#fff; background:#ef4444;
+  border-radius:3px; padding:0 2px; line-height:1.3;
+  box-shadow:0 1px 3px rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.18); pointer-events:none;
+}
+/* 作業タイプ・受付の文字は幅に合わせて自動縮小（長い「コーティング」等でもはみ出さない） */
+.tag-drop{ font-size:14px; }
+.tag-work{ font-size:13px; }
+.tag-work.long{ font-size:11px; }
+
+/* 休憩ゾーン：全体が黄色の斜めストライプの連続ブロック。中のカードもその上に乗る。
+   ゾーンの一番下に明るい黄色の点線（休憩の終わりの目印） */
+/* 休憩ゾーン＝ブルーグレー（C-1）。警告色を避け「ひと息つく」トーンに */
+.tod-break{
+  background:repeating-linear-gradient(45deg, rgba(110,140,180,.16), rgba(110,140,180,.16) 10px, rgba(110,140,180,.05) 10px, rgba(110,140,180,.05) 20px);
+  border-top:1px dashed #6b87a8;      /* 上 */
+  border-bottom:1px dashed #6b87a8;   /* 下＝上と同じ点線 */
+}
+.tod-break-bar{
+  color:#3a5273; font-size:12px; font-weight:800; text-align:center;
+  padding:5px 0; border-bottom:1px dashed rgba(110,140,180,.5);
+  background:rgba(110,140,180,.14);
+}
+[data-theme="dark"] .tod-break-bar{ color:#a9c2e0; }
+/* 休憩枠内のカードは背景を透かしてストライプを見せる＝枠の中にいる感じ */
+.tod-break .today-row, .tod-break .today-row.in-break{ background:transparent; }
+.tod-break .today-row:hover{ background:rgba(110,140,180,.12); }
+.tod-break .today-row{ border-bottom:1px dashed rgba(110,140,180,.28); }
+/* 休憩枠内の空き行（相手側にカードがある時に枠を縦に広げる）＝枠と同じストライプ（背景は親が出すので透明）。
+   行間の点線で枠が何台分か分かる。一番下の明るい点線は親(.tod-break)の border-bottom が担当 */
+.tod-break-pad{ height:56px; box-sizing:border-box; border-bottom:1px dashed rgba(110,140,180,.28); background:transparent; }
+.tod-break-pad:last-child{ border-bottom:none; }
+/* セグメントの空き行＝相手カラムにカードがある高さに合わせた余白（午前の入庫スカスカが見える） */
+.tod-seg-pad{ height:56px; box-sizing:border-box; border-bottom:1px solid var(--border); background:repeating-linear-gradient(45deg, transparent, transparent 12px, rgba(128,128,128,.04) 12px, rgba(128,128,128,.04) 24px); }
+/* 休憩枠内のカードも同じ56px固定なので、フルビューで休憩バーが左右ぴったり揃う */
+.tod-break .today-row{ height:56px; }
+
+@media (max-width:768px){
+  .today-cols{grid-template-columns:1fr}
+  .today-nav{margin-left:0}
+}
+
+/* タスクボード：終端列・サイド列のスタイル */
+.kanban-col.terminal{
+  background:var(--bg);
+}
+.kanban-col.terminal .kanban-col-head{
+  color:var(--green);
+  background:linear-gradient(0deg, transparent, rgba(29,185,122,0.06));
+}
+.kanban-col.side{
+  flex:0 0 220px;
+  min-width:0;
+  margin-left:8px;
+  border-color:var(--border2);
+  background:repeating-linear-gradient(45deg,var(--bg2),var(--bg2) 8px,var(--bg) 8px,var(--bg) 16px);
+}
+.kanban-col.side .kanban-col-head{
+  color:var(--text3);
+  background:none;
+}
+.kanban-empty{
+  color:var(--text3);
+  font-size:11px;
+  text-align:center;
+  padding:10px 0;
+}
+
+/* ===== 試運転を「選ぶ」2枠（各フェーズ列の下段・通常/試運転） ===== */
+.kanban-td2{ flex:0 0 auto; margin:2px 8px 8px; display:flex; flex-direction:column; gap:6px; }
+.kanban-td2-box{ border:1.5px dashed var(--border2); border-radius:8px; padding:5px 6px; min-height:40px; display:flex; flex-direction:column; gap:8px; justify-content:center; }
+.kanban-td2-ph{ font-size:10.5px; color:var(--text3); text-align:center; opacity:.6; font-weight:700; letter-spacing:.02em; }
+.kanban-td2-lb{ font-size:10.5px; font-weight:800; color:var(--text3); letter-spacing:.03em; }
+.kanban-td2-test.has{ border-color:var(--orange); background:rgba(245,158,11,.09); }
+.kanban-td2-test.has .kanban-td2-lb{ color:var(--orange); }
+.kanban-td2-box.dnd-over{ border-style:solid; border-color:var(--green); background:rgba(29,185,122,.12); }
+/* 並び替え：このカードの手前に差し込む、を上辺の緑ラインで示す */
+.pit-card.pcm.dnd-over{ box-shadow:inset 0 3px 0 0 var(--green); }
+
+/* ===== side列（廃車・外注）の縦積み ===== */
+.kanban-side-stack{ display:flex; flex-direction:column; gap:8px; flex:0 0 220px; min-width:0; margin-left:8px; align-self:stretch; }
+.kanban-side-stack .kanban-col.side{ margin-left:0; flex:0 0 auto; }
+
+/* ===== 外注ビュー（外注先ごとの俯瞰） ===== */
+.os-row{ background:var(--bg2); border:1px solid var(--border); border-radius:10px; margin-bottom:12px; overflow:hidden; }
+.os-rowh{ padding:9px 14px; font-size:13px; font-weight:700; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+.os-rowh .os-n{ font-size:11px; font-weight:600; color:var(--text3); background:var(--bg3); border-radius:10px; padding:1px 8px; }
+.os-cards{ display:flex; flex-wrap:wrap; gap:12px; padding:12px; align-items:flex-start; }
+.os-none{ font-size:12px; color:var(--text3); padding:6px 2px; }
+/* タスクボードと同じコンパクトカード＋右側に完了予定・何日目 */
+.os-item{ display:flex; align-items:stretch; }
+.os-item .pit-card.pcm{ width:200px; border-top-right-radius:0; border-bottom-right-radius:0; }
+/* 外注ビューは右側BOXに外注先・日数を出すので、カード下の外注ラベルは隠す（重複回避） */
+.os-item .pcm-out{ display:none; }
+/* 横BOXは「耳（予約番号タブ）」の分だけ下げてカード本体と高さを揃える（耳ありカードは margin-top:9px） */
+.os-item .pit-card.pcm.pcm-tab + .os-side{ margin-top:9px; }
+.os-side{ display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; min-width:66px; padding:6px 8px; background:var(--bg4); border:1px solid var(--border2); border-left:none; border-radius:0 8px 8px 0; }
+.os-side-due{ font-size:10px; color:var(--text3); text-align:center; line-height:1.3; }
+.os-side-due b{ font-size:14px; font-weight:800; color:var(--text); }
+.os-side-day{ font-size:11px; font-weight:800; color:#1c1300; background:#f59e0b; border-radius:4px; padding:0 6px; }
+.os-empty{ font-size:13px; color:var(--text3); padding:24px; text-align:center; }
+
+/* 返車ビュー：カレンダー上のイベント色（緑系で入庫と区別） */
+.reserve-month-event.return,
+.reserve-week-event.return{
+  background:rgba(29,185,122,.15);
+  border-left-color:var(--green);
+}
+.reserve-month-event.return:hover,
+.reserve-week-event.return:hover{
+  background:var(--green);
+  color:#fff;
+}
+.pit-card.return{
+  border-left-color:var(--green) !important;
+}
+/* 月＝日付リスト型（rml）でも返車は緑で統一（入庫＝作業色との区別） */
+.rml-ev.return{
+  border-left-color:var(--green) !important;
+  background:rgba(29,185,122,.12);
+}
+.rml-ev.return:hover{
+  background:var(--green);
+  color:#fff;
+}
+
+/* ========================================
+   カード詳細フォーム
+   ======================================== */
+.modal-box{
+  width:min(760px, 94vw) !important;
+  max-height:90dvh !important;
+}
+
+.cf-section{
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  margin-bottom:10px;
+}
+.cf-section-head{
+  padding:8px 12px;
+  font-size:12px;
+  font-weight:600;
+  color:var(--brand);
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  border-radius:var(--r) var(--r) 0 0;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.cf-section-body{
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.cf-row{
+  display:flex;
+  gap:10px;
+  align-items:flex-end;
+}
+.cf-field{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.cf-label{
+  font-size:10px;
+  color:var(--text3);
+  font-weight:600;
+}
+
+.cf-input{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:6px 8px;
+  font-size:13px;
+  color:var(--text);
+  font-family:inherit;
+  width:100%;
+}
+/* 🔴 v1.54.2 上下の矢印（数字を増減させるつまみ）を出さない印（ゆうた指定）。
+   手で打つ金額欄に付ける。⚠ 付けた欄だけに効く＝ほかの数字欄は今までどおり。 */
+.cf-input[data-nospin]::-webkit-outer-spin-button,
+.cf-input[data-nospin]::-webkit-inner-spin-button{ -webkit-appearance:none; appearance:none; margin:0; }
+.cf-input[data-nospin][type=number]{ -moz-appearance:textfield; appearance:textfield; }
+.cf-input:focus{
+  outline:none;
+  border-color:var(--brand);
+  background:var(--bg);
+}
+.cf-input[type="date"],
+.cf-input[type="number"]{
+  font-family:inherit;
+}
+textarea.cf-input{
+  resize:vertical;
+  min-height:38px;
+}
+select.cf-input{
+  cursor:pointer;
+}
+
+.cf-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px;
+}
+.cf-chip{
+  padding:4px 12px;
+  font-size:12px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  color:var(--text2);
+  cursor:pointer;
+  transition:all .1s;
+  font-family:inherit;
+}
+.cf-chip:hover{
+  background:var(--bg3);
+}
+.cf-chip.active{
+  background:var(--brand);
+  color:#fff;
+  border-color:var(--brand);
+  font-weight:600;
+}
+
+.cf-toggle{
+  display:flex;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:6px;
+  overflow:hidden;
+  width:fit-content;
+}
+.cf-tg{
+  padding:5px 14px;
+  font-size:12px;
+  background:transparent;
+  color:var(--text2);
+  border:none;
+  cursor:pointer;
+  font-family:inherit;
+}
+.cf-tg.active{
+  background:var(--brand);
+  color:#fff;
+  font-weight:600;
+}
+.cf-tg + .cf-tg{
+  border-left:1px solid var(--border);
+}
+
+.cf-loaner-detail{
+  margin-top:6px;
+  padding:8px 10px;
+  background:var(--bg2);
+  border-radius:6px;
+  border-left:3px solid var(--brand);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+@media (max-width:768px){
+  .cf-row{flex-direction:column;align-items:stretch}
+}
+
+/* ===== v1.65.0 返車ビュー・当日の「終日」枠（待ち・当日返しで返車時間がまだ無い車） ===== */
+.reserve-slot.rs-allday .reserve-slot-time{ color:var(--text2); font-weight:800; }
+.reserve-slot.rs-allday .reserve-slot-time small{ display:block; font-size:9.5px; font-weight:600; color:var(--text3); margin-top:1px; }

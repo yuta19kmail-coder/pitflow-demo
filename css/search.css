@@ -1,0 +1,152 @@
+/* ========================================
+ * search.css （PitFlow v0.65.0）
+ * ダッシュボード最上部のマスター検索BOX
+ * ======================================== */
+
+/* 🔴 v1.45.0 検索の入れ物は**必ず前に出す**。
+   ⚠ 結果パネルは position:absolute で「浮いている」だけ＝**z-index を付けないと、
+      あとに並ぶ付箋（.bn-card）やダッシュボードのBOX（.md-box）に隠れる**
+      （どれも position:relative なので、同じ高さなら**後ろに書いてある方が上**に乗る。
+        2026-08-04 の不具合＝検索結果がBOXの下に回り込む）。
+   ⚠ 数字は 50（モーダル・トースト＝60以上より下、ふつうの中身＝0 より上）。 */
+#pit-search-wrap,
+.md-search {
+  position: relative;
+  z-index: 50;
+}
+#pit-search-wrap { margin: 0 0 14px; }
+
+#pit-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--text1);
+  background: var(--bg2);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+#pit-search-input::placeholder { color: var(--text3); }
+#pit-search-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+/* 結果パネル（ドロップダウン） */
+.pit-search-results {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;   /* ⚠ 入れ物に z-index が付いていない画面でも隠れないように、ここにも付けておく */
+  max-height: 62vh;
+  overflow-y: auto;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  padding: 6px;
+}
+.pit-search-results.open { display: block; }
+
+.psr-head {
+  font-size: 11px;
+  color: var(--text3);
+  padding: 6px 10px 8px;
+}
+.psr-empty {
+  font-size: 13px;
+  color: var(--text3);
+  text-align: center;
+  padding: 22px 12px;
+}
+
+.psr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+
+.psr-no {
+  flex: 0 0 auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.psr-no.psr-cust {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 左：予約番号＋ステータスバッジ（縦積み） */
+.psr-lead { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 78px; }
+.psr-cust-tag { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: var(--brand-soft); color: var(--brand); font-size: 15px; }
+
+.psr-main { flex: 1; min-width: 0; }
+
+/* 右：操作ボタン */
+.psr-acts { flex: 0 0 auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; max-width: 360px; }
+.psr-act {
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  color: var(--text2); background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 7px; padding: 5px 9px; cursor: pointer;
+}
+.psr-act:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+@media (max-width: 768px) {
+  .psr-row { flex-wrap: wrap; }
+  .psr-acts { max-width: none; width: 100%; justify-content: flex-start; }
+}
+.psr-l1 {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text1);
+}
+.psr-name { font-size: 14px; font-weight: 800; }
+.psr-l1 .psr-car { font-size: 14px; color: var(--text1); font-weight: 700; } /* 車種は名前と同格 */
+.psr-plate { font-size: 12px; color: var(--text2); font-weight: 600; }
+.psr-more { font-size: 11px; color: var(--text3); }
+/* 工程・代車・当待バッジ（1/2課ボードのカードと同じ小さいスタイル・顧客の横に） */
+.psr-bs { display: inline-flex; gap: 5px; flex-wrap: wrap; }
+.psr-b { font-size: 11.5px; line-height: 1.4; font-weight: 700; padding: 1px 6px; border-radius: 6px; border: 1px solid; white-space: nowrap; }
+.psr-b-loaner { background: rgba(245,158,11,.16); color: #f59e0b; border-color: rgba(245,158,11,.55); }
+.psr-b-drop { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+.psr-l2 {
+  font-size: 11.5px;
+  color: var(--text3);
+  margin-top: 3px;
+}
+
+.psr-st {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  background: var(--bg2);
+}
+
+@media (max-width: 768px) {
+  .psr-l1 { white-space: normal; }
+  #pit-search-input { font-size: 16px; } /* iOSズーム防止 */
+}

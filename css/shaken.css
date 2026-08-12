@@ -1,0 +1,126 @@
+/* ========================================
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v0.110.0
+   ======================================== */
+#shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
+  --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
+
+.shk-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:2px 2px 10px; }
+.shk-nav{ display:inline-flex; align-items:center; gap:6px; }
+.shk-nav b{ min-width:96px; text-align:center; font-size:14px; }
+.shk-nav button{ border:1px solid var(--border); background:var(--bg3); color:var(--text); padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer; }
+.shk-nav button:hover{ border-color:var(--brand,#1f7a4d); }
+.shk-legend{ display:inline-flex; gap:6px; font-size:11px; flex-wrap:wrap; }
+.shk-lg{ padding:2px 9px; border-radius:999px; border:1px solid var(--border); color:var(--text3); }
+.shk-lg.dc{ color:#7fa8f5; } .shk-lg.dn{ color:#5fd3a6; } .shk-lg.re{ color:#f8a866; } .shk-lg.cd{ color:#5fd3a6; }
+.shk-sum{ margin-left:auto; font-size:12px; color:var(--text3); font-weight:600; }
+
+.shk-un{ font-size:11.5px; color:var(--text2); margin:0 2px 10px; line-height:2; }
+.shk-uchip{ display:inline-block; border:1px solid var(--border); border-left:3px solid var(--green); background:var(--bg3); border-radius:6px; padding:2px 8px; margin:0 5px 4px 0; cursor:pointer; font-size:11px; }
+.shk-uchip:hover{ border-color:var(--brand,#1f7a4d); }
+
+.shk-scroll{ overflow-x:auto; border:1px solid var(--border); border-radius:12px; background:var(--bg2); }
+.shk-tbl{ min-width:max-content; }
+.shk-row{ display:flex; align-items:stretch; }
+.shk-gut{ position:sticky; left:0; z-index:3; flex:0 0 var(--GUT); min-width:0; overflow:hidden; background:var(--bg3); border-right:1px solid var(--border); }
+.shk-day{ flex:0 0 calc(var(--SUB)*2); border-right:1px solid var(--daybd); text-align:center; }
+.shk-day:last-child{ border-right:0; }
+.shk-day.dayoff{ flex:0 0 var(--OFF); }
+.shk-sc{ flex:0 0 var(--SUB); min-width:0; overflow:hidden; border-right:1px solid var(--border2,#232c34); }
+.shk-sc.pm{ border-right:1px solid var(--daybd); }
+.shk-row .shk-sc:last-child{ border-right:0; }
+
+.shk-dh{ padding:6px 4px; text-align:center; }
+.shk-dh.today{ background:rgba(31,122,77,.30); }
+.shk-dh.off{ opacity:.5; }
+.shk-dh .d{ font-size:16px; font-weight:800; } .shk-dh .w{ font-size:10px; }
+.shk-dh .w.sun{ color:#ef6a6a; } .shk-dh .w.sat{ color:#6db0ec; } .shk-dh .w.wd{ color:var(--text3); }
+.shk-dh .cn{ font-size:9px; color:var(--text3); }
+.shk-ap{ font-size:10px; font-weight:700; text-align:center; padding:3px 2px; border-bottom:1px solid var(--border); }
+.shk-ap.am{ color:#e6c34d; } .shk-ap.pm{ color:#8bb4f7; }
+.hgut{ background:var(--bg3); }
+.hgut.bb{ border-bottom:1px solid var(--border); }
+
+.shk-bandrow{ background:var(--bg4,#26313b); border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.shk-band{ position:sticky; left:0; z-index:2; flex:0 0 var(--GUT); min-width:0; font-size:12px; font-weight:800; color:var(--text2); padding:7px 12px; background:var(--bg4,#26313b); }
+.shk-bandfill{ flex:1 0 auto; min-width:0; }
+/* 決定チップを「予定」エリアにドロップ＝候補（行ける日）に戻す（v0.124.0） */
+.shk-drophint{ font-size:10px; color:var(--text3); font-weight:600; padding-left:10px; }
+.shk-gantt-drop.drop{ background:rgba(38,162,105,.12); outline:2px dashed var(--brand); outline-offset:-2px; }
+.shk-gantt-drop.drop .shk-drophint{ color:var(--brand); }
+/* ポインタ方式ドラッグ（マウス＋タッチ）v0.124.1：掴める要素はタッチでスクロールに取られない */
+.shk-chip.shk-drag, .shk-bar{ touch-action:none; }
+/* v0.124.2 ドラッグ中：元チップは薄く／ドロップ先の決定枠にプレビュー用ゴーストチップを表示 */
+.shk-chip.shk-dragsrc{ opacity:.3; }
+.shk-chip.shk-ghostchip{ pointer-events:none; opacity:.7; border-style:dashed; border-left-color:var(--brand); background:var(--brand-soft,rgba(38,162,105,.15)); }
+
+.shk-glabel, .shk-gut.glabel{ display:flex; align-items:center; padding:8px 12px; font-size:12px; font-weight:800; color:var(--text2); }
+
+/* 決定セル */
+.shk-decell{ padding:4px 5px 5px; min-height:42px; }
+.shk-decell.off{ min-height:0; height:100%; background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
+.shk-decell.drop{ outline:2px dashed var(--brand,#1f7a4d); outline-offset:-3px; background:rgba(31,122,77,.14); }
+.shk-chip{ position:relative; overflow:visible; display:block; max-width:100%; border:1px solid var(--border); border-left:3px solid var(--green); border-radius:6px; padding:3px 8px; background:var(--bg3); cursor:grab; margin-bottom:4px; line-height:1.28; }
+/* 済（完了）チップ＝右上に赤い「済」スタンプ（緑チップと見分けやすく）v0.124.2 */
+.shk-chip.shk-done::after{
+  content:"済"; position:absolute; top:-7px; right:-5px; transform:rotate(-12deg);
+  font-size:10px; font-weight:900; color:#fff; background:#ef4444;
+  border-radius:3px; padding:0 3px; line-height:1.3;
+  box-shadow:0 1px 3px rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.2); pointer-events:none; z-index:2;
+}
+.shk-chip.dragging{ opacity:.4; }
+.shk-chip .shk-nm{ font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.shk-chip .shk-car{ font-size:12px; font-weight:700; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.shk-chip.shk-decided{ background:rgba(59,130,246,.12); }
+.shk-chip.shk-done{ background:rgba(29,185,122,.14); }
+.shk-chip.shk-recheck{ background:rgba(249,115,22,.14); }
+.shk-empty{ font-size:10px; color:var(--text3); opacity:.35; }
+
+/* 可能性ガント */
+.shk-gcar{ border-bottom:1px solid var(--border2,#232c34); }
+.shk-gut.gcar{ display:flex; flex-direction:column; justify-content:center; padding:6px 10px; min-width:0; }
+.shk-gcar-nm{ font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.shk-gcar-sub{ display:flex; gap:3px; margin-top:2px; flex-wrap:nowrap; overflow:hidden; }
+.shk-ca{ font-size:8.5px; padding:0 4px; border-radius:4px; background:rgba(255,255,255,.06); color:var(--text3); }
+.shk-gsc{ flex:0 0 var(--SUB); min-width:0; overflow:hidden; border-right:1px solid var(--border2,#232c34); padding:8px 3px; display:flex; align-items:center; }
+.shk-gsc.pm{ border-right:1px solid var(--daybd); }
+.shk-gcar .shk-gsc:last-child{ border-right:0; }
+.shk-gsc.off{ background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
+.shk-bar{ height:20px; width:100%; background:rgba(29,185,122,.24); border-top:1px solid #1db97a66; border-bottom:1px solid #1db97a66; cursor:grab; }
+.shk-bar.dragging{ opacity:.4; }
+.shk-bar.imp{ background:rgba(236,72,153,.22); border-color:#ec489966; }
+.shk-bar.l{ border-left:1px solid #1db97a66; border-top-left-radius:6px; border-bottom-left-radius:6px; margin-left:2px; }
+.shk-bar.r{ border-right:1px solid #1db97a66; border-top-right-radius:6px; border-bottom-right-radius:6px; margin-right:2px; }
+.shk-bar.imp.l{ border-left-color:#ec489966; } .shk-bar.imp.r{ border-right-color:#ec489966; }
+.shk-bar:hover{ filter:brightness(1.25); }
+
+/* ポップ */
+.shk-box{ max-width:340px; }
+.shk-popbody{ padding:14px 16px 16px; }
+.shk-pinfo{ font-size:14px; font-weight:700; margin-bottom:4px; }
+.shk-pnote{ font-size:12px; color:var(--text3); margin-bottom:10px; }
+.shk-pbtn{ display:block; width:100%; text-align:left; border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; padding:9px 12px; border-radius:8px; margin-bottom:7px; cursor:pointer; }
+.shk-pbtn:hover{ border-color:var(--brand,#1f7a4d); }
+.shk-pbtn.ok{ border-color:rgba(29,185,122,.5); color:#5fd3a6; }
+.shk-pbtn.re{ border-color:rgba(249,115,22,.5); color:#f8a866; }
+.shk-pbtn.ghost{ color:var(--text3); }
+
+/* 休日＝午前午後なしの1ブロック */
+.shk-off2{ flex:0 0 var(--OFF); min-width:0; overflow:hidden; border-right:1px solid var(--daybd); display:flex; align-items:center; justify-content:center;
+  background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
+.shk-row .shk-off2:last-child{ border-right:0; }
+.shk-off2.apoff{ border-bottom:1px solid var(--border); }
+.shk-off2 .shk-ap.off{ border-bottom:0; color:var(--text3); font-weight:700; padding:3px 2px; }
+.shk-nocar{ color:var(--text3); opacity:.55; }
+
+/* 未設定行＋範囲塗り */
+.shk-gsc{ -webkit-user-select:none; user-select:none; }
+.shk-gsc.paintable{ cursor:cell; }
+.shk-gsc.paintable:hover{ background:rgba(31,122,77,.10); }
+.shk-gsc.paintsel{ background:rgba(31,122,77,.32); box-shadow:inset 0 0 0 1px #1f7a4d88; }
+.shk-gcar.unset .shk-gcar-nm{ color:var(--text2); }
+.shk-ca.unset{ background:rgba(249,115,22,.20); color:#f8a866; }
+.shk-ures{ margin-left:6px; font-size:9.5px; color:var(--text3); background:rgba(255,255,255,.06); border-radius:4px; padding:0 4px; }
+.shk-plabel{ display:block; font-size:11px; color:var(--text3); font-weight:600; margin:2px 0 4px; }
+.shk-psel{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:10px; }
+.shk-chip.locked{ cursor:pointer; }
+.shk-chip.locked:hover{ filter:brightness(1.1); }

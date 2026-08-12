@@ -1,0 +1,152 @@
+/* ========================================
+   news-oplog.css  -  お知らせ（nw-）と操作ログ（op-）
+   ======================================== */
+
+/* ===== 共通 ===== */
+.nw-loading,.op-loading,.nw-empty,.op-empty{
+  padding:30px 12px; text-align:center; color:var(--text2); font-size:13px;
+}
+.nw-note,.op-note{
+  display:flex; align-items:center; gap:8px; margin-bottom:12px;
+  background:rgba(234,179,8,.10); border:1px solid rgba(234,179,8,.32);
+  color:#eab308; border-radius:var(--r); padding:9px 14px; font-size:12.5px;
+}
+
+/* ===== サイドバーの未読の丸 ===== */
+.si-newsbadge{
+  margin-left:auto; min-width:18px; height:18px; padding:0 5px;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:#ef4444; color:#fff; border-radius:999px;
+  font-size:10.5px; font-weight:700; line-height:1;
+}
+
+/* ===== お知らせ（受信箱）=====
+   🔴 v1.68.0 で CarFlow（announcements.js）と同じ形に入れ替えた。
+      お知らせはコードで配る＝手で書くモーダル（.nw-modal / .nw-add）は廃止。 */
+#news-body{ padding:0 4px 40px }
+
+.nw-top{ display:flex; align-items:center; gap:12px; margin-bottom:12px }
+.nw-top-lb{ font-size:12.5px; color:var(--text2) }
+.nw-top-lb b{ color:#ef4444; font-size:14px }
+.nw-allread{
+  margin-left:auto; padding:7px 14px; border-radius:8px; cursor:pointer; font-family:inherit;
+  border:1px solid var(--border); background:var(--bg3); color:var(--text2); font-size:12px;
+}
+.nw-allread:hover{ border-color:#2ea567; color:#2ea567 }
+
+.nw-list{ border:1px solid var(--border); border-radius:var(--r2,12px); overflow:hidden; background:var(--bg2) }
+.nw-item{ border-bottom:1px solid var(--border) }
+.nw-item:last-child{ border-bottom:none }
+
+.nw-h{ display:flex; align-items:center; gap:10px; padding:13px 15px; cursor:pointer; transition:background .15s }
+.nw-h:hover{ background:var(--bg3) }
+/* 未読の青丸。既読の行でも場所は空けておく＝見出しの左端が揃う */
+.nw-dot{ width:8px; height:8px; border-radius:50%; background:#38bdf8; flex-shrink:0; visibility:hidden }
+.nw-item.is-unread .nw-dot{ visibility:visible }
+.nw-ver{
+  font-size:10px; font-weight:700; color:#38bdf8; background:rgba(56,189,248,.12);
+  border:1px solid rgba(56,189,248,.30); border-radius:6px; padding:1px 6px; flex-shrink:0;
+}
+.nw-t{ flex:1; font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.nw-item.is-unread .nw-t{ font-weight:700 }
+.nw-item.is-read .nw-t{ color:var(--text2) }
+.nw-date{ font-size:11px; color:var(--text3); flex-shrink:0 }
+.nw-caret{ font-size:10px; color:var(--text3); flex-shrink:0 }
+
+.nw-body{ padding:2px 18px 16px 33px; font-size:13px; color:var(--text2); line-height:1.85 }
+.nw-body p{ margin:7px 0 }
+.nw-body ul{ margin:7px 0 7px 18px; padding:0 }
+.nw-body li{ margin:4px 0 }
+.nw-body b{ color:var(--text) }
+.nw-foot{ margin-top:13px; padding-top:11px; border-top:1px dashed var(--border) }
+.nw-ok2{
+  border:0; background:#1f7a4d; color:#fff; font-weight:600; font-family:inherit;
+  padding:8px 18px; border-radius:8px; font-size:13px; cursor:pointer;
+}
+.nw-ok2:hover{ background:#26935c }
+.nw-ok2:active{ transform:scale(.97) }
+.nw-done{ font-size:12px; color:#2ea567; font-weight:600; display:inline-flex; align-items:center; gap:5px }
+
+/* ===== 新着ポップアップ（ログイン直後）===== */
+.nw-pop-ov{
+  position:fixed; inset:0; z-index:9000; display:none;
+  align-items:center; justify-content:center; background:rgba(0,0,0,.55); padding:20px;
+}
+.nw-pop-ov.open{ display:flex }
+.nw-pop{
+  width:520px; max-width:96vw; max-height:86vh; display:flex; flex-direction:column;
+  background:var(--bg2); border:2px solid #1f7a4d; border-radius:var(--r2,12px);
+  box-shadow:0 18px 56px rgba(0,0,0,.55); overflow:hidden;
+}
+.nw-pop-h{ padding:14px 20px; background:#1f7a4d; color:#fff; display:flex; align-items:center; gap:10px }
+.nw-pop-ic{ display:inline-flex; line-height:1; flex-shrink:0 }
+.nw-pop-ttl{ font-size:16px; font-weight:700; color:#fff; flex:1 }
+.nw-pop-prog{
+  font-size:12px; font-weight:600; color:#fff; background:rgba(255,255,255,.22);
+  padding:2px 10px; border-radius:10px; flex-shrink:0;
+}
+.nw-pop-b{ padding:16px 20px; overflow-y:auto; flex:1 }
+.nw-pop-ih{ display:flex; align-items:center; gap:8px; margin-bottom:9px; flex-wrap:wrap }
+.nw-pop-it{ flex:1; font-size:14.5px; font-weight:700; color:var(--text); min-width:200px }
+.nw-pop-id{ font-size:11px; color:var(--text3); flex-shrink:0 }
+.nw-pop-ib{ font-size:13px; color:var(--text2); line-height:1.85 }
+.nw-pop-ib p{ margin:7px 0 }
+.nw-pop-ib ul{ margin:7px 0 7px 18px; padding:0 }
+.nw-pop-ib li{ margin:4px 0 }
+.nw-pop-ib b{ color:var(--text) }
+.nw-pop-rest{
+  margin:0 20px 4px; padding:9px 13px; border-radius:8px; font-size:12px;
+  background:rgba(56,189,248,.10); border:1px solid rgba(56,189,248,.28); color:var(--text2);
+}
+.nw-pop-rest b{ color:#38bdf8 }
+.nw-pop-f{ padding:13px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px }
+.nw-pop-later{
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  border-radius:8px; padding:8px 18px; font-size:13px; cursor:pointer; font-family:inherit;
+}
+.nw-pop-later:hover{ background:var(--bg4); color:var(--text) }
+.nw-pop-ok{
+  background:#1f7a4d; color:#fff; border:0; border-radius:8px;
+  padding:8px 24px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+}
+.nw-pop-ok:hover{ background:#26935c }
+.nw-pop-ok:active{ transform:scale(.97) }
+
+/* ===== 操作ログ ===== */
+#oplog-body{ padding:0 4px 40px }
+.op-bar{ display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap }
+.op-search{
+  display:inline-flex; align-items:center; gap:7px; flex:1; min-width:220px; max-width:460px;
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:0 11px; color:var(--text2);
+}
+.op-search input{
+  flex:1; background:transparent; border:0; outline:none; color:var(--text);
+  font-size:13px; font-family:inherit; padding:9px 0;
+}
+.op-count{ font-size:12px; color:var(--text2) }
+.op-reload{
+  margin-left:auto; display:inline-flex; align-items:center; gap:6px;
+  padding:8px 13px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:12.5px; font-family:inherit;
+}
+.op-reload:hover{ border-color:#2ea567; color:#2ea567 }
+
+.op-list{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden }
+.op-row{
+  display:grid; grid-template-columns:88px 90px minmax(150px,1fr) minmax(120px,1.4fr);
+  gap:12px; align-items:center; padding:9px 14px;
+  border-bottom:1px solid var(--border); font-size:12.5px;
+}
+.op-row:last-child{ border-bottom:0 }
+.op-row:hover{ background:var(--bg3) }
+.op-time{ color:var(--text2); font-variant-numeric:tabular-nums; white-space:nowrap }
+.op-user{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.op-act{ color:var(--text) }
+.op-label{ color:var(--text2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.op-label a{ color:#2ea567; text-decoration:none }
+.op-label a:hover{ text-decoration:underline }
+
+@media (max-width:760px){
+  .op-row{ grid-template-columns:1fr; gap:2px; padding:11px 14px }
+  .op-label{ white-space:normal }
+}

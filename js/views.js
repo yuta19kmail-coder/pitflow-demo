@@ -5,6 +5,12 @@
    ======================================== */
 
 function showView(viewId){
+  /* 🔴 v1.80.0 代車カレンダーに**未確定の下書き**がある時は、黙って離れさせない。
+     ⚠ 下書きは state に直接書かれていて、よその画面の保存に巻き込まれると
+        「動かしただけのつもり」が本当に変わってしまう。
+     ⚠ 聞くのは1回だけ。答えが返ってから改めて showView をやり直す（写しを作らない）。 */
+  if (state.currentView === 'loaner' && viewId !== 'loaner'
+      && window.pitLoanerAskLeave && pitLoanerAskLeave(viewId)) return;
   state.currentView = viewId;
   // 付箋の表示先を既定（ダッシュボード）へ戻す。マイダッシュボードは renderMyDash 内で自分の器へ切替。
   window.PIT_BN_TARGET = 'board-notes-area';

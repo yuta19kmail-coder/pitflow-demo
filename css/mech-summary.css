@@ -1,0 +1,99 @@
+/* ========================================
+   mech-summary.css  -  作業担当ピッカー＋割合表示＋作業サマリービュー / PitFlow v0.129.0
+   ・sales.css の sv-* を土台に、メカニック配分まわりだけ追加。
+   ======================================== */
+
+/* ===== v1.67.0 カード「整備」タブ：担当チップ（案B・ゆうた確定） =====
+   名前をタップで入る／もう一度で ×2・×3…／✕ で外す。
+   🔴 配分はライブ（返車前でも出る）＋**％だけ**（金額は出さない）。 */
+.cf-mech-block{ margin:0 0 14px; }
+.cf-label .cf-mech-cnt{ font-style:normal; font-size:10.5px; font-weight:600; color:var(--text3,#5c6490); margin-left:8px; }
+.cf-mech-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
+.cf-mchip{
+  position:relative; border:1px solid var(--border,#333650); background:var(--bg3,#222536);
+  color:var(--text2,#9fa8c7); font-size:13px; font-weight:700; padding:7px 13px;
+  border-radius:999px; cursor:pointer; font-family:inherit; user-select:none;
+  transition:background .12s, border-color .12s, color .12s;
+}
+.cf-mchip:hover{ border-color:var(--border2,#444870); }
+.cf-mchip.full{ opacity:.4; cursor:not-allowed; }
+.cf-mchip.on{ border-color:transparent; }
+.cf-mech-i .cf-mchip.on{ background:#38bdf8; color:#06283d; }
+.cf-mech-m .cf-mchip.on{ background:#f59e0b; color:#3a2503; }
+.cf-mchip-x{ font-style:normal; font-size:11px; font-weight:900; margin-left:5px; }
+/* 🔴 「×2」（枠の数）と「✕」（外す）を見間違えないように、✕ は仕切り線で別ボタンに見せる */
+.cf-mchip-off{
+  display:inline-block; margin-left:8px; padding-left:8px; font-size:11px; font-weight:900;
+  opacity:.72; border-left:1px solid rgba(0,0,0,.24); line-height:1;
+}
+.cf-mchip-off:hover{ opacity:1; }
+
+/* ===== 配分（％だけ）＝点検ぶん／作業ぶんの帯 ===== */
+.mech-split{ display:flex; height:24px; border-radius:7px; overflow:hidden; background:rgba(148,163,184,.14); margin-bottom:5px; }
+.mech-split i{ display:flex; align-items:center; justify-content:center; font-style:normal; font-size:10.5px; font-weight:800; white-space:nowrap; overflow:hidden; }
+.mech-split .ms-i{ background:#38bdf8; color:#06283d; }
+.mech-split .ms-m{ background:#f59e0b; color:#3a2503; }
+.mech-split-lb{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--text3,#5c6490); margin-bottom:8px; }
+.mech-alloc-x{ font-style:normal; font-size:10.5px; font-weight:800; color:var(--text3,#5c6490); margin-left:5px; }
+
+/* ===== カード「整備」タブ：担当ピッカー（旧・プルダウン。過去の画面が残っていても崩れないよう据え置き） ===== */
+.cf-mech-block{ margin:0 0 14px; }
+.cf-mech-rows{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+.cf-mech-row{ display:flex; align-items:center; gap:6px; }
+.cf-mech-no{
+  width:20px; height:20px; flex:0 0 auto; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:#cbd5e1;
+  background:rgba(148,163,184,.18);
+}
+.cf-mech-sel{ min-width:120px; }
+.cf-mech-actions{ margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; }
+.cf-mech-preview{ margin-top:12px; }
+.cf-mech-note{ font-size:12px; color:#94a3b8; margin:6px 0; }
+
+/* ===== 割合表示（埋め込み） ===== */
+.mech-alloc{
+  border:1px solid rgba(148,163,184,.22); border-radius:12px;
+  padding:12px 14px; background:rgba(148,163,184,.06);
+}
+.mech-alloc-head{ font-size:13px; margin-bottom:8px; }
+.mech-alloc-head b{ font-size:15px; }
+.mech-alloc-sub{ color:#94a3b8; margin-left:8px; font-size:12px; }
+.mech-alloc-row{
+  display:grid; grid-template-columns: 1fr auto 52px; align-items:center;
+  gap:8px; padding:6px 0; border-top:1px dashed rgba(148,163,184,.2);
+}
+.mech-alloc-pct{ font-size:16px; }
+.mech-alloc-row.insp .mech-alloc-pct{ color:#38bdf8; }
+.mech-alloc-row.mech .mech-alloc-pct{ color:#f59e0b; }
+.mech-alloc-nm{ font-weight:700; }
+.mech-alloc-kind{ font-size:11px; color:#94a3b8; }
+.mech-alloc-pct{ text-align:right; font-variant-numeric:tabular-nums; font-weight:700; }
+.mech-alloc-veh{ text-align:right; font-variant-numeric:tabular-nums; color:#94a3b8; font-size:12px; }
+.mech-alloc-amt{ text-align:right; font-variant-numeric:tabular-nums; font-weight:700; }
+.mech-alloc-row.insp .mech-alloc-kind{ color:#0ea5e9; }
+.mech-alloc-row.mech .mech-alloc-kind{ color:#1db97a; }
+
+/* ===== 作業サマリー：横バー ===== */
+.mech-bars{ display:flex; flex-direction:column; gap:8px; padding:6px 2px 2px; }
+.mech-bar-row{ display:grid; grid-template-columns:74px 1fr 62px; align-items:center; gap:10px; }
+.mech-bar-nm{ font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mech-bar-track{ display:flex; height:18px; border-radius:6px; overflow:hidden; background:rgba(148,163,184,.14); }
+.mech-bar-insp{ background:#0ea5e9; min-width:0; position:relative; }
+.mech-bar-work{ background:#1db97a; min-width:0; position:relative; }
+.mech-bar-insp .mech-bar-tt, .mech-bar-work .mech-bar-tt{
+  display:none; position:absolute; bottom:22px; left:0; white-space:nowrap;
+  background:#0f172a; color:#e2e8f0; font-size:11px; padding:2px 6px; border-radius:5px; z-index:5;
+}
+.mech-bar-insp:hover .mech-bar-tt, .mech-bar-work:hover .mech-bar-tt{ display:block; }
+.mech-bar-amt{ text-align:right; font-variant-numeric:tabular-nums; font-weight:700; }
+
+.mech-lg{ display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:middle; margin:0 3px 0 8px; }
+.mech-lg-insp{ background:#0ea5e9; }
+.mech-lg-work{ background:#1db97a; }
+.mech-table td.sv-num{ font-variant-numeric:tabular-nums; }
+
+/* ライトテーマ微調整 */
+[data-theme="light"] .cf-mech-no{ color:#475569; background:rgba(100,116,139,.16); }
+[data-theme="light"] .mech-alloc{ border-color:rgba(100,116,139,.25); background:rgba(100,116,139,.05); }
+[data-theme="light"] .mech-alloc-sub, [data-theme="light"] .mech-alloc-veh, [data-theme="light"] .cf-mech-note{ color:#64748b; }

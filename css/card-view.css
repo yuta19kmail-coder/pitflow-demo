@@ -1,0 +1,448 @@
+/* card-view.css - 予約確定後カード詳細（読み取り主体・2カラム）。全クラス cv- 接頭辞で衝突回避 */
+
+/* モーダル枠の上書き（カードビュー時） */
+.modal-box.card-modal.cardview{ width:97vw !important; max-width:1320px !important; height:92dvh !important; max-height:960px !important; overflow:hidden !important; }
+.modal-box.card-modal.cardview > .modal-head{ display:none; }
+.modal-box.card-modal.cardview > .modal-body{ padding:0 !important; overflow:hidden !important; flex:1 1 auto; min-height:0; }
+
+.cv-root{ position:relative; display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; border-radius:inherit; }
+
+/* スクロールバー */
+.cv-root *::-webkit-scrollbar{ width:9px; height:9px; }
+.cv-root *::-webkit-scrollbar-track{ background:transparent; }
+.cv-root *::-webkit-scrollbar-thumb{ background:var(--bg4); border-radius:6px; border:2px solid transparent; background-clip:padding-box; }
+.cv-root *::-webkit-scrollbar-thumb:hover{ background:var(--border2); background-clip:padding-box; }
+
+/* トップ */
+.cv-top{ display:flex; align-items:center; gap:10px; padding:12px 18px; background:linear-gradient(135deg,var(--bg2),var(--bg3)); border-bottom:1px solid var(--border); flex:0 0 auto; position:relative; z-index:20; }
+.cv-resno{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; font-weight:700; color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:2px 9px; }
+.cv-status{ font-size:12px; font-weight:800; padding:3px 11px; border-radius:999px; border:1px solid; }
+.cv-intake{ font-size:11.5px; font-weight:700; color:var(--text3); }
+.cv-acts{ margin-left:auto; display:flex; gap:8px; align-items:center; }
+.cv-iconbtn{ font-size:15px; width:34px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+.cv-iconbtn:hover{ background:var(--bg4); }
+.cv-optwrap{ position:relative; }
+.cv-optmenu{ display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:208px; background:var(--bg2); border:1px solid var(--border2); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.5); padding:6px; z-index:80; }
+.cv-optmenu.show{ display:block; }
+.cv-opth{ font-size:10px; font-weight:800; color:var(--text3); padding:5px 8px 4px; }
+.cv-opti{ display:block; width:100%; text-align:left; font-size:12.5px; font-weight:700; color:var(--text); background:transparent; border:none; border-radius:7px; padding:8px 9px; cursor:pointer; }
+.cv-opti:hover{ background:var(--bg3); }
+.cv-opti.cv-danger{ color:#ff8c8c; }
+.cv-optdiv{ height:1px; background:var(--border); margin:5px 4px; }
+
+.cv-claimbanner{ background:rgba(239,68,68,.16); border-bottom:1px solid rgba(239,68,68,.5); color:#ff8c8c; font-size:13px; font-weight:800; padding:9px 18px; flex:0 0 auto; position:relative; z-index:19; text-align:center; letter-spacing:.5px; }
+
+/* 付箋・削除ポップ */
+.cv-fusenpop,.cv-delpop{ display:none; position:absolute; right:14px; top:50px; width:300px; background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 16px 40px rgba(0,0,0,.55); padding:13px; z-index:80; }
+.cv-fusenpop.show,.cv-delpop.show{ display:block; }
+.cv-fph{ font-size:12.5px; font-weight:800; color:var(--text1); margin-bottom:8px; }
+.cv-fplink{ font-size:11.5px; font-weight:800; color:#9cc4f0; background:rgba(55,138,221,.12); border:1px solid rgba(55,138,221,.4); border-radius:7px; padding:5px 9px; margin-bottom:9px; }
+.cv-fpbody{ width:100%; min-height:70px; background:var(--bg1); border:1px solid var(--border2); border-radius:8px; color:var(--text); font-size:13px; padding:8px; resize:vertical; font-family:inherit; }
+.cv-fpcolors{ display:flex; gap:7px; margin:9px 0; }
+.cv-fpc{ width:22px; height:22px; border-radius:6px; cursor:pointer; border:2px solid transparent; }
+.cv-fpc.on{ border-color:#fff; }
+.cv-fpacts{ display:flex; justify-content:flex-end; gap:8px; }
+.cv-ok{ font-size:12px; font-weight:800; border:none; border-radius:7px; padding:7px 14px; cursor:pointer; background:var(--brand); color:#fff; }
+.cv-ng{ font-size:12px; font-weight:800; border:1px solid var(--border2); border-radius:7px; padding:7px 12px; cursor:pointer; background:var(--bg3); color:var(--text2); }
+.cv-dpt{ font-size:14px; font-weight:800; color:var(--text1); }
+.cv-dpsub{ font-size:12.5px; font-weight:700; color:var(--text2); margin-top:4px; }
+.cv-dpnote{ font-size:11px; color:var(--text3); margin:9px 0 12px; line-height:1.5; }
+.cv-dpdel{ font-size:12px; font-weight:800; border:1px solid #5b2230; border-radius:7px; padding:7px 14px; cursor:pointer; background:rgba(239,68,68,.15); color:#ff8c8c; }
+
+/* 2カラム */
+.cv-twocol{ display:flex; align-items:stretch; flex:1 1 auto; min-height:0; }
+.cv-left{ flex:0 0 440px; padding:18px 20px; border-right:1px solid var(--border); overflow:auto; min-height:0; }
+.cv-right{ flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; }
+@media(max-width:860px){ .cv-twocol{ flex-direction:column; overflow:auto; } .cv-left{ flex:none; border-right:none; border-bottom:1px solid var(--border); overflow:visible; } .cv-right{ overflow:visible; } }
+
+/* 左：識別情報 */
+.cv-resnotab{ display:inline-block; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; font-weight:800; letter-spacing:.5px; color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-bottom:none; border-radius:7px 7px 0 0; padding:2px 11px 3px; margin-bottom:-1px; }
+.cv-id1{ display:flex; align-items:baseline; gap:10px; }
+.cv-nm{ font-size:21px; font-weight:800; color:var(--text); } .cv-nm small{ font-size:13px; font-weight:600; color:var(--text2); margin-left:4px; }
+.cv-editmini{ font-size:11px; font-weight:700; color:var(--brand); background:var(--brand-soft); border:1px solid rgba(38,162,105,.35); border-radius:7px; padding:4px 10px; cursor:pointer; }
+.cv-idedit{ margin-left:auto; align-self:center; }
+/* 🔤 v1.56.0 お客様名の下のフリガナ（小さく・控えめに） */
+.cv-kana{ font-size:12px; font-weight:700; color:var(--text3); letter-spacing:.4px; margin-top:2px; }
+/* 🏷 v1.56.0 新規／リピーターの印。初回＝オレンジ、リピーター＝緑（CoreFlow の色づかいに合わせる） */
+.cv-rep{ font-size:11px; font-weight:800; padding:2px 9px; border-radius:999px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); white-space:nowrap; }
+.cv-rep.cv-rep-first{ background:rgba(245,158,11,.16); color:#f0a93c; border-color:rgba(245,158,11,.45); }
+.cv-rep.cv-rep-repeater{ background:rgba(29,185,122,.16); color:#37d39a; border-color:rgba(29,185,122,.45); }
+.cv-id2{ display:flex; align-items:baseline; gap:11px; flex-wrap:wrap; margin-top:8px; }
+.cv-car{ font-size:20px; font-weight:800; color:var(--text); } .cv-plate{ font-size:13px; font-weight:700; color:var(--text2); }
+.cv-id3{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:10px; }
+.cv-pill{ font-size:12px; font-weight:700; padding:3px 11px; border-radius:999px; border:1px solid var(--border); background:var(--bg2); color:var(--text2); }
+.cv-pill.cv-kokusan,.cv-pill.cv-div1{ background:rgba(29,185,122,.16); color:#37d39a; border-color:rgba(29,185,122,.45); }
+.cv-pill.cv-yunyu,.cv-pill.cv-div2{ background:rgba(236,72,153,.16); color:#f08fc4; border-color:rgba(236,72,153,.45); }
+.cv-pill.cv-staff{ background:var(--bg3); color:var(--text); border-color:var(--border2); font-weight:800; }
+/* v0.93.0 予約詳細に反映：カルテNo／LINE状態／Lステップボタン */
+.cv-karte{ font-size:12px; font-weight:700; color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:2px 9px; }
+.cv-pill.cv-line-ng{ background:var(--bg3); color:var(--text3); }
+.cv-pill.cv-line-ok{ background:var(--bg3); color:var(--text2); }
+.cv-line-link{ font-size:12px; font-weight:800; color:#06281d; background:#1db97a; border:1px solid #1db97a; border-radius:999px; padding:3px 12px; text-decoration:none; white-space:nowrap; cursor:grab; box-shadow:0 1px 6px rgba(29,185,122,.35); }
+.cv-line-link:hover{ filter:brightness(1.08); }
+/* Lステップ＝LINE風の小さい緑「L」アイコン */
+.cv-licon{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:7px; flex:0 0 auto; font-size:13px; font-weight:900; font-family:"Arial Black",Arial,sans-serif; line-height:1; text-decoration:none; color:#fff; background:#06C755; border:1px solid #05b14c; box-shadow:0 1px 3px rgba(6,199,85,.4); }
+.cv-licon:hover{ background:#05b14c; color:#fff; }
+/* 車両注意（特殊運転：左ハンドル/M/T/車高低い）＝メモの下・該当時のみ */
+.cv-drvbox{ margin-top:12px; border:1px solid rgba(245,158,11,.4); border-radius:10px; background:rgba(245,158,11,.06); padding:10px 12px; }
+.cv-drvh{ font-size:11px; color:#ffd27d; font-weight:800; margin-bottom:7px; display:flex; align-items:center; gap:6px; }
+.cv-drvrow{ display:flex; gap:6px; flex-wrap:wrap; }
+.cv-drv{ font-size:13px; font-weight:800; padding:4px 13px; border-radius:999px; background:rgba(245,158,11,.18); color:#ffd27d; border:1px solid rgba(245,158,11,.55); }
+
+/* 電話ホバー */
+.cv-telwrap{ position:relative; margin-left:auto; }
+.cv-tel{ font-size:12px; font-weight:800; color:var(--text1); } .cv-tel small{ color:var(--text3); font-weight:800; }
+.cv-telpop{ display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:210px; background:var(--bg2); border:1px solid var(--border2); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.5); padding:9px 11px; z-index:40; }
+.cv-telwrap:hover .cv-telpop{ display:block; }
+.cv-telpop b{ font-size:10.5px; color:var(--text3); font-weight:800; display:block; margin-bottom:5px; }
+.cv-tl{ display:flex; gap:8px; font-size:12.5px; font-weight:800; color:var(--text1); padding:3px 0; }
+.cv-tl i{ font-style:normal; font-size:11px; color:var(--text3); font-weight:700; min-width:64px; }
+
+/* 車検枠 */
+.cv-wframe{ margin-top:13px; background:var(--bg1); border:1px solid var(--border); border-left:3px solid #ef4444; border-radius:13px; padding:12px 14px; }
+.cv-wftop{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.cv-wftype{ font-size:22px; font-weight:900; display:inline-flex; align-items:center; gap:7px; }
+.cv-wfbadges{ display:inline-flex; gap:6px; flex-wrap:wrap; align-items:center; margin-left:auto; }
+.cv-bdg{ font-size:12px; font-weight:800; padding:3px 10px; border-radius:7px; border:1px solid; white-space:nowrap; }
+.cv-bdg.cv-drop{ background:rgba(38,162,105,.14); color:#5fcfa0; border-color:rgba(38,162,105,.45); }
+.cv-bdg.cv-consult{ background:rgba(245,158,11,.14); color:var(--orange); border-color:rgba(245,158,11,.45); }
+.cv-bdg.cv-early{ background:rgba(236,72,153,.14); color:#ec4899; border-color:rgba(236,72,153,.5); }
+.cv-bdg.cv-none{ background:rgba(29,185,122,.14); color:#5fcfa0; border-color:rgba(29,185,122,.45); }
+.cv-bdg.cv-special{ background:rgba(148,163,184,.12); color:#94a3b8; border-color:rgba(148,163,184,.5); }/* 特殊（保証/保険）＝グレーのアウトライン v0.116.0 */
+/* 確定情報のロック行（実績移行後の返車日など）＝金額確定と同じ「確定＝編集不可」表示 v0.117.0 */
+.cv-fixrow.cv-fixlocked{ opacity:1; }
+.cv-fixlocked .cv-fixval{ font-weight:800; font-size:15px; color:var(--text); }
+.cv-locktag{ font-size:11px; font-weight:700; color:#10b981; background:rgba(16,185,129,.14); border:1px solid rgba(16,185,129,.5); border-radius:6px; padding:1px 7px; margin-left:6px; }
+.cv-unlockbtn{ font-size:11px; font-weight:700; color:var(--brand); background:transparent; border:1px solid var(--brand); border-radius:6px; padding:1px 8px; margin-left:6px; cursor:pointer; }
+.cv-unlockbtn:hover{ background:var(--brand); color:#fff; }
+/* 📆 v1.57.0 実績カウント日（売上をどの日に数えるか）＝直せるのは管理だけ */
+.cv-adminonly{ display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:1px 8px; margin-left:6px; }
+.cv-fixrow.cv-resdate .cv-frt small{ font-size:10.5px; font-weight:600; color:var(--text3); margin-left:2px; }
+.cv-resnote{ font-size:11px; font-weight:700; color:var(--text3); margin-left:10px; }
+.cv-unlockwrap{ display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap; }
+/* 実績カードの「完了アーカイブ」＝読み取り専用の記録リスト v0.120.0 */
+.cv-arch{ display:flex; flex-direction:column; }
+.cv-arow{ display:flex; gap:12px; align-items:baseline; padding:7px 2px; border-bottom:1px solid var(--border); font-size:13px; }
+.cv-arow:last-child{ border-bottom:none; }
+.cv-ak{ width:98px; flex:none; color:var(--text2); font-weight:700; font-size:12px; }
+.cv-av{ flex:1; color:var(--text); font-weight:600; }
+.cv-aok{ color:var(--green); }
+.cv-adone{ display:inline-block; font-size:10px; font-weight:800; color:var(--green); background:rgba(29,185,122,.16); border:1px solid rgba(29,185,122,.5); border-radius:5px; padding:0 6px; margin-left:2px; }
+.cv-asub{ color:var(--text3); font-size:12px; font-weight:500; }
+.cv-amuted{ color:var(--text3); font-weight:500; }
+.cv-asect-note{ font-size:10px; color:var(--text3); font-weight:600; }
+/* 💳 入金日を分ける（売掛）コントロール v0.121.0 */
+.cv-payctl{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:8px; padding:8px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:9px; }
+.cv-paychk{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text2); cursor:pointer; }
+.cv-paychk input{ width:16px; height:16px; accent-color:var(--brand); }
+.cv-payin{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; }
+.cv-paywait{ font-size:11px; font-weight:800; color:var(--orange); background:rgba(245,158,11,.14); border:1px solid rgba(245,158,11,.5); border-radius:6px; padding:1px 8px; }
+/* 💰 入金待ちカードの日付入力（返車ビュー未定タブ） v0.121.0 */
+.rtbd-pay{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:6px; padding:6px 8px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; }
+.rtbd-payinfo{ font-size:11px; color:var(--text2); font-weight:700; }
+.rtbd-paylb{ font-size:11px; font-weight:700; color:var(--text2); display:inline-flex; align-items:center; gap:5px; }
+.rtbd-paydate{ background:var(--bg2); color:var(--text); border:1px solid var(--border2); border-radius:6px; padding:3px 6px; font-size:12px; }
+
+/* 代車メーター */
+.cv-lo{ margin-top:11px; display:flex; flex-direction:column; background:var(--bg1); border:1px solid var(--border); border-radius:13px; padding:12px 14px; }
+.cv-lomain{ display:flex; align-items:center; gap:14px; }
+.cv-loleft{ text-align:center; flex:0 0 auto; }
+.cv-lorem{ font-size:11px; font-weight:800; color:var(--text3); }
+.cv-lodays{ font-size:28px; font-weight:900; color:var(--text1); line-height:1; margin-top:2px; }
+.cv-loright{ flex:1; min-width:0; }
+.cv-lodue{ font-size:14px; font-weight:800; color:var(--text1); } .cv-lowhich{ font-size:11.5px; font-weight:700; color:var(--text2); margin-top:2px; }
+.cv-lometer{ height:6px; background:var(--bg3); border-radius:999px; margin-top:8px; overflow:hidden; }
+.cv-lometer i{ display:block; height:100%; background:var(--text3); }
+/* 代車リミットのレベル色（緑/黄/赤/黒＝超過） */
+.cv-lo.cv-lev-green{ background:rgba(29,185,122,.09); border-color:rgba(29,185,122,.4); }
+.cv-lo.cv-lev-green .cv-lodays{ color:#1db97a; } .cv-lo.cv-lev-green .cv-lometer i{ background:#1db97a; }
+.cv-lo.cv-lev-amber{ background:rgba(245,158,11,.09); border-color:rgba(245,158,11,.4); }
+.cv-lo.cv-lev-amber .cv-lodays{ color:var(--orange); } .cv-lo.cv-lev-amber .cv-lometer i{ background:var(--orange); }
+.cv-lo.cv-lev-red{ background:rgba(239,68,68,.1); border-color:rgba(239,68,68,.5); }
+.cv-lo.cv-lev-red .cv-lodays{ color:#ff6b6b; } .cv-lo.cv-lev-red .cv-lometer i{ background:var(--red); }
+.cv-lo.cv-lev-dead{ background:rgba(239,68,68,.2); border-color:var(--red); box-shadow:0 0 0 1px var(--red) inset, 0 0 18px rgba(239,68,68,.4); animation:cvDeadPulse 1.2s ease-in-out infinite; }
+.cv-lo.cv-lev-dead .cv-lorem{ color:#ff8c8c; }
+.cv-lo.cv-lev-dead .cv-lodays{ color:#ff3b3b; }
+.cv-lo.cv-lev-dead .cv-lometer i{ background:var(--red); }
+@keyframes cvDeadPulse{ 0%,100%{ box-shadow:0 0 0 1px var(--red) inset, 0 0 12px rgba(239,68,68,.3); } 50%{ box-shadow:0 0 0 1px var(--red) inset, 0 0 22px rgba(239,68,68,.6); } }
+.cv-loextras{ display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(245,158,11,.28); align-items:center; }
+.cv-loxchip{ font-size:11px; font-weight:800; padding:2px 9px; border-radius:6px; background:var(--bg3); border:1px solid var(--border2); color:var(--text2); }
+.cv-loxchip.cv-fix{ background:rgba(245,158,11,.16); color:var(--orange); border-color:rgba(245,158,11,.45); }
+.cv-loxmemo{ font-size:11.5px; font-weight:700; color:var(--text2); }
+
+/* メモ */
+.cv-work{ margin-top:12px; background:var(--bg1); border:1px solid var(--border); border-radius:10px; padding:11px 14px; }
+/* 🔴 v1.56.3 担当が2つ（フロント担当／予約担当）並ぶようになったので、
+   両端に飛ばさず左から順に並べる（片方しか居ない時もそのまま左に付く）。 */
+.cv-wtop{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:6px; }
+/* 名前ピルの前に付く小さな見出し（例「フロント」）＝何の担当か裸の名前と見分けるため */
+.cv-pill.cv-staff > i{ font-style:normal; font-size:10px; font-weight:800; color:var(--text3); margin-right:5px; letter-spacing:.3px; }
+.cv-wtt{ font-size:12px; font-weight:800; color:var(--text2); }
+.cv-wsec{ padding:7px 0; } .cv-wsec + .cv-wsec{ border-top:1px dashed var(--border); }
+.cv-gt{ font-size:10.5px; font-weight:800; color:var(--text3); margin-bottom:5px; letter-spacing:.3px; } .cv-gt small{ font-weight:700; color:var(--text3); opacity:.8; }
+.cv-wl{ font-size:13.5px; font-weight:600; color:var(--text1); padding:2px 0; line-height:1.5; }
+.cv-wl.cv-muted{ color:var(--text3); font-weight:500; }
+/* お礼LINE不要などのチェック（表紙チェック内） */
+.cv-linecheck{ display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--text1); cursor:pointer; }
+.cv-linecheck input{ width:16px; height:16px; }
+/* 引継ぎメモ＝この画面で直接入力できる欄 */
+.cv-hoinput{ width:100%; box-sizing:border-box; min-height:54px; resize:vertical; font-family:inherit;
+  font-size:13.5px; line-height:1.5; color:var(--text1); background:var(--bg1);
+  border:1px solid var(--border2); border-radius:8px; padding:8px 10px; }
+.cv-hoinput::placeholder{ color:var(--text3); }
+.cv-hoinput:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 2px rgba(29,185,122,.25); }
+
+/* 右：進捗バー */
+.cv-pbar{ display:flex; align-items:center; background:var(--bg2); border-bottom:1px solid var(--border); padding:9px 14px; overflow-x:auto; flex:0 0 auto; }
+.cv-pstep{ display:flex; align-items:center; flex:0 0 auto; }
+.cv-dot{ width:15px; height:15px; border-radius:50%; background:var(--bg4); border:2px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:8px; color:var(--text3); }
+.cv-pstep.done .cv-dot{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.cv-pstep.now .cv-dot{ background:var(--orange); border-color:var(--orange); box-shadow:0 0 0 3px rgba(245,158,11,.2); }
+.cv-pl{ font-size:11px; font-weight:700; color:var(--text3); margin-left:5px; }
+.cv-pstep.done .cv-pl,.cv-pstep.now .cv-pl{ color:var(--text1); } .cv-pstep.now .cv-pl{ color:var(--orange); }
+.cv-seg{ width:16px; height:2px; background:var(--border); margin:0 6px; } .cv-pstep.done .cv-seg{ background:var(--brand); }
+
+/* タブ */
+.cv-tabs{ display:flex; gap:2px; padding:8px 12px 0; background:var(--bg2); border-bottom:1px solid var(--border); overflow-x:auto; flex:0 0 auto; }
+.cv-tab{ font-size:12.5px; font-weight:700; color:var(--text2); background:transparent; border:none; border-bottom:2px solid transparent; padding:9px 12px; cursor:pointer; white-space:nowrap; }
+.cv-tab.on{ color:var(--text1); border-bottom-color:var(--brand); }
+.cv-body{ flex:1; padding:16px 18px; overflow:auto; }
+.cv-panel{ display:none; } .cv-panel.on{ display:block; }
+
+/* ===== 📋 v1.56.0 予約詳細（入庫前の1画面） ===== */
+.cv-tabs-one .cv-tab{ font-size:13px; }
+.cv-rsv{ background:var(--bg1); border:1px solid var(--border); border-radius:13px; padding:13px 15px 12px; }
+.cv-rsvhead{ font-size:12.5px; font-weight:800; color:var(--text2); margin-bottom:10px; }
+.cv-rsvbig{ display:flex; gap:12px; flex-wrap:wrap; }
+.cv-rsvb{ flex:1 1 190px; background:var(--bg2); border:1px solid var(--border); border-radius:11px; padding:10px 14px 12px; }
+.cv-rsvbl{ font-size:11.5px; font-weight:800; color:var(--text3); }
+.cv-rsvbv{ font-size:30px; font-weight:800; color:var(--text); line-height:1.15; margin-top:3px; letter-spacing:.5px; }
+.cv-rsvbv small{ font-size:15px; font-weight:700; color:var(--text2); margin-left:3px; }
+.cv-rsvnote{ font-size:11px; color:var(--text3); margin-top:9px; }
+@media(max-width:700px){ .cv-rsvbv{ font-size:24px; } }
+
+/* ===== ✏ v1.56.0 予約編集の「保存する／キャンセル」（ポップアップの右上・✕ の代わり） ===== */
+.cv-editacts{ display:flex; gap:8px; align-items:center; margin-left:auto; }
+.cv-editacts[hidden]{ display:none; }
+.cv-eact{ display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:800; border-radius:9px; padding:7px 14px; cursor:pointer; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); }
+.cv-eact:hover{ filter:brightness(1.12); }
+.cv-eact-ok{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.cv-eact-ng{ background:var(--bg3); }
+.cv-sec{ margin-bottom:18px; }
+.cv-sect{ font-size:12.5px; font-weight:800; color:var(--text2); margin-bottom:8px; }
+
+/* 確定項目 */
+.cv-fixrow{ background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:11px 14px; margin-bottom:9px; }
+.cv-frt{ font-size:11.5px; color:var(--text3); font-weight:800; margin-bottom:7px; }
+.cv-frb{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cv-plan{ font-size:12.5px; color:var(--text3); font-weight:700; } .cv-arr{ color:var(--text3); } .cv-yenmark{ font-size:16px; font-weight:900; color:var(--green); }
+.cv-fixinput{ font-size:16px; font-weight:900; color:var(--text1); background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:7px 12px; }
+.cv-fixinput.cv-money{ color:var(--green); width:140px; }
+.cv-fixinput:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 2px var(--brand-soft); }
+input.cv-fixinput[type=date]{ color-scheme:dark; }
+.cv-fixconfirm{ display:none; align-items:center; gap:8px; margin-top:9px; font-size:12.5px; font-weight:700; color:var(--orange); }
+.cv-fixconfirm.show{ display:flex; }
+/* 金額チェーン（概算→見積→受注→確定 を1行で・現フェーズの1枠だけ入力可） */
+.cv-amchain{ display:flex; flex-wrap:wrap; align-items:center; gap:5px 7px; margin-bottom:9px; }
+.cv-aseg{ display:inline-flex; align-items:center; gap:4px; font-size:14px; font-weight:900; color:var(--text2); }
+.cv-aseg .cv-alb{ font-size:10px; font-weight:800; color:var(--text3); }
+.cv-aseg.cur{ color:var(--text1); }
+.cv-aseg.cur .cv-alb{ color:var(--brand); }
+.cv-amarr{ color:var(--text3); font-weight:700; }
+.cv-ayen{ font-size:14px; font-weight:900; color:var(--green); }
+.cv-ain{ width:88px; font-size:14px; font-weight:900; color:var(--green); text-align:right; background:var(--bg3); border:1px solid var(--border2); border-radius:6px; padding:3px 7px; }
+.cv-ain:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 2px var(--brand-soft); }
+/* フローの金額バッジ */
+.cv-famt{ font-size:12px; font-weight:800; color:var(--green); }
+
+/* 車検スケジュール */
+.cv-csched{ background:var(--bg1); border:1px solid var(--border); border-radius:12px; padding:13px 13px 14px; }
+.cv-cspick{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:12px; }
+.cv-cspick label{ font-size:12px; font-weight:800; color:var(--text2); }
+.cv-cspick select{ font-size:13px; font-weight:700; background:var(--bg3); color:var(--text1); border:1px solid var(--border2); border-radius:8px; padding:8px 12px; cursor:pointer; }
+.cv-csbanner{ font-size:12px; font-weight:700; border-radius:9px; padding:10px 13px; margin-bottom:12px; display:none; line-height:1.6; }
+.cv-csbanner.show{ display:block; }
+.cv-csbanner.blue{ background:rgba(55,138,221,.12); border:1px solid rgba(55,138,221,.4); color:#9cc4f0; }
+.cv-csbanner.amber{ background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); color:var(--orange); }
+.cv-csbanner.gray{ background:var(--bg3); border:1px solid var(--border2); color:var(--text2); }
+.cv-rst{ font-size:11px; font-weight:800; color:#9cc4f0; background:rgba(55,138,221,.18); border:1px solid rgba(55,138,221,.5); border-radius:6px; padding:2px 9px; cursor:pointer; margin-left:6px; }
+.cv-muted2{ color:var(--text3); }
+.cv-cstrack{ display:flex; gap:8px; overflow-x:auto; padding:16px 2px 12px; }
+.cv-vday{ flex:0 0 70px; background:var(--bg2); border:1px solid var(--border); border-radius:11px; padding:0 0 9px; text-align:center; position:relative; overflow:hidden; cursor:default; }
+.cv-vhead{ padding:7px 0 6px; border-bottom:1px solid var(--border); }
+.cv-vd{ font-size:18px; font-weight:900; color:var(--text1); line-height:1; }
+.cv-vdow{ font-size:10.5px; font-weight:800; color:var(--text3); margin-top:3px; }
+.cv-vday.cv-today{ border-color:var(--orange); box-shadow:0 0 0 1px rgba(245,158,11,.45) inset; }
+.cv-vday.cv-today .cv-vhead{ background:rgba(245,158,11,.10); }
+.cv-vday.sat .cv-vdow,.cv-vday.sat .cv-vd{ color:#6db0ec; }
+.cv-vday.sun .cv-vdow,.cv-vday.sun .cv-vd{ color:#ff8c8c; } .cv-vday.holi .cv-vdow,.cv-vday.holi .cv-vd{ color:#ff8c8c; }
+.cv-vholi{ font-size:9px; font-weight:800; color:#ff8c8c; margin-top:2px; padding:0 2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cv-vslots{ display:flex; flex-direction:column; gap:5px; padding:9px 7px 0; }
+.cv-slot{ font-size:11.5px; font-weight:800; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); border-radius:7px; padding:5px 0; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:center; gap:5px; }
+.cv-slot:hover{ border-color:var(--brand); }
+.cv-bx{ width:13px; height:13px; border-radius:4px; border:1.5px solid var(--border2); display:inline-block; }
+.cv-slot.on{ background:var(--brand); border-color:var(--brand); color:#fff; } .cv-slot.on .cv-bx{ background:#fff; border-color:#fff; }
+.cv-vday.off{ opacity:.72; } .cv-voff{ font-size:10.5px; font-weight:800; color:var(--text3); padding:18px 4px; line-height:1.4; }
+.cv-vsoon{ position:absolute; top:-1px; left:50%; transform:translateX(-50%); font-size:9px; font-weight:900; color:#0a0c11; background:var(--orange); border-radius:0 0 7px 7px; padding:2px 9px; white-space:nowrap; display:none; z-index:2; }
+.cv-vday.cv-soon .cv-vsoon{ display:block; } .cv-vday.cv-soon{ border-color:var(--orange); }
+.cv-cstrack.cv-locked .cv-vday:not(.off){ opacity:.45; } .cv-cstrack.cv-locked .cv-slot{ pointer-events:none; }
+.cv-vday.cv-ask{ border-color:var(--blue); box-shadow:0 0 0 1px rgba(55,138,221,.35) inset; cursor:pointer; } .cv-vday.cv-ask .cv-slot{ border-color:rgba(55,138,221,.45); }
+.cv-vday.cv-cut{ opacity:.4; } .cv-vday.cv-cut .cv-vd{ text-decoration:line-through; } .cv-vday.cv-cut.cv-ask{ box-shadow:none; border-color:var(--border); }
+.cv-vday.cv-cut .cv-vcut{ display:block; }
+.cv-vcut{ display:none; position:absolute; top:-1px; left:50%; transform:translateX(-50%); font-size:9px; font-weight:900; color:#fff; background:#7a2230; border-radius:0 0 7px 7px; padding:2px 8px; z-index:2; }
+.cv-cslegend{ display:flex; gap:12px; flex-wrap:wrap; margin-top:9px; font-size:10.5px; font-weight:700; color:var(--text3); }
+.cv-cslegend i{ font-style:normal; } .cv-sw{ display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
+.cv-cshelp{ font-size:11px; color:var(--text3); margin-top:11px; line-height:1.65; }
+.cv-callat{ font-size:11px; color:var(--text3); font-weight:700; margin:-4px 0 9px 4px; }
+
+/* 表紙チェック */
+.cv-pickrow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:11px 14px; margin-bottom:9px; }
+.cv-pk{ font-size:12px; color:var(--text3); font-weight:800; flex:0 0 70px; }
+.cv-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+.cv-chip{ font-size:12.5px; font-weight:700; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); border-radius:999px; padding:5px 13px; cursor:pointer; user-select:none; }
+.cv-chip.on{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.cv-hint{ font-size:11px; color:var(--text3); margin-top:10px; }
+
+/* チェックリスト */
+.cv-prog{ font-size:12px; color:var(--text3); margin-bottom:9px; font-weight:700; }
+.cv-checks{ display:flex; flex-direction:column; gap:7px; }
+.cv-chk{ display:flex; align-items:center; gap:11px; background:var(--bg1); border:1px solid var(--border); border-radius:10px; padding:11px 13px; cursor:pointer; font-size:14px; font-weight:600; }
+.cv-box{ width:22px; height:22px; border-radius:6px; border:2px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff; flex:0 0 auto; }
+.cv-chk.on{ background:var(--brand-soft); border-color:rgba(38,162,105,.4); } .cv-chk.on .cv-box{ background:var(--brand); border-color:var(--brand); }
+
+/* フロー */
+.cv-flow{ position:relative; padding-left:4px; }
+.cv-frow{ display:flex; gap:12px; align-items:flex-start; padding:7px 0; }
+.cv-fdot{ flex:0 0 12px; width:12px; height:12px; border-radius:50%; background:var(--border2); margin-top:4px; position:relative; }
+.cv-frow.done .cv-fdot{ background:var(--brand); }
+.cv-frow:not(:last-child) .cv-fdot:after{ content:''; position:absolute; left:5px; top:12px; width:2px; height:24px; background:var(--border); }
+.cv-ft{ font-size:14px; font-weight:700; } .cv-fd{ font-size:11.5px; color:var(--text3); margin-top:1px; }
+/* v1.43.0 手で足した記録を消す ✕（自動の工程記録には出さない） */
+.cv-fmain{ flex:1; min-width:0; }
+.cv-fdel{ flex:0 0 auto; align-self:center; background:transparent; border:none; color:var(--text3); cursor:pointer; padding:2px 5px; border-radius:6px; display:inline-flex; align-items:center; opacity:0; transition:opacity .12s,color .12s,background .12s; }
+.cv-frow:hover .cv-fdel{ opacity:1; }
+.cv-fdel:hover{ background:var(--bg3); color:#ef4444; }
+
+/* ===== 車検 実施記録（済／再検） v0.110.5 ===== */
+.cv-shdone{ background:rgba(29,185,122,.10); border:1px solid rgba(29,185,122,.4); border-radius:10px; padding:10px 12px; }
+.cv-shdone-main{ font-size:14px; font-weight:700; color:var(--text); }
+.cv-shstaff{ color:var(--text2); font-weight:600; }
+.cv-shrc{ font-size:11.5px; color:#f8a866; margin-top:5px; }
+.cv-shact{ display:flex; gap:8px; margin-top:10px; }
+.cv-shbtn{ border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-weight:700; padding:8px 14px; border-radius:9px; cursor:pointer; }
+.cv-shbtn:hover{ border-color:var(--brand,#1f7a4d); }
+.cv-shbtn.ok{ border-color:rgba(29,185,122,.5); color:#5fd3a6; }
+.cv-shbtn.re{ border-color:rgba(249,115,22,.5); color:#f8a866; }
+.cv-shbtn.ghost{ color:var(--text3); margin-top:8px; }
+/* 記録モーダル */
+.cv-shbox{ width:min(92vw,340px); }
+.cv-shpb{ padding:14px 16px 16px; }
+.cv-shpb label{ display:block; font-size:11.5px; color:var(--text3); font-weight:600; margin:10px 0 4px; }
+.cv-shpb label:first-child{ margin-top:0; }
+.cv-shpb input[type=date], .cv-shpb select{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:14px; }
+.cv-shslot{ display:flex; gap:8px; }
+.cv-shslot button{ flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text2); border-radius:8px; padding:8px 0; font-size:14px; font-weight:700; cursor:pointer; }
+.cv-shslot button.on{ background:var(--brand,#1f7a4d); border-color:var(--brand,#1f7a4d); color:#fff; }
+.cv-shpb-act{ display:flex; gap:8px; margin-top:16px; }
+.cv-shpb-act .cv-shbtn{ flex:1; text-align:center; }
+
+
+/* ===== 🗂 「その他保存」メニュー（新規予約カードの右上・v1.19.0） =====
+   ⚠ カードのヘッダ(.card-page-head)は position:sticky なので、パネルは
+      その中で position:absolute にして下へ出す。z-index はヘッダより上。 */
+.vh-menu{ position:relative; display:inline-flex; }
+.vh-menu-panel{
+  position:absolute; top:calc(100% + 6px); right:0; min-width:286px;
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 16px 44px rgba(0,0,0,.5); padding:6px; z-index:60;
+  display:none; text-align:left;
+}
+.vh-menu.open .vh-menu-panel{ display:block; }
+.vh-mhead{ font-size:10.5px; font-weight:800; color:var(--text3); padding:6px 12px 3px; letter-spacing:.02em; }
+.vh-mi{
+  display:flex; flex-direction:column; gap:2px; width:100%; text-align:left;
+  background:transparent; border:0; border-radius:9px; padding:9px 12px;
+  cursor:pointer; color:var(--text); font-family:inherit;
+}
+.vh-mi:hover{ background:var(--bg3); }
+.vh-mi b{ font-size:13.5px; font-weight:700; display:inline-flex; align-items:center; gap:7px; }
+.vh-mi span{ font-size:11.5px; color:var(--text3); line-height:1.5; }
+.vh-msep{ height:1px; background:var(--border); margin:5px 8px; }
+@media (max-width:768px){
+  .vh-menu-panel{ right:auto; left:0; min-width:min(88vw,286px); }
+}
+
+/* ===== 🖱 右クリックメニュー（PitFlow 全体・v1.20.0） =====
+   ⚠ body 直下に出す（親の overflow / transform に潰されないように）。
+      位置は JS が画面の内側へ寄せて決める（はみ出したら反転）。 */
+.pcx{
+  position:fixed; z-index:9000; min-width:232px; max-width:320px;
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 18px 48px rgba(0,0,0,.55); padding:6px;
+  font-size:13px; user-select:none;
+  animation:pcxIn .09s ease-out;
+}
+@keyframes pcxIn{ from{ opacity:0; transform:translateY(-3px) } to{ opacity:1; transform:none } }
+.pcx-sub{ z-index:9001; min-width:172px; }
+.pcx-title{
+  font-size:12px; font-weight:800; color:var(--text2);
+  padding:7px 11px 8px; margin-bottom:4px; border-bottom:1px solid var(--border);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pcx-head{ font-size:10.5px; font-weight:800; color:var(--text3); padding:6px 11px 3px; letter-spacing:.02em; }
+.pcx-sep{ height:1px; background:var(--border); margin:5px 7px; }
+.pcx-i{
+  display:flex; align-items:center; gap:9px; width:100%; text-align:left;
+  background:transparent; border:0; border-radius:8px; padding:7px 10px;
+  color:var(--text); font-family:inherit; font-size:13px; cursor:pointer;
+}
+.pcx-i:hover:not(:disabled){ background:var(--bg3); }
+.pcx-i.is-off{ opacity:.42; cursor:default; }
+.pcx-i.danger b{ color:#ef4444; }
+.pcx-ic{ display:inline-flex; width:16px; flex:0 0 16px; color:var(--text2); }
+.pcx-i:hover:not(:disabled) .pcx-ic{ color:var(--brand); }
+.pcx-tx{ display:flex; flex-direction:column; gap:1px; min-width:0; flex:1; }
+.pcx-tx b{ font-weight:600; font-size:13px; white-space:nowrap; }
+.pcx-tx span{ font-size:11px; color:var(--text3); line-height:1.45; }
+.pcx-arrow{ display:inline-flex; color:var(--text3); flex:0 0 auto; margin-left:2px; }
+
+/* 🔴 v1.52.0 都度車両変動のお客様＝ナンバー欄の代わりに印と案内を出す（card-detail.js の plateInput） */
+.cf-plate.cf-plate-pv{ display:flex; flex-direction:column; gap:5px; }
+.cf-pv-badge{ display:inline-flex; align-items:center; gap:6px; align-self:flex-start; font-size:12px; font-weight:800;
+  color:#a5b4fc; background:rgba(124,140,248,.14); border:1px solid rgba(124,140,248,.45); border-radius:8px; padding:5px 11px; }
+.cf-pv-hint{ font-size:11px; line-height:1.6; color:var(--text3); }
+.cf-pv-hint b{ color:var(--text2); }
+
+/* ===== v1.65.0 返車日の3段チェーン（概算→予定→確定）。金額チェーンの真下に置く ===== */
+.cv-dchain{ margin-top:6px; }
+.cv-dchain .cv-aval{ font-variant-numeric:tabular-nums; }
+.cv-dtime{ margin-left:10px; font-size:12px; font-weight:700; color:var(--text2); display:inline-flex; align-items:center; gap:3px; }
+
+/* ===== v1.66.0 確定返車日まわり（返車日未定チェック／返車時間の入力ガイド） ===== */
+.cv-tbdchk{ display:inline-flex; align-items:center; gap:5px; margin-left:10px; font-size:11.5px; color:var(--text2); cursor:pointer; white-space:nowrap; }
+.cv-tbdchk input{ width:14px; height:14px; accent-color:var(--brand,#1f7a4d); cursor:pointer; }
+.cv-fixrow-time .cv-frb{ display:block; }
+.cv-timeslot{ display:block; max-width:340px; }
+.cv-timeslot .cf-time{ width:100%; }
+
+/* ===== 🆕 v1.73.0 表紙の「金額の並び」「返車日の並び」を あとから直す（ゆうた指定・案1） =====
+   ・並びの右端に ✏編集 を1つずつ。押すと、その並びのすぐ下に入力欄がまとめて開く。
+   ・見た目は既存の「確定売上金額」「確定 返車日」の ✏編集（.cv-unlockbtn）とそろえてある。 */
+.cv-chainline{ display:flex; align-items:flex-start; gap:10px; }
+.cv-chainline > .cv-amchain{ flex:1; min-width:0; }
+.cv-chedit{ flex:0 0 auto; font-size:11px; font-weight:700; color:var(--text3); background:transparent;
+  border:1px solid var(--border2); border-radius:6px; padding:2px 9px; cursor:pointer;
+  display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.cv-chedit:hover{ color:var(--brand); border-color:var(--brand); }
+.cv-chedit.on{ color:#fff; background:var(--brand); border-color:var(--brand); }
+.cv-editbox{ border:1px dashed var(--brand); border-radius:11px; padding:11px 12px 12px; margin:2px 0 12px; background:var(--brand-soft); }
+.cv-editbox .cv-fixrow{ background:var(--bg2); }
+.cv-ebhead{ display:flex; align-items:center; justify-content:space-between; font-size:11.5px; font-weight:800; color:var(--brand); margin-bottom:9px; }
+.cv-ebhead span{ display:inline-flex; align-items:center; gap:5px; }
+.cv-ebclose{ font-size:11px; font-weight:700; color:var(--text3); background:transparent; border:1px solid var(--border2); border-radius:6px; padding:2px 9px; cursor:pointer; }
+.cv-ebclose:hover{ color:var(--text1); border-color:var(--text3); }
+.cv-ebnote{ font-size:11px; font-weight:700; color:var(--text3); margin:0 0 9px; line-height:1.6; }
+.cv-ebnote:last-child{ margin:9px 0 0; }
+.cv-ebnote b{ color:var(--text2); }
+.cv-ebgrid{ display:flex; flex-wrap:wrap; gap:9px; }
+.cv-ebgrid > .cv-fixrow{ flex:1 1 210px; margin-bottom:0; }

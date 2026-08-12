@@ -1,0 +1,1921 @@
+/* ========================================
+   polish.css  -  5ビューの見た目・操作感 底上げ（v0.1.1）
+   ----------------------------------------
+   既存 views.css を壊さず、後から上書き・追加する層。
+   ・カードの色分け（作業タイプ）／ステータスピル
+   ・看板の工程カラー＋工程送りボタン
+   ・PIT枠・実績・代車・当日の質感アップ
+   ======================================== */
+
+/* ===== 共通カード（pit-card）強化 ===== */
+.pit-card{ border-left-width:4px; transition:transform .1s ease, box-shadow .1s ease, border-color .1s ease; }
+.pit-card:hover{ transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,.4); }
+.pit-card.is-urgent{ box-shadow:0 0 0 1px rgba(239,68,68,.45), var(--shadow-card); }
+
+.pit-card .pc-line1{ align-items:center; }
+.pit-card .pc-status{
+  margin-left:auto; font-size:10px; font-weight:700; padding:1px 8px; border-radius:999px; white-space:nowrap;
+  color:var(--sc,#64748b);
+  background:color-mix(in srgb, var(--sc,#64748b) 16%, transparent);
+  border:1px solid color-mix(in srgb, var(--sc,#64748b) 42%, transparent);
+}
+.pit-card .pc-urg{
+  font-size:9px; font-weight:800; padding:1px 6px; border-radius:6px;
+  color:#fff; background:var(--red);
+}
+.pit-card .pc-customer{ font-size:13.5px; }
+.pit-card .pc-tag.drop{ background:var(--bg3); color:var(--text2); }
+.pit-card .pc-tag.soft.loaner{ background:rgba(38,162,105,.12); color:var(--brand); border-color:var(--brand); }
+.pit-card .pc-tag.soft.wash{ background:rgba(59,130,246,.12); color:#3b82f6; border-color:#3b82f6; }
+.pit-card .tag-work{ font-size:10px; font-weight:700; padding:1px 7px; border-radius:6px; border:1px solid; }
+
+/* 工程送りボタン（看板カード） */
+.pit-card .pc-kbtns{ display:flex; gap:6px; margin-top:7px; }
+.pc-kbtn{
+  font-size:11px; padding:4px 8px; border-radius:7px; cursor:pointer;
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2);
+  transition:filter .1s, background .1s;
+}
+.pc-kbtn:hover{ filter:brightness(1.12); }
+.pc-kbtn.next{ flex:1; background:var(--brand-soft); color:var(--brand); border-color:var(--brand); font-weight:700; }
+
+/* ===== タスク看板 ===== */
+.kanban-col{
+  border-top:3px solid var(--stage, var(--brand));
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+.kanban-col-head{ font-size:13.5px; }
+.kanban-col-head .count{
+  background:color-mix(in srgb, var(--stage,#64748b) 18%, transparent);
+  color:var(--stage, var(--text2));
+  font-weight:700;
+}
+.kanban-col.side{ box-shadow:none; }
+.kanban-empty{
+  border:1px dashed var(--border); border-radius:var(--r);
+  padding:14px 0; color:var(--text3);
+}
+
+/* ===== コンパクトカード（整備ビュー＝看板/作業で統一・小さく／文字は大きく見やすく・移動はドラッグのみ） ===== */
+.pit-card.pcm{
+  min-width:0;
+  padding:8px 10px;
+  background:var(--bg2);
+  border:1px solid var(--border2);   /* ピットボードと同じくはっきり角丸で囲む */
+  border-left-width:4px;             /* 左ライン＝国産緑/輸入ピンク（JSで色指定） */
+  border-radius:8px;
+  cursor:grab;
+}
+.pit-card.pcm:active{ cursor:grabbing; }
+/* PITカードと同じ2行構成：1行目=客名＋様／右に内容・代車、2行目=車種／右に担当 */
+.pcm-r{ display:flex; align-items:center; gap:6px; min-width:0; }
+.pcm-r + .pcm-r{ margin-top:3px; }
+.pcm-name{
+  flex:1 1 auto; min-width:0; font-weight:800; font-size:15px; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pcm-car{
+  flex:1 1 auto; min-width:0; font-size:15px; font-weight:700; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pcm-badges{ flex:0 0 auto; display:flex; gap:4px; align-items:center; }
+/* バッジ＝PITカード（pfv-*）に準じた13px・角丸6px・パツパツ */
+.pcm-badges > span, .pcm-front{
+  flex:0 0 auto; font-size:13px; line-height:1.42; padding:0 6px; border-radius:6px;
+  font-weight:700; white-space:nowrap;
+}
+.pcm-wt{ border:1px solid; }
+.pcm-drop{ border:1px solid; }
+.pcm-loaner{ background:rgba(245,158,11,.16); color:#f59e0b; border:1px solid rgba(245,158,11,.55); }
+.pcm-front{ background:var(--bg3); color:var(--text); border:1px solid var(--border2); }
+/* 洗車バッジ（完TEL待ち以降・洗車対象）＝担当の左。青ベタ・白字で目立たせる（代車の緊急と同様の見せ方） */
+.pcm-wash{ flex:0 0 auto; font-size:13px; line-height:1.42; padding:0 7px; border-radius:6px; font-weight:800; white-space:nowrap;
+  background:#2563eb; color:#fff; border:1px solid #2563eb; }
+/* 通常カードのバッジにも「済」スタンプ（1Y/3M・洗車）。ホバーと同じ案E。 */
+.pcm-wt, .pcm-wash{ position:relative; overflow:visible; }
+.pcm-done::after{ content:"済"; position:absolute; top:-7px; right:-4px; transform:rotate(-12deg);
+  font-size:10px; font-weight:900; color:#fff; background:#ef4444; border-radius:3px; padding:0 1.5px; line-height:1.25;
+  box-shadow:0 1px 3px rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.18); pointer-events:none; }
+.pit-card.pcm.pcm-claim{ border-color:#ef4444 !important; box-shadow:var(--shadow-card); }
+.pcm-loaner.pcm-dead{ background:#ef4444 !important; color:#fff !important; border-color:#ef4444 !important; box-shadow:0 0 8px rgba(239,68,68,.7); animation:pcmDeadPulse 1.2s ease-in-out infinite; }
+/* 外注フェーズのカード下ラベル＝外注先名＋経過日数 */
+.pcm-out{ margin-top:5px; display:flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:#f59e0b; background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); border-radius:6px; padding:2px 7px; }
+.pcm-outn{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pcm-outd{ flex:0 0 auto; font-size:10px; font-weight:800; color:#1c1300; background:#f59e0b; border-radius:4px; padding:0 5px; }
+@keyframes pcmDeadPulse{ 0%,100%{ box-shadow:0 0 6px rgba(239,68,68,.6); } 50%{ box-shadow:0 0 13px rgba(239,68,68,.95); } }
+/* 予約番号の耳＝左辺カラーの延長（枠の一部・上端で丸角に折れ右は滑り台カット） */
+.pit-card.pcm{ position:relative; }
+/* タスクボード／試運転サブゾーンのカードは列幅(規定)に固定＝内容で広がらない。長い名前・車種は…で省略（.pcm-name/.pcm-car既定）。 */
+.kanban-col-body > .pit-card.pcm,
+.kanban-td2 > .pit-card.pcm{ width:100%; max-width:100%; box-sizing:border-box; }
+.pit-card.pcm.pcm-tab{ border-top-left-radius:0; margin-top:9px; }
+.pcm-ear{ position:absolute; top:-14px; left:-4px; width:66px; height:17px; display:flex; align-items:center; overflow:hidden;
+  font:800 9.5px/1 ui-monospace; letter-spacing:.6px; color:var(--text2);
+  background:var(--bg2); border:1px solid var(--border2); border-bottom:none; border-left:4px solid var(--green);
+  border-radius:8px 0 0 0; padding:0 16px 2px 9px;
+  clip-path:polygon(0 0, calc(100% - 11px) 0, 100% 100%, 0 100%); }
+/* 🔴 v1.48.0 「担当車両」で**別の課から集めてきたカード**の印（myonly-pit.js が data-xboard を付ける）。
+   ⚠ 文字は CSS が `data-xboard` から出す＝カードのHTMLは組み立て直していない。
+   ⚠ 置き場所は**右上の外側**（左上は予約番号の耳、右上の中はバッジで埋まっているため）。
+      耳が無いカードは上に隙間が無いので、その時だけ 9px 空ける。 */
+.pit-card.pcm.kb-xboard{ position:relative; }
+.pit-card.pcm.kb-xboard:not(.pcm-tab){ margin-top:9px; }
+.pit-card.pcm.kb-xboard::after{
+  content:attr(data-xboard); position:absolute; top:-7px; right:7px; z-index:2; pointer-events:none;
+  font-size:9px; font-weight:800; line-height:1; letter-spacing:.03em; white-space:nowrap;
+  color:#fff; background:var(--text3); border-radius:999px; padding:3px 7px;
+  box-shadow:0 1px 3px rgba(0,0,0,.4); }
+/* 色は左の帯と同じ（国産＝緑／輸入＝桃）＝どっちから来たか一目で分かる。
+   ⚠ v1.48.1 印の文字は「1課／2課」から **「国産／輸入」** に変えた（ゆうた指定）。
+      myonly-pit.js の COURSE と**必ずセットで直す**（片方だけだと色が付かない）。 */
+.pit-card.pcm.kb-xboard[data-xboard="国産"]::after{ background:#1db97a; }
+.pit-card.pcm.kb-xboard[data-xboard="輸入"]::after{ background:#ec4899; }
+
+/* 滑り台の斜め縁にグレー線（clip-pathでは線が出ないので別要素で重ねる） */
+.pcm-ear-slide{ position:absolute; top:-13px; left:51px; width:1px; height:15.5px; background:var(--border2);
+  transform:rotate(-32.9deg); transform-origin:top left; pointer-events:none; }
+.pit-card.pcm.pcm-claim .pcm-ear-slide{ background:#ef4444; }
+/* 車両注意タブ（左/M/T/車高）＝耳と同じ上辺ライン・右側・最大2・アンバー。折り返し禁止でブレ防止 */
+.pcm-cau{ position:absolute; top:-13px; right:6px; display:flex; gap:3px; z-index:3; white-space:nowrap; pointer-events:none; }
+.pcm-cau .pcm-caut{ flex:0 0 auto; width:auto; max-width:none; height:16px; display:flex; align-items:center; white-space:nowrap; word-break:keep-all; padding:0 6px 1px; font:800 9px/1 -apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; letter-spacing:0; color:#1c1300; background:#f59e0b; border:1px solid #f59e0b; border-bottom:none; border-radius:6px 6px 0 0; }
+
+/* ===== 作業ビュー（PIT枠） ===== */
+#view-work .pit-bay{
+  border:1px solid var(--border);
+  border-top:3px solid var(--brand);
+  border-radius:var(--r2);
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+#view-work .pit-bay-head{ border-bottom:1px solid var(--border); }
+#view-work .pit-bay-head .bay-icon{ font-size:20px; }
+#view-work .pit-bay-empty{ border:1px dashed var(--border); border-radius:var(--r); }
+#view-work .pit-bay-empty::before{ content:"🅿️ "; }
+
+/* ===== 当日ビュー ===== */
+.today-head{
+  background:linear-gradient(180deg, var(--brand-soft), transparent), var(--bg2);
+  box-shadow:0 2px 10px rgba(0,0,0,.15);
+}
+.today-col{ box-shadow:0 2px 10px rgba(0,0,0,.15); }
+.today-row{ transition:background .1s ease, transform .05s ease; }
+.today-row:hover{ background:var(--bg3); }
+.today-row.is-urgent{ background:rgba(239,68,68,.06); }
+.count-chip{ box-shadow:0 1px 6px rgba(38,162,105,.18); }
+
+/* ===== 実績ビュー（月） ===== */
+#view-result .result-cell{ transition:background .1s; }
+#view-result .result-cell:not(.dow):hover{ background:var(--bg3); }
+#view-result .result-card{ transition:filter .1s; }
+#view-result .result-card:hover{ filter:brightness(1.12); }
+
+/* ===== 代車ガント ===== */
+#view-loaner .loaner-bar{
+  background:linear-gradient(180deg, var(--brand), var(--brand-deep));
+  box-shadow:0 1px 4px rgba(0,0,0,.3);
+  cursor:pointer; transition:filter .1s;
+}
+#view-loaner .loaner-bar:hover{ filter:brightness(1.12); }
+#view-loaner .loaner-car-name span{ font-size:16px; }
+
+/* ===== 予約・返車カレンダー ===== */
+.reserve-month-cell:not(.dow):not(.other-month):hover{ background:var(--bg3); }
+.reserve-month-event, .reserve-week-event{ transition:filter .1s; }
+.reserve-month-event:hover, .reserve-week-event:hover{ filter:brightness(1.1); }
+.reserve-slot{ border-radius:var(--r); transition:background .1s; }
+.reserve-slot:hover{ background:var(--bg3); }
+
+/* ===== ビュー見出しの軽い強調（共通） ===== */
+.view-header .view-title{ letter-spacing:.01em; }
+.vh-btn:hover, .tb-btn:hover{ border-color:var(--brand); }
+
+/* ===== ドラッグ＆ドロップ ===== */
+.pit-card[draggable="true"]{ cursor:grab; }
+.pit-card[draggable="true"]:active{ cursor:grabbing; }
+.dnd-dragging{ opacity:.45; }
+.pit-card.dnd-dragging{ opacity:.45; transform:scale(.98); }
+.reserve-month-event[draggable="true"], .reserve-week-event[draggable="true"]{ cursor:grab; }
+/* ドロップ先のハイライト */
+[data-drop].dnd-over{
+  outline:2px dashed var(--brand);
+  outline-offset:-3px;
+  background:var(--brand-soft);
+  border-radius:var(--r);
+}
+.kanban-col-body[data-drop]{ min-height:48px; }
+#view-work .pit-bay.dnd-over,
+[data-drop].dnd-over{ transition:background .08s; }
+
+/* ===== 顧客呼び出し（カード詳細） ===== */
+.cf-recall{ position:relative; margin-bottom:10px; }
+#cf-recall-input{ background:var(--bg2); border:1px dashed var(--brand); }
+.cf-recall-list{ position:absolute; left:0; right:0; top:100%; z-index:20; margin-top:4px;
+  background:var(--bg2); border:1px solid var(--border); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.45);
+  overflow-y:auto; max-height:240px; }
+.cf-recall-item{ display:block; width:100%; text-align:left; padding:8px 10px; border:0; border-bottom:1px solid var(--border);
+  background:none; color:var(--text); cursor:pointer; font-size:13px; }
+.cf-recall-item:last-child{ border-bottom:0; }
+.cf-recall-item:hover{ background:var(--bg3); }
+.cf-recall-item span{ color:var(--text3); font-size:11.5px; margin-left:4px; }
+
+/* ===== 顧客リスト ビュー ===== */
+.cust-head{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.cust-search{ flex:1; background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 11px; font-size:13px; font-family:inherit; }
+.cust-search:focus{ outline:none; border-color:var(--brand); }
+/* 🔴 v1.49.0 顧客一覧の「アーカイブ済みを見る」切替（ゆうた指定）。
+   ⚠ 押している間は色が付く＝**いまアーカイブ済みを見ている**と一目で分かる。 */
+.cust-archbtn{ flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; background:var(--bg3); border:1px solid var(--border);
+  color:var(--text2); border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.cust-archbtn:hover{ border-color:var(--brand); color:var(--brand); }
+.cust-archbtn.on{ background:#8b6d3f; border-color:#c08a3e; color:#fff; }
+.cust-count{ font-size:12px; color:var(--text3); white-space:nowrap; }
+.cust-note{ font-size:12px; color:var(--text3); background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:12px; line-height:1.6; }
+.cust-empty{ color:var(--text3); font-size:13px; text-align:center; padding:30px; }
+.cust-list{ display:flex; flex-direction:column; gap:8px; }
+.cust-row{ display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--border); border-left:3px solid var(--brand); border-radius:8px; padding:10px 12px; }
+.cust-main{ flex:1; min-width:0; }
+.cust-name{ font-size:14px; font-weight:600; }
+.cust-sub{ font-size:11.5px; color:var(--text2); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cust-del{ background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:5px 9px; cursor:pointer; color:var(--text2); }
+.cust-del:hover{ border-color:var(--red); color:var(--red); }
+/* 顧客ビュー v0.37：チームバッジ＋操作ボタン */
+.cust-name{ display:flex; align-items:center; gap:8px; }
+.cust-badge{ font-size:10px; font-weight:700; border:1px solid; border-radius:999px; padding:1px 8px; line-height:16px; }
+.cust-acts{ display:flex; gap:6px; flex:0 0 auto; }
+.cust-act{ background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:5px 10px; cursor:pointer; color:var(--text); font-size:12px; white-space:nowrap; }
+.cust-act:hover{ border-color:var(--brand); color:var(--brand); }
+/* 顧客モーダル（編集 / 履歴） */
+.cm-overlay{ position:fixed; inset:0; z-index:300; display:none; align-items:flex-start; justify-content:center; background:rgba(0,0,0,.5); padding:6vh 16px; overflow:auto; }
+.cm-overlay.show{ display:flex; }
+.cm-box{ width:520px; max-width:100%; background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); overflow:hidden; }
+.cm-head{ display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; padding:14px 16px; border-bottom:1px solid var(--border); }
+.cm-head .cm-sub{ font-size:12px; font-weight:400; color:var(--text2); }
+.cm-x{ margin-left:auto; background:transparent; border:none; color:var(--text3); font-size:16px; cursor:pointer; line-height:1; }
+.cm-x:hover{ color:var(--text); }
+.cm-body{ padding:14px 16px; max-height:64vh; overflow:auto; }
+.cm-f{ display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+.cm-f label{ font-size:10px; color:var(--text3); font-weight:600; }
+.cm-f input, .cm-f select{ background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:8px 10px; font-size:13px; font-family:inherit; width:100%; box-sizing:border-box; }
+.cm-f input:focus, .cm-f select:focus{ outline:none; border-color:var(--brand); }
+.cm-2{ display:flex; gap:10px; } .cm-2 .cm-f{ flex:1; }
+.cm-3{ display:flex; gap:10px; } .cm-3 .cm-f{ flex:1; }
+.cm-foot{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border); }
+.cm-cancel{ background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:8px 14px; cursor:pointer; color:var(--text); font-size:13px; }
+.cm-save{ background:var(--brand); border:1px solid var(--brand); border-radius:8px; padding:8px 16px; cursor:pointer; color:#fff; font-size:13px; font-weight:600; }
+.cm-save:hover{ filter:brightness(1.07); }
+/* 履歴リスト */
+.cm-hist{ display:flex; flex-direction:column; gap:8px; }
+.cm-hrow{ display:flex; align-items:center; gap:12px; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:9px 12px; }
+.cm-hdt{ flex:0 0 86px; font-size:12px; color:var(--text2); font-weight:600; }
+.cm-hmid{ flex:1; min-width:0; font-size:13px; }
+.cm-hsub{ font-size:11px; color:var(--text3); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cm-hamt{ flex:0 0 auto; font-size:13px; font-weight:700; color:var(--brand); }
+/* 顧客ビューの列フィルタ（区分/課/担当/メーカー） */
+.cust-filters{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.cust-fsel{ background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:6px 9px; font-size:12px; font-family:inherit; cursor:pointer; }
+.cust-fsel:focus{ outline:none; border-color:var(--brand); }
+/* 顧客テーブル（1行・均一フォント・ラベルでソート）v0.37.2 */
+.ct-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:8px; }
+.ct{ width:100%; border-collapse:collapse; font-size:13px; }
+.ct th, .ct td{ text-align:left; padding:8px 10px; white-space:nowrap; border-bottom:1px solid var(--border); }
+.ct tbody tr:last-child td{ border-bottom:none; }
+.ct thead th{ background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; cursor:pointer; user-select:none; }
+.ct-th:hover{ color:var(--brand); }
+.ct-th.on{ color:var(--brand); }
+.ct-acth{ cursor:default; text-align:right; }
+.ct tbody tr:hover{ background:var(--bg3); }
+.ct td{ color:var(--text); max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+.ct-name{ font-weight:400; }
+.ct-mut{ color:var(--text2); }
+.ct-pill{ font-size:11px; font-weight:700; border:1px solid; border-radius:999px; padding:1px 8px; }
+.ct-act{ text-align:right; white-space:nowrap; }
+.ct-b{ background:transparent; border:1px solid var(--border); border-radius:6px; padding:3px 7px; cursor:pointer; color:var(--text2); font-size:12px; margin-left:2px; }
+.ct-b:hover{ border-color:var(--brand); color:var(--brand); }
+.ct-bd:hover{ border-color:var(--red); color:var(--red); }
+/* 一覧のLステップリンク（LINE登録済の人だけ・目立つ緑）v0.96.0 */
+.ct-bline{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; font-size:11.5px; font-weight:800; text-decoration:none; color:#fff; background:#1db97a; border:1px solid #19a86d; border-radius:7px; padding:4px 9px; box-shadow:0 1px 3px rgba(29,185,122,.35); }
+.ct-bline:hover{ background:#17a268; color:#fff; }
+/* 一覧のLステップ＝LINE風の小さい緑「L」アイコンバッジ（横幅を取らない）v0.96.3 */
+.ct-licon{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:7px; flex:0 0 auto; font-size:13px; font-weight:900; font-family:"Arial Black",Arial,sans-serif; line-height:1; text-decoration:none; color:#fff; background:#06C755; border:1px solid #05b14c; box-shadow:0 1px 3px rgba(6,199,85,.4); }
+.ct-licon:hover{ background:#05b14c; color:#fff; }
+/* 1人1行＋2台目以降は車の欄だけ下に増える（人の欄は空・行間の線を消して1人の塊に見せる）v0.38.1 */
+.ct-norb td{ border-bottom:none; }
+.ct-rb td{ border-bottom:1px solid var(--border); }
+.ct-cont td:nth-child(3)::before{ content:'↳ '; color:var(--text3); }   /* 2台目以降のメーカー欄に↳ */
+.ct-cont:hover td{ background:var(--bg3); }
+/* 編集モーダル：連絡先・車両 */
+.ce-sec{ font-size:11px; font-weight:700; color:var(--text2); margin:14px 0 6px; padding-top:8px; border-top:1px dashed var(--border); }
+.ce-ct{ display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.ce-ct .ce-ctel{ flex:0 0 11em; }
+.ce-ct .ce-clabel{ flex:1 1 7em; }
+.ce-veh{ display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px; }
+.ce-veh-l{ display:flex; gap:6px; flex:1 1 auto; flex-wrap:wrap; }
+.ce-veh-l .ce-plate{ flex:1 1 12em; }
+.ce-veh-l .ce-maker{ flex:0 0 6em; }
+.ce-veh-l .ce-car{ flex:1 1 7em; }
+.ce-veh-l .ce-karte{ flex:0 0 7em; }
+.ce-veh-r{ display:flex; gap:6px; align-items:center; }
+.ce-board, .ce-div, .ce-front, .ce-veh input, .ce-ct input.ce-ctel, .ce-ct input.ce-clabel{ background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:7px 9px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
+.ce-board, .ce-div, .ce-front{ cursor:pointer; }
+.ce-add{ background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:6px 12px; font-size:12px; cursor:pointer; margin-top:2px; }
+.ce-add:hover{ border-color:var(--brand); color:var(--brand); }
+/* 編集モーダル：LINE設定（新規予約欄と同じ3状態＋Lステップ番号）v0.96.0 */
+.ce-line{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.ce-line .ce-line-sel{ flex:0 0 9em; background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:7px 9px; font-size:12.5px; font-family:inherit; cursor:pointer; box-sizing:border-box; }
+.ce-line .ce-line-id{ flex:1 1 14em; background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:7px 9px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
+
+/* ===== カード設計サンプル（今だけ・たたき台） ===== */
+.sp-banner{ background:rgba(124,58,237,.10); border:1px solid rgba(124,58,237,.35); border-radius:10px; padding:11px 14px; font-size:12.5px; line-height:1.6; color:var(--text); margin-bottom:12px; }
+.sp-tabs{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.sp-tab{ width:40px; height:40px; border-radius:10px; border:1px solid var(--border); background:var(--bg2); color:var(--text2); font-size:16px; font-weight:800; cursor:pointer; }
+.sp-tab:hover{ border-color:var(--brand); }
+.sp-tab.on{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.sp-grid{ display:grid; grid-template-columns:minmax(260px,360px) 1fr; gap:16px; align-items:start; }
+@media(max-width:880px){ .sp-grid{ grid-template-columns:1fr; } }
+.sp-desc{ background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; }
+.sp-desc h3{ font-size:16px; margin-bottom:4px; }
+.sp-tagline{ font-size:12.5px; color:var(--text2); line-height:1.6; margin-bottom:12px; }
+.sp-block{ margin-top:12px; }
+.sp-bt{ font-size:12px; font-weight:700; color:var(--text2); margin-bottom:5px; }
+.sp-block ul{ margin:0; padding-left:18px; }
+.sp-block li{ font-size:12.5px; line-height:1.7; }
+.sp-pros .sp-bt{ color:var(--brand); }
+.sp-cons .sp-bt{ color:var(--orange); }
+.sp-mock{ background:var(--bg); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.sp-mock-head{ background:var(--bg3); padding:9px 14px; font-size:12px; font-weight:700; color:var(--text2); border-bottom:1px solid var(--border); }
+.sp-mock-body{ padding:14px; max-height:62vh; overflow-y:auto; }
+.sp-mock-body .cf-section{ margin-bottom:10px; }
+.sp-row{ display:flex; gap:10px; flex-wrap:wrap; }
+.sp-fld{ flex:1; min-width:120px; }
+.sp-fl{ font-size:10px; color:var(--text3); font-weight:600; }
+.sp-fv{ font-size:13px; color:var(--text); margin-top:2px; }
+.sp-checks{ display:flex; flex-direction:column; gap:6px; }
+.sp-chk{ display:flex; align-items:center; gap:9px; padding:7px 9px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); cursor:pointer; }
+.sp-chk.on{ border-color:var(--brand); background:var(--brand-soft); }
+.sp-box{ width:20px; height:20px; border-radius:5px; border:1.5px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:var(--brand); flex:0 0 auto; }
+.sp-chk.on .sp-box{ border-color:var(--brand); }
+.sp-cl{ flex:1; font-size:13px; }
+.sp-who{ font-size:11px; color:var(--text2); }
+.sp-who.sp-none{ color:var(--text3); }
+.sp-meass{ display:flex; flex-wrap:wrap; gap:8px; }
+.sp-meas{ display:flex; align-items:baseline; gap:4px; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+.sp-ml{ font-size:11px; color:var(--text3); }
+.sp-mv{ font-size:15px; font-weight:700; color:var(--text); }
+.sp-mu{ font-size:10px; color:var(--text3); }
+.sp-hint{ font-size:11px; color:var(--text3); margin-top:8px; line-height:1.6; }
+.sp-paper{ background:var(--bg2); border:1px dashed var(--border2); border-radius:10px; padding:12px 14px; font-size:12.5px; color:var(--text2); line-height:1.6; }
+.sp-warn{ background:rgba(239,68,68,.10); border:1px solid rgba(239,68,68,.3); border-radius:10px; padding:11px 14px; font-size:12.5px; color:var(--text); }
+.sp-tbl{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.sp-tbl th,.sp-tbl td{ border:1px solid var(--border); padding:5px 8px; text-align:left; }
+.sp-tbl th{ background:var(--bg3); color:var(--text2); font-size:11px; }
+.sp-photos{ display:flex; gap:8px; }
+.sp-photo{ width:54px; height:54px; border:1px dashed var(--border2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--text3); }
+
+/* ===== ダッシュボード ===== */
+.dash-date{ font-size:14px; color:var(--text2); margin-bottom:14px; }
+.dash-kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+@media(max-width:680px){ .dash-kpis{ grid-template-columns:repeat(2,1fr); } }
+.dash-kpi{ background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:14px; }
+.dash-kpi-ic{ font-size:18px; }
+.dash-kpi-num{ font-size:28px; font-weight:800; line-height:1.1; margin-top:6px; }
+.dash-kpi-num span{ font-size:13px; font-weight:600; color:var(--text3); margin-left:3px; }
+.dash-kpi-l{ font-size:12px; color:var(--text2); margin-top:2px; }
+.dash-card{ background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:14px; }
+.dash-h{ display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:14px; font-weight:700; margin-bottom:12px; }
+.dash-note{ font-size:11px; color:var(--text3); font-weight:400; }
+.dash-lv{ font-size:12px; font-weight:700; color:#fff; padding:3px 10px; border-radius:999px; }
+.dash-gauge{ height:14px; background:var(--bg3); border-radius:999px; overflow:hidden; }
+.dash-gauge-fill{ height:100%; border-radius:999px; transition:width .3s; }
+.dash-sub{ font-size:11.5px; color:var(--text3); margin-top:8px; line-height:1.6; }
+.dash-earliest .dash-earliest-main{ font-size:22px; font-weight:800; color:var(--text); }
+.dash-earliest.ok .dash-earliest-main{ color:var(--brand); }
+.dash-bars{ display:flex; gap:6px; align-items:flex-end; overflow-x:auto; padding-top:6px; }
+.dash-bar{ flex:1; min-width:34px; text-align:center; }
+.dash-bar-n{ font-size:11px; font-weight:700; color:var(--text2); margin-bottom:3px; }
+.dash-bar-track{ position:relative; height:90px; background:var(--bg3); border-radius:6px; display:flex; align-items:flex-end; overflow:hidden; }
+.dash-bar-fill{ width:100%; border-radius:6px 6px 0 0; transition:height .3s; }
+.dash-bar-cap{ position:absolute; left:0; right:0; height:0; border-top:1.5px dashed var(--text3); opacity:.7; }
+.dash-bar.today .dash-bar-track{ outline:2px solid var(--brand); outline-offset:-2px; }
+.dash-bar.is-forecast .dash-bar-fill{ opacity:.45; background-image:repeating-linear-gradient(45deg, rgba(255,255,255,.35), rgba(255,255,255,.35) 3px, transparent 3px, transparent 6px); }
+.dash-bar.is-forecast .dash-bar-n{ color:var(--text3); }
+/* 予約の埋まり（チーム別） */
+.dash-cap{ display:flex; flex-direction:column; gap:6px; }
+.dash-cap-row{ display:flex; align-items:center; gap:8px; }
+.dash-cap-name{ width:54px; font-size:12px; font-weight:700; color:var(--text2); flex:0 0 auto; }
+.dash-cap-axis{ height:1px; }
+.dash-cap-cells{ display:flex; gap:4px; flex:1; overflow-x:auto; }
+.dash-cap-cell{ flex:1; min-width:24px; text-align:center; font-size:11px; font-weight:700; padding:4px 0; border-radius:5px; background:var(--bg3); color:var(--text2); }
+.dash-cap-cell.near{ background:rgba(234,179,8,.22); color:#a16207; }
+.dash-cap-cell.full{ background:var(--red); color:#fff; }
+.dash-cap-cell.today{ outline:2px solid var(--brand); outline-offset:-2px; }
+.dash-cap-d{ flex:1; min-width:24px; text-align:center; font-size:9.5px; color:var(--text3); }
+.dash-bar-d{ font-size:10.5px; color:var(--text2); margin-top:4px; }
+.dash-bar-w{ font-size:10px; color:var(--text3); }
+.dash-foot{ font-size:11px; color:var(--text3); line-height:1.6; }
+
+/* ===== 代車ビュー（縦＝日付・横＝代車20台・両方向スクロール） ===== */
+.lo-scroll{ height:calc(100dvh - 150px); overflow:auto; border:1px solid var(--border); border-radius:var(--r); background:var(--bg2); }
+.lo-grid{ display:grid; min-width:max-content; }
+.lo-cell{ border-bottom:1px solid var(--border); border-right:1px solid var(--border); min-height:38px; padding:3px 4px; font-size:11px; position:relative; }
+.lo-head{ position:sticky; top:0; z-index:4; background:var(--bg3); border-bottom:1px solid var(--border2); text-align:center; }
+.lo-corner{ position:sticky; left:0; top:0; z-index:6; }
+/* 🔴 v1.46.0 代車カレンダーの列見出し＝**車種名がメイン／番号は小さく下に**（ゆうた指定）。
+   ⚠ 列の幅は 96〜112px しかないので、車種名は1行で入りきらない時だけ「…」で詰める。
+   ⚠ 番号は鍵タグや車両管理と突き合わせるのに要るので消さない＝小さく残す。 */
+.lo-model{ font-weight:800; font-size:12.5px; line-height:1.25; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lo-no{ font-size:9.5px; line-height:1.3; color:var(--text3); white-space:nowrap; margin-top:1px; }
+/* 車種が未登録の代車＝番号を主役に戻す（列が真っ白にならないように） */
+.lo-model-none{ color:var(--text2); }
+.lo-no-sub{ color:var(--text3); opacity:.8; }
+/* v0.98.0 緊急車両の列ヘッダ＝赤で強調／予約以外の貸出の用途ラベル */
+.lo-emg-head{ background:#3a1417; box-shadow:inset 0 -2px 0 #ef4444; }
+.lo-emg-tag{ font-size:9px; font-weight:800; color:#fff; background:#ef4444; border-radius:5px; padding:0 5px; margin:2px auto 1px; display:inline-block; }
+.lo-bk-pp{ display:inline-block; font-size:8.5px; font-weight:700; opacity:.85; }
+.lo-emg-btn{ border-color:#ef4444 !important; color:#ff6b6b !important; }
+/* 空きセルのドラッグ範囲選択（予約以外の貸出） */
+.lo-free.lo-selecting{ background:rgba(59,130,246,.28) !important; box-shadow:inset 0 0 0 1px #3b82f6; cursor:crosshair; }
+.lo-free{ cursor:crosshair; }
+/* 軽量モーダル（予約以外の貸出／緊急車両） */
+.lo-modal-ov{ position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; }
+.lo-modal-box{ background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:18px 20px; width:min(420px,92vw); box-shadow:0 18px 50px rgba(0,0,0,.55); }
+.lo-modal-h{ margin:0 0 12px; font-size:15px; font-weight:700; color:var(--text); }
+.lo-modal-f{ display:block; font-size:11px; color:var(--text2); margin-bottom:10px; }
+.lo-modal-f select, .lo-modal-f input{ display:block; width:100%; margin-top:3px; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+.lo-modal-row{ display:flex; gap:10px; } .lo-modal-row .lo-modal-f{ flex:1; }
+.lo-modal-foot{ display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+.lo-modal-foot button{ background:var(--bg3); border:1px solid var(--border2); color:var(--text); border-radius:8px; padding:8px 16px; font-size:13px; font-weight:700; cursor:pointer; }
+.lo-modal-foot button.primary{ background:#1db97a; border-color:#1db97a; color:#06281d; }
+.lo-date{ position:sticky; left:0; z-index:3; font-weight:600; color:var(--text2); background:var(--bg2); padding:3px 6px; }
+/* 左の日付ドラッグ範囲ハイライト（その区間だけ薄く）。日付列(sticky)は不透明で塗る＝横スクロールで裏のセルが透けない */
+.lo-cell.lo-row-hl{ background:rgba(96,165,250,.10); }
+.lo-date.lo-row-hl{ background:#1c2c45; box-shadow:inset 3px 0 0 #60a5fa; }
+.lo-date span{ font-size:9.5px; color:var(--text3); }
+.lo-date.sun{ color:#f87171; } .lo-date.sat{ color:#60a5fa; }
+.lo-date .lo-hol{ font-size:8.5px; color:var(--red); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lo-date .lo-month{ font-size:9px; font-weight:800; color:var(--brand); }
+.lo-cell.lo-today{ background:var(--brand-soft); }
+.lo-date.lo-today{ background:#16271d; color:var(--brand); box-shadow:inset 3px 0 0 var(--brand); }   /* 不透明＝横スクロールで裏が透けない */
+/* ===== 案F改（v0.99.5）＝中央の茎＋複数日枠を使う3行カード／1〜2日は省スペース1行／当日かぶりは耳 ===== */
+.lo-bk{ text-align:center; padding:0; background:transparent; }
+.lo-bk.bk-start{ z-index:2; }   /* カードは下の日付セルより前面・ただし左の日付列(z5)より後ろ＝横スクロールで日付に被らない */
+/* 中央の茎（細い縦線）＝予約の継続 */
+.lo-bk .lo-fill{ position:absolute; left:50%; transform:translateX(-50%); top:0; bottom:0; width:4px; z-index:0; background:var(--lo-team, var(--brand)); border-radius:2px; pointer-events:none; }
+.lo-bk.bk-start.bk-full .lo-fill{ top:60px; }   /* 3行カード（約1.5日枠）の下から茎 */
+.lo-bk.bk-start.bk-compact .lo-fill{ top:21px; } /* 省スペース1行の下から茎 */
+.lo-bk.bk-end .lo-fill{ bottom:12px; }
+.lo-bk.bk-single .lo-fill{ display:none; }
+.lo-bk.lo-closed, .lo-bk.lo-holiday{ background:transparent !important; }
+/* 終端の大きい▼ */
+.lo-end{ position:absolute; left:50%; transform:translateX(-50%); bottom:0; font-size:15px; line-height:1; color:var(--lo-team, var(--brand)); cursor:ns-resize; z-index:2; }
+/* 車両イベントのオーバーレイ */
+.lo-evs{ position:absolute; right:0; top:0; bottom:0; width:5px; opacity:.85; }
+.lo-evt-tag{ position:absolute; right:6px; top:2px; z-index:1; font-size:8.5px; font-weight:800; color:#fff; border-radius:4px; padding:1px 4px; white-space:nowrap; max-width:80%; overflow:hidden; text-overflow:ellipsis; }
+/* ラベル札＝チーム色カード（クリックで操作メニュー／ドラッグで移動） */
+.lo-badge{ background:var(--lo-team, var(--brand)); color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.4); cursor:grab; text-align:left; }
+.lo-badge:active{ cursor:grabbing; }
+/* 3行カード（必要最小の高さ＝約1.5日分・最大幅維持・はみ出しは…） */
+.lo-badge.full{ position:absolute; z-index:2; top:2px; left:4px; right:4px; height:56px; border-radius:8px; padding:4px 7px; overflow:hidden; }
+.lo-badge.full .lo-lbl.full{ display:flex; flex-direction:column; gap:1px; height:100%; min-width:0; overflow:hidden; }
+.lo-badge.full .lo-nm{ display:block; font-size:11.5px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:100%; }
+.lo-badge.full .lo-car2{ display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; color:#fff; min-width:0; }
+.lo-badge.full .lo-cartxt{ flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lo-badge.full .lo-fix{ margin-left:auto; }
+.lo-badge.full .lo-memo{ font-size:9.5px; color:#0e141c; background:rgba(255,255,255,.9); border-radius:4px; padding:0 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* 省スペース1行（1〜2日）：カードはセル幅いっぱい。客名は長い時だけ…／車種は省略しない／固は右に保持 */
+.lo-badge.mini{ position:relative; z-index:2; display:block; margin:2px 4px; border-radius:7px; padding:2px 6px; overflow:hidden; }
+.lo-badge.mini .lo-lbl.mini{ display:flex; align-items:center; gap:4px; min-width:0; font-size:10.5px; font-weight:600; color:#fff; }
+.lo-badge.mini .lo-mininm{ flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lo-badge.mini .lo-minicar{ flex:0 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; opacity:.95; }
+.lo-badge.mini .lo-fix{ flex:0 0 auto; margin-left:0; }
+/* 固定バッジ（黄） */
+.lo-fix{ display:inline-block; font-size:9px; font-weight:800; color:#3a2a00; background:#fbbf24; border-radius:4px; padding:0 5px; margin-left:3px; flex:0 0 auto; }
+/* 当日かぶり（本当に同日）＝後客の3行札を共有日の上端まで伸ばし、上辺を“下向き矢印型”にくり抜く。
+   くり抜きの中を先客の棒＋▼が均一の隙間で通る（先客の▼は共有日の下端まで）。テキストはくり抜きの下＝翌日から。 */
+.lo-badge.full.lo-handoff{ top:-36px; height:96px; padding:44px 7px 4px;
+  clip-path:polygon(0 0,
+    calc(50% - 6px) 0, calc(50% - 6px) 17px, calc(50% - 11px) 17px,
+    50% 40px,
+    calc(50% + 11px) 17px, calc(50% + 6px) 17px, calc(50% + 6px) 0,
+    100% 0, 100% 100%, 0 100%); }
+/* 返却済み＝アーカイブ（消し過ぎず読める・茎は実線でグレー） */
+.lo-bk.lo-returned .lo-badge{ background:#5b6675; color:#dfe6ef; box-shadow:inset 5px 0 0 var(--lo-team, #888); cursor:default; opacity:1; }   /* 左に国産=緑/輸入=ピンクのカラーバー＝どちらか分かる */
+.lo-bk.lo-returned .lo-badge.full .lo-memo{ background:rgba(255,255,255,.75); }
+.lo-bk.lo-returned .lo-fill{ background:#46505e; filter:none; opacity:1; }
+.lo-bk.lo-returned .lo-end{ color:#46505e; }
+.lo-bk.lo-returned .lo-badge::after{ content:"返却済"; display:inline-block; margin-left:4px; font-size:8.5px; font-weight:700; color:#cdd6e2; }
+.lo-free{ background:transparent; }
+/* 省スペースのホバー＝フルサイズ札(.lo-badge.full)をそのまま重ねて表示（位置だけ上書き） */
+.lo-info{ position:fixed !important; right:auto !important; height:auto !important; min-height:54px; z-index:2147483600 !important; box-shadow:0 8px 24px rgba(0,0,0,.55); pointer-events:none; }
+/* 代車バッジ操作メニュー（詳細/返却確定/キャンセル） */
+.lo-bpop{ position:fixed; z-index:210; width:220px; background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,.55); padding:8px; }
+.lo-bpop-h{ font-size:12px; font-weight:700; color:var(--text); padding:4px 6px 8px; border-bottom:1px solid var(--border); margin-bottom:2px; }
+.lo-bpop-h small{ color:var(--text2); font-weight:400; }
+.lo-bpop-b{ display:block; width:100%; text-align:left; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:12.5px; font-weight:600; cursor:pointer; margin-top:6px; }
+.lo-bpop-b:hover{ background:var(--bg4); }
+.lo-bpop-b.danger{ color:#ff6b6b; border-color:#5a2330; }
+.lo-bpop-b.primary{ background:#1db97a; border-color:#1db97a; color:#06281d; }
+.lo-bpop-f{ display:block; font-size:11px; color:var(--text2); margin:8px 6px 4px; }
+.lo-bpop-f input{ display:block; width:100%; margin-top:3px; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:7px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+.lo-bpop-note{ font-size:10px; color:var(--text3); margin:4px 6px; line-height:1.4; }
+.lo-bpop-foot{ display:flex; gap:6px; margin-top:6px; }
+.lo-bpop-foot .lo-bpop-b{ flex:1; text-align:center; margin-top:0; }
+/* 整備予定（車検/点検/修理）＝日付枠で目立たせる：セル全体を色づけ＋濃いラベル */
+.lo-evbg{ position:absolute; inset:0; z-index:0; pointer-events:none; }
+.lo-evt-tag{ position:absolute; left:50%; transform:translateX(-50%); top:2px; z-index:2; font-size:9px; font-weight:800; color:#fff; border-radius:5px; padding:1px 6px; white-space:nowrap; max-width:96%; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 4px rgba(0,0,0,.4); }
+.lo-evday{ position:relative; }
+/* 下書き：元位置ゴースト（列の左端に点線で並べる） */
+.lo-gh-line{ position:absolute; left:5px; top:-1px; bottom:-1px; width:3px; border-radius:2px; background:repeating-linear-gradient(0deg,var(--text3),var(--text3) 3px,transparent 3px,transparent 7px); opacity:.85; z-index:1; }
+.lo-gh-line.st{ top:14px; } .lo-gh-line.en{ bottom:8px; }
+.lo-gh-tag{ position:absolute; left:2px; top:1px; z-index:1; font-size:7.5px; color:var(--text3); background:var(--bg2); border:1px dashed var(--border2); border-radius:4px; padding:0 3px; white-space:nowrap; }
+/* 下書き：動かした割当を強調／重複は赤 */
+.lo-bk.lo-chg .lo-badge{ box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.4); }
+.lo-bk.lo-bad .lo-fill{ background:var(--red)!important; }
+.lo-bk.lo-bad .lo-badge{ box-shadow:0 0 0 2px var(--red); }
+.lo-bk.lo-bad .lo-end{ color:var(--red); }
+/* 下書きバー */
+#lo-draft-bar{ background:rgba(245,158,11,.10); border:1px solid #f59e0b66; border-radius:10px; margin-bottom:8px; padding:7px 10px; }
+#lo-draft-bar .lod-inner{ display:flex; align-items:center; gap:10px; }
+#lo-draft-bar .lod-lbl{ font-size:12.5px; font-weight:800; color:var(--orange); white-space:nowrap; }
+#lo-draft-bar .lod-warn{ color:var(--red); font-weight:800; }
+#lo-draft-bar .lod-chips{ display:flex; gap:6px; overflow-x:auto; flex:1; padding:2px 0; }
+#lo-draft-bar .lod-chip{ flex:0 0 auto; font-size:10.5px; background:var(--bg3); border:1px solid var(--border2); border-left:3px solid var(--orange); border-radius:7px; padding:3px 8px; white-space:nowrap; color:var(--text2); }
+#lo-draft-bar .lod-chip.bad{ border-left-color:var(--red); }
+#lo-draft-bar .lod-chip b{ color:var(--text); }
+#lo-draft-bar .lod-chip i{ font-style:normal; margin-left:6px; cursor:pointer; color:var(--text3); font-weight:800; }
+#lo-draft-bar .lod-chip i:hover{ color:var(--red); }
+#lo-draft-bar .lod-btn{ flex:0 0 auto; font-size:12px; font-weight:700; padding:5px 12px; border-radius:8px; border:1px solid var(--border2); background:var(--bg3); color:var(--text); cursor:pointer; }
+#lo-draft-bar .lod-btn.primary{ background:var(--brand); border-color:var(--brand); color:#fff; }
+#lo-draft-bar .lod-btn.primary:disabled{ opacity:.45; cursor:not-allowed; }
+#lo-draft-bar .lod-btn.warn{ color:#ff9d9d; border-color:#7a3b3b; }
+/* 代車カレンダー：オプション絞り込みスイッチ */
+.lo-filters{ display:inline-flex; align-items:center; gap:5px; margin-right:8px; flex-wrap:wrap; }
+.lo-filters-lb{ font-size:11px; color:var(--text3); font-weight:700; }
+.lo-filter{ font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; background:var(--bg3); color:var(--text2); border:1px solid var(--border2); cursor:pointer; }
+.lo-filter:hover{ background:var(--bg4); }
+.lo-filter.on{ background:var(--brand); color:#fff; border-color:var(--brand); }
+.vh-btn.lo-sortbtn.on{ background:var(--brand); color:#fff; border-color:var(--brand); }
+/* 代車ヘッダのホバー詳細カード */
+#lo-veh-hover{ position:fixed; z-index:300; width:210px; background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 12px 36px rgba(0,0,0,.5); padding:11px 12px; font-size:12px; opacity:0; transform:translateY(-4px); pointer-events:none; transition:opacity .1s, transform .1s; }
+#lo-veh-hover.show{ opacity:1; transform:translateY(0); }
+#lo-veh-hover .lvh-head{ display:flex; align-items:baseline; gap:7px; flex-wrap:wrap; }
+#lo-veh-hover .lvh-no{ font-size:10.5px; font-weight:700; color:var(--text3); background:var(--bg3); border:1px solid var(--border2); border-radius:5px; padding:0 6px; }
+#lo-veh-hover .lvh-name{ font-size:17px; font-weight:800; color:var(--text); }   /* 車種名＝メイン */
+#lo-veh-hover .lvh-color{ font-size:11px; color:var(--text3); }                   /* 色＝添え */
+#lo-veh-hover .lvh-badges{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:7px; }
+#lo-veh-hover .lvh-plate-badge{ font-size:11px; font-weight:700; color:var(--text); background:var(--bg3); border:1px solid var(--border2); border-radius:6px; padding:2px 8px; letter-spacing:.02em; }
+#lo-veh-hover .lvh-opts{ display:flex; gap:5px; margin-top:8px; }
+#lo-veh-hover .lvh-opt{ font-size:11px; font-weight:800; padding:2px 7px; border-radius:6px; }
+#lo-veh-hover .lvh-opt.on{ background:rgba(29,185,122,.16); color:var(--green); border:1px solid rgba(29,185,122,.5); }
+#lo-veh-hover .lvh-opt.off{ background:var(--bg3); color:var(--text3); border:1px solid var(--border); }
+#lo-veh-hover .lvh-h{ margin-top:7px; font-size:12px; color:var(--text2); }
+#lo-veh-hover .lvh-h b{ color:var(--text); font-size:14px; }
+#lo-veh-hover .lvh-cat{ font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:6px; }
+#lo-veh-hover .lvh-cat.kei{ background:rgba(132,204,22,.16); color:#84cc16; border:1px solid rgba(132,204,22,.5); }
+#lo-veh-hover .lvh-cat.normal{ background:rgba(55,138,221,.16); color:var(--blue); border:1px solid rgba(55,138,221,.5); }
+#lo-veh-hover .lvh-cat.import{ background:rgba(236,72,153,.16); color:#ec4899; border:1px solid rgba(236,72,153,.5); }
+/* v1.15.0：区分に「商用車」を追加（軽=黄緑／普通車=青／輸入車=ピンク／商用車=オレンジ） */
+#lo-veh-hover .lvh-cat.commercial{ background:rgba(249,115,22,.16); color:#f97316; border:1px solid rgba(249,115,22,.5); }
+#lo-veh-hover .lvh-seats{ font-size:11px; color:var(--text2); font-weight:700; }
+#lo-veh-hover .lvh-dims{ display:flex; gap:10px; margin-top:8px; }
+#lo-veh-hover .lvh-dim{ font-size:11px; color:var(--text3); }
+#lo-veh-hover .lvh-dim b{ color:var(--text); font-size:13px; margin-left:2px; }
+#lo-veh-hover .lvh-sub{ margin-top:6px; font-size:10.5px; color:var(--text3); border-top:1px solid var(--border); padding-top:5px; }
+/* 車両モーダルの寸法欄 */
+.fl-dims{ display:flex; gap:10px; margin-top:5px; }
+.fl-dims label{ display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text2); }
+.fl-in.fl-dim{ width:62px; }
+/* 車両モーダルの装備オプション */
+.fl-opts{ display:flex; gap:14px; margin-top:5px; }
+/* v1.14.1：装備のチェックは、アプリの他のチップと同じ見た目に（素のチェックボックスをやめる） */
+.fl-opt{ display:inline-flex; align-items:center; gap:7px; font-size:13px; cursor:pointer;
+  padding:7px 12px 7px 9px; border:1px solid var(--border); border-radius:9px; background:var(--bg2);
+  transition:border-color .12s, background .12s; user-select:none; }
+.fl-opt:hover{ border-color:var(--brand); }
+.fl-opt input{ position:absolute; opacity:0; width:0; height:0; }
+.fl-optbox{ width:18px; height:18px; border-radius:5px; border:1px solid var(--border2); background:var(--bg3);
+  display:inline-flex; align-items:center; justify-content:center; color:transparent; transition:all .12s; flex:0 0 auto; }
+.fl-optlb{ font-weight:600; color:var(--text2); }
+.fl-opt:has(input:checked){ border-color:var(--brand); background:var(--brand-soft); }
+.fl-opt:has(input:checked) .fl-optbox{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.fl-opt:has(input:checked) .fl-optlb{ color:var(--text); }
+.fl-opt input:focus-visible + .fl-optbox{ box-shadow:0 0 0 3px var(--brand-soft); }
+.fl-opts{ display:flex; flex-wrap:wrap; gap:8px; }
+.fl-opttag{ display:inline-block; font-size:10px; font-weight:800; color:var(--green); background:rgba(29,185,122,.14); border:1px solid rgba(29,185,122,.45); border-radius:5px; padding:0 5px; margin:2px 4px 0 0; }
+/* 代車モーダル：ナンバーは新規予約と同じ cf-plate 構造を流用（CSSは cf-plate-* をそのまま使用）。入替予定・自動メモ */
+.fl-plate{ margin-top:5px; }   /* ※ナンバーは .cf-plate を使用 */
+.fl-auto{ font-size:10px; color:var(--brand); font-weight:700; margin-left:4px; }
+.fl-rep{ background:rgba(245,158,11,.10); border:1px solid #f59e0b66; border-radius:8px; padding:8px 10px; font-size:11.5px; color:var(--text2); line-height:1.6; }
+.fl-rep .fl-rep-note{ color:var(--orange); font-weight:700; }
+.fl-rep .fl-rep-note b{ color:var(--text); }
+.fl-retired{ display:inline-block; margin-left:7px; font-size:9.5px; font-weight:800; color:var(--text3); background:var(--bg4); border:1px solid var(--border2); border-radius:5px; padding:0 6px; }
+.fl-retired.plan{ color:var(--orange); background:rgba(245,158,11,.14); border-color:#f59e0b66; }
+.fl-opttag.h{ color:var(--text2); background:var(--bg3); border-color:var(--border2); }
+/* 定休日・祝日（代車ビュー） */
+.lo-cell.lo-closed{ background:repeating-linear-gradient(45deg, rgba(120,120,120,.12), rgba(120,120,120,.12) 6px, transparent 6px, transparent 12px); }
+.lo-cell.lo-holiday{ background:rgba(220,38,38,.06); }
+.lo-date.closed{ color:var(--text3); }
+.lo-closed-tag{ font-size:8.5px; font-weight:700; color:var(--text3); }
+/* ドラッグ中のゴーストプレビュー（落とすとこうなる） */
+.lo-cell.lo-prev{ background:rgba(38,162,105,.45) !important; box-shadow:inset 0 0 0 1px var(--brand); }
+.lo-cell.lo-prev-bad{ background:rgba(239,68,68,.45) !important; box-shadow:inset 0 0 0 1px var(--red); }
+/* 車両管理 日別：代車の貸出透かし・定休/祝日 */
+.fl-cal-cell.fl-use{ background:rgba(38,162,105,.14); }
+.fl-use-tag{ font-size:8.5px; font-weight:700; color:var(--brand); opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.fl-cal-cell.fl-closedc{ background:repeating-linear-gradient(45deg, rgba(120,120,120,.10), rgba(120,120,120,.10) 6px, transparent 6px, transparent 12px); }
+.fl-cal-cell.fl-holc{ background:rgba(220,38,38,.05); }
+.fl-cal-h.fl-holh{ color:var(--red); }
+.fl-cal-h.fl-closedh{ color:var(--text3); }
+
+/* ===== 代車・自社車両管理 ===== */
+.fl-card{ background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:14px; }
+.fl-h{ font-size:14px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; justify-content:flex-start; gap:7px; }
+/* v1.12.0：見出しはアイコンと文字をくっつける（space-between だと間が大きく空いていた）。
+   右に置きたいもの（ボタン・注記）だけを右端へ寄せる。 */
+.fl-h > .vh-btn, .fl-h > .fl-note{ margin-left:auto; }
+.fl-note{ font-size:11px; color:var(--text3); font-weight:400; line-height:1.6; }
+.fl-form{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.fl-in{ background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:7px 10px; font-size:13px; font-family:inherit; }
+.fl-in:focus{ outline:none; border-color:var(--brand); }
+/* v1.15.0：数字の枠に上下矢印（スピナー）は出さない＝打ち込み専用。
+   ⚠ 中身は type="text" ＋ flDigits() で「全角→半角・数字のみ」にしてある。
+      ここは、将来また type="number" が混ざった時のための保険。 */
+.fl-in::-webkit-outer-spin-button,
+.fl-in::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.fl-in[type=number]{ -moz-appearance:textfield; appearance:textfield; }
+.fl-lb{ font-size:11px; color:var(--text3); display:inline-flex; align-items:center; gap:6px; }
+.fl-empty{ color:var(--text3); font-size:12.5px; padding:8px 0; }
+.fl-row{ display:flex; align-items:center; gap:10px; padding:9px 10px; border:1px solid var(--border); border-radius:9px; margin-bottom:7px; background:var(--bg); }
+.fl-row.editing{ border-color:var(--brand); background:var(--brand-soft); }
+.fl-main{ flex:1; min-width:0; }
+.fl-name{ font-size:13.5px; font-weight:700; }
+.fl-sub{ font-size:11.5px; color:var(--text2); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fl-btn{ background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:5px 10px; font-size:12px; cursor:pointer; color:var(--text2); }
+.fl-btn:hover{ border-color:var(--brand); color:var(--text); }
+.fl-btn.del:hover{ border-color:var(--red); color:var(--red); }
+/* エクセル風 月次カレンダー（縦横スクロール・行列固定） */
+.fl-cal-wrap{ max-height:58vh; overflow:auto; border:1px solid var(--border); border-radius:10px; background:var(--bg); }
+.fl-cal{ display:grid; min-width:max-content; }
+.fl-cal-h{ position:sticky; top:0; z-index:3; font-size:11.5px; font-weight:700; color:var(--text2); text-align:center; padding:8px 4px; background:var(--bg3); border-bottom:1px solid var(--border2); border-right:1px solid var(--border); }
+.fl-cal-h span{ display:block; font-size:9px; color:var(--text3); }
+.fl-cal-h.sun{ color:#f87171; } .fl-cal-h.sat{ color:#60a5fa; }
+.fl-cal-m{ cursor:pointer; }
+.fl-cal-m:hover{ background:var(--bg4); color:var(--text); }
+.fl-evt{ display:inline-block; font-size:9px; font-weight:800; color:#fff; border-radius:4px; padding:1px 5px; margin:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; cursor:pointer; }
+.fl-cal-cell{ cursor:pointer; flex-wrap:wrap; }
+.fl-cal-cell:hover{ background:var(--bg3); }
+.fl-cal-corner{ position:sticky; left:0; top:0; z-index:5; text-align:left; padding-left:10px; }
+.fl-cal-name{ position:sticky; left:0; z-index:2; background:var(--bg2); font-size:12px; font-weight:600; padding:8px 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid var(--border); border-right:1px solid var(--border2); }
+.fl-cal-cell{ min-height:36px; border-bottom:1px solid var(--border); border-right:1px solid var(--border); display:flex; align-items:center; justify-content:center; gap:3px; padding:3px; background:var(--bg2); }
+.fl-rows{ display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:7px; }
+/* v1.12.0：入力が縦に長くて「保存」が画面の外に出て押せなかった。
+   ポップアップに高さの上限を付けて中身をスクロールさせ、操作ボタンは下に貼り付ける。 */
+.fl-modal{ width:min(440px, 94vw); max-height:88dvh; display:flex; flex-direction:column; }
+.fl-modal .modal-head{ flex:0 0 auto; }
+.fl-modal .modal-body{ flex:1 1 auto; overflow-y:auto; }
+.fl-mact{ position:sticky; bottom:-14px; display:flex; align-items:center; gap:8px; margin-top:8px;
+  padding:10px 0 4px; background:var(--bg2); border-top:1px solid var(--border); z-index:2; }
+.fl-mact .vh-btn.del{ border-color:rgba(239,68,68,.45); color:#fca5a5; background:rgba(239,68,68,.10); }
+.fl-mact .vh-btn.del:hover{ background:rgba(239,68,68,.18); }
+
+/* v1.12.0：車両カードは「クリックで詳細」。編集・削除は詳細→編集画面の中へ移した。 */
+.fl-row-click{ cursor:pointer; }
+.fl-row-click:hover{ border-color:var(--brand); }
+.fl-more{ margin-left:auto; color:var(--text3); display:flex; align-items:center; }
+.fd-box{ width:min(420px,94vw); max-height:88dvh; overflow-y:auto; padding:18px; }
+.fd-head{ display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.fd-title{ font-size:18px; font-weight:800; }
+.fd-kind{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; background:var(--bg3); border:1px solid var(--border); color:var(--text2); }
+.fd-tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+.fd-tbl td{ padding:6px 0; border-bottom:1px dashed var(--border); }
+.fd-tbl td:first-child{ width:88px; color:var(--text2); font-size:12px; }
+.fd-auto{ color:var(--text3); font-size:11px; margin-left:4px; }
+.fd-opts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.fd-opt{ font-size:11.5px; padding:2px 9px; border-radius:999px; border:1px solid var(--border); }
+.fd-opt.on{ background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.32); color:#86efac; }
+.fd-opt.off{ color:var(--text3); opacity:.7; }
+.fd-btns{ display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+.fl-mform{ display:flex; flex-direction:column; gap:10px; }
+.fl-mlb{ font-size:12px; color:var(--text2); display:flex; flex-direction:column; gap:4px; font-weight:600; }
+.fl-bdg{ font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:5px; color:#fff; white-space:nowrap; }
+.fl-bdg.shaken{ background:var(--red); }
+.fl-bdg.tenken{ background:#f59e0b; }
+
+/* ===== カード内タブ ===== */
+.cf-tabs{ display:flex; gap:2px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+/* ポップアップは固定高さ＝タブ切替で箱が伸び縮みして上端がブレない */
+.card-modal{ width:min(760px,94vw); height:min(88dvh,840px); display:flex; flex-direction:column; }
+.card-modal .modal-head{ flex:0 0 auto; }
+.card-modal .modal-body{ flex:1 1 auto; overflow-y:auto; }
+/* ポップアップ内ではタブを上端に固定 */
+.card-modal .cf-tabs{ position:sticky; top:0; background:var(--bg2); z-index:3; padding-top:2px; }
+.cf-tab{ padding:9px 13px; font-size:13px; color:var(--text2); background:none; border:0; border-bottom:2px solid transparent; cursor:pointer; white-space:nowrap; }
+.cf-tab:hover{ color:var(--text); }
+.cf-tab.on{ color:var(--brand); border-bottom-color:var(--brand); font-weight:700; }
+.cf-panel[hidden]{ display:none; }
+
+/* チェックリスト（整備・バックオフィス） */
+.cf-checks{ display:flex; flex-direction:column; gap:6px; }
+.cf-chk{ display:flex; align-items:center; gap:10px; padding:9px 11px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); cursor:pointer; transition:border-color .1s, background .1s; }
+.cf-chk.on{ border-color:var(--brand); background:var(--brand-soft); }
+.cf-chkbox{ width:21px; height:21px; border-radius:5px; border:1.5px solid var(--border2); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:var(--brand); flex:0 0 auto; }
+.cf-chk.on .cf-chkbox{ border-color:var(--brand); }
+.cf-chkl{ font-size:13.5px; }
+.cf-hint{ font-size:11px; color:var(--text3); margin-top:10px; line-height:1.6; }
+
+/* フロー（進捗ログ・タイムライン） */
+.cf-flow{ display:flex; flex-direction:column; }
+.cf-flowrow{ display:flex; gap:12px; padding:7px 0; position:relative; }
+.cf-flowdot{ width:11px; height:11px; border-radius:50%; background:var(--border2); margin-top:3px; flex:0 0 auto; box-shadow:0 0 0 3px var(--bg2); position:relative; z-index:1; }
+.cf-flowrow.now .cf-flowdot{ background:var(--brand); }
+.cf-flow .cf-flowrow:not(:last-child)::before{ content:""; position:absolute; left:5px; top:15px; bottom:-7px; width:1px; background:var(--border); }
+.cf-flowt{ font-size:13.5px; font-weight:600; }
+.cf-flowrow.now .cf-flowt{ color:var(--brand); }
+.cf-flowd{ font-size:11.5px; color:var(--text3); margin-top:1px; }
+/* ナンバー：見た目は1BOX、クリックでガイド（地名/分類/かな/ナンバー）がポップで開く */
+.cf-plate{ position:relative; }
+.cf-plate-main{ width:100%; cursor:pointer; }
+.cf-plate-guide{ position:absolute; top:calc(100% + 4px); left:0; z-index:30; display:none; background:var(--bg2); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+.cf-plate.open .cf-plate-guide{ display:block; }
+.cf-plate-grid{ display:flex; gap:8px; align-items:flex-end; }
+.cf-plate-grid > div{ display:flex; flex-direction:column; }
+.cf-plate-l{ font-size:10px; color:var(--text3); margin-bottom:3px; white-space:nowrap; }
+.cf-plate-guide .cf-input{ padding:6px 6px; box-sizing:border-box; }
+.cf-plate-grid > div{ flex:0 0 auto; }
+/* v0.87.2 受付タイプ2つ選択の「待預」＝小さいバッジ2個を詰めて並べる（固定枠でも崩れない・どの表示エリアでも共通） */
+.dbpair{ display:inline-flex; gap:1px; align-items:center; vertical-align:middle; }
+.dbpair > span{ font-size:9px !important; padding:1px 3px !important; line-height:1.5 !important; border-radius:5px !important; }
+
+/* v0.84.0 新規予約・右パネル：選んだ日の入庫/返車ミニ一覧（時間提案用） */
+.dl{background:var(--bg);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px}
+.dl-cols{display:flex}
+.dl-col{flex:1;min-width:0}
+.dl-col + .dl-col{border-left:1px solid var(--border)}
+.dl-h{display:flex;align-items:center;justify-content:center;gap:5px;padding:6px;font-size:11.5px;font-weight:700;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border)}
+.dl-h.in{color:#7fe7c4}
+.dl-h.ret{color:#f6a9d3}
+.dl-body{padding:6px;display:flex;flex-direction:column;gap:4px;min-height:120px}
+.dl-ev{position:relative;background:var(--bg2);border:1px solid var(--border);border-left:3px solid #1db97a;border-radius:7px;padding:4px 7px}
+.dl-ev.imp{border-left-color:#ec4899}
+.dl-top{display:flex;align-items:center;gap:6px}
+.dl-time{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text)}
+.dl-badge{font-size:9.5px;font-weight:700;color:#06281d;background:#1db97a;border-radius:5px;padding:1px 5px;line-height:1.5;white-space:nowrap}
+.dl-ev.imp .dl-badge{background:#ec4899;color:#3a0b25}
+.dl-line{font-size:12px;font-weight:600;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px}
+.dl-car{color:var(--text2)}
+.dl-ev.hl{box-shadow:inset 0 0 0 1px rgba(202,161,75,.40);background:rgba(202,161,75,.055)}
+.dl-ev.hl::after{content:"担当";position:absolute;top:4px;right:6px;font-size:8.5px;color:#d4ba7e;background:rgba(202,161,75,.12);border:1px solid rgba(202,161,75,.40);border-radius:5px;padding:0 4px}
+.dl-brk{display:flex;align-items:center;justify-content:center;gap:6px;font-size:10.5px;color:var(--text3);background:repeating-linear-gradient(45deg,#23283a,#23283a 6px,#1d2230 6px,#1d2230 12px);border:1px solid var(--border);border-radius:6px;padding:3px;letter-spacing:.06em}
+.dl-empty{color:var(--text3);font-size:11px;text-align:center;padding:14px 0}
+/* 担当フロントのMHS予定枠（来客以外＝MTG/外出など）＝代車カレンダーの上 */
+.mhs-box{background:var(--bg3);border:1px dashed var(--border2);border-radius:9px;padding:9px 11px;margin-top:8px;margin-bottom:12px}/* v0.89.0 MHS欄と代車カレンダーがくっつくのでデフォの隙間を追加 */
+.mhs-head{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--text)}
+.mhs-tag{margin-left:auto;font-size:9px;font-weight:700;color:#9fc4ff;background:rgba(55,138,221,.15);border:1px solid rgba(55,138,221,.4);border-radius:5px;padding:1px 5px;letter-spacing:.04em}
+.mhs-note{font-size:10.5px;color:var(--text3);margin:5px 0 8px;line-height:1.45}
+.mhs-row{display:flex;gap:8px;align-items:baseline;padding:4px 0;border-top:1px solid var(--border)}
+.mhs-row:first-child{border-top:0}
+.mhs-t{font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text2);white-space:nowrap;flex:0 0 auto;min-width:82px}
+.mhs-ic{font-size:11px;flex:0 0 auto}
+.mhs-l{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mhs-empty{font-size:11px;color:var(--text3);padding:4px 0}
+/* v1.22.0 MHS連携：この予定がいつ時点のものか（配っているのはMHSを開いている人なので古くなり得る） */
+.mhs-foot{margin-top:7px;padding-top:6px;border-top:1px dashed var(--border2);font-size:10px;color:var(--text3);text-align:right;font-variant-numeric:tabular-nums}
+.mhs-foot.old{color:#e0a33a}
+.mhs-row.off .mhs-l{color:#e0a33a}
+
+/* 🔴 v1.29.0 休み欄＝MHS と同じく「顔（アバター）を並べる」（当番の行は出さなくなった）
+   ⚠ .bn-av は board-notes.css の共通アバター。ここでは大きさと並びだけ足す。 */
+.mhs-off{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;padding-top:6px;border-top:1px solid var(--border)}
+.mhs-off-h{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#e0a33a;flex:0 0 auto}
+.mhs-off-av{display:flex;flex-wrap:wrap;align-items:center}
+.mhs-off-av .mhs-av{width:24px;height:24px;font-size:10px;margin-right:-4px}
+.mhs-off-av .mhs-av:last-child{margin-right:0}
+/* 🔴 選んでいる担当その人が休みの日＝アバターに混ぜず、**大きく知らせる**（見落とし防止） */
+.mhs-big{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin:7px 0 8px;padding:9px 11px;border-radius:8px;
+  color:#e0a33a;background:rgba(224,163,58,.13);border:1.5px solid rgba(224,163,58,.55);
+}
+.mhs-big-t{font-size:16px;font-weight:800;letter-spacing:.04em}
+.mhs-big-n{font-size:12px;font-weight:700;opacity:.9}
+.mhs-big-sub{font-size:11px;font-weight:600;opacity:.85;margin-left:auto}
+
+/* v0.83.0 ナンバーガイドの右に「新規車両」スイッチ列を足す（既存グリッドは無変更） */
+.cf-plate-row{ display:flex; gap:12px; align-items:flex-end; }
+.cf-plate-side{ display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; gap:5px; border-left:1px solid var(--border2); padding-left:12px; }
+.cf-plate-newveh{ padding:7px 12px; border-radius:7px; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); font-size:12px; font-weight:700; line-height:1; white-space:nowrap; cursor:pointer; }
+.cf-plate-newveh:hover{ border-color:var(--text3); }
+.cf-plate-newveh.on{ background:#1db97a; border-color:#1db97a; color:#fff; }
+.cf-plate-side-hint{ font-size:10px; color:var(--text3); line-height:1.3; text-align:center; }
+.cf-plate-guide .cf-plate-region{ width:7em; }
+.cf-plate-guide .cf-plate-cls{ width:3.4em; text-align:center; }
+.cf-plate-guide .cf-plate-kana{ width:2.6em; text-align:center; }
+.cf-plate-guide .cf-plate-num{ width:4.6em; text-align:center; }
+/* 代車スイッチ行：高さを固定＋中央揃え＝ON/OFFでスイッチの位置が一切動かない（使用代車はラベルなしの1行） */
+.cf-loaner-switchrow{ align-items:center; min-height:44px; }
+/* 前回入庫時 代車あり バッジ */
+.cf-prevloaner{ flex:0 0 auto; font-size:11.5px; font-weight:700; color:#eab308; background:rgba(234,179,8,.12); border:1px solid rgba(234,179,8,.5); border-radius:999px; padding:3px 10px; white-space:nowrap; }
+/* 「この顧客で新規車両を追加」ボタン（基本情報ヘッダー右端） */
+.cf-addveh-btn{ margin-left:auto; background:var(--brand-soft); border:1px solid var(--brand); color:var(--brand); border-radius:7px; padding:4px 11px; font-size:11.5px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.cf-addveh-btn:hover{ background:var(--brand); color:#fff; }
+/* 🔴 v1.49.0 「＋ この顧客で新規車両」を **乗り換え／増車 の2択メニュー**に（右上の保存メニューと同じ形）。
+   ⚠ 入れ物（.vh-menu）が margin-left:auto を持たないと、見出しの右端に寄らない。 */
+.cf-vehmenu{ margin-left:auto; }
+.cf-vehmenu .cf-addveh-btn{ margin-left:0; display:inline-flex; align-items:center; gap:5px; }
+.cf-vehmenu .vh-menu-panel{ min-width:306px; }
+/* その他連絡先ボタン＋ポップ内の連絡先行 */
+.cf-contacts-btn{ background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:7px 12px; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+.cf-contacts-btn:hover{ border-color:var(--brand); color:var(--brand); }
+.cf-ct-badge{ display:inline-block; margin-left:5px; background:#ef4444; color:#fff; border-radius:999px; font-size:10px; padding:0 6px; line-height:16px; }
+.cf-ct-row{ display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.cf-ct-pri{ display:flex; align-items:center; gap:3px; font-size:11px; color:var(--text2); white-space:nowrap; }
+/* 連絡先の番号は本体TELと同じ 1BOX＋ガイド。ガイド内の3枠 */
+.cf-ct-telw{ flex:0 0 11em; }
+.cf-tel-guide .cf-tel-row .cf-input{ width:3.6em; text-align:center; padding:6px 5px; box-sizing:border-box; }
+.cf-ct-label{ flex:1 1 8em; min-width:7em; }
+/* 連絡先モーダルはガイド（ポップ）を切らない */
+#cf-contacts-modal .cm-body{ overflow:visible; }
+.cf-ct-del{ background:transparent; border:1px solid var(--border); border-radius:6px; padding:4px 8px; cursor:pointer; color:var(--text3); }
+.cf-ct-del:hover{ border-color:var(--red); color:var(--red); }
+/* TEL：見た目は1BOX、クリックで3枠ガイドがポップ（ナンバーと同じ作り・ハイフン自動・全角→半角） */
+.cf-tel{ position:relative; }
+.cf-tel-main{ width:100%; cursor:pointer; }
+/* ガイドは右アンカー＝右にはみ出して横スクロール（カードずれ）を起こさない。右端を枠に揃える */
+.cf-tel-guide{ position:absolute; top:calc(100% + 4px); right:0; left:auto; z-index:30; display:none; background:var(--bg2); border:1px solid var(--border2); border-radius:8px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+.cf-tel.open .cf-tel-guide{ display:block; }
+.cf-tel-row{ display:flex; align-items:center; gap:5px; }
+.cf-tel-guide .cf-input{ width:auto; text-align:center; padding:6px 6px; box-sizing:border-box; }
+.cf-tel-1{ width:3.8em; }
+.cf-tel-2{ width:3.4em; }
+.cf-tel-3{ width:3.4em; }
+.cf-tel-sep{ color:var(--text3); font-weight:700; }
+/* お客様名／カナ＝見た目1BOX・中で姓/名の2セグメント（ナンバー入力と同じ思想・高さは他のcf-inputと一致） */
+.cf-namebox{ display:flex; align-items:stretch; background:var(--bg2); border:1px solid var(--border); border-radius:6px; width:100%; overflow:hidden; }
+.cf-namebox:focus-within{ border-color:var(--brand); background:var(--bg); }
+.cf-namebox .cf-nb-seg{ flex:1; min-width:0; background:transparent; border:0; color:var(--text); font-size:13px; padding:6px 8px; font-family:inherit; }
+.cf-namebox .cf-nb-seg:focus{ outline:none; }
+.cf-namebox .cf-nb-sep{ width:1px; align-self:stretch; background:var(--border); margin:5px 0; flex:0 0 auto; }
+.cf-namebox.cf-miss{ border-color:#ef4444; }
+/* 特殊運転チップ（ON＝アンバー＝注意色） */
+.cf-chip-drv.active{ background:#f59e0b; border-color:#f59e0b; color:#1c1300; }
+/* 入庫時刻＝メインBOX直接入力＋フォーカスで下にショートカット（ポップアップ＝行は増えない） */
+.cf-time{ position:relative; }
+.cf-time-main{ width:100%; }
+.cf-time-guide{ position:absolute; top:calc(100% + 4px); left:0; z-index:30; display:none; background:var(--bg2); border:1px solid var(--border2); border-radius:8px; padding:8px 10px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+.cf-time.open .cf-time-guide{ display:block; }
+.cf-time-l{ font-size:10px; color:var(--text3); margin-bottom:5px; }
+.cf-time-l + .cf-time-pick{ margin-bottom:9px; }
+.cf-time-pick{ width:auto; }
+/* v1.33.0 ショートカットが9個になったので、はみ出さないよう幅を決めて折り返す */
+.cf-time-quick{ display:flex; gap:5px; flex-wrap:wrap; max-width:260px; }
+.cf-chip-tm.active{ background:var(--brand); border-color:var(--brand); color:#fff; font-weight:600; }
+/* 時刻が本当に分からないもの（決まり次第・レッカー・鍵ポスト・未定）＝薄い見た目で見分ける。
+   ⚠ 選ぶと今までどおり緑（.active）になる。 */
+.cf-chip-tm.cf-chip-tbd{ border-style:dashed; color:var(--text2); }
+.cf-chip-tm.cf-chip-tbd.active{ color:#fff; border-style:solid; }
+/* セクション内のサブ見出し（例：予約内容の中の「🚙 代車」） */
+.cf-subhead{ font-size:11px; font-weight:700; color:var(--text2); letter-spacing:.04em; margin:14px 0 6px; padding-top:10px; border-top:1px dashed var(--border); }
+/* v0.91.0 基本情報：顧客情報(上)と車両情報(下)を点線で区切る */
+.cf-divider{ border-top:1px dashed var(--border2); margin:12px 0 10px; }
+/* v0.92.2 LINE欄：状態セレクト＋(OKなら)Lステップ番号＋リンクを1行で横並び（新しい行を足さない） */
+.cf-line-wrap{ display:flex; gap:6px; align-items:center; min-width:0; }
+.cf-line-wrap .cf-line-status{ flex:0 0 auto; width:auto; }
+.cf-line-wrap input.cf-input{ flex:1 1 5.5em; min-width:0; }
+/* v0.92.4 Lステップボタン＝「その他連絡先」(.cf-contacts-btn)に準じた大きさ。LINE緑のアクセント。ドラッグ可。 */
+.cf-line-link{ flex:0 0 auto; background:#1db97a; border:1px solid #1db97a; color:#06281d; border-radius:8px; padding:7px 13px; font-size:12.5px; font-weight:800; text-decoration:none; white-space:nowrap; cursor:grab; box-shadow:0 1px 6px rgba(29,185,122,.35); }
+.cf-line-link:active{ cursor:grabbing; }
+.cf-line-link:hover{ filter:brightness(1.08); }
+/* v0.92.7 登録済の埋め込みラベル＝地味に（ハイライトしない）。Lステップボタンを主役に。 */
+.cf-line-done{ flex:0 0 auto; color:var(--text3); font-size:12px; font-weight:600; white-space:nowrap; }
+.cf-line-x{ flex:0 0 auto; background:none; border:1px solid var(--border2); color:var(--text3); border-radius:6px; font-size:11px; line-height:1; padding:5px 7px; cursor:pointer; }
+.cf-line-x:hover{ color:var(--text); border-color:var(--text3); }
+.cf-line-bad{ font-size:11px; color:var(--orange); }
+/* 内容セクション：テンプレを開いてクリックで挿入 */
+.cf-tpl{ margin-top:8px; }
+.cf-tpl-toggle{ background:transparent; border:1px dashed var(--border2); color:var(--text2); border-radius:7px; padding:5px 12px; font-size:12px; cursor:pointer; }
+.cf-tpl-toggle:hover{ border-color:var(--brand); color:var(--brand); }
+.cf-tpl-panel{ display:none; flex-wrap:wrap; gap:7px; margin-top:8px; padding:10px; background:var(--bg2); border:1px solid var(--border); border-radius:8px; }
+.cf-tpl.open .cf-tpl-panel{ display:flex; }
+.cf-tpl.open .cf-tpl-toggle{ border-style:solid; border-color:var(--brand); color:var(--brand); }
+.cf-tpl-chip{ background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:999px; padding:6px 12px; font-size:12px; cursor:pointer; transition:background .12s,border-color .12s; }
+.cf-tpl-chip:hover{ background:var(--brand-soft); border-color:var(--brand); }
+/* 受付タイプ＋相談：相談は待/当/預の隣に□っぽい別ボタンで（区切り線で違いを演出） */
+.cf-recv{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cf-recv .cf-chips{ gap:4px; }
+.cf-recv-sep{ width:1px; align-self:stretch; min-height:26px; background:var(--border2); margin:0 2px; }
+.cf-consult{ padding:6px 16px; font-size:12px; border:1px solid var(--border2); border-radius:5px; background:var(--bg3); color:var(--text2); cursor:pointer; transition:background .12s,border-color .12s,color .12s; }
+.cf-consult:hover{ border-color:#eab308; color:#eab308; }
+.cf-consult.active{ background:#eab308; border-color:#eab308; color:#1c1917; font-weight:700; }
+/* マルエフ Ⓕ＝コードレッド（クレーム等）：○の中にF。OFF=白／押すと赤 */
+.cf-codered{ width:25px; height:25px; flex:0 0 auto; border-radius:50%; border:1.5px solid var(--text2); background:transparent; color:var(--text); font-weight:700; font-size:12px; line-height:1; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:background .12s,color .12s,border-color .12s,box-shadow .12s; }
+.cf-codered:hover{ border-color:#ef4444; color:#ef4444; background:rgba(239,68,68,.10); }
+.cf-codered.active{ background:#ef4444; border-color:#ef4444; color:#fff; box-shadow:0 0 0 3px rgba(239,68,68,.25); }
+/* 手動アクションログの ✕（削除）ボタン */
+.cf-flowdel{ margin-left:auto; align-self:center; background:transparent; border:none; color:var(--text3); cursor:pointer; font-size:13px; line-height:1; padding:2px 6px; border-radius:6px; }
+.cf-flowdel:hover{ background:var(--bg3); color:#ef4444; }
+/* 手動でアクションを残すブロック */
+.cf-flowadd{ margin-top:14px; padding:12px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
+.cf-flowadd .cf-label{ margin-bottom:8px; }
+.cf-flowmeta{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; }
+.cf-flowmeta .cf-input{ flex:0 0 auto; }
+.cf-flowmeta #cf-flow-staff{ flex:0 0 auto; width:7.5em; min-width:0; box-sizing:border-box; }
+.cf-flowwhen{ flex:1 1 210px; min-width:200px; width:auto; box-sizing:border-box; }
+.cf-flownow{ flex:0 0 auto; background:var(--bg3); border:1px solid var(--border); color:var(--text2); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer; }
+.cf-flownow:hover{ background:var(--brand-soft); border-color:var(--brand); color:var(--brand); }
+.cf-flowquick{ display:flex; flex-wrap:wrap; gap:7px; }
+.cf-flowchip{ background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:999px; padding:6px 11px; font-size:12px; cursor:pointer; transition:background .12s,border-color .12s; }
+.cf-flowchip:hover{ background:var(--brand-soft); border-color:var(--brand); }
+.cf-flowcustom{ display:flex; gap:8px; margin-top:10px; }
+.cf-flowcustom .cf-input{ flex:1; }
+.cf-flowaddbtn{ flex:0 0 auto; background:var(--brand); border:1px solid var(--brand); color:#fff; border-radius:8px; padding:0 14px; font-size:13px; font-weight:600; cursor:pointer; }
+.cf-flowaddbtn:hover{ filter:brightness(1.07); }
+
+/* ===== フロー v1.43.0 ＝「詳細で足す／編集で直す」 =====
+   ⚠ カード詳細（.cv-…）と編集画面（.cf-…）の両方に同じ形を置くので、
+      ここのクラスは **pf-** で始める（どちらの画面に入れても崩れないように）。 */
+/* 用件を足すブロック */
+.pf-flowadd{ margin-top:14px; padding:12px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
+.pf-flowlabel{ font-size:12px; color:var(--text2); font-weight:600; margin-bottom:8px; }
+.pf-flowmeta{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center; }
+.pf-fin{ background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:6px 9px; font-size:13px; font-family:inherit; box-sizing:border-box; }
+.pf-fin:focus{ outline:none; border-color:var(--brand); background:var(--bg2); }
+.pf-flowmeta select.pf-fin{ flex:0 0 auto; width:7.5em; min-width:0; }
+.pf-flowwhen{ flex:1 1 200px; min-width:180px; width:auto; }
+.pf-flownow{ flex:0 0 auto; background:var(--bg3); border:1px solid var(--border); color:var(--text2); border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer; }
+.pf-flownow:hover{ background:var(--brand-soft); border-color:var(--brand); color:var(--brand); }
+.pf-flowquick{ display:flex; flex-wrap:wrap; gap:7px; }
+.pf-flowchip{ background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:999px; padding:6px 11px; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:background .12s,border-color .12s; }
+.pf-flowchip:hover{ background:var(--brand-soft); border-color:var(--brand); }
+.pf-flowcustom{ display:flex; gap:8px; margin-top:10px; }
+.pf-flowcustom .pf-fin{ flex:1; min-width:0; }
+.pf-flowaddbtn{ flex:0 0 auto; background:var(--brand); border:1px solid var(--brand); color:#fff; border-radius:8px; padding:0 14px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.pf-flowaddbtn:hover{ filter:brightness(1.07); }
+.cv-fhint{ margin-top:9px; font-size:11.5px; color:var(--text3); line-height:1.6; }
+
+/* 「本当の編集」の表（設定権限のある人だけ） */
+.cf-flownote{ display:block; margin:2px 0 12px; padding:9px 11px; background:var(--brand-soft); border:1px solid var(--border); border-left:3px solid var(--brand); border-radius:8px; font-size:12px; color:var(--text); line-height:1.7; }
+.cf-flownote-lock{ background:var(--bg3); border-left-color:var(--text3); color:var(--text2); }
+.cf-flownote-sub{ color:var(--text3); font-size:11.5px; }
+.pf-flowedit{ display:flex; flex-direction:column; gap:8px; }
+.pf-flowempty{ padding:14px; text-align:center; color:var(--text3); font-size:12.5px; }
+.pf-ferow{ background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:9px 10px; }
+.pf-ferow:hover{ border-color:var(--border2); }
+.pf-fetop{ display:flex; align-items:center; gap:8px; }
+.pf-fekind{ flex:0 0 auto; font-size:10.5px; padding:2px 7px; border-radius:999px; border:1px solid var(--border2); color:var(--text3); white-space:nowrap; }
+.pf-fekind-man{ color:var(--brand); border-color:var(--brand); }
+.pf-fettl{ flex:1; min-width:0; font-size:13px; font-weight:600; display:inline-flex; align-items:center; gap:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pf-fettlin{ flex:1; min-width:0; font-weight:600; }
+.pf-fedel{ flex:0 0 auto; background:transparent; border:none; color:var(--text3); cursor:pointer; padding:3px 6px; border-radius:6px; display:inline-flex; align-items:center; }
+.pf-fedel:hover{ background:var(--bg3); color:#ef4444; }
+.pf-febot{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px; }
+.pf-fef{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text3); }
+.pf-fef .pf-fin{ font-size:12.5px; padding:5px 8px; }
+.pf-feamt{ font-size:12px; color:var(--text2); }
+
+/* ===== 入庫カード 全画面ページ（新規予約／編集 共通） ===== */
+.card-page-head{ position:sticky; top:0; z-index:5; background:var(--bg); padding-bottom:12px; margin-bottom:4px; border-bottom:1px solid var(--border); align-items:center; }
+.card-page-body{ max-width:none; }   /* v0.27.1 全幅を使う（旧860px） */
+.card-page-body .cf-section{ background:var(--bg2); border-color:var(--border); }
+.card-page-body .cf-section-head{ background:var(--bg3); }
+.card-page-body .cf-input{ background:var(--bg); }
+.card-page-body .cf-input:focus{ background:var(--bg2); }
+
+/* ===== 祝日表示 ===== */
+.reserve-month-cell.holiday .day-num{ color:var(--red); }
+.reserve-month-cell .hol-name{
+  font-size:9px; line-height:1.15; color:var(--red); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px;
+}
+.reserve-week-head.holiday .day{ color:var(--red); }
+.reserve-week-head .hol{
+  font-size:9px; color:var(--red); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+#view-result .result-cell.holiday .day-num{ color:var(--red); }
+#view-result .result-cell .hol-name{
+  font-size:9px; color:var(--red); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px;
+}
+.hol-badge{ color:var(--red); font-weight:600; }
+
+/* ===== レスポンシブ補正 ===== */
+@media (max-width:768px){
+  .today-counts{ margin-left:0; }
+  .pit-card .pc-kbtns{ margin-top:8px; }
+}
+
+/* ===== 設定画面（v0.14.0） ===== */
+.ps-bar{ display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.ps-bar-note{ font-size:12px; color:var(--text2); }
+.ps-status{ font-size:12.5px; font-weight:700; color:#1db97a; opacity:0; transition:opacity .25s; margin-left:auto; }
+.ps-status.show{ opacity:1; }
+.ps-card{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:16px 18px; margin-bottom:14px; }
+.ps-h{ font-size:14.5px; font-weight:700; margin-bottom:6px; }
+.ps-desc{ font-size:12px; color:var(--text2); line-height:1.7; margin-bottom:12px; }
+.ps-hint{ font-size:11.5px; color:var(--text3); line-height:1.7; margin-top:10px; }
+.ps-grid{ display:flex; gap:18px; flex-wrap:wrap; }
+.ps-lb{ display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; }
+.ps-in{ background:var(--bg3); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:7px 10px; font-size:14px; }
+.ps-in:focus{ outline:none; border-color:#2ea567; }
+.ps-num{ width:72px; text-align:center; font-weight:700; }
+.ps-unit{ font-size:11.5px; color:var(--text3); font-weight:400; }
+.ps-est-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:8px 18px; }
+.ps-est-item{ display:flex; align-items:center; gap:8px; font-size:13px; padding:4px 0; }
+.ps-est-tag{ width:10px; height:10px; border-radius:3px; flex:none; }
+.ps-est-name{ flex:1; min-width:0; }
+.ps-dow-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.ps-dow-t{ font-size:13px; font-weight:600; margin-right:4px; }
+.ps-dow{ display:inline-flex; align-items:center; gap:5px; font-size:13px; padding:6px 12px; border:1px solid var(--border); border-radius:999px; cursor:pointer; background:var(--bg3); transition:all .15s; }
+.ps-dow input{ accent-color:#1db97a; }
+.ps-dow.on{ border-color:#1db97a; background:rgba(29,185,122,.12); font-weight:700; }
+
+/* ===== 🧩 ルール設定（v0.17.0） ===== */
+.rl-row{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:9px 12px; margin-bottom:8px; }
+.rl-row.off{ opacity:.45; }
+.rl-no{ min-width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; background:#1f7a4d; color:#fff; border-radius:6px; font-size:12px; font-weight:700; }
+.rl-on input{ accent-color:#1db97a; }
+.rl-jo{ font-size:12px; color:var(--text3); }
+.rl-sel{ max-width:190px; }
+.rl-note{ flex:1; min-width:180px; }
+.rl-del{ margin-left:auto; background:transparent; border:1px solid var(--border); border-radius:8px; padding:5px 9px; cursor:pointer; color:var(--text2); font-size:13px; }
+.rl-del:hover{ border-color:var(--red); }
+.rl-test-out .rl-tl{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:7px 0; border-bottom:1px dashed var(--border); font-size:13.5px; }
+.rl-test-out .rl-tl:last-child{ border-bottom:0; }
+.rl-tl-n{ min-width:130px; font-weight:600; }
+.rl-tl-v b{ font-size:15px; }
+.rl-tl-v.stop{ color:var(--red); font-weight:700; }
+.rl-tl-r{ font-size:11.5px; color:var(--text3); }
+.rl-tl.warn{ color:#eab308; }
+.rl-tl.warn .rl-tl-v{ color:var(--text); }
+
+/* ===== 🧩 入庫ルール v2（フロー・行アクセント・2週間グリッド） v0.18.0 ===== */
+.rl-flow{ display:flex; align-items:stretch; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.rl-fbox{ flex:1; min-width:150px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+.rl-fbox.dim{ opacity:.55; border-style:dashed; }
+.rl-fb-t{ font-size:13px; font-weight:700; margin-bottom:3px; }
+.rl-fb-s{ font-size:11.5px; color:var(--text3); line-height:1.5; }
+.rl-farr{ align-self:center; color:var(--text3); font-size:16px; }
+.rl-row{ border-left:4px solid var(--border); }
+.rl-row.act-up{ border-left-color:#1db97a; }
+.rl-row.act-down{ border-left-color:#ef4444; }
+.rl-row.act-warn{ border-left-color:#eab308; }
+.rl-grid{ display:grid; gap:3px; overflow-x:auto; }
+.rl-g-h{ font-size:11px; text-align:center; color:var(--text2); padding:4px 2px; line-height:1.4; cursor:pointer; border-radius:6px; }
+.rl-g-h.red{ color:#ef4444; }
+.rl-g-h.sat{ color:#3b82f6; }
+.rl-g-n{ font-size:12px; font-weight:600; padding:6px 4px; white-space:nowrap; }
+.rl-g-c{ text-align:center; font-size:13px; font-weight:600; padding:7px 2px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; cursor:pointer; transition:transform .1s; }
+.rl-g-c:hover{ transform:translateY(-1px); }
+.rl-g-c.up{ background:rgba(29,185,122,.16); border-color:#1db97a; color:#1db97a; }
+.rl-g-c.down{ background:rgba(249,115,22,.14); border-color:#f97316; color:#f97316; }
+.rl-g-c.stop{ background:rgba(239,68,68,.16); border-color:#ef4444; color:#ef4444; }
+.rl-g-c.wmark{ background:transparent; border-color:transparent; color:#eab308; font-size:12px; }
+.rl-g-c.sel, .rl-g-h.sel{ outline:2px solid #1db97a; }
+.rl-day-t{ font-size:13.5px; font-weight:700; margin-bottom:6px; }
+
+/* ===== 🧩 入庫ルール v3（編集モード／閲覧モード） v0.19.0 ===== */
+.rl-ebadge{ background:#eab308; color:#1c1917; font-size:11px; font-weight:700; border-radius:999px; padding:3px 10px; white-space:nowrap; }
+.ps-bar.edit{ border:1px solid #eab308; border-radius:10px; padding:8px 12px; background:rgba(234,179,8,.07); }
+.rl-row.rl-vw{ cursor:default; }
+.rl-vtxt{ font-size:13.5px; line-height:1.6; }
+.rl-vtxt b{ color:inherit; }
+.rl-offtag{ margin-left:auto; font-size:11px; color:var(--text3); border:1px solid var(--border); border-radius:999px; padding:2px 8px; white-space:nowrap; }
+.rl-vbasics .ps-lb b{ font-size:16px; }
+
+/* ===== 🏖 長期休み＋📐 営業日配分（v0.20.0） ===== */
+.rl-brk-lb{ width:130px; }
+.rl-g-c.closed{ background:transparent; border-color:transparent; color:var(--text3); font-weight:400; }
+.dash-cap-cell.closed{ background:transparent; border-color:transparent; color:var(--text3); }
+.rl-alloc{ width:100%; max-width:560px; border-collapse:collapse; font-size:12.5px; }
+.rl-alloc th, .rl-alloc td{ padding:5px 8px; border-bottom:1px dashed var(--border); text-align:right; }
+.rl-alloc th:first-child, .rl-alloc td:first-child{ text-align:left; }
+.rl-alloc th{ color:var(--text3); font-weight:600; font-size:11.5px; }
+.rl-alloc td b{ font-size:14px; }
+.rl-alloc td.dim{ color:var(--text3); }
+.rl-alloc tr:last-child td{ border-bottom:0; }
+
+/* ===== 🧮 計算式カスケード（v0.22.0） ===== */
+.fx{ display:flex; flex-direction:column; gap:2px; max-width:760px; }
+.fx-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:13.5px; }
+.fx-row.fx-big{ border-color:#1db97a; background:rgba(29,185,122,.07); }
+.fx-row.fx-big .fx-pair b{ font-size:19px; color:#1db97a; }
+.fx-lb{ min-width:100px; font-weight:700; font-size:12.5px; color:var(--text2); }
+.fx-pair{ display:inline-flex; align-items:center; gap:4px; }
+.fx-pair b{ font-size:15px; }
+.fx-pair.dim{ color:var(--text3); font-size:12px; }
+.fx-u{ font-size:11.5px; color:var(--text3); }
+.fx-arr{ padding:3px 14px; font-size:12px; color:var(--text3); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.fx-arr b{ color:var(--text); }
+.fx-v{ font-size:15px; }
+.fx-in{ text-align:center; }
+.fx-note{ font-size:11px; color:var(--text3); font-weight:400; margin-left:10px; }
+
+/* ===== 📞 受付の○△×（v0.23.0） ===== */
+.rl-g-c.vd-ok,  .dash-cap-cell.vd-ok{  background:rgba(29,185,122,.16); border-color:#1db97a; color:#1db97a; font-weight:800; }
+.rl-g-c.vd-mid, .dash-cap-cell.vd-mid{ background:rgba(249,115,22,.14); border-color:#f97316; color:#f97316; font-weight:800; }
+.rl-g-c.vd-ng,  .dash-cap-cell.vd-ng{  background:rgba(239,68,68,.16);  border-color:#ef4444; color:#ef4444; font-weight:800; }
+
+/* ===== ⏱ 最短入庫日＋🅿️ 駐車場空き（v0.24.0） ===== */
+.dash-el{ width:100%; max-width:620px; border-collapse:collapse; }
+.dash-el th{ font-size:11.5px; color:var(--text3); font-weight:600; padding:4px 8px; text-align:center; }
+.dash-el td{ padding:8px; text-align:center; border-top:1px dashed var(--border); }
+.dash-el-t{ font-size:13px; font-weight:700; text-align:left !important; white-space:nowrap; }
+.dash-el-d{ display:block; font-size:26px; font-weight:800; line-height:1.1; color:#1db97a; }
+.dash-el-d.ok{ color:#1db97a; }
+.dash-el-d.none{ color:var(--text3); font-size:16px; }
+.dash-el-w{ display:block; font-size:10.5px; color:var(--text3); margin-top:2px; }
+.dash-park{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.dash-park-num{ font-size:44px; font-weight:800; line-height:1; }
+.dash-park-u{ font-size:14px; font-weight:700; color:var(--text2); }
+.dash-park-sub{ font-size:11.5px; color:var(--text3); line-height:1.6; margin-left:10px; }
+
+/* ===== 📋 新規予約の2カラム＋右パネル（v0.28.0＝左右が独立スクロール・バー非表示） ===== */
+#view-card.active{ display:flex; flex-direction:column; overflow:hidden; }
+#view-card .card-page-head{ position:relative; z-index:5; background:var(--bg); margin-bottom:10px; }   /* 透け防止：ヘッダは不透明で前面 */
+#view-card .card-page-body{ flex:1; min-height:0; overflow:hidden; position:relative; z-index:1; }
+.cfp-wrap{ display:flex; gap:22px; align-items:stretch; height:100%; }
+.cfp-main{ flex:none; width:min(860px, 100%); min-width:0; height:100%; overflow-y:auto; scrollbar-width:none; padding-bottom:30px; }
+.cfp-side{ flex:1; min-width:320px; height:100%; overflow-y:auto; scrollbar-width:none; padding-bottom:30px; }
+.cfp-main::-webkit-scrollbar, .cfp-side::-webkit-scrollbar{ display:none; }
+.cfp-main, .cfp-side{ overscroll-behavior:contain; }
+.cfs-lg-scroll{ background:var(--bg2); }   /* 角丸すき間からの透け防止 */
+@media (max-width:980px){
+  #view-card.active{ display:block; overflow:auto; }
+  #view-card .card-page-body{ overflow:visible; }
+  .cfp-wrap{ flex-direction:column; height:auto; }
+  .cfp-main, .cfp-side{ width:100%; height:auto; overflow:visible; }
+}
+
+/* ☰ サイドバーたたみ（v0.27.1） */
+#app.sb-off{ grid-template-columns:0 1fr; }
+#app.sb-off #sidebar{ display:none; }
+#sb-toggle{ font-size:15px; padding:6px 10px; }
+.cfs-card{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px; margin-bottom:12px; }
+.cfs-h{ display:flex; align-items:center; gap:6px; font-size:13.5px; font-weight:800; margin-bottom:10px; border-left:4px solid var(--brand); padding-left:8px; }
+.cfs-team{ font-size:11px; font-weight:700; margin-left:4px; }
+.cfs-el{ display:flex; align-items:center; gap:8px; width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:9px; padding:9px 12px; margin-bottom:7px; cursor:pointer; color:var(--text); text-align:left; transition:border-color .12s, transform .12s; }
+.cfs-el:hover{ border-color:#1db97a; transform:translateY(-1px); }
+.cfs-el.sel{ border-color:#1db97a; outline:1px solid #1db97a; }
+.cfs-el:disabled{ opacity:.5; cursor:default; }
+.cfs-el-n{ font-size:12px; font-weight:700; min-width:58px; }
+.cfs-el b{ font-size:16px; }
+.cfs-el-go{ margin-left:auto; font-size:9.5px; color:var(--text3); }
+.cfs-nav{ margin-left:auto; display:inline-flex; align-items:center; gap:8px; font-size:13px; }
+.cfs-nav button{ background:var(--bg3); border:1px solid var(--border); border-radius:7px; color:var(--text); padding:3px 10px; cursor:pointer; font-size:12px; }
+.cfs-nav button:hover{ border-color:#1db97a; }
+.cfs-nav .cfs-sortbtn.on{ background:#1db97a; border-color:#1db97a; color:#fff; }
+/* 代車ガント：条件マッチの列ヘッダを強調 */
+.cfs-lg th.cfs-lg-match{ background:rgba(29,185,122,.22); box-shadow:inset 0 -2px 0 0 #1db97a; }
+.cfs-lg th.cfs-lg-match i{ color:#1db97a; }
+.cfs-cal{ display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.cfs-dow{ font-size:11px; text-align:center; color:var(--text3); padding:3px 0; font-weight:600; }
+.cfs-dow.red{ color:#ef4444; } .cfs-dow.sat{ color:#3b82f6; }
+.cfs-day{ position:relative; text-align:center; padding:7px 2px 5px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; cursor:pointer; line-height:1.3; min-height:58px; }
+.cfs-day i{ font-style:normal; display:block; font-size:13px; font-weight:800; }
+.cfs-day span{ display:block; font-size:11px; font-weight:700; }
+.cfs-day .cfs-mk{ display:block; font-size:11px; font-weight:800; }
+.cfs-day.blank{ background:transparent; border-color:transparent; cursor:default; }
+.cfs-day.ok{ border-color:#1db97a; color:#1db97a; }
+.cfs-day.near{ border-color:#f97316; color:#f97316; }
+.cfs-day.full{ border-color:#ef4444; color:#ef4444; background:rgba(239,68,68,.08); }
+.cfs-day.closed{ background:transparent; border:1px solid var(--border); color:var(--text3); font-weight:400; cursor:default; }   /* 定休日もラインは引く（v0.27.3） */
+.cfs-day.past{ background:transparent; border-color:transparent; color:var(--text3); opacity:.35; cursor:default; }
+.cfs-day.noclick{ cursor:default; }
+
+/* 📥📤 当日アクションシート（v0.30.0） */
+.ta-sheet{ width:min(92vw,360px); background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+.ta-head{ font-size:14px; line-height:1.5; padding:4px 4px 12px; border-bottom:1px solid var(--border); margin-bottom:12px; }
+.ta-head b{ font-size:16px; }
+.ta-plate{ font-size:12px; color:var(--text2); margin-left:8px; }
+.ta-sub{ font-size:12px; color:var(--text3); margin-top:4px; }
+.ta-btn{ display:flex; flex-direction:column; gap:2px; width:100%; text-align:left; background:var(--bg3); border:1px solid var(--border); border-radius:11px; padding:11px 14px; margin-bottom:9px; cursor:pointer; color:var(--text); transition:border-color .12s, transform .1s; }
+.ta-btn:hover{ border-color:#1db97a; transform:translateY(-1px); }
+.ta-btn b{ font-size:14.5px; }
+.ta-btn span{ font-size:11.5px; color:var(--text3); }
+.ta-btn.primary{ background:rgba(29,185,122,.12); border-color:#1db97a; }
+.ta-btn.primary b{ color:#1db97a; }
+.ta-cancel{ width:100%; background:transparent; border:0; color:var(--text2); font-size:13px; padding:8px; cursor:pointer; margin-top:2px; }
+.ta-cancel:hover{ color:var(--text); }
+.ta-btn.danger{ background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.4); }
+.ta-btn.danger b{ color:#ef4444; }
+.ta-f{ display:flex; align-items:center; gap:10px; font-size:13px; font-weight:600; margin-bottom:10px; }
+.ta-f input{ flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:9px; color:var(--text); padding:9px 11px; font-size:14px; }
+
+/* 🕒 未定タブ（予約/返車内・v0.31.0／v0.31.1 縦半分） */
+.und-half{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; max-width:760px; }
+.und-half .und-sec + .und-sec{ border-top:6px solid var(--bg); }
+.und-sec{ }
+.und-sec-h{ display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:800; color:var(--text2); padding:10px 14px 6px; }
+.und-cnt{ margin-left:auto; font-size:11px; background:var(--bg3); padding:1px 9px; border-radius:10px; }
+.und-note{ font-size:11px; color:var(--text3); padding:4px 14px 12px; line-height:1.6; }
+.und-row{ display:flex; align-items:center; gap:10px; padding:9px 12px 9px 14px; border-bottom:1px solid var(--border); border-left:5px solid var(--team); cursor:pointer; }
+.und-row:hover{ background:var(--bg3); }
+.und-main{ flex:1; min-width:0; }
+.und-headline{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+.und-headline b{ font-size:15px; }
+.und-car{ font-size:13.5px; color:var(--text); }
+.und-sub{ font-size:11.5px; color:var(--text3); margin-top:2px; }
+.und-meta{ color:var(--red); margin-left:6px; }
+.und-actwrap{ flex:none; }
+.und-act{ font-size:11.5px; font-weight:700; padding:7px 11px; border:1px solid #1db97a; background:rgba(29,185,122,.10); color:#1db97a; border-radius:9px; cursor:pointer; white-space:nowrap; }
+.und-act:hover{ background:rgba(29,185,122,.2); }
+@media (max-width:768px){ .und-half{ max-width:100%; } }
+
+/* 🔎 入力チェックの漏れハイライト（v0.28.1）
+   🔴 赤（.cf-miss）＝**無いと保存できない**（v1.76.0・ゆうた指定）
+   🟡 黄（.cf-warn）＝**入れなくてもいいが、入るのでは？**（保存の前に1回だけ聞く）
+   ⚠ 同じ形（枠）で色だけ変える＝現場が「どっちが重いか」を色で覚えられる。 */
+.cf-miss{ outline:2px solid #ef4444 !important; outline-offset:2px; border-radius:8px; animation:cfMiss .5s ease 2; }
+@keyframes cfMiss{ 50%{ outline-color:rgba(239,68,68,.25); } }
+.cf-warn{ outline:2px solid #f59e0b !important; outline-offset:2px; border-radius:8px; animation:cfWarn .5s ease 2; }
+@keyframes cfWarn{ 50%{ outline-color:rgba(245,158,11,.25); } }
+.cf-namebox.cf-warn{ border-color:#f59e0b; }
+
+/* 🚙 代車の空き＝代車ビュー式ミニガント（v0.27.4） */
+.cfs-lg-scroll{ overflow:auto; max-height:420px; border:1px solid var(--border); border-radius:8px; }
+.cfs-lg{ border-collapse:collapse; min-width:max-content; }
+.cfs-lg th{ position:sticky; top:0; z-index:2; background:var(--bg3); font-size:10px; font-weight:700; color:var(--text2); padding:4px 3px; border:1px solid var(--border); min-width:30px; vertical-align:bottom; }
+.cfs-lg th i{ font-style:normal; display:block; font-size:10.5px; color:var(--text); }
+.cfs-lg th b{ display:block; writing-mode:vertical-rl; margin:3px auto 0; font-size:9.5px; font-weight:600; color:var(--text2); max-height:62px; overflow:hidden; letter-spacing:.04em; }
+.cfs-lg td{ border:1px solid var(--border); height:22px; min-width:24px; }
+.cfs-lg-d{ position:sticky; left:0; z-index:1; background:var(--bg2) !important; font-size:10.5px; font-weight:700; color:var(--text2); padding:2px 7px; white-space:nowrap; }
+th.cfs-lg-d{ z-index:3; }
+.cfs-lg-d span{ font-size:9px; margin-left:3px; color:var(--text3); }
+.cfs-lg-d.red, .cfs-lg-d.red span{ color:#ef4444; }
+.cfs-lg-d.sat, .cfs-lg-d.sat span{ color:#3b82f6; }
+.cfs-lg-d.today{ color:#1db97a !important; outline:1px dashed #1db97a; }
+.cfs-lg-busy{ background:rgba(245,158,11,.45); cursor:help; }
+.cfs-lg-free{ background:transparent; cursor:pointer; }
+.cfs-lg-free:hover{ background:rgba(29,185,122,.18); }
+.cfs-lg-pick{ background:#1db97a !important; }
+
+/* ===== 🔵 v1.35.0 代車カレンダーの「選択している列・行」（ゆうた指定・エクセルの列選択のイメージ）=====
+   ⚠ 背景色は塗らない＝緑（このカードの貸出予定）とオレンジ（貸出中）がそのまま見えるように。
+      囲うのは**点線の枠だけ**。
+   ⚠ 下端は無限スクロールで切れるので、列は左右＋上だけ引く。 */
+.cfs-lg th.cfs-lg-thpick{ cursor:pointer; }
+.cfs-lg th.cfs-lg-thpick:hover{ background:rgba(55,138,221,.16); }
+.cfs-lg td.cfs-lg-colsel,
+.cfs-lg th.cfs-lg-colsel{ border-left:2px dashed #378ADD !important; border-right:2px dashed #378ADD !important; }
+.cfs-lg th.cfs-lg-colsel{ border-top:2px dashed #378ADD !important; background:rgba(55,138,221,.18) !important; color:#cfe2ff; }
+/* 日付の行（左端の日付を押した時） */
+.cfs-lg .cfs-lg-dpick{ cursor:pointer; }
+.cfs-lg .cfs-lg-dpick:hover{ background:rgba(55,138,221,.16) !important; }
+.cfs-lg tr.cfs-lg-rowsel > td{ border-top:2px dashed #378ADD !important; border-bottom:2px dashed #378ADD !important; }
+.cfs-lg tr.cfs-lg-rowsel > td.cfs-lg-d{ background:rgba(55,138,221,.18) !important; color:#cfe2ff !important; }
+/* 列と行がぶつかるマス＝どちらの点線も見えるように角を強調 */
+.cfs-lg tr.cfs-lg-rowsel > td.cfs-lg-colsel{ box-shadow:inset 0 0 0 1px rgba(55,138,221,.55); }
+.cfs-lg{ user-select:none; }
+.cfs-day.today{ outline:1px dashed #1db97a; }
+/* 選んだ入庫日＝ベタ塗りでドンと目立たせる（v0.28.0） */
+.cfs-day.sel{ background:#1db97a !important; border-color:#1db97a !important; outline:2px solid #1db97a; transform:scale(1.06); z-index:1; }
+.cfs-day.sel, .cfs-day.sel i, .cfs-day.sel span, .cfs-day.sel .cfs-mk{ color:#fff !important; }
+/* 祝日バッジ（小さく右上） */
+.cfs-hol{ position:absolute; top:2px; right:3px; font-style:normal; font-size:8.5px; font-weight:800; color:#fff; background:#ef4444; border-radius:4px; padding:0 3px; line-height:1.4; }
+.cfs-hint{ font-size:10px; color:var(--text3); margin-top:8px; line-height:1.6; }
+
+/* ===== 🗓️ 空きカレンダービュー（v0.32.0）＝右パネル部品を3カラムで一同に ===== */
+.av-cols{ display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; padding:4px 2px 30px; }
+.av-col{ flex:1 1 300px; min-width:280px; max-width:440px; display:flex; flex-direction:column; }
+.av-col .cfs-card{ margin-bottom:14px; }
+.av-col-lg{ flex:2 1 460px; max-width:none; }
+.av-col-lg .cfs-lg-scroll{ max-height:72vh; }
+/* 読み取り専用＝クリックできる見た目を消す */
+.cfs-el-ro{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; padding:7px 10px; margin-top:6px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; cursor:default; }
+.cfs-el-ro .cfs-el-n{ font-size:11px; color:var(--text2); }
+.cfs-el-ro b{ font-size:13px; }
+.cfs-cal-ro .cfs-day{ cursor:default; }
+.cfs-lg-ro{ cursor:default; }
+.cfs-lg-ro:hover{ background:transparent; }
+
+/* 🗓️ 空きカレンダービュー：日付クリック→その日の入庫一覧（v0.99.24） */
+#view-availcal-body .cfs-cal-ro .cfs-day[data-ds]{ cursor:pointer; }
+#view-availcal-body .cfs-cal-ro .cfs-day[data-ds]:hover{ outline:2px solid var(--blue); outline-offset:-2px; }
+.cfs-day.av-sel{ box-shadow:0 0 0 2px var(--blue) inset; border-radius:6px; }
+
+/* ===== 🧽 車販作業ビュー（v0.99.42） ===== */
+/* セクションは縦に積む／中のカードは横並び＝レスポンシブで折り返し（横スクロールなし） */
+.cs-cols{ display:flex; flex-direction:column; gap:14px; padding:4px 2px 30px; }
+.cs-sec{ width:100%; box-sizing:border-box; background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+.cs-sec-h{ font-size:13.5px; font-weight:800; color:var(--text); margin-bottom:8px; display:flex; align-items:baseline; gap:6px; }
+.cs-sec-h small{ font-size:10.5px; font-weight:600; color:var(--text3); }
+.cs-sec-body{ display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; }
+.cs-subh{ flex:1 1 100%; font-size:11px; font-weight:700; color:var(--text2); margin-top:4px; }
+.cs-empty{ flex:1 1 100%; font-size:11px; color:var(--text3); padding:8px 2px; }
+.cs-item{ width:224px; flex:0 0 224px; display:flex; flex-direction:column; gap:4px; }
+.cs-cardwrap{ position:relative; }
+.cs-extra{ font-size:11px; color:var(--text2); margin-top:3px; line-height:1.5; }
+.cs-done{ align-self:stretch; font-size:12px; font-weight:700; padding:5px 0; border-radius:7px; cursor:pointer;
+  background:var(--brand); color:#06210f; border:1px solid var(--brand); }
+.cs-done:hover{ filter:brightness(1.05); }
+.cs-undo{ align-self:stretch; font-size:11px; font-weight:700; padding:4px 0; border-radius:7px; cursor:pointer;
+  background:var(--bg3); color:var(--text2); border:1px solid var(--border2); }
+.cs-done-strip{ margin-top:10px; border-top:1px dashed var(--border); padding-top:8px; }
+.cs-done-lb{ font-size:10.5px; font-weight:700; color:var(--text3); margin-bottom:6px; }
+.cs-done-row{ display:flex; flex-wrap:wrap; gap:8px; }
+.cs-doneitem{ opacity:.5; }
+
+/* ===== タスクボード：完TEL済／完TEL依頼 ドラッグエリア（v0.99.34） ===== */
+/* ⚠ v1.47.0 ここだけは**破線のまま**＝「投げ込む場所」だと分かる形は崩さない。
+   ただし枠 2px→1.5px・幅と余白を少し詰めて、隣のボタンと背の高さを近づける。 */
+.kb-droparea{ display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  min-width:94px; padding:4px 11px; border:1.5px dashed var(--border2); border-radius:var(--r, 8px);
+  background:transparent; color:var(--text2); line-height:1.25; }
+.kb-droparea-t{ font-size:11.5px; font-weight:700; color:var(--text); white-space:nowrap; }
+.kb-droparea-s{ font-size:9px; color:var(--text3); }
+.kb-droparea.dnd-over{ border-color:var(--brand); background:rgba(29,185,122,.14); color:var(--brand); }
+.kb-droparea.dnd-over .kb-droparea-t{ color:var(--brand); }
+
+/* ===== 🎛 v1.47.0 タスクボード右上の並び＝ぜんぶ同じ寸法に揃える（ゆうた指定「もうちょい小さく・調和よく」）
+   🔴 **ふつうのボタン（.vh-btn）と同じ物差し**にする＝枠1px・角8px・padding 5/11・12px。
+      今まで＝枠2px・角10px・padding 9/16・太さ800・min-width 96〜104px で**ぼってり**していた。
+   ⚠ 並びは `align-items:center`＝**背の高い「完TEL済」に引っぱられて縦に伸びない**
+      （既定の stretch のせいで、どのボタンも 44px まで伸びていたのが「やぼったさ」の正体）。
+   ⚠ 区切りラインの**オレンジは残す**（用途がひと目で分かる目印）。ただし
+      2px の輪郭 → **1px＋うっすら地色**にして主張を弱める。 */
+#view-course1 > .view-header > .view-actions,
+#view-course2 > .view-header > .view-actions,
+#view-task    > .view-header > .view-actions{ align-items:center; gap:7px; }
+
+.kb-myonly, .kb-lineadd{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:5px 11px; border:1px solid var(--border); border-radius:var(--r, 8px);
+  background:var(--bg3); color:var(--text2);
+  font-size:12px; font-weight:700; line-height:1.5; white-space:nowrap; }
+/* 🙋 担当車両（myonly-pit.js）＝押している間だけ色が変わる。フロントの人にだけ出る（JS 側で display:none） */
+.kb-myonly{ cursor:pointer; }
+.kb-myonly:hover{ border-color:var(--brand); color:var(--brand); }
+.kb-myonly.on{ border-color:var(--brand); background:var(--brand); color:#fff; }
+/* ▬ 区切りライン（board-line.js）＝掴んでカードのあいだへ落とす。
+   🔴 v1.37.0（ゆうた指定）実線・文字だけ（アイコンも「ここからドラッグ」も出さない）。
+   ⚠ 完TEL済との間隔は残す（用途が別なので、くっつけない）。 */
+.kb-lineadd{ cursor:grab; user-select:none;
+  color:#e0a33a; border-color:rgba(224,163,58,.55); background:rgba(224,163,58,.09);
+  margin-right:14px; }
+.kb-lineadd:active{ cursor:grabbing; }
+.kb-lineadd:hover{ background:rgba(224,163,58,.18); border-color:#e0a33a; }
+/* ⚠ 明るいテーマだと #e0a33a は下地に溶けて読みにくいので、文字と枠だけ一段濃くする（色みは同じ橙のまま） */
+[data-theme^="light"] .kb-lineadd{ color:#a86a10; border-color:rgba(168,106,16,.5); background:rgba(224,163,58,.14); }
+[data-theme^="light"] .kb-lineadd:hover{ background:rgba(224,163,58,.26); border-color:#a86a10; }
+
+/* 盤面に入ったライン。カードとカードのあいだに挟まる。
+   ⚠ v1.37.0 ✕ は廃止（消すのは枠の外へドラッグ）。名前は入っている時だけ出る。 */
+.kb-line{ display:flex; align-items:center; gap:7px; margin:5px 2px; padding:3px 2px; cursor:grab; user-select:none; }
+.kb-line:active{ cursor:grabbing; }
+.kb-line-bar{ flex:1 1 auto; height:0; border-top:2px dashed #e0a33a; }
+.kb-line-t{ flex:0 0 auto; max-width:60%; font-size:10.5px; font-weight:800; color:#e0a33a;
+  background:rgba(224,163,58,.14); border:1px solid rgba(224,163,58,.5); border-radius:999px;
+  padding:1px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.kb-line:hover .kb-line-bar{ border-top-color:#f0bb6a; }
+.kb-line.kb-line-drag{ opacity:.3; }
+/* 🔴 v1.69.0 「担当車両」で、よその課から集めてきたカードのまとまりの頭に付くバー（myonly-pit.js）。
+   ⚠ 全員で共有している区切りライン（黄）とは**別物**＝掴めない・保存されない。
+      取り違えないよう、色をグレーにして、カーソルも通常のまま（掴めそうに見せない）。 */
+.kb-line.kb-line-xb{ cursor:default; margin:13px 2px 7px; }
+.kb-line.kb-line-xb .kb-line-bar{ border-top:2px dotted var(--text3); }
+.kb-line.kb-line-xb .kb-line-t{ color:var(--text2); background:rgba(148,163,184,.16);
+  border-color:rgba(148,163,184,.5); }
+.kb-line.kb-line-xb:hover .kb-line-bar{ border-top-color:var(--text3); }
+/* この下の1枚目は、カードの印（国産／輸入）がバーに被らないよう少しだけ空ける */
+.kb-line.kb-line-xb + .pit-card.pcm.kb-xboard{ margin-top:11px; }
+/* 🔴 v1.37.0 ドラッグ中に「そこに入るよ」と先に見せるゴースト */
+.kb-line-ghost{ pointer-events:none; margin:5px 2px; }
+.kb-line-ghost .kb-line-bar{ border-top:3px solid #e0a33a; box-shadow:0 0 8px rgba(224,163,58,.7); }
+/* 落とし先の列を光らせる（カードのドラッグとは別の色＝取り違えない） */
+.kanban-col-body.kb-line-over{ box-shadow:inset 0 0 0 2px rgba(224,163,58,.75); border-radius:8px; }
+
+/* 💬 v1.38.0 ボタンをクリックした時の使い方の吹き出し（board-line.js）
+   ⚠ 盤面から離れずに読めるよう、その場に出す。くわしく読みたい人にはヘルプへのボタンを置く。 */
+.kb-linehelp{ position:fixed; z-index:9000; width:288px; max-width:calc(100vw - 16px);
+  background:var(--bg2); border:1px solid #e0a33a; border-radius:12px;
+  box-shadow:0 14px 40px rgba(0,0,0,.5); padding:12px 14px; color:var(--text); }
+.kb-linehelp-h{ display:flex; align-items:center; font-size:12.5px; font-weight:800; color:#e0a33a;
+  padding-bottom:7px; margin-bottom:8px; border-bottom:1px dashed rgba(224,163,58,.5); }
+.kb-linehelp-x{ margin-left:auto; border:0; background:transparent; color:var(--text3);
+  font-size:15px; line-height:1; cursor:pointer; padding:0 2px; }
+.kb-linehelp-x:hover{ color:#ef4444; }
+.kb-linehelp-l{ margin:0; padding-left:18px; font-size:11.5px; line-height:1.6; color:var(--text2); }
+.kb-linehelp-l li{ margin-bottom:5px; }
+.kb-linehelp-l b{ color:var(--text); }
+/* v1.39.0 簡易表示にしたので「くわしいヘルプ」ボタンは廃止（説明はヘルプ画面にある） */
+
+/* ===== 返車ビュー：未定タブ＝完TEL待ち／返車未定の2カラム（v0.99.34） ===== */
+.ret-tbd-cols{ display:flex; gap:16px; align-items:flex-start; padding:4px 2px 30px; flex-wrap:wrap; }
+.ret-tbd-col{ flex:1 1 320px; min-width:280px; background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+.ret-tbd-h{ font-size:13px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+.ret-tbd-h small{ font-size:10.5px; font-weight:600; color:var(--text3); }
+.ret-tbd-h .und-cnt{ margin-left:auto; }
+.ret-tbd-body{ display:flex; flex-wrap:wrap; gap:8px; min-height:40px; align-content:flex-start; }
+.ret-tbd-body .pit-card{ width:224px; flex:0 0 224px; min-width:0; }
+.ret-tbd-body .today-empty{ flex:1 1 100%; }
+
+/* ===== 完TEL済／依頼ポップアップ（return-popup.js・pp-* を流用） ===== */
+#rp-backdrop .pp-box{ width:min(460px,93vw) !important; border-radius:16px; }
+#rp-backdrop .pp-box .modal-body{ padding:18px 20px 20px; gap:14px; display:flex; flex-direction:column; }
+#rp-backdrop .pp-box .modal-head{ padding:14px 18px; }
+#rp-backdrop .pp-box .modal-title{ font-size:16px; font-weight:800; }
+.rp-time{ align-self:flex-start; min-width:210px; font-size:15px; padding:7px 9px; border:1px solid var(--border2); border-radius:8px; background:var(--bg3); color:var(--text); }
+.rp-text{ width:100%; box-sizing:border-box; font-size:13px; padding:7px 9px; border:1px solid var(--border2); border-radius:8px; background:var(--bg3); color:var(--text); }
+.rp-chips{ display:flex; gap:8px; }
+.rp-chip{ font-size:13px; font-weight:700; padding:6px 18px; border-radius:8px; border:1px solid var(--border2); background:var(--bg3); color:var(--text2); cursor:pointer; }
+.rp-chip.on{ background:var(--brand); color:#06210f; border-color:var(--brand); }
+.rp-check{ display:flex; align-items:center; gap:7px; font-size:13.5px; font-weight:700; color:var(--text); cursor:pointer; }
+.rp-check input{ width:16px; height:16px; }
+.av-list-card .av-list-date{ margin-left:auto; font-size:11px; color:var(--text2); white-space:nowrap; }
+.av-list-card .av-list-date b{ font-size:13px; color:var(--text); }
+.av-list-body{ display:flex; flex-direction:column; gap:6px; margin-top:8px; max-height:46vh; overflow:auto; }
+.av-list-empty{ font-size:11px; color:var(--text3); padding:12px 4px; text-align:center; line-height:1.6; }
+.av-it{ display:flex; align-items:center; gap:8px; padding:7px 9px; background:var(--bg3); border:1px solid var(--border); border-left:4px solid var(--team,#1db97a); border-radius:8px; cursor:pointer; }
+.av-it:hover{ background:var(--bg2); }
+.av-it.urgent{ background:#fef2f2; border-color:#fecaca; }
+.av-it-time{ font-size:13px; font-weight:800; min-width:42px; color:var(--text); }
+.av-it-main{ flex:1 1 auto; min-width:0; }
+.av-it-head{ display:flex; align-items:center; gap:6px; }
+.av-it-name{ font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.av-it-done{ font-size:9px; font-weight:800; color:#fff; background:#9ca3af; border-radius:4px; padding:1px 4px; flex-shrink:0; }
+.av-it-car{ font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }/* 客名とウェイト・サイズを揃える */
+.av-it-tags{ display:flex; align-items:center; gap:4px; flex-shrink:0; }
+/* 枠ありき：作業バッジ(3M/1y/BP/車検/一般…)も添え物チップ(代車/相談)も
+   全部まったく同じ固定枠（同じ縦横）にして中身を中央寄せ。色だけ各自で持つ。 */
+.av-it-tags > *{
+  width:42px; height:22px; box-sizing:border-box;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; line-height:1;
+  border:1px solid; border-radius:5px; padding:0 4px;
+  white-space:nowrap; overflow:hidden;
+}
+.av-it-tags > .long{ font-size:9px; }/* 4文字以上のラベルは枠内で文字だけ縮める（枠サイズは固定のまま） */
+/* 相談・代車チップは他ビューと共通の tag-side 配色（背景/文字/枠色）を流用。サイズはこの枠で統一 */
+
+/* 設定：作業タイプ編集行（v0.27.0） */
+.ps-wt-row{ display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px dashed var(--border); }
+.ps-wt-row:last-child{ border-bottom:0; }
+.ps-wt-color{ width:34px; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--bg3); cursor:pointer; padding:1px; }
+/* 作業タイプ設定の「併用可」チェック */
+.ps-wt-combo{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text2); white-space:nowrap; cursor:pointer; }
+.ps-wt-combo input{ width:15px; height:15px; cursor:pointer; }
+.ps-wt-row .rl-del{ margin-left:0; }
+/* 入庫カード：作業タイプの「＋併用」チップ群（基本チップの下に少し離して） */
+.cf-wt-combo{ margin-top:6px; align-items:center; }
+.cf-combo-lab{ font-size:11px; font-weight:700; color:var(--text3); margin-right:2px; align-self:center; }
+/* v0.94.4 作業タイプ(基本)と併用可のチップを完全に同寸・同高さに（flex中央＋固定高さで上下とも揃える） */
+.cf-chips[data-key="workType"] .cf-chip,
+.cf-chips[data-key="workAddons"] .cf-chip{ display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 12px; font-size:12px; line-height:1; min-width:46px; box-sizing:border-box; }
+
+/* ===== 📅 予約・月ビュー＝日付リスト型（v0.26.0） ===== */
+.reserve-month.rml-host{ display:block; background:transparent; border:0; border-radius:0; overflow:visible; }
+.rml-scroll{ overflow-y:auto; max-height:calc(100vh - 190px); padding-right:6px; }
+.rml-mhead{ font-size:14.5px; font-weight:800; padding:16px 2px 6px; color:var(--text); }
+.rml-row{ display:flex; gap:12px; align-items:flex-start; border-bottom:1px dashed var(--border); padding:5px 0; }
+.rml-row.closed{ background:repeating-linear-gradient(45deg,var(--bg3),var(--bg3) 10px,transparent 10px,transparent 20px); border-radius:6px; }
+.rml-date{ flex:none; width:92px; font-size:13px; font-weight:700; color:var(--text2); padding:6px 0 0 4px; line-height:1.3; }
+.rml-date span{ font-size:10.5px; font-weight:600; color:var(--text3); margin-left:4px; }
+.rml-date.red, .rml-date.red span{ color:#ef4444; }
+.rml-date.sat, .rml-date.sat span{ color:#3b82f6; }
+.rml-date.today, .rml-date.today span{ color:#1db97a; }
+.rml-hol{ display:block; font-size:9.5px; color:#ef4444; font-weight:600; margin-left:0 !important; }
+.rml-cards{ flex:1; display:flex; flex-wrap:wrap; gap:6px; min-height:30px; align-items:flex-start; padding:2px 0; }
+.rml-empty{ color:var(--text3); font-size:11px; padding-top:7px; }
+.rml-ev{ background:var(--bg3); border:1px solid var(--border); border-left:3px solid var(--brand); border-radius:7px; padding:4px 9px; font-size:11.5px; cursor:pointer; white-space:nowrap; transition:filter .1s, transform .1s; }
+.rml-ev:hover{ filter:brightness(1.12); transform:translateY(-1px); }
+.rml-ev b{ font-size:11px; }
+.rml-ev.urgent{ border-color:#ef4444; color:#ef4444; }
+.rml-ev[draggable="true"]{ cursor:grab; }
+.rml-wt{ font-size:9.5px; font-weight:700; margin-left:6px; color:var(--text3); }
+
+/* ===== 🗓 予約の埋まり＝横軸の無限カレンダー（v0.25.0） ===== */
+.drc-scroll{ overflow-x:auto; padding-bottom:6px; }
+.drc-grid{ display:flex; gap:3px; min-width:max-content; }
+.drc-col{ display:flex; flex-direction:column; gap:3px; min-width:62px; }
+.drc-col.today .drc-h{ outline:2px solid #1db97a; border-radius:6px; font-weight:700; }
+.drc-col.drc-lab{ position:sticky; left:0; z-index:2; background:var(--bg2); min-width:90px; padding-right:5px; }
+.drc-col.drc-lab .drc-c{ background:transparent; border-color:transparent; text-align:left; white-space:nowrap; font-size:12.5px; }
+.drc-h{ font-size:11px; text-align:center; color:var(--text2); padding:4px 2px; line-height:1.35; min-height:34px; }
+.drc-h.red{ color:#ef4444; }
+.drc-h.sat{ color:#3b82f6; }
+.drc-c{ text-align:center; font-size:12.5px; font-weight:700; padding:6px 3px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; line-height:1.15; }
+.drc-c span{ display:block; font-size:10px; font-weight:700; margin-top:1px; letter-spacing:.06em; }
+.drc-okk{ background:rgba(29,185,122,.13); border-color:#1db97a; color:#1db97a; }
+.drc-end{ background:rgba(239,68,68,.13); border-color:#ef4444; color:#ef4444; }
+.drc-over{ background:#0b0b0d; border-color:#000; color:#fff; }
+[data-theme="light"] .drc-over{ background:#1c1917; border-color:#1c1917; color:#fff; }
+.drc-closed{ background:transparent; border-color:transparent; color:var(--text3); font-weight:400; }
+
+/* ささやかなトースト（△の一言注意など・ブロックしない） */
+.pit-toast{
+  position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(10px);
+  background:var(--bg2); color:var(--text); border:1px solid #f97316; border-radius:10px;
+  padding:10px 18px; font-size:13px; font-weight:600; z-index:99999;
+  opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+  box-shadow:0 10px 34px rgba(0,0,0,.4); max-width:min(92vw,560px);
+}
+.pit-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ===== 📊 整備ダッシュボード（工場ぜんたい・v0.40.0） ===== */
+.md-top{ display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+.md-period{ font-size:11.5px; color:var(--text3); }
+.md-kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+.md-kpi{ background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:14px 16px; position:relative; }
+.md-kpi-ic{ font-size:18px; }
+.md-kpi-num{ font-size:30px; font-weight:800; line-height:1.1; margin-top:4px; }
+.md-kpi-num span{ font-size:13px; font-weight:700; color:var(--text3); margin-left:3px; }
+.md-kpi-l{ font-size:12px; color:var(--text2); font-weight:700; margin-top:2px; }
+.md-kpi-sub{ font-size:11.5px; color:var(--text3); margin-top:3px; }
+.md-kpi-warn{ border-color:rgba(234,179,8,.55); }
+.md-kpi-warn .md-kpi-num{ color:#eab308; }
+.md-kpi-alert{ border-color:rgba(239,68,68,.55); background:rgba(239,68,68,.06); }
+.md-kpi-alert .md-kpi-num{ color:#ef4444; }
+.md-kpi-ok .md-kpi-num{ color:#1db97a; }
+@media (max-width:768px){ .md-kpis{ grid-template-columns:repeat(2,1fr); } }
+
+.md-courses{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+@media (max-width:768px){ .md-courses{ grid-template-columns:1fr; } }
+.md-course{ background:var(--bg2); border:1px solid var(--border); border-top:4px solid var(--cc); border-radius:14px; padding:14px 16px; }
+.md-course-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.md-course-pill{ color:#fff; font-size:13px; font-weight:800; padding:3px 12px; border-radius:999px; }
+.md-course-team{ font-size:13px; font-weight:700; color:var(--text2); }
+.md-course-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.md-cell{ background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center; }
+.md-cell-l{ font-size:11px; color:var(--text3); font-weight:700; }
+.md-cell-v{ font-size:22px; font-weight:800; margin-top:3px; }
+.md-cell-v b{ font-size:24px; }
+.md-cell-a{ font-size:12px; color:var(--text2); font-weight:700; margin-top:1px; }
+.md-cell-rem{ border-color:rgba(234,179,8,.5); background:rgba(234,179,8,.08); }
+.md-cell-rem .md-cell-v{ color:#eab308; }
+
+.md-alert-card{ }
+.md-alert-none{ text-align:center; font-size:13px; font-weight:700; color:#1db97a; padding:18px; }
+.md-alert-list{ display:flex; flex-direction:column; gap:8px; }
+.md-alert-row{ display:flex; align-items:center; gap:12px; background:var(--bg3); border:1px solid var(--border); border-left:4px solid #eab308; border-radius:10px; padding:9px 12px; cursor:pointer; transition:transform .1s, border-color .12s; }
+.md-alert-row:hover{ transform:translateX(2px); border-left-color:#f97316; }
+.md-alert-row.md-sev2{ border-left-color:#ef4444; background:rgba(239,68,68,.07); }
+.md-alert-days{ flex:none; width:46px; text-align:center; }
+.md-alert-days b{ font-size:22px; font-weight:800; color:#eab308; }
+.md-sev2 .md-alert-days b{ color:#ef4444; }
+.md-alert-days span{ font-size:10px; color:var(--text3); margin-left:1px; }
+.md-alert-main{ flex:1; min-width:0; }
+.md-alert-car{ font-size:14px; font-weight:700; }
+.md-alert-cust{ font-size:12px; color:var(--text2); font-weight:600; margin-left:4px; }
+.md-alert-sub{ font-size:11.5px; color:var(--text3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.md-alert-tags{ flex:none; display:flex; align-items:center; gap:7px; }
+.md-alert-div{ color:#fff; font-size:11px; font-weight:800; padding:2px 9px; border-radius:999px; }
+.md-alert-st{ font-size:11px; font-weight:700; padding:2px 8px; border:1px solid; border-radius:7px; background:var(--bg2); }
+
+/* ===========================================================
+   仮予約システム（v0.100.1・ゆうた調整反映）
+   ① compactカード＝「様」のすぐ後ろにインライン「仮」（名前が長いと…様 仮で省略）
+   ② 予約標準カード（full）＝上寄り中央に丸スタンプ
+   ③ 月/2ヶ月カレンダー＝行の右端に小さく「仮」
+   色は全て #f59e0b（オレンジ）。
+   =========================================================== */
+
+/* 共通：仮予約カードは左ボーダーを点線にして「未確定っぽく」 */
+.pit-card.is-tentative{ position:relative; border-left-style:dashed; }
+
+/* ① compactカード：様の直後に小さな丸「仮」。名前だけ…省略し「様 仮」は必ず残す */
+.pcm-nm2{ display:flex; align-items:center; min-width:0; flex:1 1 auto; }
+.pcm-nm2 .pcm-name{ flex:0 1 auto; }   /* 名前だけ縮めて…省略（様/仮は縮めない） */
+.pcm-sama{ flex:0 0 auto; font-weight:800; font-size:15px; color:var(--text); margin-left:3px; }
+.kari-name{
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  width:19px; height:19px; margin-left:4px;
+  border:1.5px solid #d97706; color:#fff; background:#f59e0b;
+  border-radius:50%; font-family:serif; font-weight:900; font-size:12px; line-height:1; letter-spacing:0;
+}
+
+/* ② full（予約標準カード）：上寄り中央の丸スタンプ（ゆうた指定 left46/top27/φ42/26px/回転0/枠2） */
+.kari-stamp{
+  position:absolute;
+  top:var(--k-top,27%); left:var(--k-left,46%);
+  transform:translate(-50%,-50%) rotate(var(--k-rot,0deg));
+  width:var(--k-d,42px); height:var(--k-d,42px);
+  display:flex; align-items:center; justify-content:center;
+  font-family:serif; font-weight:900; font-size:var(--k-size,26px); letter-spacing:-1px;
+  color:var(--k-color,rgba(245,158,11,.95));
+  border:var(--k-bw,2px) solid var(--k-color,rgba(245,158,11,.95));
+  border-radius:50%;
+  text-shadow:1px 1px 0 rgba(255,255,255,.35);
+  pointer-events:none; z-index:6;
+}
+
+/* ③ カレンダー行の右端の小さな丸「仮」 */
+.kari-edge{
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  width:17px; height:17px; border:1.5px solid #d97706; color:#fff; background:#f59e0b;
+  border-radius:50%; font-family:serif; font-weight:900; font-size:11px; line-height:1; vertical-align:middle;
+}
+.rml-ev .kari-edge{ float:right; margin-left:6px; }   /* 月リスト行はflexでないので右端へfloat */
+.reserve-month-event .kari-edge{ margin-left:4px; }     /* 2ヶ月チップはflex＝最後の要素＝右端 */
+
+/* 小さい「仮」チップ（週ミニカード用＝バッジ群の中で右寄せ） */
+.kari-mini{
+  display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px;
+  font-size:11px; font-weight:900; line-height:1;
+  color:#fff; background:#f59e0b; border:1.5px solid #d97706; border-radius:50%;
+  font-family:serif; letter-spacing:0; vertical-align:middle; padding:0 2px;
+}
+
+/* 代車カレンダーのバッジ用「〇仮」丸スタンプ（他と同じ・塗りオレンジ＋白字でハッキリ）v0.100.5
+   ※透けは無し（バッジを透かすと中の茎(棒)が出てしまうため） */
+.kari-lo{
+  position:absolute; top:50%; right:6px; transform:translateY(-50%);
+  width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+  font-family:serif; font-weight:900; font-size:13px; line-height:1; letter-spacing:0;
+  color:#fff; border:1.5px solid #d97706; border-radius:50%; background:#f59e0b;
+  box-shadow:0 1px 3px rgba(0,0,0,.3); pointer-events:none; z-index:3;
+}
+.lo-badge.mini .kari-lo{ width:16px; height:16px; font-size:10px; right:3px; }
+
+/* ホバー情報カードのバッジ一覧に出す〇仮（塗りオレンジの丸） */
+.ph-b.ph-b-kari{
+  width:20px; min-width:20px; height:20px; padding:0; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:#fff; background:#f59e0b; border:1.5px solid #d97706;
+  font-family:serif; font-weight:900; font-size:12px; line-height:1;
+}
+
+/* 新規予約画面ヘッダの「📝 仮予約で登録」ボタン */
+.vh-btn.vh-kari{ border-color:#f59e0b88; color:#f59e0b; }
+.vh-btn.vh-kari:hover{ background:#f59e0b1a; }
+
+/* カード詳細：状態横の「📝 仮予約」バッジ＋⋮メニューの切替 */
+.cv-karibadge{ font-size:11px; font-weight:800; color:#f59e0b; background:#f59e0b1f;
+  border:1px solid #f59e0b66; border-radius:7px; padding:2px 8px; }
+.cv-opti.cv-kariopt{ color:#f59e0b; font-weight:700; }
+
+/* 予約・未定タブの3カラム：各カードに小さなアクションボタンを下げる用の枠 */
+.ret-tbd-body .rtbd-item{ width:224px; flex:0 0 224px; display:flex; flex-direction:column; gap:4px; }
+.ret-tbd-body .rtbd-item .pit-card{ width:100%; flex:0 0 auto; }
+.rtbd-act{ font-size:11px; font-weight:700; padding:5px 8px; border-radius:7px;
+  border:1px solid var(--border); background:var(--bg3); color:var(--text2); cursor:pointer; width:100%; }
+.rtbd-act:hover{ border-color:var(--brand); color:var(--text); }
+
+/* 概算初期値：国産／輸入の2列 */
+.ps-est2{ display:flex; flex-direction:column; gap:4px; max-width:520px; }
+.ps-est2-head{ display:grid; grid-template-columns:1fr 120px 120px; align-items:center; font-size:11px; color:var(--text3); font-weight:700; padding:0 0 2px; }
+.ps-est2-head .ps-est2-cell{ text-align:center; justify-content:center; }
+.ps-est2-row{ display:grid; grid-template-columns:1fr 120px 120px; align-items:center; gap:0; padding:3px 0; border-top:1px solid var(--border2,#232c34); }
+.ps-est2-name{ display:flex; align-items:center; gap:8px; font-size:13px; min-width:0; }
+.ps-est2-cell{ display:flex; align-items:center; justify-content:center; gap:4px; }
+.ps-est2-cell .ps-num{ width:66px; }
+
+/* 入庫時持ち物（車検）＝スタッフが案内する用に見やすく */
+.cf-mochi{ background:rgba(31,122,77,.08); border:1px solid rgba(31,122,77,.35); border-radius:10px; padding:10px 12px; margin:2px 0 10px; }
+.cf-mochi-lead{ font-size:12px; font-weight:700; color:var(--text2); margin-bottom:8px; }
+.cf-mochi-items{ display:flex; flex-wrap:wrap; gap:8px; }
+.cf-mochi-i{ font-size:14px; font-weight:800; color:var(--text); background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 12px; }
+.cf-field.cf-field-narrow{ flex:0 0 auto; }
+
+/* ===== 設定の引っ越し（settings-transfer.js・v0.133.0） ===== */
+.ps-transfer-btns{ display:flex; gap:10px; flex-wrap:wrap }
+.ps-tbtn{
+  display:inline-flex; align-items:center; gap:7px;
+  padding:9px 14px; border-radius:8px; cursor:pointer;
+  border:1px solid var(--border); background:var(--bg3); color:var(--text);
+  font-size:13px; font-family:inherit;
+}
+.ps-tbtn:hover{ border-color:#2ea567; color:#2ea567 }
+
+/* ===== v1.13.1 車両カード ===== */
+.fl-rows{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:9px; }
+.fl-row{ display:block; background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:12px 13px; transition:border-color .12s, transform .12s; }
+.fl-row-click:hover{ border-color:var(--brand); transform:translateY(-1px); }
+.fl-card-top{ display:flex; align-items:center; gap:8px; }
+.fl-no{ flex:0 0 auto; min-width:26px; height:26px; padding:0 7px; border-radius:8px; background:var(--brand-soft);
+  border:1px solid rgba(38,162,105,.35); color:var(--brand); font-size:14px; font-weight:800;
+  display:inline-flex; align-items:center; justify-content:center; }
+.fl-ttl{ font-size:15px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fl-card-top .fl-more{ margin-left:auto; }
+.fl-card-plate{ margin-top:5px; font-size:12px; color:var(--text2); }
+/* 区分・カラー・定員＝ラベル付きで1行（色だけの表示は弱いので言葉で書く） */
+.fl-card-line{ display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:6px; font-size:12.5px; color:var(--text); }
+.fl-kv i{ font-style:normal; color:var(--text3); font-size:11px; margin-right:5px; }
+/* 装備は次の行 */
+.fl-card-tags{ display:flex; flex-wrap:wrap; gap:4px; margin-top:7px; }
+/* 寸法は一覧表示（バッジにしない） */
+.fl-card-dims{ margin-top:6px; font-size:12px; color:var(--text2); letter-spacing:.02em; }
+/* 線を挟んで 車検・点検 */
+.fl-card-foot{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:9px; padding-top:8px;
+  border-top:1px solid var(--border); font-size:12px; }
+.fl-card-foot b{ font-weight:700; }
+.fl-card-foot.none{ color:var(--text3); font-size:11.5px; }
+.fl-fk{ font-size:9.5px; font-weight:800; color:#fff; border-radius:4px; padding:1px 5px; }
+.fl-fk.shaken{ background:var(--red); }
+.fl-fk.tenken{ background:#f59e0b; margin-left:8px; }
+.fl-wareki{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.fl-w-era{ width:74px; }
+.fl-w-n{ width:58px; text-align:center; }
+.fl-w-u{ font-size:12px; color:var(--text2); }
+.fl-w-hint{ font-size:11px; color:var(--text3); margin-top:3px; min-height:15px; }
+.fl-w-hint.ng{ color:#fca5a5; }
+
+/* ===== v1.14.6 車両カレンダー：代車／社用車の切り替え線（横方向） ===== */
+.fl-cal-sec{
+  grid-column: 1 / -1;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  background: var(--bg3);
+  border-top: 1px solid var(--border2);
+  border-bottom: 1px solid var(--border2);
+}
+.fl-cal-sec > span{
+  position: sticky;
+  left: 0;
+  padding: 0 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: var(--text3);
+  background: var(--bg3);
+}
+
+/* ===== v1.23.0 メーカー／車種の入力候補（carname-pit.js） =====
+   ⚠ 見た目は .cf-input のまま。▼と候補リストを足しているだけ＝他の入力欄と並んで浮かない。
+   🔴 v1.28.0 .cn-dd は入力欄の**上**に絶対配置（既定）。Windows の変換候補（IMEの予測）が
+      入力欄の下に出るので、そこと重ならないようにするため（ゆうた指定）。
+      上の余白が足りない時だけ carname-pit.js が `.cn-down` を付けて下に出す。
+   ⚠ 親（.cf-field）に position:relative を入れると .cf-row の flex 計算が変わるので、
+      包み側（.cn-wrap）で受けている。 */
+.cn-wrap{position:relative;width:100%}
+.cn-wrap>.cf-input{padding-right:24px}                     /* ▼のぶん右を空ける */
+.cn-arrow{
+  position:absolute;top:0;right:0;width:22px;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  background:none;border:0;padding:0;cursor:pointer;color:var(--text3);
+}
+.cn-arrow:hover{color:var(--text)}
+.cn-caret{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid currentColor}
+.cn-dd{
+  /* ⚠ 幅は入力欄以上・中身なり。メーカー欄は8.5emと狭く、「ホンダオブザユーケー」のような
+     長い車検証表記が「…」で切れて読めなくなるため、はみ出してよい作りにしている。 */
+  display:none;position:absolute;left:0;bottom:calc(100% + 3px);z-index:60;
+  min-width:100%;width:max-content;max-width:min(320px,62vw);
+  max-height:262px;overflow:auto;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:8px;
+  box-shadow:0 -10px 28px rgba(0,0,0,.38);   /* 上に出るので影も上向き */
+  padding:3px;
+}
+/* 上の余白が足りない時だけ下に出す（carname-pit.js が付ける） */
+.cn-dd.cn-down{
+  bottom:auto;top:calc(100% + 3px);
+  box-shadow:0 10px 28px rgba(0,0,0,.38);
+}
+.cn-dd.show{display:block}
+.cn-i{
+  display:flex;align-items:baseline;gap:8px;
+  padding:5px 8px;border-radius:5px;cursor:pointer;font-size:12.5px;line-height:1.3;
+}
+.cn-i.on{background:var(--bg3)}
+.cn-v{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cn-v b{color:var(--brand);font-weight:700}
+.cn-n{flex:0 0 auto;font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums}
+.cn-more{padding:5px 8px;font-size:10.5px;color:var(--text3);border-top:1px dashed var(--border)}
+
+/* ===== 🚫 会社の営業日カレンダー（MHSが基準・cal-pit.js / PitCal）v1.50.0 =====
+   ・.cal-warn … MHSが未着／古い時の注意帯（日付を選ぶ画面の上に出る）
+   ・.cal-note … 日ビューの見出しに出す「お盆休み」「午前休み」など
+   ・.cal-chip … 週・月カレンダーのマスに出す小さい札
+   ・.cal-soft … 休業ではない（半休・早締め・特別営業）＝赤くしない
+   🔴 「休みかどうか」と「まだ届いていない」は色も文言も分ける。混ぜると誤予約の元。 */
+.cal-warn{
+  display:flex;align-items:flex-start;gap:7px;
+  margin:0 0 10px;padding:7px 10px;
+  background:rgba(224,163,58,.10);border:1px solid rgba(224,163,58,.45);border-left-width:3px;
+  border-radius:7px;color:#e0a33a;font-size:11.5px;line-height:1.55;
+}
+.cal-warn i{flex:0 0 auto;margin-top:1px}
+.cal-note{
+  display:inline-flex;align-items:center;gap:4px;
+  color:var(--text2);font-weight:600;
+}
+.cal-note.closed{ color:#ef4444; }
+.cal-chip{
+  display:inline-block;max-width:100%;
+  margin-top:2px;padding:0 4px;border-radius:4px;
+  font-size:9.5px;font-weight:700;line-height:1.5;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:rgba(148,163,184,.16);color:var(--text2);
+}
+.cal-chip.closed{ background:rgba(239,68,68,.14); color:#ef4444; }
+.rml-hol.cal-soft,.lo-closed-tag.cal-soft{ color:var(--text3) !important; font-weight:600; }
+.drc-h.closed{ color:#ef4444; font-weight:600; }
+
+/* 🔴 v1.52.0 顧客一覧の操作欄：新規予約 → その右に Lステップ（ゆうた指定）。
+   ⚠ Lステップが無い人にも**同じ幅の空きマス**を置く＝有無で新規予約の位置がガタつかない。 */
+.ct-actrow{ display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; }
+.ct-licon-none{ display:inline-block; width:22px; height:22px; flex:0 0 auto; }
+/* 都度車両変動＝ナンバーを持たない車の印（一覧のナンバー欄） */
+.ct-pv{ display:inline-block; font-size:10.5px; font-weight:800; color:#a5b4fc;
+  background:rgba(124,140,248,.14); border:1px solid rgba(124,140,248,.45); border-radius:999px; padding:1px 8px; }
+/* 顧客編集モーダル：片付けた車・都度変動の車の印 */
+.ce-vtags{ display:flex; gap:6px; flex-wrap:wrap; width:100%; margin-bottom:6px; }
+.ce-vtag{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:800; border-radius:999px; padding:1px 8px; }
+.ce-vtag.arch{ color:#e0b978; background:rgba(192,138,62,.14); border:1px solid rgba(192,138,62,.45); }
+.ce-vtag.pv{ color:#a5b4fc; background:rgba(124,140,248,.14); border:1px solid rgba(124,140,248,.45); }
+.ce-veh.ce-veh-arch{ opacity:.7; }
+
+/* ===== v1.64.0 設定▸概算金額の下に置く「いずれ自動計算にする」メモ ===== */
+.ps-note-auto{ margin-top:10px; border:1px dashed var(--border); border-radius:10px; background:var(--bg3); padding:10px 12px; }
+.ps-note-auto-h{ display:flex; align-items:center; gap:6px; font-size:12px; font-weight:800; color:var(--text2); margin-bottom:5px; }
+.ps-note-auto-b{ font-size:11.5px; line-height:1.75; color:var(--text3); }
+.ps-note-auto-b b{ color:var(--text2); }
+
+/* ===== v1.64.1 設定▸概算日数／概算金額の入力枠（ゆうた指摘） =====
+   ・上下の矢印（スピナー）を消す＝数字を打つだけの欄なので、あっても押さないし幅を食う
+   ・金額は7桁（1,150,200）まで入るので、日数と同じ66pxでは切れていた → 金額の表だけ枠を広げる
+   ⚠ 日数の表は今までどおりの幅（1〜2桁しか入らないため）。 */
+.ps-est2-cell .ps-num::-webkit-outer-spin-button,
+.ps-est2-cell .ps-num::-webkit-inner-spin-button{ -webkit-appearance:none; appearance:none; margin:0; }
+.ps-est2-cell .ps-num{ -moz-appearance:textfield; appearance:textfield; }
+
+.ps-est2-money{ max-width:620px; }
+.ps-est2-money .ps-est2-head,
+.ps-est2-money .ps-est2-row{ grid-template-columns:1fr 160px 160px; }
+.ps-est2-money .ps-est2-cell .ps-num{ width:112px; text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ===== v1.65.1 金額入力欄の下に出す「税抜で入力／税込 ¥○○」（確認用・ライブ） =====
+   🔴 PitFlow が持つ金額はすべて税抜。これは目で確かめるための表示だけで、保存する値は変わらない。 */
+.pt-tax{ display:flex; align-items:baseline; gap:8px; margin-top:5px; font-size:11px; line-height:1.4; }
+.pt-tax-l{ color:var(--text3); font-weight:700; letter-spacing:.02em; }
+.pt-tax-v{ color:var(--text2); font-weight:800; font-variant-numeric:tabular-nums; }
+
+/* ===========================================================
+   🔵 承認制度（v1.74.0・ゆうた指定／案A＝青の丸「承」）
+   -----------------------------------------------------------
+   仮予約（オレンジ #f59e0b）と**一目で見分ける**ために青（#378ADD）。
+   形・大きさは仮とまったく同じ＝現場が覚え直さなくていい。
+   🔴 カード詳細だけは丸い印を出さず、文字で「承認待」（ゆうた指定）。
+      あわせて仮予約側も「仮予約」の文字だけに揃えた（ペンのアイコンを外した）。
+   =========================================================== */
+/* 承認待ちカードの左ボーダー＝二重線（仮＝点線 と見分ける） */
+.pit-card.is-approval{ position:relative; border-left-style:double; border-left-width:6px; }
+
+/* ① compactカード：様の直後（.kari-name と同じ形） */
+.appr-name{
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  width:19px; height:19px; margin-left:4px;
+  border:1.5px solid #1e5fc2; color:#fff; background:#378ADD;
+  border-radius:50%; font-family:serif; font-weight:900; font-size:12px; line-height:1; letter-spacing:0;
+}
+/* ② 予約標準カード（full）：上寄り中央の丸スタンプ（.kari-stamp と同じ位置・大きさ） */
+.appr-stamp{
+  position:absolute;
+  top:var(--k-top,27%); left:var(--k-left,46%);
+  transform:translate(-50%,-50%);
+  width:var(--k-d,42px); height:var(--k-d,42px);
+  display:flex; align-items:center; justify-content:center;
+  font-family:serif; font-weight:900; font-size:var(--k-size,26px); letter-spacing:-1px;
+  color:rgba(55,138,221,.95); border:2px solid rgba(55,138,221,.95); border-radius:50%;
+  text-shadow:1px 1px 0 rgba(255,255,255,.35); pointer-events:none; z-index:6;
+}
+/* ③ 月／2ヶ月カレンダー行の右端 */
+.appr-edge{
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+  width:17px; height:17px; border:1.5px solid #1e5fc2; color:#fff; background:#378ADD;
+  border-radius:50%; font-family:serif; font-weight:900; font-size:11px; line-height:1; vertical-align:middle;
+}
+.rml-ev .appr-edge{ float:right; margin-left:6px; }
+.reserve-month-event .appr-edge{ margin-left:4px; }
+/* ④ 週ミニカードのバッジ群 */
+.appr-mini{
+  display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px;
+  font-size:11px; font-weight:900; line-height:1; color:#fff; background:#378ADD;
+  border:1.5px solid #1e5fc2; border-radius:50%; font-family:serif; vertical-align:middle; padding:0 2px;
+}
+/* ⑤ 代車カレンダーの札 */
+.appr-lo{
+  position:absolute; top:50%; right:6px; transform:translateY(-50%);
+  width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+  font-family:serif; font-weight:900; font-size:13px; line-height:1;
+  color:#fff; border:1.5px solid #1e5fc2; border-radius:50%; background:#378ADD;
+  box-shadow:0 1px 3px rgba(0,0,0,.3); pointer-events:none; z-index:3;
+}
+.lo-badge.mini .appr-lo{ width:16px; height:16px; font-size:10px; right:3px; }
+/* ⑥ ホバー情報カードのバッジ列 */
+.ph-b.appr-hb{
+  width:20px; min-width:20px; height:20px; padding:0; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  color:#fff; background:#378ADD; border:1.5px solid #1e5fc2;
+  font-family:serif; font-weight:900; font-size:12px; line-height:1;
+}
+/* ⑦ カード詳細＝文字だけ（丸い印は出さない・ゆうた指定） */
+.cv-apprbadge{ font-size:11px; font-weight:800; color:#378ADD; background:#378ADD1f;
+  border:1px solid #378ADD66; border-radius:7px; padding:2px 8px; }
+
+/* 予約詳細のいちばん上に出る承認バー */
+.cv-apbar{ border:1px solid #378ADD66; background:#378ADD14; border-radius:12px; padding:12px 14px; margin-bottom:14px; }
+.cv-apt{ font-size:12.5px; font-weight:800; color:#378ADD; display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.cv-apnote{ font-size:11.5px; color:var(--text3); line-height:1.6; margin-bottom:10px; }
+.cv-apacts{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.cv-apok{ font-size:13px; font-weight:800; color:#fff; background:#378ADD; border:1px solid #1e5fc2;
+  border-radius:9px; padding:9px 16px; display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
+.cv-apok:hover{ background:#1e5fc2; }
+.cv-apsub{ font-size:12px; font-weight:700; color:#378ADD; background:transparent; border:1px solid #378ADD88;
+  border-radius:9px; padding:8px 12px; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+.cv-apsub:hover{ background:#378ADD1a; }
+.cv-apwho{ font-size:11px; color:var(--text3); margin-left:auto; font-weight:700; }
+
+/* 未定タブ：承認待ちBOXの「開いて承認する」 */
+.rtbd-act.go{ border-color:#378ADD; color:#378ADD; font-weight:800; }
+.rtbd-act.go:hover{ background:#378ADD1a; color:#378ADD; }
+/* その他保存メニューの「承認に回して保存」 */
+.vh-mi.vh-mi-appr b{ color:#378ADD; }

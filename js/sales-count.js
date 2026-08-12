@@ -1,0 +1,117 @@
+/* ========================================
+   sales-count.js  -  「売上をどの月に数えるか」を決める、たった1本の物差し
+   ----------------------------------------
+   PitFlow v1.61.0（2026-08-06・ゆうた指定）
+
+   ◎ゆうた指定
+     「売上サマリー等の集計に、受注済みの確定金額が入っている車両でも、
+       返車予定が当月内でなければ、その時までずらす。
+       基本的には**返車予定日が月内かどうか**が分けるポイント」
+
+   ◎これまで（不具合）
+     売上ビューの「確定（受注済）」「予定」「見込」は、**進行中というだけで無条件に当月**へ積んでいた。
+     返車予定が翌月の車まで今月の着地見込みに乗ってしまい、月をまたぐたびに数字が二重に見えた。
+
+   ◎これから（決めごと）
+     🔴 **1台につき「数える日」は1つだけ**。その日が入っている月に、その台の金額を積む。
+
+     | 状態 | 数える日 |
+     |---|---|
+     | 実績（返車済み） | **実績カウント日 `completedAt`**（無ければ確定返車日→返車日） |
+     | 進行中（受注済・見積提示済・入庫済） | **返車予定日 `returnDate`** |
+     | 予約（未入庫） | **返車予定日**。無ければ **入庫予定日＋概算 預かり日数** |
+
+     - **返車予定日が空（未定）＝当月に寄せる**（決まった時点で自動でその月へ移る）
+     - **返車予定日が過ぎている（遅れている）＝当月に寄せる**（締めた過去の月の数字を後から動かさない）
+     - **実績だけは日付そのまま**（過去は過去のまま。寄せない）
+
+   ◎使い方
+     - `pitSalesCountDate(c)` … その車の金額を数える日（'YYYY-MM-DD'／未定は ''）
+     - `pitSalesTier(c)`      … 確度の区分（actual/confirmed/planned/prospect/forecast／対象外は null）
+     - `pitSalesInRange(c, fromStr, toStr, todayStr)` … その期間に数えるか（true/false）
+
+   🔴 **写しを作らないこと。** 期間で絞る集計は必ずこの3本を通す。
+      （sales.js / mydash.js / mech-summary.js / maintdash.js が呼んでいる）
+   ⚠ 読み込みは state.js より後ろ、使う側（sales.js / mydash.js …）より前。
+   ======================================== */
+(function(){
+  'use strict';
+
+  var CONFIRMED = ['parts','work','workDone','outsource'];   // 受注済＝パーツ待ち以降
+
+  function s(v){ return (v == null) ? '' : String(v); }
+  function n(v){ v = +v; return isFinite(v) ? v : 0; }
+  function pad(x){ return (x < 10 ? '0' : '') + x; }
+  function ymdL(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+  function addStr(str, days){
+    var p = s(str).split('-'); if (p.length !== 3) return '';
+    var d = new Date(+p[0], (+p[1])-1, +p[2]); if (isNaN(d.getTime())) return '';
+    d.setDate(d.getDate() + days); return ymdL(d);
+  }
+  function today(){ var t = new Date(); t.setHours(0,0,0,0); return ymdL(t); }
+
+  /* 概算の預かり日数（カードの指定 → 作業タイプ別の目安 → 5日） */
+  function holdOf(c){
+    if (c && c.estHoldDays != null && c.estHoldDays !== '') return Math.max(0, n(c.estHoldDays));
+    if (window.pitEstHold){
+      try { return Math.max(0, n(pitEstHold(c.workType, c.dropType, window.pitTeamKey ? pitTeamKey(c) : 'default'))); } catch(e){}
+    }
+    return 5;
+  }
+
+  /* ===== ①その車の金額を「いつ」数えるか =====
+     🔴 v1.65.0（ゆうた確定）返車日は**3段のチェーン**になった（return-slot.js）。
+        まだ返していない車は **C（確定返車日）→ B（受注時の約束）→ A（概算＝入庫日＋預かり日数）** の順に見る。
+        ゆうた指定「予定で月内に入るか入らないかは B を見る」＋ 完TEL済なら C のほうが確かなので C を先に。
+     ⚠ ここで日付を組み立てないこと。**物差しは return-slot.js の 1本**。 */
+  function pitSalesCountDate(c){
+    if (!c) return '';
+    /* 実績＝実績カウント日が正。返車日は予備（v1.57.0 で completedAt が売上の基準になった） */
+    if (c.status === 'returned') return s(c.completedAt) || s(c.returnDateFinal) || s(c.returnDate);
+    if (window.pitReturnDates){
+      var d = pitReturnDates(c);
+      return s(d.c) || s(d.b) || s(d.a);
+    }
+    /* 部品が無い時の保険（読み込み順が崩れた場合） */
+    if (s(c.returnDatePlan)) return s(c.returnDatePlan);
+    if (s(c.returnDate)) return s(c.returnDate);
+    if (s(c.reserveDate)) return addStr(s(c.reserveDate), holdOf(c));
+    return '';   /* ＝未定 */
+  }
+
+  /* ===== ②確度の区分（状態だけで決まる。期間は見ない） ===== */
+  function pitSalesTier(c){
+    if (!c || c.status === 'scrap') return null;
+    var st = c.status;
+    if (st === 'returned') return 'actual';                                            /* 実績＝返車済み */
+    if (st === 'reserved') return 'forecast';                                          /* 予測＝未入庫の予約 */
+    if (c.returnStage || CONFIRMED.indexOf(st) >= 0) return 'confirmed';               /* 確定＝受注済（パーツ待ち以降・完TEL待ち） */
+    if (st === 'contact') return 'planned';                                            /* 予定＝連絡中（見積提示済） */
+    if (st === 'check' || st === 'estim') return 'prospect';                            /* 見込＝入庫済・受注前 */
+    return null;
+  }
+
+  /* ===== ③その期間（月・クォーター）に数えるか ===== */
+  function pitSalesInRange(c, fromStr, toStr, todayStr){
+    if (!c) return false;
+    todayStr = todayStr || today();
+    var d = pitSalesCountDate(c);
+
+    /* 実績＝日付そのまま。過去も未来も寄せない */
+    if (c.status === 'returned') return !!d && d >= fromStr && d <= toStr;
+
+    /* 🔴 まだ返していない車は、もう終わった期間には出さない（締めた月の数字を後から動かさない） */
+    if (toStr < todayStr) return false;
+
+    var isCur = (todayStr >= fromStr && todayStr <= toStr);   /* いま見ている期間が「今」を含むか */
+    if (!d) return isCur;                          /* 返車予定日が未定＝当月に寄せる */
+    if (d >= fromStr && d <= toStr) return true;   /* 期間内＝そのまま */
+    if (d > toStr) return false;                   /* 先の月＝そちらへずらす（ここには出さない） */
+    return isCur;                                  /* 予定日が過ぎている＝当月に寄せる */
+  }
+
+  window.pitSalesCountDate = pitSalesCountDate;
+  window.pitSalesTier      = pitSalesTier;
+  window.pitSalesInRange   = pitSalesInRange;
+  window.pitSalesHoldOf    = holdOf;
+})();

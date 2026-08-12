@@ -1,0 +1,157 @@
+/* ============================================
+   CoreFlow アプリランチャー（共通：全アプリで同一）v2.3（2026-08-01）
+   中心＝CoreFlow（太陽・トリガーに被らないよう右上にオフセット）＋公転2周。
+   ラベルは普段隠し球ホバーで表示。位置は各 .cf-lo-item の inline --dx/--dy。
+
+   ⚠ このファイルの本体は  D:\Claude\アプリ開発\_shared\launcher.css  です。
+      直す時はそこを直して、sync-shared.ps1 を実行して全アプリに配ること。
+      各アプリの css\ に入っているのは配られたコピー。直接直すと次の配布で消えます。
+      （2026-08-01：9アプリに手で配る運用をやめ、coreflow-icons.js と同じ「_shared が本体」に統一）
+
+   v2.3（2026-08-01）：閉じている時のトリガーの丸を「C＋虹リング」から CoreFlow の丸ロゴへ。
+      **開いた時に中心へ出る太陽（.cf-lo-sun）とまったく同じ作り**＝暗い丸＋うすい枠＋ロゴ。
+      開く前と後で見た目がつながる。画像が読めなかった時は今までどおり「C」に戻る。
+   ============================================ */
+[data-cf-launcher]{margin-top:auto}
+
+.cf-launcher-trigger{
+  margin: 0 10px 12px;
+  background: var(--bg3, rgba(255,255,255,.04));
+  border: 1px solid var(--border, rgba(127,127,127,.25));
+  border-radius:10px;
+  padding:9px 11px;
+  display:flex;align-items:center;gap:10px;
+  cursor:pointer;
+  transition:background .15s ease, border-color .15s ease;
+  position:relative;z-index:2;
+  color: var(--text, #e8ecf2);
+  font-family:inherit;
+  user-select:none;
+}
+.cf-launcher-trigger:hover{
+  background: var(--bg4, var(--bg3, rgba(255,255,255,.08)));
+  border-color: rgba(127,127,127,.45);
+}
+/* 閉じている時の丸＝CoreFlowロゴ（v2.3）。開いた時の太陽 .cf-lo-sun と同じ作りにしてある。
+   ⚠ 色はテーマに関係なく暗い丸で固定（ロゴが透過なので、明るい下地だと渦が背景に溶ける）。 */
+.cf-lg-logo{
+  width:28px;height:28px;border-radius:50%;
+  background:#0e1116;
+  border:1.5px solid rgba(255,255,255,.22);
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+  box-sizing: border-box;
+  padding:3px;
+  display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:11px;
+  flex:0 0 auto;
+  transition:box-shadow .2s ease;
+}
+/* 画像が読めなかった時は launcher.js が中身を「C」に戻す＝上の文字指定がそのまま効く */
+.cf-lg-logo>img{width:100%;height:100%;display:block;object-fit:contain;pointer-events:none;-webkit-user-drag:none;user-select:none}
+.cf-launcher-trigger:hover .cf-lg-logo,
+body.cf-open .cf-lg-logo{ box-shadow:0 0 14px 3px rgba(255,255,255,.45); }
+.cf-lg-text{display:flex;flex-direction:column;line-height:1.2}
+.cf-lg-text .cf-l1{font-size:12.5px;font-weight:700;color: var(--text, #e8ecf2)}
+.cf-lg-text .cf-l2{font-size:10.5px;color: var(--text2, var(--text3, rgba(127,127,127,.7)));margin-top:2px}
+.cf-lg-arrow{margin-left:auto;color: var(--text2, var(--text3, rgba(127,127,127,.7)));font-size:14px;transition:transform .2s ease}
+body.cf-open .cf-lg-arrow{transform:rotate(-90deg);color: var(--text, #e8ecf2)}
+
+.cf-lo-backdrop{position:fixed;inset:0;background:rgba(6,8,12,.72);opacity:0;pointer-events:none;transition:opacity .22s ease;z-index:9050;}
+body.cf-open .cf-lo-backdrop{opacity:1;pointer-events:auto}
+
+.cf-lo-flood{position:fixed;inset:0;pointer-events:none;z-index:9051;overflow:hidden;}
+.cf-lo-flood::before{
+  content:"";position:absolute;
+  left:var(--cf-fx, 0);top:var(--cf-fy, 100vh);
+  width:80px;height:80px;border-radius:50%;
+  background:var(--cf-fcolor, transparent);
+  transform:translate(-50%,-50%) scale(0);opacity:0;
+  transition:transform .35s ease-out, opacity .25s ease-out;
+}
+body.cf-flooding .cf-lo-flood::before{ animation:cf-flood-grow 2.0s cubic-bezier(.32,.08,.28,1) forwards; }
+@keyframes cf-flood-grow{
+  0%{ transform:translate(-50%,-50%) scale(0); opacity:0; }
+  5%{ opacity:1; }
+  100%{ transform:translate(-50%,-50%) scale(90); opacity:1; }
+}
+
+.cf-lo-catcher{position:fixed;inset:0;z-index:9055;display:none}
+body.cf-open .cf-lo-catcher{display:block}
+
+.cf-lo-hotzone{position:fixed;left:0;bottom:0;width:430px;height:480px;z-index:9061;pointer-events:none;}
+body.cf-open .cf-lo-hotzone{pointer-events:auto}
+
+.cf-lo-stage{position:absolute;left:36px;bottom:46px;width:0;height:0;z-index:1;pointer-events:none;}
+
+/* 中心の太陽＝CoreFlow（トリガーボタンに被らないよう右上に +28/-66 オフセット） */
+.cf-lo-sun{
+  position:absolute;left:0;top:0;width:52px;height:52px;border-radius:50%;
+  transform:translate(calc(-50% + 44px), calc(-50% - 50px)) scale(.3);opacity:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;text-decoration:none;color:#fff;background:#0e1116;
+  border:3px solid rgba(255,255,255,.22);box-sizing:border-box;
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+  pointer-events:auto;cursor:pointer;z-index:2;
+  transition:transform .28s cubic-bezier(.18,.85,.25,1), opacity .2s ease;
+}
+body.cf-open .cf-lo-sun{transform:translate(calc(-50% + 44px), calc(-50% - 50px)) scale(1);opacity:1}
+.cf-lo-sun:hover{transform:translate(calc(-50% + 44px), calc(-50% - 50px)) scale(1.12)}
+@keyframes cf-sun{0%,100%{box-shadow:0 0 16px 4px rgba(255,255,255,.34)}50%{box-shadow:0 0 28px 8px rgba(255,255,255,.55)}}
+.cf-lo-sunlabel{
+  position:absolute;left:0;top:0;transform:translate(calc(-50% + 44px), -16px);
+  font-size:10px;font-weight:800;color:#fff;white-space:nowrap;
+  text-shadow:0 1px 3px rgba(0,0,0,.9);
+  opacity:0;transition:opacity .2s ease .15s;pointer-events:none;z-index:2;
+}
+.cf-lo-sun:hover + .cf-lo-sunlabel{opacity:1}
+
+.cf-lo-item{
+  position:absolute;left:0;top:0;width:0;height:0;
+  transform:translate(0,0) scale(.35);opacity:0;
+  transition:transform .30s cubic-bezier(.18,.85,.25,1), opacity .2s ease-out;
+  pointer-events:none;
+}
+body.cf-open .cf-lo-item{transform:translate(var(--dx,0), var(--dy,0)) scale(1);opacity:1;transition-delay:var(--d, 0s);}
+
+.cf-lo-ball{
+  position:absolute;left:0;top:0;width:42px;height:42px;border-radius:50%;
+  transform:translate(-50%,-50%);
+  pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:19px;color:#fff;text-decoration:none;
+  border:1.5px solid rgba(255,255,255,.22);
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.cf-lo-ball:hover{transform:translate(-50%,-50%) scale(1.18);box-shadow:0 6px 18px rgba(0,0,0,.6);text-decoration:none}
+
+.cf-lo-label{
+  position:absolute;left:0;top:0;transform:translate(-50%, 28px);
+  font-size:10.5px;font-weight:700;color:#fff;
+  letter-spacing:.04em;white-space:nowrap;
+  background:rgba(8,10,14,.6);padding:1px 7px;border-radius:7px;
+  text-shadow:0 1px 3px rgba(0,0,0,.9);
+  opacity:0;transition:opacity .15s ease;pointer-events:none;
+}
+.cf-lo-ball:hover + .cf-lo-label{opacity:1}
+.cf-lo-item:hover{z-index:5}
+
+.cf-lo-ball.cf-coreflow{
+  background-color:#fff;
+  background-image: linear-gradient(#fff,#fff), conic-gradient(#ff0040,#ff8800,#ffe600,#00d048,#00c8ff,#5e3bff,#ff00aa,#ff0040);
+  background-origin: border-box;background-clip: padding-box, border-box;
+  border:3px solid transparent;box-sizing: border-box;color:#1a1a1a;
+}
+.cf-lo-ball.cf-carflow{background:#378ADD}
+.cf-lo-ball.cf-stockflow{background:#7c3aed}
+.cf-lo-ball.cf-pitflow{background:#1db97a}
+.cf-lo-ball.cf-mhs{background:#dc2626}
+.cf-lo-ball.cf-coreboard{background:#06b6d4}
+.cf-lo-ball.cf-corenote{background:#ec4899}
+.cf-lo-ball.cf-coretools{background:#64748b}
+.cf-lo-ball.cf-coremembers{background:#ea580c}
+.cf-lo-ball.cf-moneyflow{background:#e0a92b}
+.cf-lo-ball.cf-coretemplate{background:#6366f1}
+
+body.cf-open .cf-lo-item.cf-current{opacity:.55}
+.cf-lo-ball[aria-disabled="true"]{cursor:default}
+.cf-lo-ball[aria-disabled="true"]:hover{transform:translate(-50%,-50%) scale(1);box-shadow:0 2px 8px rgba(0,0,0,.5)}

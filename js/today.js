@@ -68,6 +68,9 @@ function renderToday(){
   const dow = '日月火水木金土'[day.getDay()];
   const isToday = (window._todayOffset || 0) === 0;
 
+  /* 🔴 v1.99.0 「売上なしでアーカイブ」した車は返車済みの台数に数えない（物差し＝sales-count.js の pitCardNoSale）。
+     ＝当日ビューの「返車 ◯／◯台」が、売上0で片付けた車のぶんだけ増えてしまうのを防ぐ。 */
+  const _noSale = c => !!(window.pitCardNoSale && pitCardNoSale(c));
   // 入庫リスト＝まだ来ていない予約（status=reserved）。入庫済みにするとタスクへ移りここから消える
   const intake = state.cards
     .filter(c => c.reserveDate === dayStr && c.status === 'reserved')
@@ -82,15 +85,20 @@ function renderToday(){
     .sort((a,b) => _rmin(a) - _rmin(b));
 
   // 入庫：今日の予約総数（返車済み含む）を固定表示。残＝まだ来ていない（status=reserved）
-  const intakeTotal = state.cards.filter(c => c.reserveDate === dayStr && c.status !== 'scrap').length;
+  const intakeTotal = state.cards.filter(c => c.reserveDate === dayStr && c.status !== 'scrap' && !_noSale(c)).length;
   const inLeft  = state.cards.filter(c => c.reserveDate === dayStr && c.status === 'reserved').length;
   const inMoved = intakeTotal - inLeft;   // すでに入った台数（1台でも動けば残を表示）
   // 返車：今日の返車総数を固定。残＝まだ返してない
-  const _retDone = c => c.status === 'returned' && (c.completedAt === dayStr || c.returnDate === dayStr);
+  const _retDone = c => !_noSale(c) && c.status === 'returned' && (c.completedAt === dayStr || c.returnDate === dayStr);
   const returnDone  = state.cards.filter(_retDone).length;
   const returnTotal = returns.length + returnDone;
   const outLeft = returnTotal - returnDone;
   const outMoved = returnDone;
+
+  /* その日の営業（休み／午前休み・午後休み・早締め／特別営業）。届いていなければ空。 */
+  const calNote = (window.PitCal && PitCal.label) ? PitCal.label(dayStr) : '';
+  const calTone = (window.PitCal && PitCal.tone)  ? PitCal.tone(dayStr)  : '';
+  const calHrs  = (window.PitCal && PitCal.hoursText) ? PitCal.hoursText(dayStr) : '';
 
   let html = '';
 
@@ -100,6 +108,11 @@ function renderToday(){
   html += '<span class="big">' + (day.getMonth()+1) + '月 ' + day.getDate() + '日</span>';
   html += '<span class="dow">(' + dow + ')</span>';
   html += (isToday ? '<span class="today-badge">今日</span>' : '<span class="today-badge next">翌日</span>');
+  /* 🔴 v1.90.0（ゆうた指摘 2026-08-13）**当日ビューは営業日カレンダーを一切見ていなかった。**
+     休みの日も、午前休み・早締めの日も、この画面には何ひとつ出ていなかった。
+     🔴 判定も色も PitCal 1本（休み=赤／短縮=オレンジ／特別営業=緑）。ここで曜日を数えない。 */
+  if (calNote) html += '<span class="cal-note ' + calTone + '" style="margin-left:4px">'
+                     + '<i data-ic=' + (calTone === 'closed' ? 'ban' : 'clock') + ' data-ics=14></i> ' + _todEsc(calNote) + '</span>';
   html += '</div>';
 
   html += '<div class="today-counts">';
@@ -127,7 +140,21 @@ function renderToday(){
     ? _todMergeAlign(intakeRows, returnRows)
     : { left: _todPlain(intakeRows, false), right: _todPlain(returnRows, true) };
 
-  html += '<div class="today-cols' + (window._todayFull ? ' full' : '') + '">';
+  /* 🔴 v1.90.0 営業日の帯。**入庫と返車で分けず、2列ぶちぬきで横1本**（ゆうた指定）
+     ＝その日の店の話であって、入庫か返車かは関係ないため。 */
+  if (calTone === 'closed'){
+    html += '<div class="today-calbar closed"><i data-ic=ban data-ics=15></i> 本日は休業日です'
+          + '<span class="sm">' + _todEsc(calNote) + '</span></div>';
+  } else if (calTone === 'short'){
+    html += '<div class="today-calbar short"><i data-ic=clock data-ics=15></i> ' + _todEsc(calNote)
+          + (calHrs ? '<span class="sm">受付 ' + calHrs + '</span>' : '') + '</div>';
+  } else if (calTone === 'open'){
+    html += '<div class="today-calbar open"><i data-ic=check data-ics=15></i> ' + _todEsc(calNote)
+          + (calHrs ? '<span class="sm">受付 ' + calHrs + '</span>' : '') + '</div>';
+  }
+
+  html += '<div class="today-cols' + (window._todayFull ? ' full' : '')
+        + (calTone === 'closed' ? ' is-closed' : '') + '">';
   html += '<div class="today-col">';
   html += '<div class="today-col-head intake"><span class="ic"><i data-ic=download data-ics=16></i></span>入庫 <span class="cnt">' + intake.length + '</span></div>';
   html += '<div class="today-col-body">' + (_todHasAny(merged.left) ? merged.left : '<div class="today-empty">入庫予定なし</div>') + '</div>';
@@ -182,13 +209,24 @@ window.pitTodayTap = function(id, isReturn){
   const doneFn    = isReturn ? 'pitTodayReturn' : 'pitTodayCheckIn';
   const cancelLabel = isReturn ? '<i data-ic=ban data-ics=16></i> 返車キャンセル' : '<i data-ic=ban data-ics=16></i> キャンセル（来店なし）';
   const cancelSub   = isReturn ? '返車予定を外して「返車・未定」へ戻す' : '「未入庫」へ（1ヶ月後に自動アーカイブ）';
+  /* 🔴 v1.97.0（ゆうた指定）**完TELを通っていない車は「返車済みにする」を押せない。**
+     ◎なぜ
+       待ち・当日返しの車は、盤面を通らなくても返車の一覧に出る（今までどおり・これはOK）。
+       だがそのまま返車済みにできてしまうと、**確定売上も担当者も入らないまま実績に固まる**。
+     ◎押せるようになる時
+       盤面で 完TEL済／完TEL依頼 へ入れた時（＝returnStage が付いた時）。
+       ⚠ 判断はこの1つだけ。預かりの車はもともと完TELを通ってしか一覧に出ないので、今までどおり押せる。 */
+  const canDone = !isReturn || !!c.returnStage;
+  const doneWhy = '<span class="ta-why">まだ完TELを通っていません。タスクボードで完TEL済／完TEL依頼へ入れてください</span>';
   back.innerHTML =
     '<div class="ta-sheet">' +
       '<div class="ta-head"><b>' + ((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</b>　' +
         (c.maker ? c.maker + ' ' : '') + (c.car || '') + (c.plate ? '<span class="ta-plate">' + c.plate + '</span>' : '') +
         '<div class="ta-sub">' + team + (wt ? '・' + wt.label : '') + (isReturn ? '・返車' : '・入庫') + '</div>' +
       '</div>' +
-      '<button class="ta-btn primary" onclick="' + doneFn + '(\'' + id + '\')"><b>' + doneLabel + '</b><span>' + doneSub + '</span></button>' +
+      '<button class="ta-btn primary' + (canDone ? '' : ' is-off') + '"' +
+        (canDone ? ' onclick="' + doneFn + '(\'' + id + '\')"' : ' disabled') +
+        '><b>' + doneLabel + '</b><span>' + doneSub + '</span>' + (canDone ? '' : doneWhy) + '</button>' +
       '<button class="ta-btn" onclick="pitTodayEditDt(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"><b><i data-ic=clock data-ics=16></i> 日時変更</b><span>' + (isReturn ? '返車' : '入庫') + 'の日付・時間だけ変更</span></button>' +
       '<button class="ta-btn" onclick="pitTodayDetail(\'' + id + '\')"><b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b><span>カードを開いて確認・編集</span></button>' +
       '<button class="ta-btn danger" onclick="pitTodayCancel(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"><b>' + cancelLabel + '</b><span>' + cancelSub + '</span></button>' +
@@ -306,6 +344,12 @@ function _pitTodayCheckInGo(c){
 window.pitTodayReturn = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  /* 🔴 v1.97.0 完TELを通っていない車は、ここでも固めない（ボタンを消しただけにしない）。
+     ⚠ 判断はアクションシートと同じ1つ＝returnStage が付いているか。 */
+  if (!c.returnStage){
+    if (window.pitToast) pitToast('まだ完TELを通っていません。タスクボードで完TEL済／完TEL依頼へ入れてください');
+    return;
+  }
   const t = ymd(new Date());
   c.status = 'returned';
   c.returnDate = c.returnDate || t;
@@ -408,13 +452,25 @@ function todayRow(c, isReturn, inBreak){
   // フロント担当（縦書きバッジ・1課=緑/2課=ピンク）
   const isImp = c.boardId === 'import';
   const frontName = (window.pitSurname ? pitSurname((c.frontStaff || '').trim()) : (c.frontStaff || '').trim());
+  /* 🔴 v1.98.0（ゆうた指定）**人が入っていない時は、代わりに課を出す。空欄にしない。**
+     ◎なぜ
+       時間の横のバッジが真っ白だと「誰の車か手がかりが何も無い」ので、
+       せめて **どっちの課の車か** は分かるようにする。
+     ⚠ 課は **c.division（予約画面のボタン）だけ**で決まる。国産／輸入からは逆算しない（v1.92.0の決めごと）。
+     ⚠ 名前も色も **state.divisions の1本**から引く（既定＝1課は緑・2課はピンク）。ここに直に書かない。
+     ⚠ 課のボタンも空なら、今までどおり空欄のまま（無いものを作らない）。 */
+  const divLabel = frontName ? '' : (window.pitDivisionLabel ? pitDivisionLabel(c) : '');
+  /* ⚠ 色が入っていない課だった時の保険は**既定の緑**。ここでも車（国産／輸入）から色を作らない。 */
+  const divColor = divLabel ? ((window.pitDivisionColor ? pitDivisionColor(c) : '') || '#1db97a') : '';
 
   let h = '';
   h += '<div class="today-row' + (c.urgent ? ' is-urgent' : '') + (inBreak ? ' in-break' : '') + '" onclick="pitTodayTap(\'' + c.id + '\',' + (isReturn ? 'true' : 'false') + ')" style="--team:' + teamColor + '">';
   h += '<div class="tr-time">' + time + '</div>';
-  // 担当フロント縦書きバッジ
+  // 担当フロント縦書きバッジ（人が無ければ課）
   if (frontName){
     h += '<div class="tr-front" style="background:' + (isImp ? '#ec4899' : '#1db97a') + '">' + frontName + '</div>';
+  } else if (divLabel){
+    h += '<div class="tr-front is-div" style="background:' + _todEsc(divColor) + '" title="担当者はまだ決まっていません（' + _todEsc(divLabel) + '）">' + _todEsc(divLabel) + '</div>';
   } else {
     h += '<div class="tr-front empty"></div>';
   }

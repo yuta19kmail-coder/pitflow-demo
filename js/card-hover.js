@@ -167,7 +167,9 @@
   function fill(c){
     var team = (c.boardId==='import') ? 'y' : 'k';
     var teamLabel = (team==='y') ? '輸入車' : '国産車';
-    var ku = (c.division==='div2') ? '2課' : (c.division==='div1' ? '1課' : (c.boardId==='import' ? '2課' : '1課'));
+    /* 🔴 v1.92.0 表紙と同じ物差し＝予約画面のボタン（c.division）だけを見る。
+       ⚠ 前はここも車（国産／輸入）から逆算していたので、**紙とホバーで違う課**が出ることがあった。 */
+    var ku = (window.pitDivisionLabel ? pitDivisionLabel(c) : '');
     var staff = c.frontStaff || c.staff || '';
     var carTxt = (c.maker ? esc(c.maker)+' ' : '') + esc(c.car||'（車種未入力）');
 
@@ -175,7 +177,8 @@
     h += '<div class="ph-head">';
     if (c.resNo) h += '<span class="ph-resno">'+esc(c.resNo)+'</span>';
     h += '<span class="ph-pill ph-team '+team+'">'+teamLabel+'</span>';
-    h += '<span class="ph-pill ph-div">'+ku+'</span>';
+    /* 課が選ばれていない時は、空の札を出さない（前は必ず「1課」が出ていた） */
+    if (ku) h += '<span class="ph-pill ph-div">'+ku+'</span>';
     if (staff) h += '<span class="ph-staffwrap"><span class="ph-stafflb">担当</span><span class="ph-staff">'+esc(staff)+'</span></span>';
     h += '</div>';
     h += '<div class="ph-name">'+esc((window.pitCustName?pitCustName(c):c.customer)||'（未入力）')+' <small>様</small></div>';

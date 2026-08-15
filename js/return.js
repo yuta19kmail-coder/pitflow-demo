@@ -68,7 +68,9 @@ function renderReturnDay(){
   html += PitCal.noticeHtml();
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">';
   html += '<div style="font-size:13px;color:var(--text2);">';
-  if (dayNote) html += '<span class="cal-note' + (isClosed ? ' closed' : '') + '"><i data-ic=' + (isClosed ? 'ban' : 'clock') + ' data-ics=14></i> ' + dayNote + '</span>　';
+  /* 🔴 v1.90.0 休み＝赤／短縮＝オレンジ／特別営業＝緑（PitCal.tone・予約カレンダーと同じ） */
+  const dayTone = (window.PitCal && PitCal.tone) ? PitCal.tone(dateStr) : (isClosed ? 'closed' : '');
+  if (dayNote) html += '<span class="cal-note ' + dayTone + '"><i data-ic=' + (isClosed ? 'ban' : 'clock') + ' data-ics=14></i> ' + dayNote + '</span>　';
   const holDay = (window.Holidays && Holidays.name(dateStr)) || null;
   if (holDay) html += '<span class="hol-badge"><i data-ic=flag data-ics=16></i> ' + holDay + '</span>　';
   html += '本日の返車予定 ' + todays.length + ' 件';
@@ -147,7 +149,8 @@ function renderReturnWeek(){
     html += '<span class="dow">' + dow + '</span>';
     html += '<span class="day">' + (d.getMonth()+1) + '/' + d.getDate() + '</span>';
     if (hol) html += '<span class="hol" title="' + hol + '">' + hol + '</span>';
-    if (calNote) html += '<span class="cal-chip' + (isClosed ? ' closed' : '') + '" title="' + calNote + '">' + calNote + '</span>';
+    /* ⚠ 週ビューは**札だけ・マスは塗らない**（ゆうた指定） */
+    if (calNote) html += '<span class="cal-chip ' + ((PitCal.tone ? PitCal.tone(dStr) : (isClosed ? 'closed' : ''))) + '" title="' + calNote + '">' + calNote + '</span>';
     if (cnt > 0) html += '<span style="font-size:10px;color:var(--green);font-weight:600;">' + cnt + '台</span>';
     html += '</div>';
   });
@@ -243,10 +246,13 @@ function _rmlRowsReturn(from, to){
     if (dow === 0 || hol) dCls += ' red';
     else if (dow === 6) dCls += ' sat';
 
-    html += '<div class="rml-row' + (isClosed ? ' closed' : '') + '">';
+    /* 🔴 v1.90.0 月ビュー（縦の一覧）も休み＝赤／短縮＝オレンジ。
+       ⚠ 短縮の札は cal-soft（灰色固定）で出していたので、赤い「定休」の隣で読み飛ばされていた。 */
+    const calTone = (PitCal.tone ? PitCal.tone(ds) : (isClosed ? 'closed' : ''));
+    html += '<div class="rml-row' + (isClosed ? ' closed' : '') + (calTone === 'short' ? ' calshort' : '') + '">';
     html += '<div class="rml-date' + dCls + '">' + (d.getMonth()+1) + '/' + d.getDate() + '<span>' + '日月火水木金土'[dow] + (ds === todayStr ? '・今日' : '') + '</span>'
          + (hol ? '<span class="rml-hol"><i data-ic=flag data-ics=16></i>' + hol + '</span>' : '')
-         + (calNote ? '<span class="rml-hol' + (isClosed ? '' : ' cal-soft') + '">' + calNote + '</span>' : '') + '</div>';
+         + (calNote ? '<span class="rml-hol rml-cal ' + calTone + '">' + calNote + '</span>' : '') + '</div>';
     html += '<div class="rml-cards" data-drop="returnDate" data-drop-val="' + ds + '">';
     if (!cardsOfDay.length){
       html += '<span class="rml-empty">' + (isClosed ? '休' : '—') + '</span>';
@@ -332,11 +338,13 @@ function monthGridCellsReturn(refDate){
 
     const hol = (window.Holidays && Holidays.name(dateStr)) || null;
     // セルの「予約チップ以外」をクリック＝その日の返車を全件ポップアップ
-    html += '<div class="reserve-month-cell' + (isToday ? ' today' : '') + (isClosed ? ' closed' : '') + (hol ? ' holiday' : '') + dowClass + '" data-drop="returnDate" data-drop-val="' + dateStr + '"'
+    /* 🔴 v1.90.0 月ビューは短縮の日もうっすら色を敷く */
+    const calTone = (PitCal.tone ? PitCal.tone(dateStr) : (isClosed ? 'closed' : ''));
+    html += '<div class="reserve-month-cell' + (isToday ? ' today' : '') + (isClosed ? ' closed' : '') + (calTone === 'short' ? ' calshort' : '') + (hol ? ' holiday' : '') + dowClass + '" data-drop="returnDate" data-drop-val="' + dateStr + '"'
          + ' onclick="if(!event.target.closest(\'.reserve-month-event\'))pitReserveDayPopup(\'' + dateStr + '\',\'return\')">';
     html += '<div class="day-num">' + dd + '</div>';
     if (hol) html += '<div class="hol-name" title="' + hol + '">' + hol + '</div>';
-    if (calNote) html += '<div class="cal-chip' + (isClosed ? ' closed' : '') + '" title="' + calNote + '">' + calNote + '</div>';
+    if (calNote) html += '<div class="cal-chip ' + calTone + '" title="' + calNote + '">' + calNote + '</div>';
     visible.forEach(c => {
       const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';   // 国産緑/輸入ピンク
       const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';

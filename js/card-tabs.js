@@ -118,36 +118,33 @@ window.cfFlowAddCustom = cfFlowAddCustom;
 window.cfFlowDel = cfFlowDel;
 window.cfFlowNow = cfFlowNow;
 
-/* ===== 整備（作業チェックリスト） ===== */
-function cfMaintItems(c){
-  const base = ['オイル交換','オイルエレメント','空気圧調整','灯火類','洗車'];
-  const extra = {
-    shaken: ['下回り点検','ブレーキ','ライト光軸','排ガス','サイドスリップ'],
-    '12pt': ['12ヶ月点検 一式'],
-    bp:     ['板金・塗装 仕上げ確認']
-  };
-  return base.concat(extra[c.workType] || []);
-}
+/* ===== 整備（作業チェックリスト） =====
+   🔴 v1.100.0 **項目も保存の形も、予約詳細（card-view.js）と1本に揃えた。**
+      ⚠ それまでは、同じ `c.maint` を
+        ・予約詳細＝`c.maint.checks[番号]`（受付・問診／点検／…）
+        ・この編集画面＝`c.maint[番号]`（オイル交換／オイルエレメント／…）
+        と、**別の項目・別の場所**で読み書きしていた。同じ車なのに2つの表が出ていて、
+        どちらを直しても、もう片方の画面では意味が変わってしまう状態だった。
+      🔴 項目は state.js の `PIT_MAINT_CHECKS`、読み書きは `pitMaintChecked` / `pitMaintToggle` を通す。
+         **ここに項目を書き写さないこと。** */
 function cfMaintHtml(c){
   c.maint = c.maint || {};
-  const wtLabel = (state.workTypes.find(function(w){ return w.id === c.workType; }) || {}).label || '';
-  const items = cfMaintItems(c);
-  let h = sec('作業チェック' + (wtLabel ? '（' + wtLabel + '）' : ''), '<i data-ic=wrench data-ics=16></i>');
+  const items = window.PIT_MAINT_CHECKS || [];
+  let h = sec('作業チェック', '<i data-ic=wrench data-ics=16></i>');
   h += '<div class="cf-checks">';
-  items.forEach(function(it, i){
-    const on = !!c.maint[i];
-    h += '<div class="cf-chk' + (on ? ' on' : '') + '" onclick="cfMaintToggle(' + i + ')"><span class="cf-chkbox">' + (on ? '✓' : '') + '</span><span class="cf-chkl">' + it + '</span></div>';
+  items.forEach(function(it){
+    const on = window.pitMaintChecked ? pitMaintChecked(c, it.key) : false;
+    h += '<div class="cf-chk' + (on ? ' on' : '') + '" onclick="cfMaintToggle(\'' + it.key + '\')"><span class="cf-chkbox">' + (on ? '✓' : '') + '</span><span class="cf-chkl">' + it.label + '</span></div>';
   });
   h += '</div>';
-  h += '<div class="cf-hint">タップで✓。項目は作業タイプごとに今は固定（将来は設定で編集できるように）。</div>';
+  h += '<div class="cf-hint">タップで✓。予約詳細の「整備」タブと同じ項目・同じ✓です。</div>';
   h += secEnd();
   return h;
 }
-function cfMaintToggle(i){
+function cfMaintToggle(key){
   const c = state.cards.find(function(x){ return x.id === _editingCardId; });
   if (!c) return;
-  c.maint = c.maint || {};
-  c.maint[i] = !c.maint[i];
+  if (window.pitMaintToggle) pitMaintToggle(c, key);
   if (window.PitDB) PitDB.save();
   renderCardForm(c);
 }

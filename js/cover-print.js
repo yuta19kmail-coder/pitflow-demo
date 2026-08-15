@@ -66,10 +66,11 @@
   }
 
   var DROP_FULL = { wait:'待ち', sameDay:'当日返し', drop:'預かり' };
+  /* 🔴 v1.92.0 課は**予約画面のボタン（c.division）だけ**を見る。
+     ⚠ 前は課が空だと国産／輸入（＝車）から 1課／2課 を作って刷っていた（ゆうた報告）。
+        名前も直書きだったので、課の名前を変えると紙だけ食い違った。物差しは state.js の1本。 */
   function courseLabel(c){
-    if (c.division==='div2' || c.boardId==='import') return '2課';
-    if (c.division==='div1' || c.boardId) return '1課';
-    return '';
+    return (window.pitDivisionLabel ? pitDivisionLabel(c) : '');
   }
   function repeatLabel(c){ return c.repeat==='repeater' ? 'リピーター' : '初回'; }
 

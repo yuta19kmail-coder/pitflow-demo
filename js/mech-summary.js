@@ -134,6 +134,8 @@
     var totalAmt = 0, totalVeh = 0, cardN = 0;
     (state.cards||[]).forEach(function(c){
       if(!c || c.status!=='returned') return;
+      /* 🔴 v1.99.0 売上なしでアーカイブした車は実績ではないので、メカの配分にも数えない */
+      if(window.pitCardNoSale && pitCardNoSale(c)) return;
       var d = returnDateOf(c); if(!d || d<moS || d>moE) return;
       var a = pitMechAlloc(c); if(!a) return;
       cardN++; totalAmt += a.total;

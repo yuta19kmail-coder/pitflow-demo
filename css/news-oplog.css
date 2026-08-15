@@ -146,9 +146,38 @@
 .op-label a{ color:#2ea567; text-decoration:none }
 .op-label a:hover{ text-decoration:underline }
 
+/* 🔴 v1.84.0 選んで、まとめて消す（マスターにだけ出る）
+   ・行の**右はし**にチェックBOX（列が1本増える）
+   ・その上に［表示中のぜんぶを選ぶ］と［選んだ ◯件 を消す］の帯 */
+.op-selbar{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  margin-bottom:10px; padding:8px 12px; border-radius:var(--r);
+  background:var(--bg2); border:1px solid var(--border);
+}
+.op-all{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--text2); cursor:pointer }
+.op-all input{ width:16px; height:16px; accent-color:#2ea567; cursor:pointer }
+.op-seln{ font-size:12.5px; color:var(--text2); font-variant-numeric:tabular-nums }
+.op-delsel{
+  margin-left:auto; display:inline-flex; align-items:center; gap:7px;
+  padding:8px 14px; border-radius:8px; cursor:pointer; font-family:inherit;
+  font-size:12.5px; font-weight:600; color:#fca5a5;
+  border:1px solid rgba(239,68,68,.5); background:rgba(239,68,68,.12);
+}
+.op-delsel:hover:not(:disabled){ background:rgba(239,68,68,.22); color:#fecaca }
+.op-delsel:disabled{ opacity:.4; cursor:default; color:var(--text3); border-color:var(--border); background:var(--bg3) }
+
+.op-row.op-can-del{ grid-template-columns:88px 90px minmax(150px,1fr) minmax(120px,1.4fr) 30px }
+.op-row.op-picked{ background:rgba(239,68,68,.08) }
+.op-ck{ display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:4px }
+.op-ck input{ width:16px; height:16px; accent-color:#ef4444; cursor:pointer }
+
 @media (max-width:760px){
   .op-row{ grid-template-columns:1fr; gap:2px; padding:11px 14px }
+  /* スマホは4段になるので、チェックBOXは右側に縦ぶち抜きで置く */
+  .op-row.op-can-del{ grid-template-columns:1fr 30px }
+  .op-row.op-can-del .op-ck{ grid-column:2; grid-row:1 / span 4; align-self:center }
   .op-label{ white-space:normal }
+  .op-delsel{ margin-left:0; width:100% ; justify-content:center }
 }
 
 /* ===== お知らせ・ヘルプの中のリンク（v1.79.0）=====

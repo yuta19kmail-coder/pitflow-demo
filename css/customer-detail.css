@@ -238,3 +238,7 @@
 .cr-tel3{ display:flex; align-items:center; gap:5px; flex:0 0 auto; }
 .cr-tel3 .cr-in{ width:4.6em; text-align:center; padding:8px 6px; }
 .cr-telsep{ color:var(--text3); font-size:12px; }
+
+/* v1.99.0 来店履歴：売上なしでアーカイブした入庫（実績には入っていない） */
+.cd-hnosale{ font-size:11.5px; font-weight:800; color:var(--text3); }
+.cd-hst.nosale{ color:var(--text3); border-style:dashed; }

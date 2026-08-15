@@ -9,12 +9,23 @@
    どちらも：タスクボードから外れ（returnStage がつくと盤面の filter で除外）、
             PIT枠(bayId)も外す。入力内容は予約詳細(表紙)と同じ項目に保存され相互反映。
    タスクボードのドラッグエリア(dnd.js)と、返車ビュー「完TEL待ち」カードのクリックから開く。
+
+   🔴 v1.97.0（ゆうた指定）**待ち・当日返しの車だけ、先に1枚聞く。**
+      「通常の完TEL済み（完TEL依頼）にしますか？ 実績化しますか？」
+      ・通常   … 今までどおり。返車予定日を入れて返車カレンダー／完TEL待ちへ。
+                 日付を変えれば返車カレンダーもそちらへ動き、当日ビューからは消える。
+                 予定そのままなら当日ビューに残り、**そこで初めて「返車済みにする」が押せる**。
+      ・実績化 … その場で返車済み。実績（確定売上）に固めて、当日ビューからは自動で消える。
+      ⚠ 預かりの車（待・当が付いていない車）は今までどおり＝この1枚は出ない。
+      ⚠ 「もう渡し終わった車を、過去の日付であとから登録する」道（v1.57.0）は今までどおり残す。
+         行き先は同じ（実績化）なので、書き込みは apply() の1か所にまとめてある。
    ======================================== */
 (function(){
   'use strict';
 
-  var pending = null;   // { card, mode }
+  var pending = null;   // { card, mode, toResult }
   var built = false;
+  var kbuilt = false;   // 「通常か実績化か」の1枚（v1.97.0）
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
@@ -105,11 +116,14 @@
     return i ? (window._normTime ? _normTime(i.value) : i.value) : '';
   }
 
-  function openModal(card, mode){
+  function openModal(card, mode, toResult){
     build();
     var isDone = (mode === 'callDone');
-    el('rp-title').textContent = isDone ? '完TEL済 → 返車予定へ': '完TEL依頼（先に金額だけ）';
-    el('rp-ok').textContent = isDone ? '返車予定に入れる' : '完TEL待ちへ';
+    /* 実績化＝もう渡した車。返車予定日・時間の欄は要らないので出さない。 */
+    var showDate = isDone && !toResult;
+    el('rp-title').textContent = toResult ? '実績化 — 確定金額を入れてください'
+                               : (isDone ? '完TEL済 → 返車予定へ': '完TEL依頼（先に金額だけ）');
+    el('rp-ok').textContent = toResult ? '実績に固める' : (isDone ? '返車予定に入れる' : '完TEL待ちへ');
     el('rp-move').innerHTML = '<span class="pp-to">'+esc((card.customer||'（未入力）')+' 様')+'</span>'
       + (card.car ? '<span class="pp-who">'+esc(card.car)+'</span>' : '');
 
@@ -118,10 +132,10 @@
     el('rp-amt').value = (amt!=null && amt!=='') ? Number(amt).toLocaleString() : '';
     if (window.pitTaxHintSync) pitTaxHintSync(el('rp-amt'), el('rp-tax'));   /* 🧾 開いた時点のぶんも出す */
 
-    // 日付・時間（完TEL済のみ）
-    el('rp-date-field').style.display = isDone ? '' : 'none';
-    el('rp-time-field').style.display = isDone ? '' : 'none';
-    if (isDone){
+    // 日付・時間（完TEL済のみ／実績化では出さない）
+    el('rp-date-field').style.display = showDate ? '' : 'none';
+    el('rp-time-field').style.display = showDate ? '' : 'none';
+    if (showDate){
       el('rp-date').value = '';   // 返車予定日はデフォルト空（その場で決めて入れる）
       el('rp-datetbd').checked = false;
       syncDateTbd();
@@ -142,14 +156,71 @@
     setTimeout(function(){ try{ el('rp-amt').focus(); }catch(e){} }, 30);
   }
 
+  /* ===================================================================
+     🔴 v1.97.0 「通常にしますか？ 実績化しますか？」の1枚（待ち・当日返しの車だけ）
+     -------------------------------------------------------------------
+     ⚠ ここでは**何も書き込まない**。どちらを選んだかを覚えて、次の金額の画面へ渡すだけ。
+        書き込みは今までどおり apply() の1か所。
+     =================================================================== */
+  function kbuild(){
+    if (kbuilt) return; kbuilt = true;
+    var bd = document.createElement('div');
+    bd.className = 'modal-backdrop';
+    bd.id = 'rk-backdrop';
+    bd.innerHTML =
+      '<div class="modal-box pp-box rk-box">'
+      + '<div class="modal-head"><div class="modal-title" id="rk-title">どちらにしますか？</div>'
+      + '<button class="modal-close" onclick="PitReturnPopup.kind(null)"><i data-ic=close data-ics=16></i></button></div>'
+      + '<div class="modal-body">'
+      + '  <div class="pp-move" id="rk-move"></div>'
+      + '  <button type="button" class="rk-pick" onclick="PitReturnPopup.kind(0)">'
+      + '    <b id="rk-normal">通常の完TEL済みにする</b>'
+      + '    <small>返車予定日を入れて返車カレンダーに置きます。日付を変えれば返車カレンダーもそちらへ動き、'
+      +      '当日ビューからは消えます。予定そのままなら当日ビューに残り、渡したときに「返車済みにする」が押せるようになります。</small>'
+      + '  </button>'
+      + '  <button type="button" class="rk-pick" onclick="PitReturnPopup.kind(1)">'
+      + '    <b>実績化する</b>'
+      + '    <small>返車済みとして、そのまま実績（確定売上）に固めます。当日ビューからは自動で消えます。'
+      +      '返車カレンダーには置きません。</small>'
+      + '  </button>'
+      + '  <div class="rk-note">どちらを選んでも、このあと金額の入力に進みます。</div>'
+      + '</div></div>';
+    document.body.appendChild(bd);
+    bd.addEventListener('click', function(e){ if (e.target.id==='rk-backdrop') PitReturnPopup.kind(null); });
+  }
+  /* この1枚を出すか＝**待ち・当日返しで、まだ完TELを通っていない車**だけ */
+  function needKind(card){
+    if (!card || card.returnStage) return false;
+    return window.pitDropIsSameDay ? !!pitDropIsSameDay(card) : false;
+  }
+  function openKind(card, mode){
+    kbuild();
+    el('rk-title').textContent = (mode === 'callDone' ? '完TEL済' : '完TEL依頼') + ' → どちらにしますか？';
+    el('rk-normal').textContent = (mode === 'callDone' ? '通常の完TEL済みにする' : '通常の完TEL依頼にする');
+    el('rk-move').innerHTML = '<span class="pp-to">'+esc(((window.pitCustName?pitCustName(card):card.customer)||'（未入力）')+' 様')+'</span>'
+      + (card.car ? '<span class="pp-who">'+esc(card.car)+'</span>' : '');
+    el('rk-backdrop').classList.add('show');
+    if (window.icHydrate) { try { icHydrate(el('rk-backdrop')); } catch(e){} }
+  }
+  function khide(){ var bd = el('rk-backdrop'); if (bd) bd.classList.remove('show'); }
+
   window.PitReturnPopup = {
     open: function(cardOrId, mode){
       var card = (typeof cardOrId === 'string')
         ? (window.state && state.cards || []).find(function(x){ return x.id === cardOrId; })
         : cardOrId;
       if (!card) return;
-      pending = { card: card, mode: mode || 'callDone' };
-      openModal(card, pending.mode);
+      pending = { card: card, mode: mode || 'callDone', toResult: false };
+      if (needKind(card)){ openKind(card, pending.mode); return; }
+      openModal(card, pending.mode, false);
+    },
+    /* 1枚目の答え：0＝通常／1＝実績化／null＝やめる */
+    kind: function(v){
+      khide();
+      if (v == null){ pending = null; if (window.pitToast) pitToast('やめました'); return; }
+      if (!pending) return;
+      pending.toResult = (v === 1 || v === '1' || v === true);
+      openModal(pending.card, pending.mode, pending.toResult);
     },
     onAmt: function(input){
       input.value = comma(input.value);
@@ -180,7 +251,7 @@
          ⚠ **今日は過去ではない。今日より前**だけが対象。
          ⚠ 「完TEL依頼」には日付の欄が無いので、こちらは今までどおり（ゆうた確認済み）。
          =================================================================== */
-      if (p.mode === 'callDone'){
+      if (p.mode === 'callDone' && !p.toResult){
         var dChk = el('rp-date') ? el('rp-date').value : '';
         if (dChk && dChk < todayISO()){
           var msg = '過去の日付です。このまま実績に登録しますか？';
@@ -196,14 +267,17 @@
           return;
         }
       }
-      hide(); pending = null; apply(p, false);
+      hide(); pending = null; apply(p, !!p.toResult);
     }
   };
 
   function hide(){ var bd = el('rp-backdrop'); if (bd) bd.classList.remove('show'); }
 
   /* 入力された内容をカードに書き込む。
-     toResult=true ＝ 返車カレンダーを通さず、その日付でそのまま実績に入れる（v1.57.0） */
+     toResult=true ＝ 返車カレンダーを通さず、そのまま実績に入れる（＝実績化）。
+     🔴 実績化に入る道は2つあるが、**書き込みはここ1か所**（形が食い違うと実績・売上・来店履歴でズレる）。
+        ① v1.57.0 完TEL済で返車予定日が過去 → 「実績に登録する」を選んだ
+        ② v1.97.0 待ち・当日返しの車で、1枚目の「実績化する」を選んだ */
   function apply(p, toResult){
       var c = p.card;
       var isDone = (p.mode === 'callDone');
@@ -223,9 +297,39 @@
       c.bayId = null; c.baySlot = null;
       c.returnTbd = false;   // 旧フラグは使わない（returnStage に一本化）
 
-      if (isDone){
-        var d = (el('rp-datetbd') && el('rp-datetbd').checked) ? '' : (el('rp-date') ? el('rp-date').value : '');
-        var t = timeVal();
+      /* 画面に出ていた返車予定日・返車時間（実績化のときは欄自体が出ていないので空） */
+      var d = (isDone && el('rp-date-field') && el('rp-date-field').style.display !== 'none')
+            ? ((el('rp-datetbd') && el('rp-datetbd').checked) ? '' : (el('rp-date') ? el('rp-date').value : ''))
+            : '';
+      var t = (isDone && el('rp-time-field') && el('rp-time-field').style.display !== 'none') ? timeVal() : '';
+
+      if (toResult){
+        /* ===== 実績化＝もう渡した車。返車カレンダーには置かず、そのまま実績（確定売上）へ =====
+           ⚠ 当日ビューの「返車済みにする」（today.js の pitTodayReturn）と**同じ形に揃える**こと。
+              揃っていないと、実績ビュー・売上・来店履歴のどれかで見え方が食い違う。
+              　status='returned' ／ completedAt＝実績に乗る日 ／ amountFinal＝売上を固める */
+        var rd = d || todayISO();          /* 日付の欄が無い時（完TEL依頼・当日返し）は今日 */
+        c.returnStage = 'returnWait';
+        if (window.pitReturnSetDateTime) pitReturnSetDateTime(c, rd, t);
+        else { c.returnDate = rd; c.returnTime = t || ''; }
+        c.returnDateFinal = rd;
+        c.completeCallAt = c.completeCallAt || todayISO();
+        if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd0=new Date(); c.coverCall.at=(dd0.getMonth()+1)+'/'+dd0.getDate(); } }
+        c.status = 'returned';
+        c.completedAt = rd;
+        /* 🔴 拾う順番は当日ビューの「返車済みにする」と同じ＝確定→受注→見積→概算 */
+        if (c.amountFinal == null || c.amountFinal === ''){
+          var _amt = [c.amountOrder, c.amountQuote, c.estAmount].find(function(v){ return v != null && v !== ''; });
+          if (_amt == null && window.pitEstAmount){
+            try { _amt = pitEstAmount(c.workType, window.pitTeamKey ? pitTeamKey(c) : 'default'); } catch(e){}
+          }
+          c.amountFinal = (_amt != null && _amt !== '') ? Number(_amt) : 0;
+        }
+        if (window.logFlow) logFlow(c, (isDone ? '完TEL済' : '完TEL依頼') + ' → 実績化（返車済み・' + rd + '）');
+        if (window.pitLog) pitLog('実績化した（返車済み）', { cardId: c.id, kind: 'out',
+          label: ((window.pitCustName?pitCustName(c):c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '')
+               + ' / 実績日 ' + rd + (c.amountFinal ? ' / ¥' + Number(c.amountFinal).toLocaleString() : '') });
+      } else if (isDone){
         /* 🔴 v1.60.0 日付・時間の書き込みは return-slot.js の pitReturnSetDateTime 1本を通す。
            行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）の決め方をここに書き写さない。 */
         c.returnStage = 'returnWait';
@@ -234,25 +338,8 @@
         c.returnDateFinal = d || c.returnDateFinal || null;
         c.completeCallAt = c.completeCallAt || todayISO();
         if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd=new Date(); c.coverCall.at=(dd.getMonth()+1)+'/'+dd.getDate(); } }
-
-        if (toResult && d){
-          /* 🔴 v1.57.0 過去の日付＋ゆうたOK＝**返車カレンダーを通さず、その日で実績に入れる**。
-             ⚠ 当日ビューの「返車済みにする」（today.js の pitTodayReturn）と**同じ形に揃える**こと。
-                揃っていないと、実績ビュー・売上・来店履歴のどれかで見え方が食い違う。
-                　status='returned' ／ completedAt＝実績に乗る日 ／ amountFinal＝売上を固める */
-          c.status = 'returned';
-          c.completedAt = d;
-          if (c.amountFinal == null || c.amountFinal === ''){
-            c.amountFinal = (window.pitEstAmount ? (c.estAmount || pitEstAmount(c.workType)) : (c.estAmount || 0));
-          }
-          if (window.logFlow) logFlow(c, '完TEL済 → 過去の日付なので、そのまま実績へ（' + d + '）');
-          if (window.pitLog) pitLog('過去の日付で実績に登録', { cardId: c.id, kind: 'out',
-            label: ((window.pitCustName?pitCustName(c):c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '')
-                 + ' / 実績日 ' + d + (c.amountFinal ? ' / ¥' + Number(c.amountFinal).toLocaleString() : '') });
-        } else {
-          if (window.logFlow) logFlow(c, '完TEL済 → ' + ((window.pitReturnPlaceLabel ? pitReturnPlaceLabel(pitReturnPlace(c)) : '') || '返車未定')
-                                        + (d ? '（' + d + (t ? ' ' + t : '') + '）' : ''));
-        }
+        if (window.logFlow) logFlow(c, '完TEL済 → ' + ((window.pitReturnPlaceLabel ? pitReturnPlaceLabel(pitReturnPlace(c)) : '') || '返車未定')
+                                      + (d ? '（' + d + (t ? ' ' + t : '') + '）' : ''));
       } else {
         c.returnStage = 'callWait';
         if (window.logFlow) logFlow(c, '完TEL依頼（金額入力・完TEL待ちへ）');

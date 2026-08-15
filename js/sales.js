@@ -35,6 +35,8 @@
         ・確定／予定／見込＝**返車予定日**。翌月以降ならその月へずらす。未定・予定日超過は当月に寄せる
         ・予測＝返車予定日。無ければ 入庫予定日＋概算 預かり日数 */
   function countDate(c){ return window.pitSalesCountDate ? pitSalesCountDate(c) : String(c.completedAt || c.returnDateFinal || c.returnDate || ''); }
+  /* 🔴 v1.99.0 「売上なしでアーカイブ」した車か。**判定は sales-count.js の1本**（ここで c.noSale を直に見ない） */
+  function noSale(c){ return !!(window.pitCardNoSale && pitCardNoSale(c)); }
   function inRange(c, fromStr, toStr, todayStr){
     if (window.pitSalesInRange) return pitSalesInRange(c, fromStr, toStr, todayStr);
     var d = countDate(c); return !!d && d>=fromStr && d<=toStr;
@@ -419,7 +421,8 @@
     var moS=ymdL(new Date(y,m,1)), moE=ymdL(new Date(y,m+1,0)); var tg=target();
     var last=new Date(y,m+1,0).getDate(); var qs=[{f:1,t:7},{f:8,t:15},{f:16,t:23},{f:24,t:last}];
     var qAct=[0,0,0,0], qCnt=[0,0,0,0], qMin=[0,0,0,0], qMax=[0,0,0,0];
-    (state.cards||[]).forEach(function(c){ if(c.status!=='returned')return; var d=countDate(c); if(d<moS||d>moE)return; var qi=qOfDay(pd(d).getDate()); qAct[qi]+=actAmt(c); qCnt[qi]++; });
+    /* 🔴 v1.99.0 売上なしでアーカイブした車は実績に数えない（物差し＝pitCardNoSale） */
+    (state.cards||[]).forEach(function(c){ if(c.status!=='returned'||noSale(c))return; var d=countDate(c); if(d<moS||d>moE)return; var qi=qOfDay(pd(d).getDate()); qAct[qi]+=actAmt(c); qCnt[qi]++; });
     var al=qAlloc(y,m+1); for(var i=0;i<4;i++){ qMin[i]=al?al.q[i].min:Math.round(tg.min/4); qMax[i]=al?al.q[i].max:Math.round(tg.max/4); }
     var today=new Date(); var isThis=(today.getFullYear()===y&&today.getMonth()===m);
     var todayQ=isThis?qOfDay(today.getDate()):(ymdL(today)>moE?3:0);
@@ -582,7 +585,7 @@
     function dayDiff(a, b){ var x=dayMs(a), y=dayMs(b); return (x==null||y==null) ? null : Math.round((y-x)/86400000); }
 
     (state.cards||[]).forEach(function(c){ var fn=c.frontStaff||c.staff||'（未割当）';
-      if(c.status==='returned' && inRange(c, fromStr, toStr, todayStr)){
+      if(c.status==='returned' && !noSale(c) && inRange(c, fromStr, toStr, todayStr)){
         var d=countDate(c); var f=ens(fn); var amt=actAmt(c); var g=workGroupOf(c);
         f.cnt++; f.sum+=amt; if(amt>f.hi)f.hi=amt; f.grp[g]+=amt; f.grpN[g]++;
         if(c.reserveDate && d){ var hd=Math.round((pd(d)-pd(c.reserveDate))/86400000); if(hd>=0){ f.hold+=hd; f.holdN++; if(hd>f.holdMax)f.holdMax=hd; } }

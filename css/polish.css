@@ -457,15 +457,32 @@
 /* ===== 案F改（v0.99.5）＝中央の茎＋複数日枠を使う3行カード／1〜2日は省スペース1行／当日かぶりは耳 ===== */
 .lo-bk{ text-align:center; padding:0; background:transparent; }
 .lo-bk.bk-start{ z-index:2; }   /* カードは下の日付セルより前面・ただし左の日付列(z5)より後ろ＝横スクロールで日付に被らない */
-/* 中央の茎（細い縦線）＝予約の継続 */
-.lo-bk .lo-fill{ position:absolute; left:50%; transform:translateX(-50%); top:0; bottom:0; width:4px; z-index:0; background:var(--lo-team, var(--brand)); border-radius:2px; pointer-events:none; }
-.lo-bk.bk-start.bk-full .lo-fill{ top:60px; }   /* 3行カード（約1.5日枠）の下から茎 */
-.lo-bk.bk-start.bk-compact .lo-fill{ top:21px; } /* 省スペース1行の下から茎 */
-.lo-bk.bk-end .lo-fill{ bottom:12px; }
+/* 中央の茎（細い縦線）＝予約の継続
+   🔴 v1.94.0（ゆうた指摘 2026-08-15）**茎が1日ごとに切れて点線に見えていた。**
+      1日＝1マスで描いていて、マスごとに角丸＋日付の区切り線（1px）が入るため。
+      → **途中のマスは角丸を付けず、上下に1pxはみ出させて区切り線を跨ぐ**＝1本の線に見える。
+      角を丸めるのは**茎の始まり（札の下）だけ**。終わりは▼が受ける。 */
+.lo-bk .lo-fill{ position:absolute; left:50%; transform:translateX(-50%); top:-1px; bottom:-1px; width:4px; z-index:0; background:var(--lo-team, var(--brand)); border-radius:0; pointer-events:none; }
+.lo-bk.bk-start.bk-full .lo-fill{ top:60px; border-radius:2px 2px 0 0; }   /* 3行カード（約1.5日枠）の下から茎 */
+.lo-bk.bk-start.bk-compact .lo-fill{ top:21px; border-radius:2px 2px 0 0; } /* 省スペース1行の下から茎 */
+.lo-bk.bk-end .lo-fill{ bottom:11px; }   /* ▼の平らな上辺にぴったり付ける（浮かせない） */
 .lo-bk.bk-single .lo-fill{ display:none; }
-.lo-bk.lo-closed, .lo-bk.lo-holiday{ background:transparent !important; }
-/* 終端の大きい▼ */
-.lo-end{ position:absolute; left:50%; transform:translateX(-50%); bottom:0; font-size:15px; line-height:1; color:var(--lo-team, var(--brand)); cursor:ns-resize; z-index:2; }
+/* 🔴 v1.94.0 ここに `.lo-bk.lo-closed{background:transparent!important}` があった。
+   ＝**貸出が入った日だけ休みの色が消える**の正体（ゆうた報告）。
+      休みをセルの背景で塗っていたので、札を出すために消すしかなかった。
+      いまは敷き紙（.lo-daybg）に塗るので、消す必要が無い。**戻さないこと。** */
+/* 終端の▼（貸出の終わり）
+   🔴 v1.94.0 前は「⌄」のアイコン（線のV字）を**茎と離して**置いていたので、
+      **矢印の先が浮いて見えた**（ゆうた指摘「もっと▼みたいな形じゃなかった？」）。
+      → **塗りつぶしの三角**にして、茎の下端に直付けした。
+   ⚠ 色は currentColor で受ける＝返却済み（グレー）・重複（赤）の色分けがそのまま効く。
+   ⚠ 掴む所（ドラッグで期間を伸ばす）が小さくならないよう、**箱は広め・三角は ::after** で描く。 */
+.lo-end{ position:absolute; left:50%; transform:translateX(-50%); bottom:0; width:20px; height:14px;
+  color:var(--lo-team, var(--brand)); cursor:ns-resize; z-index:2; }
+.lo-end::after{ content:''; position:absolute; left:50%; transform:translateX(-50%); bottom:3px;
+  width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent;
+  border-top:10px solid currentColor; }
+.lo-end > svg, .lo-end > i{ display:none; }   /* 旧アイコンが残っていても出さない */
 /* 車両イベントのオーバーレイ */
 .lo-evs{ position:absolute; right:0; top:0; bottom:0; width:5px; opacity:.85; }
 .lo-evt-tag{ position:absolute; right:6px; top:2px; z-index:1; font-size:8.5px; font-weight:800; color:#fff; border-radius:4px; padding:1px 4px; white-space:nowrap; max-width:80%; overflow:hidden; text-overflow:ellipsis; }
@@ -610,8 +627,26 @@
 .fl-retired.plan{ color:var(--orange); background:rgba(245,158,11,.14); border-color:#f59e0b66; }
 .fl-opttag.h{ color:var(--text2); background:var(--bg3); border-color:var(--border2); }
 /* 定休日・祝日（代車ビュー） */
-.lo-cell.lo-closed{ background:repeating-linear-gradient(45deg, rgba(120,120,120,.12), rgba(120,120,120,.12) 6px, transparent 6px, transparent 12px); }
-.lo-cell.lo-holiday{ background:rgba(220,38,38,.06); }
+/* ===== 🗓 v1.94.0 代車カレンダーの休日表示（ゆうた指定 2026-08-15）=====
+   土曜＝青／日曜＝赤／祝日＝赤／**自社の休み＝斜線**。重なったら「色＋斜線」。
+   🔴 **いちばん奥に敷く。**代車の札・茎（.lo-fill）・終わりの矢印（.lo-end）はこの上。
+      ＝敷き紙 `.lo-daybg` をセルの**先頭**に置き、あとから足す物が自然に上へ乗るようにしてある。
+   ⚠ 色は `background-color`、斜線は `background-image` に分けてある。
+      **分けておかないと「日曜かつ自社の休み」で片方しか出ない。** 混ぜないこと。 */
+.lo-daybg{ position:absolute; inset:0; z-index:0; pointer-events:none; border-radius:inherit; }
+.lo-cell.sat > .lo-daybg{ background-color:rgba(55,138,221,.13); }
+.lo-cell.sun > .lo-daybg,
+.lo-cell.lo-holiday > .lo-daybg{ background-color:rgba(239,68,68,.12); }
+/* ⚠ v1.94.1（ゆうた指摘）**シマウマみたいな縞模様になっていた。**
+   線を細く（5px→2.5px）・間を広く（6px→9.5px）・薄く（.30→.10）した＝
+   「塗ってある」ではなく「うっすら網が掛かっている」に見える濃さ。
+   🔴 これ以上濃くしないこと。代車の札と茎が読みにくくなる。 */
+.lo-cell.lo-closed > .lo-daybg{
+  background-image:repeating-linear-gradient(45deg,
+    rgba(148,163,184,.10) 0 2.5px, rgba(148,163,184,0) 2.5px 12px);
+}
+/* 日付列は敷き紙の上に文字を出す（包んだ .lo-dtxt を持ち上げる） */
+.lo-date > .lo-dtxt{ position:relative; z-index:1; display:block; }
 .lo-date.closed{ color:var(--text3); }
 .lo-closed-tag{ font-size:8.5px; font-weight:700; color:var(--text3); }
 /* ドラッグ中のゴーストプレビュー（落とすとこうなる） */
@@ -1179,6 +1214,16 @@
 .cfs-day.closed{ background:transparent; border:1px solid var(--border); color:var(--text3); font-weight:400; cursor:default; }   /* 定休日もラインは引く（v0.27.3） */
 .cfs-day.past{ background:transparent; border-color:transparent; color:var(--text3); opacity:.35; cursor:default; }
 .cfs-day.noclick{ cursor:default; }
+
+/* 🔴 v1.90.0（ゆうた指摘）短縮営業（午前休み・午後休み・早締め）の日の目印。
+   ⚠ ○△満 の枠色・台数表示には**一切さわらない**＝空きの読み方は今までどおり。
+      「いつもと時間が違う」だけを、右上の小さなオレンジの ◐ で足す。 */
+.cfs-day.cfs-short{ box-shadow:inset 0 0 0 1px rgba(245,158,11,.55); }
+.cfs-mk-short{
+  position:absolute; top:1px; right:3px;
+  font-size:10px; line-height:1; font-weight:800; color:#f59e0b; pointer-events:none;
+}
+.cfs-hint-short{ color:#f59e0b; font-weight:700; }
 
 /* 📥📤 当日アクションシート（v0.30.0） */
 .ta-sheet{ width:min(92vw,360px); background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 20px 60px rgba(0,0,0,.5); }
@@ -1796,6 +1841,41 @@ th.cfs-lg-d{ z-index:3; }
   background:rgba(148,163,184,.16);color:var(--text2);
 }
 .cal-chip.closed{ background:rgba(239,68,68,.14); color:#ef4444; }
+
+/* 🔴 v1.90.0（ゆうた指定 2026-08-13）**短縮営業を灰色から外した。**
+   休み＝赤／**短縮（午前休み・午後休み・早締め）＝オレンジ**／特別営業＝緑。
+   ⚠ 灰色だと赤い「定休」の隣で読み飛ばされる＝いつもの時間だと思って予約を入れてしまう。
+   🔴 色を決める物差しは PitCal.tone(ds) 1本。画面ごとに if を書かないこと。 */
+.cal-note.short{ color:#f59e0b; }
+.cal-note.open { color:#1db97a; }
+.cal-chip.short{ background:rgba(245,158,11,.16); color:#f59e0b; }
+.cal-chip.open { background:rgba(29,185,122,.15); color:#1db97a; }
+
+/* 月カレンダーのマスは、短縮の日もうっすら色を敷く（一覧で「この週は何かある」と分かる）。
+   ⚠ 週ビューは**塗らない＝札だけ**（ゆうた指定）。日ごとの列が細く、塗ると予約が読みにくいため。 */
+.reserve-month-cell.calshort{ background:rgba(245,158,11,.05); }
+/* 月ビュー（縦の一覧＝rml）。休みは今までどおり、短縮はオレンジの札＋行をうっすら。 */
+.rml-row.calshort{ background:rgba(245,158,11,.045); }
+.rml-hol.rml-cal.closed{ color:#ef4444 !important; font-weight:700; }
+.rml-hol.rml-cal.short { color:#f59e0b !important; font-weight:700; }
+.rml-hol.rml-cal.open  { color:#1db97a !important; font-weight:700; }
+
+/* ===== 🕐 当日ビューの営業日の帯（v1.90.0）=====
+   🔴 入庫と返車で分けず、**2列ぶちぬきで横1本**（ゆうた指定）＝その日の店の話であって、
+      入庫か返車かは関係ないため。 */
+.today-calbar{
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:8px 13px;margin:0 0 10px;border-radius:9px;
+  font-size:12px;font-weight:800;letter-spacing:.02em;
+}
+.today-calbar .sm{ font-weight:600;color:var(--text2);font-size:11.5px; }
+.today-calbar.closed{ background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.4); color:#ef4444; }
+.today-calbar.short { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.4); color:#f59e0b; }
+.today-calbar.open  { background:rgba(29,185,122,.11); border:1px solid rgba(29,185,122,.4); color:#1db97a; }
+/* 休みの日は列の後ろにうっすら色を敷く。⚠ 予約そのものは薄くしない
+   （お客様と約束している車が読みにくくなるほうが事故になる）。 */
+.today-cols.is-closed{ background:rgba(239,68,68,.045); border-radius:10px; }
+
 .rml-hol.cal-soft,.lo-closed-tag.cal-soft{ color:var(--text3) !important; font-weight:600; }
 .drc-h.closed{ color:#ef4444; font-weight:600; }
 
@@ -1933,3 +2013,58 @@ th.cfs-lg-d{ z-index:3; }
   cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.5);
 }
 .lo-dupmark:hover{ background:#ef4444; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.97.0 当日ビュー：完TEL前の「返車済みにする」は押せない（ゆうた指定）
+   ⚠ 押せないことと、**なぜ押せないか**を必ずセットで出す。
+     理由が無いと「壊れている」と思われて、そこで手が止まる。
+   ══════════════════════════════════════════════════════════════ */
+.ta-btn.is-off{ opacity:.45; cursor:not-allowed; background:var(--bg2); border-color:var(--border); }
+.ta-btn.is-off:hover{ border-color:var(--border); transform:none; }
+.ta-btn.is-off b{ color:var(--text2) !important; }
+.ta-why{ display:block; color:#f59e0b !important; margin-top:5px; line-height:1.45; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.97.0 完TELの1枚目「通常にしますか？ 実績化しますか？」（待ち・当日返しの車だけ）
+   ══════════════════════════════════════════════════════════════ */
+.rk-box{ max-width:440px; }
+.rk-pick{
+  display:block; width:100%; text-align:left; color:var(--text);
+  background:var(--bg3); border:1px solid var(--border); border-radius:12px;
+  padding:13px 15px; margin-bottom:10px; cursor:pointer; font-family:inherit;
+  transition:border-color .12s, transform .1s, background .12s;
+}
+.rk-pick:hover{ border-color:#1db97a; background:var(--bg2); transform:translateY(-1px); }
+.rk-pick b{ display:block; font-size:14.5px; margin-bottom:4px; }
+.rk-pick small{ display:block; font-size:12px; color:var(--text2); line-height:1.55; }
+.rk-note{ font-size:11.5px; color:var(--text3); margin-top:4px; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.97.0 作業完了：担当者が空のときの注意（チップ本体は mech-summary.css）
+   ══════════════════════════════════════════════════════════════ */
+.mg-box{ max-width:460px; }
+.mg-warn{
+  background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.34);
+  border-radius:10px; padding:10px 12px; margin:0 0 14px;
+  font-size:12.5px; color:#fbbf24; line-height:1.55;
+}
+.mg-warn i{ vertical-align:-3px; margin-right:5px; }
+[data-theme="light"] .ta-why{ color:#b45309 !important; }
+[data-theme="light"] .mg-warn{ color:#92400e; background:rgba(245,158,11,.12); }
+
+/* ========== v1.99.0 「売上なしでアーカイブ」 ==========
+   🔴 ゆうた確定＝**¥0 とは書かず「売上なし」と言い切る**（0円だと「入れ忘れ」と見分けが付かない）。
+   灰色＝実績の色（緑・ピンク）とわざと別にして、集計に乗っていないことが色でも分かるようにする。 */
+.cv-nosalebadge{ font-size:11px; font-weight:800; color:#94a3b8; background:rgba(148,163,184,.16);
+  border:1px solid rgba(148,163,184,.45); border-radius:7px; padding:2px 8px; }
+.cv-nosalenote{ border:1px solid rgba(148,163,184,.38); background:rgba(148,163,184,.10);
+  border-radius:10px; padding:10px 12px; margin:0 0 12px; font-size:12.5px; line-height:1.7; color:var(--text2); }
+.cv-nosalenote b{ color:var(--text); }
+[data-theme="light"] .cv-nosalenote{ background:rgba(100,116,139,.09); color:#475569; }
+
+/* ========== v1.101.0 予約キャンセル／承認予約 ==========
+   🔴 キャンセルは赤系。**未入庫（来なかっただけ）とは色でも分ける**＝未入庫は灰色（.cv-nosalebadge を流用）。 */
+.cv-cancelbadge{ font-size:11px; font-weight:800; color:#f87171; background:rgba(248,113,113,.14);
+  border:1px solid rgba(248,113,113,.45); border-radius:7px; padding:2px 8px; }
+[data-theme="light"] .cv-cancelbadge{ color:#b91c1c; background:rgba(185,28,28,.09); border-color:rgba(185,28,28,.30); }
+.cv-opti.cv-apopt{ color:#378ADD; font-weight:700; }

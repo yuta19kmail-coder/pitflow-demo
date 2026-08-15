@@ -92,28 +92,11 @@
       items.push({ ic:'download', label:'入庫済みにする', sub:'タスクの「点検待ち」へ',
         run: function(){ if (window.pitTodayCheckIn) pitTodayCheckIn(c.id); refresh(); } });
     }
-    if (st && st !== 'reserved' && st !== 'returned' && st !== 'scrap' && st !== 'cancelled'){
-      items.push({ ic:'upload', label:'返車済みにする', sub:'実績（確定売上）に固める',
-        run: function(){ if (window.pitTodayReturn) pitTodayReturn(c.id); refresh(); } });
-    }
-
-    /* 工程を変える＝ドラッグの代わり。今いる列は選べない */
-    var board = (window.state && state.boards || []).find(function(b){ return b.id === (c.boardId || 'default'); });
-    if (board && st !== 'reserved' && st !== 'returned'){
-      var cols = (board.cols || []).filter(function(x){ return !x.side; });
-      if (cols.length){
-        items.push({ ic:'kanban', label:'工程を変える', items: cols.map(function(col){
-          return { ic: (col.id === st ? 'check' : ''), label: col.name, disabled: (col.id === st),
-            run: function(){
-              var cc = card(c.id); if (!cc) return;
-              cc.status = col.id;
-              if (window.logFlow) logFlow(cc, '工程を変更（' + col.name + '）');
-              if (window.pitLog) pitLog('工程を変更（右クリック）', { cardId: cc.id, kind:'phase', label: label(cc) + ' / ' + col.name });
-              refresh(); toast('「' + col.name + '」へ移しました');
-            } };
-        }) });
-      }
-    }
+    /* 🔴 v1.96.0（ゆうた指定）ここから「返車済みにする」「工程を変える」「急ぎにする／急ぎを外す」を外した。
+       ・返車済み＝実績（確定売上）に固める、取り返しのつきにくい操作。右クリックのついでで押せてしまうのをやめる
+       ・工程を変える＝カードをドラッグする、が本来のやり方
+       ・急ぎ＝カードの詳細から付け外しする
+       ⚠ どれも**メニューから消しただけ**で、今までどおり画面の操作でできる。復活させないこと（テストが見張っている）。 */
 
     /* v1.36.0 タスクボードの区切りライン（board-line.js）。盤面に乗っているカードだけ。 */
     if (window.PitBoardLine && st !== 'reserved' && st !== 'returned'){
@@ -121,11 +104,8 @@
       if (_bl) items.push(_bl);
     }
 
-    items.push({ ic: c.urgent ? 'ban' : 'bolt', label: c.urgent ? '急ぎを外す' : '急ぎにする',
-      run: function(){ var cc = card(c.id); if (!cc) return; cc.urgent = !cc.urgent; refresh();
-        toast(cc.urgent ? '急ぎにしました' : '急ぎを外しました'); } });
-
-    items.push(SEP);
+    /* ⚠ 上の一群が空になる状態（返車済みのカードなど）もある。区切り線が二本並ばないように。 */
+    if (items[items.length - 1] !== SEP) items.push(SEP);
     items.push({ ic:'copy', label:'コピー', items: [
       { label:'顧客名',        run: function(){ copy(c.customer, '顧客名'); } },
       { label:'ナンバー',      run: function(){ copy(c.plate, 'ナンバー'); } },
@@ -134,8 +114,6 @@
       { label:'このカードのURL', run: function(){ copy(PITFLOW_BASE + '/?card=' + encodeURIComponent(c.id), 'URL'); } }
     ]});
     return items;
-
-    function label(x){ return (x.customer ? x.customer + ' 様' : '') + (x.car ? ' / ' + x.car : ''); }
   }
 
   /* 👤 顧客の行 */

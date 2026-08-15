@@ -22,7 +22,8 @@
 .cv-iconbtn{ font-size:15px; width:34px; height:30px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
 .cv-iconbtn:hover{ background:var(--bg4); }
 .cv-optwrap{ position:relative; }
-.cv-optmenu{ display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:208px; background:var(--bg2); border:1px solid var(--border2); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.5); padding:6px; z-index:80; }
+/* 🔴 v1.99.0 「売上なしでアーカイブする…」が2行に折り返さない幅にした（項目名が読みにくくなるため） */
+.cv-optmenu{ display:none; position:absolute; right:0; top:calc(100% + 6px); min-width:256px; background:var(--bg2); border:1px solid var(--border2); border-radius:10px; box-shadow:0 12px 30px rgba(0,0,0,.5); padding:6px; z-index:80; }
 .cv-optmenu.show{ display:block; }
 .cv-opth{ font-size:10px; font-weight:800; color:var(--text3); padding:5px 8px 4px; }
 .cv-opti{ display:block; width:100%; text-align:left; font-size:12.5px; font-weight:700; color:var(--text); background:transparent; border:none; border-radius:7px; padding:8px 9px; cursor:pointer; }
@@ -450,6 +451,14 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 /* ===== 🔴 v1.82.0 代車が返ってきている時＝落ち着いた灰色 =====
    ⚠ 返却済みなのに赤い「超過」が出ていた（画面が日付の引き算しかしていなかった）。
    ⚠ 代車カレンダーの「返却済」の灰色と同じ色みでそろえる。 */
+/* 🔵 v1.93.0 まだ入庫していない予約の代車＝「入庫待ち」。
+   ⚠ **警告の色（緑/橙/赤）を使わない。** これは予定であって、遅れでも急ぎでもない。
+      前はここが赤くなって「代車が返ってきていない」ように見えていた（ゆうた指摘）。 */
+.cv-lo.cv-lev-none{ background:rgba(55,138,221,.08); border-color:rgba(55,138,221,.38); }
+.cv-lo.cv-lev-none .cv-lorem{ color:var(--text3); }
+.cv-lo.cv-lev-none .cv-lodays{ color:#6ea8e6; }
+.cv-lo.cv-lev-none .cv-lometer i{ background:#6ea8e6; }
+
 .cv-lo.cv-lev-back{ background:rgba(131,144,166,.10); border-color:rgba(131,144,166,.42); }
 .cv-lo.cv-lev-back .cv-lorem{ color:var(--text3); }
 .cv-lo.cv-lev-back .cv-lodays{ color:#aab5c6; }

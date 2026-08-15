@@ -51,7 +51,10 @@ function renderReserveTbd(){
                                             && c.status !== 'returned' && c.status !== 'cancelled' && c.status !== 'scrap');
   const tentative = state.cards.filter(c => c.status === 'reserved' && c.tentative && !c.approvalPending);
   const intakeTbd = state.cards.filter(c => c.status === 'reserved' && c.intakeTbd && !c.tentative);
-  const noShow    = state.cards.filter(c => c.status === 'cancelled' && !c.archived);
+  /* 🔴 v1.101.0 未入庫＝**来なかっただけ**の車。
+     ⚠ 人が押した「予約キャンセル」（`cancelled:true`）は、押した時点でアーカイブして
+        お客様の来店履歴へ移すので、ここには並べない（＝もう待たないから）。 */
+  const noShow    = state.cards.filter(c => c.status === 'cancelled' && !c.archived && !c.cancelled);
 
   const card = c => (typeof cardHtml === 'function') ? cardHtml(c, { compact: true }) : '';
   const item = (c, act) => '<div class="rtbd-item">' + card(c) + (act || '') + '</div>';
@@ -76,9 +79,10 @@ function renderReserveTbd(){
     intakeTbd.length ? intakeTbd.map(c => item(c, '<button class="rtbd-act" onclick="event.stopPropagation();pitUndSetIntake(\'' + c.id + '\')"><i data-ic=calendar data-ics=16></i> 入庫日を入れる</button>')).join('') : empty,
     'カードの<i data-ic=calendar data-ics=16></i>で入庫日を入れると予約カレンダーへ移ります。');
 
-  h += col('<i data-ic=ban data-ics=16></i> 未入庫 <small>（来店なし・キャンセル）</small>', noShow.length,
+  h += col('<i data-ic=ban data-ics=16></i> 未入庫 <small>（来店なし）</small>', noShow.length,
     noShow.length ? noShow.map(c => item(c, '<button class="rtbd-act" onclick="event.stopPropagation();pitUndRestore(\'' + c.id + '\')">↩ 予約に戻す</button>')).join('') : empty,
-    '※ 1ヶ月（' + UNDET_ARCHIVE_DAYS + '日）たつと自動でキャンセル・アーカイブされます。');
+    '<b>入庫日を過ぎても入庫済みにならなかった予約は、ここへ自動で入ります</b>（仮予約と承認待ちは動きません）。'
+    + '連絡が来たら「↩ 予約に戻す」。※ 1ヶ月（' + UNDET_ARCHIVE_DAYS + '日）たつと自動でアーカイブされます。');
 
   h += '</div>';
   wrap.innerHTML = h;
@@ -195,17 +199,89 @@ window.pitUndSetIntake = function(id){
   });
 };
 
-/* 未入庫 → 予約に戻す（再度連絡が来た等） */
+/* ===================================================================
+   未入庫 → 予約に戻す（再度連絡が来た等）
+   🔴 v1.101.1（ゆうた指定）**押した瞬間に戻すのをやめて、入庫日を選ばせる。**
+
+   ◎なぜ変えたか
+     v1.101.0 は押すとその場で予約へ戻していたが、**入庫日は過ぎたまま**。
+     過ぎた日付の予約は、次に画面を描いた瞬間に**また未入庫へ落ちる**（overdue-pit.js）。
+     ＝押した人から見ると「戻したのに戻らない」「日付が消えて未定に行った」になる。
+     🔴 **未入庫から戻す＝新しい入庫日を決めること**、と割り切った。
+
+   ◎出す窓（ゆうた指定）
+     ・**今日の入庫予定にする**
+     ・**N月N日（カレンダーピッカー）の入庫予定にする**
+     の2つから選んで実行。
+
+   ⚠ **過ぎた日は選ばせない**（`min`＝今日）。選べてしまうと、また未入庫へ落ちて堂々巡りになる。
+   ⚠ ブラウザ純正のダイアログは使わない（v1.75.0）。当日ビューのアクションシートと同じ見た目を借りる。
+   =================================================================== */
+function _undFmtMD(sv){
+  const p = String(sv || '').split('-');
+  if (p.length < 3) return '';
+  const d = new Date(+p[0], (+p[1]) - 1, +p[2]);
+  if (isNaN(d.getTime())) return String(sv || '');
+  return (d.getMonth() + 1) + '月' + d.getDate() + '日（' + '日月火水木金土'[d.getDay()] + '）';
+}
+function _undEsc(sv){ return String(sv == null ? '' : sv).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 window.pitUndRestore = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  const td = ymd(new Date());
+  let back = document.getElementById('pit-und-restore');
+  if (!back){
+    back = document.createElement('div');
+    back.id = 'pit-und-restore';
+    back.className = 'modal-backdrop';
+    back.addEventListener('click', e => { if (e.target.id === 'pit-und-restore') pitUndRestoreClose(); });
+    document.body.appendChild(back);
+  }
+  const nm = (window.pitCustName ? pitCustName(c) : c.customer) || '（未入力）';
+  back.innerHTML =
+    '<div class="ta-sheet">'
+    + '<div class="ta-head"><b>' + _undEsc(nm) + ' 様</b>　' + _undEsc((c.maker ? c.maker + ' ' : '') + (c.car || ''))
+      + (c.plate ? '<span class="ta-plate">' + _undEsc(c.plate) + '</span>' : '')
+      + '<div class="ta-sub">予約に戻します。<b>入庫日を決めてください</b>'
+      + (c.reserveDate ? '（元の入庫予定 ' + _undFmtMD(c.reserveDate) + '）' : '')
+      + '</div></div>'
+    + '<button class="ta-btn primary" onclick="pitUndRestoreGo(\'' + c.id + '\',\'' + td + '\')">'
+      + '<b>今日（' + _undFmtMD(td) + '）の入庫予定にする</b><span>今日の入庫リストに出ます</span></button>'
+    + '<label class="ta-f">日付を選ぶ<input type="date" id="und-rs-date" value="' + td + '" min="' + td + '"></label>'
+    + '<button class="ta-btn" onclick="pitUndRestoreGo(\'' + c.id + '\')">'
+      + '<b>この日の入庫予定にする</b><span>選んだ日の予約カレンダーに入ります</span></button>'
+    + '<button class="ta-cancel" onclick="pitUndRestoreClose()">やめる</button>'
+    + '</div>';
+  back.classList.add('show');
+};
+window.pitUndRestoreClose = function(){
+  const back = document.getElementById('pit-und-restore');
+  if (back) back.classList.remove('show');
+};
+/* 実行＝ここ1本。今日ボタンも日付ボタンも同じ道を通る（写しを作らない）。 */
+window.pitUndRestoreGo = function(id, forced){
+  const c = state.cards.find(x => x.id === id);
+  if (!c) return;
+  const el = document.getElementById('und-rs-date');
+  const d = String(forced || (el ? el.value : '') || '').trim();
+  if (!d){ if (window.pitToast) pitToast('入庫日を選んでください'); return; }
+  /* 🔴 過ぎた日は入れない。入れるとまた未入庫へ落ちて、戻したことにならない。 */
+  if (d < ymd(new Date())){
+    if (window.pitToast) pitToast('過ぎた日は選べません（また未入庫に戻ってしまいます）');
+    return;
+  }
   c.status = 'reserved';
   c.cancelled = false; c.cancelledAt = null; c.archived = false;
-  if (!c.reserveDate) c.intakeTbd = true;   // 日付が無ければ未定へ
-  if (window.logFlow) logFlow(c, '未入庫から予約に復帰');
+  /* 自動で付いた未入庫の印と、キャンセルの理由も一緒に外す（戻したのに残っていると嘘になる） */
+  c.noShow = false; delete c.noShowAt; delete c.cancelReason; delete c.cancelledBy;
+  c.reserveDate = d;
+  c.intakeTbd = false;
+  if (window.logFlow) logFlow(c, '未入庫から予約に復帰（入庫日 ' + d + '）');
   if (window.PitDB) PitDB.save();
+  pitUndRestoreClose();
   renderReserveTbd();
-  if (window.pitToast) pitToast('↩ 予約に戻しました');
+  if (window.pitToast) pitToast('↩ ' + _undFmtMD(d) + 'の予約に戻しました');
 };
 
 /* 返車・未定 → 完TEL：返車日を入れて返車カレンダーへ */

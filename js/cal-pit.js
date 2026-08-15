@@ -183,6 +183,25 @@
     if (i.half === 'end') return '〜' + (i.end || '') + '締';
     return '';
   };
+  /* 🔴 v1.90.0 その日の「色」。全画面でこれ1つを見て色を決める＝画面ごとに食い違わない。
+       'closed' 休み（赤） / 'short' 短縮営業＝午前休み・午後休み・早締め（オレンジ）
+       'open'   特別営業＝ふだん休みの日に開ける（緑） / '' ふつうの営業日
+     ⚠ v1.89.0 までは「休みか、そうでないか」の2択しか見ておらず、
+        短縮営業が**ふつうの日と同じ灰色**で出ていた（ゆうた指摘 2026-08-13）。 */
+  PitCal.tone = function (ds) {
+    var i = PitCal.info(ds);
+    if (i.closed)  return 'closed';
+    if (i.openWin) return 'open';
+    if (i.half)    return 'short';
+    return '';
+  };
+  /* 画面に出す「受付 9:00〜17:00」の一行（休みの日は空）。ホバーや見出しで使う。 */
+  PitCal.hoursText = function (ds) {
+    var h = PitCal.hours(ds);
+    if (h.closed) return '';
+    return h.open + '〜' + h.close;
+  };
+
   /* 休業ではないが注意がいる日（半休・早締め・特別営業）＝カレンダーに小さく出す用 */
   PitCal.mark = function (ds) {
     var i = PitCal.info(ds);
@@ -330,6 +349,18 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
     });
   }
+
+  /* 🧪 自動試験の差し込み口。**MHSと同じ形のカレンダーを手で入れる**ためだけのもの。
+     ⚠ 本番の画面では誰も呼ばない（呼ばれても、次に MHS から届いた時点で上書きされる）。
+        休みの日を作るのに Firestore を触りたくない＝試験のために本番データを汚さないため。 */
+  PitCal.__inject = function (v) {
+    CAL = { ver: v.ver || 1, from: v.from || '', to: v.to || '',
+            biz: v.biz || {}, dow: Array.isArray(v.dow) ? v.dow : [],
+            days: v.days || {}, updatedAt: Date.now() };
+    SRC = 'mhs'; ERR = false; GOT = true;
+    _syncSettingsMirror();
+  };
+  window.__PitCalTest = function (v) { PitCal.__inject(v); };
 
   window.PitCal = PitCal;
 

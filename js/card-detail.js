@@ -1112,19 +1112,38 @@ function _cfsCalHtml(c, team, tStr, ro){
         else { cls = ' ok'; mark = '○'; }
       }
     }
+    /* 🔴 v1.90.0（ゆうた指摘 2026-08-13）**短縮営業（午前休み・午後休み・早締め）が
+       ふつうの日と全く同じに見えていた。**ここは「休みか、そうでないか」の2択しか見ていなかった。
+       ・右上に小さなオレンジの ◐ を出す（○△満 の台数表示は今までどおり触らない）
+       ・ホバー（title）に「何時から何時まで・空き何台」を出す＝ふつうの日にも出す
+       🔴 色と判定は PitCal.tone / PitCal.hoursText 1本。ここで営業時間を計算しない。 */
+    const calTone = (window.PitCal && PitCal.tone) ? PitCal.tone(ds) : '';
+    const calNote = (window.PitCal && PitCal.label) ? PitCal.label(ds) : '';
+    const calHrs  = (window.PitCal && PitCal.hoursText) ? PitCal.hoursText(ds) : '';
+    const shortMk = (calTone === 'short') ? '<span class="cfs-mk-short" aria-hidden="true">◐</span>' : '';
+    /* ホバーの中身（改行は &#10;）。「いつもと時間が違う」がここで必ず読める。 */
+    let tip = (ym.m + 1) + '/' + dd + '（' + '日月火水木金土'[d.getDay()] + '）';
+    if (hol) tip += '　' + hol;
+    if (calTone === 'closed')      tip += '&#10;🚫 ' + (calNote || '定休') + '（この日は開いていません）';
+    else if (calTone === 'short')  tip += '&#10;🕐 ' + calNote + (calHrs ? '&#10;受付 ' + calHrs : '');
+    else if (calTone === 'open')   tip += '&#10;✅ ' + calNote + (calHrs ? '&#10;受付 ' + calHrs : '');
+    else if (calHrs)               tip += '　' + calHrs;
+    if (num) tip += '&#10;空き ' + num + ' 台';
+
     const dayClick = ro ? '' : ' onclick="cfPickDate(\'' + ds + '\',\'' + team + '\')"';
     const avSel = (ro && window._availPick === ds) ? ' av-sel' : '';   // 空きカレンダービュー：選択日のハイライト
     /* 🔴 v1.74.1（ゆうた報告「表示に変なバグ」）**クラスの前の半角スペースが抜けていた。**
        `cfs-day ok` ＋ `sel` が `cfs-day oksel` になり、
        ①選んだ日が緑に光らない ②今日の点線枠が出ない ③**○/△/満/休 の色まで消える**（ok が別名になるため）。
        ⚠ 見た目だけの話に見えるが、「どの日を選んだのか分からない」＝入れ間違いのもと。 */
-    h += '<div class="cfs-day'+ cls + (!ro && c.reserveDate === ds ? ' sel': '') + (ds === tStr ? ' today': '') + avSel + '" data-ds="'+ ds + '" data-team="'+ team + '"'+ dayClick + ' title="'+ (ym.m + 1) + '/'+ dd + (hol ? '・'+ hol : '') + (num ? '：'+ num + '台': '') + '">'
-       + holBadge + '<i>' + dd + '</i>' + (num ? '<span>' + num + '</span>' : '<span></span>') + '<b class="cfs-mk">' + mark + '</b></div>';
+    h += '<div class="cfs-day'+ cls + (calTone === 'short' ? ' cfs-short': '') + (!ro && c.reserveDate === ds ? ' sel': '') + (ds === tStr ? ' today': '') + avSel + '" data-ds="'+ ds + '" data-team="'+ team + '"'+ dayClick + ' title="'+ tip + '">'
+       + shortMk + holBadge + '<i>' + dd + '</i>' + (num ? '<span>' + num + '</span>' : '<span></span>') + '<b class="cfs-mk">' + mark + '</b></div>';
   }
   h += '</div>';
   h += '<div class="cfs-hint">' + (ro
         ? '数字＝埋まり/枠　○空きあり ／ △残りわずか ／ 満＝受付終了'
-        : '数字＝埋まり/枠　○空きあり ／ △残りわずか ／ 満＝受付終了（タップすると確認が出ます・最終判断は人）') + '</div>';
+        : '数字＝埋まり/枠　○空きあり ／ △残りわずか ／ 満＝受付終了（タップすると確認が出ます・最終判断は人）')
+     + '<br><b class="cfs-hint-short">◐＝いつもと時間が違う日（乗せると出ます）</b></div>';
   h += '</div>';
   return h;
 }
@@ -1330,7 +1349,10 @@ function _cardMarkMisses(c, root){
        ・入庫日＝赤
        ・入庫時間＝黄
        ・作業内容＝黄
-       ・**TEL は赤のまま。国産／輸入・メーカー・車種は黄に落とす**
+       ・**国産／輸入・メーカー・車種は黄に落とす**
+       ・🔴 **TEL は 2026-08-13 に黄へ格下げ（v1.89.0・ゆうた指定）**。
+         ＝電話番号が分からなくても予約は取れる。空なら1回だけ聞いて通す。
+         ⚠ 元は赤（v1.76.0）。**戻す時はゆうたに確認してから。**
        ・受付タイプ（預かりなど）＝赤。**赤が埋まっていなければ保存禁止＋どこがダメか伝える**
      ⚠ 代車を「必要」にした時の3項目と、車検の諸費用は**今までどおり赤**（指定に無いので変えない）。
      🔴 この表がこの画面の唯一の物差し。**保存の関門（_pitCardGuard）も入力チェックもここを見る。**
@@ -1339,12 +1361,12 @@ function _cardMarkMisses(c, root){
     /* --- 🔴 赤（必須） --- */
     ['kana',        'カナ',            !!(c.kana || '').trim(),                                 'red'],
     ['repeat',      '初回／リピーター', !!(c.repeat || '').trim(),                               'red'],
-    ['tel',         'TEL',             !!(c.tel || '').trim(),                                  'red'],
     ['reserveDate', '入庫日',          !!c.reserveDate,                                         'red'],
     ['dropType',    '受付タイプ',      !!c.dropType,                                            'red'],
     ['workType',    '作業タイプ',      !!c.workType || !!((c.workAddons||[]).length),           'red'],
     /* --- 🟡 黄（入れたほうがいい） --- */
     ['customer',    'お客様名（漢字）', !!(c.customer || '').trim(),                             'yellow'],
+    ['tel',         'TEL',             !!(c.tel || '').trim(),                                  'yellow'],
     ['boardId',     '国産車／輸入車',  c.boardId === 'default' || c.boardId === 'import',       'yellow'],
     ['maker',       'メーカー',        !!(c.maker || '').trim(),                                'yellow'],
     ['car',         '車種（グレード）', !!(c.car || '').trim(),                                  'yellow'],
@@ -1795,7 +1817,8 @@ function _plateDigits(s, max){
 function telInput(c){
   const p = String(c.tel || '').split('-');
   const v1 = _pe(p[0] || ''), v2 = _pe(p[1] || ''), v3 = _pe(p.slice(2).join('') || '');
-  /* 🔴 v1.76.0 TEL は必須（赤）。赤枠を付ける目印をこのBOXに置く。 */
+  /* 🟡 v1.89.0 TEL は黄（入れたほうがいい）。枠を付ける目印をこのBOXに置く。
+     ⚠ v1.76.0〜v1.88.0 は赤（必須）だった。振り分けの正は `_cardMarkMisses` の表。 */
   let h = '<div class="cf-tel" data-key="tel">';
   h += '<input type="text" class="cf-input cf-tel-main" data-tel-main readonly value="' + _pe(c.tel || '') + '" placeholder="クリックして入力" autocomplete="off">';
   h += '<div class="cf-tel-guide"><div class="cf-tel-row">';

@@ -370,6 +370,45 @@ function _estTeamMap(root, team){
 /* カード→team（国産=default / 輸入=import） */
 function pitTeamKey(c){ return (c && c.boardId === 'import') ? 'import' : 'default'; }
 window.pitTeamKey = pitTeamKey;
+
+/* ===================================================================
+   🏷 課（1課／2課）＝ v1.92.0（ゆうた指摘 2026-08-13）
+   -------------------------------------------------------------------
+   🗣「表紙印刷の部分で、恐らく 1課・2課 が車か何かに引っ張られてる。
+      **実際の予約画面のボタンに沿ってデータが入るようにしてほしい**」
+
+   🔴 **課は「予約画面で押したボタン（c.division）」だけを見る。**
+   ⚠ 直す前は、表紙もホバー情報カードも
+        `c.division==='div2' || c.boardId==='import' ? '2課' : '1課'`
+      と書いてあり、**課のボタンを外していると、国産／輸入（＝車）から 1課／2課 を作っていた**。
+      ＝画面のボタンは何も選ばれていないのに、紙には「1課」と刷られる。これが報告の正体。
+   ⚠ 表示名も `'1課'` と**直に書いてあった**。課の名前は `state.divisions` で決まるので、
+      名前を変えたり3つ目を足したりすると紙だけ食い違う。**必ずこの表から引く。**
+   🔴 **国産／輸入を押した時に課も自動で入る**のは今までどおり（card-detail.js）。
+      それは「ボタンに値が入る」＝ここで見ている c.division が埋まる、ということ。
+      **逆算（車→課）をやめただけで、自動入力はやめていない。**
+   =================================================================== */
+function pitDivisionId(c){ return (c && c.division) ? String(c.division) : ''; }
+function pitDivisionLabel(c){
+  const id = pitDivisionId(c);
+  if (!id) return '';                       /* ボタンが押されていない＝空。車から作らない */
+  const list = (window.state && Array.isArray(state.divisions)) ? state.divisions : [];
+  const d = list.find(x => x && x.id === id);
+  return d ? String(d.label || '') : '';    /* 表にない課＝出さない（勝手に1課にしない） */
+}
+/* 🔴 v1.98.0 課の**色**も同じ表から引く（既定は 1課＝緑・2課＝ピンク）。
+   ⚠ 色を画面に直に書かないこと。設定で色を変えたら、出ている所がそろって変わるように。
+   ⚠ 表に無い課・ボタンが空のときは空文字（＝呼んだ側で出さない判断ができる）。 */
+function pitDivisionColor(c){
+  const id = pitDivisionId(c);
+  if (!id) return '';
+  const list = (window.state && Array.isArray(state.divisions)) ? state.divisions : [];
+  const d = list.find(x => x && x.id === id);
+  return (d && d.color) ? String(d.color) : '';
+}
+window.pitDivisionId = pitDivisionId;
+window.pitDivisionLabel = pitDivisionLabel;
+window.pitDivisionColor = pitDivisionColor;
 /* estHold/estAmount を team別ネストに正規化（旧フラット保存の移行・import欠けの補完） */
 function pitNormalizeEst(){
   const s = state.settings; if (!s) return;
@@ -385,6 +424,57 @@ function pitNormalizeEst(){
 }
 window.pitNormalizeEst = pitNormalizeEst;
 
+/* ===== 🔧 作業チェック（整備の実施項目）＝**全画面でこの1本** =====
+   PitFlow v1.100.0（2026-08-15・ゆうた指定で中身を丸ごと入れ替え）
+
+   🗣 ゆうた「タスクボード上の予約詳細から整備の部分で作業チェックの欄、
+              これを既存のものから入れ替えて（下の7つ）」
+
+   ◎前まで（やめた形）
+     ・カード詳細の整備タブ＝**作業タイプで中身が変わる**（車検は6項目・それ以外は4項目）
+       ＝受付・問診／24ヶ月点検／下回り点検／整備・調整／検査ライン／完成検査・洗車 …「工程」の言い換えだった
+     ・予約を編集の画面＝**別の項目・別の保存の形**（`c.maint[番号]`）で、同じ車なのに2つの表が出ていた
+     🔴 **同じ `c.maint` を、2つの画面が違う意味で読み書きしていた。** どちらかを直すともう片方が嘘になる。
+
+   ◎これから
+     🔴 **項目はこの表1本。作業タイプで変えない。** 追加・並べ替えはここだけ直せば全画面に効く。
+     🔴 **保存は「番号」ではなく「合言葉（key）」**＝`c.maint.checks['oil']`。
+        番号だと、項目を1つ足しただけで**過去のカードのチェックが全部ずれる**（別の作業をやったことになる）。
+     ⚠ **昔の番号のチェックは読まない**（前の項目とは中身が別物なので、引き継ぐと嘘になる）。
+        データは消していないので、必要なら後から見られる。 */
+var PIT_MAINT_CHECKS = [
+  { key: 'oil',      label: 'オイル入れ' },
+  { key: 'rotation', label: 'タイヤローテーション' },
+  { key: 'air',      label: 'タイヤエア調整' },
+  { key: 'llc',      label: 'LLC・ウォッシャー補充' },
+  { key: 'retorque', label: 'タイヤ増締め' },
+  { key: 'light',    label: 'ライト回りチェック' },
+  { key: 'sideslip', label: 'サイドスリップ調整' }
+];
+window.PIT_MAINT_CHECKS = PIT_MAINT_CHECKS;
+
+/* その項目が済んでいるか（読み） */
+function pitMaintChecked(c, key){
+  return !!(c && c.maint && c.maint.checks && c.maint.checks[key]);
+}
+/* 済み／未済を入れ替える（書き）。**ここ以外で c.maint.checks を書かないこと。** */
+function pitMaintToggle(c, key){
+  if (!c) return false;
+  if (!c.maint) c.maint = {};
+  if (!c.maint.checks) c.maint.checks = {};
+  c.maint.checks[key] = !c.maint.checks[key];
+  return !!c.maint.checks[key];
+}
+/* 済んだ数（「◯ / 7 完了」の左側） */
+function pitMaintDoneCount(c){
+  var n = 0;
+  PIT_MAINT_CHECKS.forEach(function(it){ if (pitMaintChecked(c, it.key)) n++; });
+  return n;
+}
+window.pitMaintChecked   = pitMaintChecked;
+window.pitMaintToggle    = pitMaintToggle;
+window.pitMaintDoneCount = pitMaintDoneCount;
+
 /* チーム別の平均単価（円）＝直近3ヶ月（92日）の返車完了カードに確定金額(amountFinal)が
    10台以上あれば実績平均を自動計算。足りないうちは設定の初期単価を使う */
 function pitUnitPrice(team){
@@ -394,6 +484,8 @@ function pitUnitPrice(team){
     const d = new Date(); d.setDate(d.getDate() - 92);
     const since = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     const done = (state.cards || []).filter(function(c){
+      /* 🔴 v1.99.0 売上なしでアーカイブした車は平均単価の材料にしない（金額が残っていても実績ではない） */
+      if (window.pitCardNoSale && pitCardNoSale(c)) return false;
       return c.boardId === team && c.status === 'returned' && c.returnDate && c.returnDate >= since && c.amountFinal > 0;
     });
     if (done.length >= 10){

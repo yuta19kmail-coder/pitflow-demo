@@ -971,3 +971,10 @@ select.cf-input{
 /* ===== v1.65.0 返車ビュー・当日の「終日」枠（待ち・当日返しで返車時間がまだ無い車） ===== */
 .reserve-slot.rs-allday .reserve-slot-time{ color:var(--text2); font-weight:800; }
 .reserve-slot.rs-allday .reserve-slot-time small{ display:block; font-size:9.5px; font-weight:600; color:var(--text3); margin-top:1px; }
+
+/* 🔴 v1.98.0 当日ビュー：担当者が入っていない時に出す「課」のバッジ（ゆうた指定）
+   人の名前と同じ緑・ピンクだが、**人ではない**ことがひと目で分かるように少しだけ落とす。 */
+.tr-front.is-div{
+  opacity:.82; letter-spacing:0;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.28);
+}

@@ -410,9 +410,25 @@ function renderLoaner(){
   _loDedupeAssigns();         // 同一予約の二重割当を掃除（日数調整が重複扱いされる不具合の元）
   _loProcessReplacements();   // 入替日を過ぎた予定を確定
   _loProcessEmergency();      // 返車済みの緊急車両は列を消す（履歴は残す）
+  /* 🔴 v1.95.0（ゆうた報告 2026-08-15）**スクロールが一回ガクッと戻る。**
+     ⚠ 正体＝**背後の描き直し**。誰かが予約を直す・クラウドから届く・MHSのカレンダーが来る…
+        そのたびに `showView(state.currentView)` が呼ばれ、ここが**毎回いちばん上（今日）まで巻き戻して**いた。
+        （`_loStart` を今日−14日に戻して描き直し → `loScrollToday()` で今日へアンカー）
+     🔴 **新しく開いた時だけ今日へ寄せる。同じ画面の描き直しなら、見ていた場所に戻す。**
+        描き直しでは**日付の範囲（_loStart / _loCount）も変えない**＝過去へ遡って見ていた分が消えない。 */
+  const _wrap0 = document.getElementById('loaner-scroll');
+  const _fresh = (window._pitPrevView !== 'loaner') || !_wrap0 || !_wrap0.querySelector('.lo-date');
+  const _keep  = _fresh ? null
+               : { top: _wrap0.scrollTop, left: _wrap0.scrollLeft, start: _loStart, count: _loCount };
+
   const today = new Date(); today.setHours(0,0,0,0);
-  _loStart = addDays(today, -14);   // 過去を多めに描画＝当日アンカー後に過去継ぎ足しが暴発しない＋前5日を確実に表示
-  loRebuild(56);
+  if (_fresh){
+    _loStart = addDays(today, -14);   // 過去を多めに描画＝当日アンカー後に過去継ぎ足しが暴発しない＋前5日を確実に表示
+    loRebuild(56);
+  } else {
+    _loStart = _keep.start;
+    loRebuild(Math.max(56, _keep.count));   // 見ていた範囲をそのまま作り直す
+  }
 
   const wrap = document.getElementById('loaner-scroll');
   if (wrap && !_loBound){
@@ -423,7 +439,13 @@ function renderLoaner(){
     });
   }
   if (!_loDnd){ _loDnd = true; loBindDnd(grid); }
-  requestAnimationFrame(function(){ loScrollToday(); setTimeout(loScrollToday, 60); });   // レイアウト確定後に確実にアンカー
+  if (_fresh){
+    requestAnimationFrame(function(){ loScrollToday(); setTimeout(loScrollToday, 60); });   // レイアウト確定後に確実にアンカー
+  } else if (wrap && _keep){
+    /* 描き直し＝見ていた場所へ黙って戻す。⚠ アニメーションさせない（また動いたように見える） */
+    wrap.scrollTop = _keep.top; wrap.scrollLeft = _keep.left;
+    requestAnimationFrame(function(){ wrap.scrollTop = _keep.top; wrap.scrollLeft = _keep.left; });
+  }
 }
 
 /* 代車の詳細ホバーは「常時・どのビューでも」効くようグローバルに1回だけ紐付け。
@@ -536,14 +558,28 @@ function _loRenderDays(start, n){
     /* 🚫 v1.50.0 休みは MHS の定休日カレンダー（PitCal）が基準＝臨時休業・お盆もここに出る */
     const isClosed = (window.PitCal ? PitCal.isClosed(dStr) : false);
     const calNote  = (window.PitCal ? PitCal.label(dStr) : '');
-    const dayMods = (isClosed ? ' lo-closed' : '') + (hol ? ' lo-holiday' : '');
+    /* 🔴 v1.94.0（ゆうた指定 2026-08-15）代車カレンダーの休日表示。
+       ・土曜＝青／日曜＝赤／祝日＝赤／**自社の休み＝斜線**（重なったら色＋斜線）
+       ・**いちばん奥に敷く**＝この上に代車の札・茎・矢印が乗る。
+       ⚠ 直す前は `.lo-bk.lo-closed{background:transparent!important}` で
+          **貸出が入った日だけ休みの色が消えていた**（ゆうた報告）。
+          セルの背景で塗っていたので、札を出すために消すしかなかった。
+          → 専用の「敷き紙」（.lo-daybg）を1枚いちばん下に入れて、そこに塗る形にした。 */
+    const dayMods = (isClosed ? ' lo-closed' : '') + (hol ? ' lo-holiday' : '')
+                  + (dow === 0 ? ' sun' : (dow === 6 ? ' sat' : ''));
+    /* 敷き紙。**セルのいちばん最初**に入れること＝あとから足す物（茎・札・矢印）が上に乗る。 */
+    const dayBg = '<i class="lo-daybg"></i>';
 
-    h += '<div class="lo-cell lo-date' + (isToday ? ' lo-today' : '') + (dow === 0 ? ' sun' : (dow === 6 ? ' sat' : '')) + (isClosed ? ' closed' : '') + '" data-ld="' + dStr + '">'
+    /* ⚠ 日付列は敷き紙の上に文字が来るよう、中身を .lo-dtxt で包む
+       （包まないと、位置指定していない生の文字が敷き紙の下に潜る）。 */
+    h += '<div class="lo-cell lo-date' + (isToday ? ' lo-today' : '') + dayMods + (isClosed ? ' closed' : '') + '" data-ld="' + dStr + '">'
+       + dayBg
+       + '<span class="lo-dtxt">'
        + (d.getDate() === 1 ? '<div class="lo-month">' + (d.getMonth()+1) + '月</div>' : '')
        + (d.getMonth()+1) + '/' + d.getDate() + ' <span>' + '日月火水木金土'[dow] + '</span>'
        + (hol ? '<div class="lo-hol">' + hol + '</div>' : '')
        + (calNote ? '<div class="lo-closed-tag' + (isClosed ? '' : ' cal-soft') + '">' + calNote + '</div>' : '')
-       + '</div>';
+       + '</span></div>';
 
     ls.forEach(function(l){
       const attrs = ' data-lo="' + l.id + '" data-ld="' + dStr + '"';
@@ -614,7 +650,7 @@ function _loRenderDays(start, n){
         const isChg = _loAssignChanged(a);
         const hoverAttr = compact ? (' onmouseenter="loInfoHover(this,\'' + (a.id || '') + '\')" onmouseleave="loInfoHide()"') : '';
         h += '<div class="lo-cell lo-bk' + (isStart ? ' bk-start' : '') + (isEnd ? ' bk-end' : '') + (single ? ' bk-single' : '') + (compact ? ' bk-compact' : ' bk-full') + (fixed ? ' lo-fixed' : '') + (returned ? ' lo-returned' : '') + (isToday ? ' lo-today' : '') + (isBad?' lo-bad':(isChg?' lo-chg':'')) + (isDup?' lo-dup':'') + evCls + dayMods + '"' + attrs
-           + ' style="--lo-team:' + teamColor + '"><i class="lo-fill"></i>' + gh;
+           + ' style="--lo-team:' + teamColor + '">' + dayBg + '<i class="lo-fill"></i>' + gh;
         /* 🔴 二重貸しの日は「2」の印を出す（押すと何と重なっているかを出す） */
         if (isDup){
           h += '<span class="lo-dupmark" title="この日は貸出が ' + dupN + ' 件重なっています"'
@@ -624,11 +660,13 @@ function _loRenderDays(start, n){
           h += '<span class="lo-badge ' + (compact ? 'mini' : 'full') + (hand ? ' lo-handoff' : '') + (isChg?' chg':'') + (isKari ? ' lo-kari' : '') + '"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '"' + (card ? ' data-card-id="' + card.id + '"' : '') + ' onclick="loBadgeMenu(event,\'' + (a.id || '') + '\')"' + hoverAttr + '>' + labelHtml + '</span>';
         }
         if (isEnd && !single){
-          h += '<span class="lo-end"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '"><i data-ic=chevDown data-ics=15></i></span>';
+          /* 🔴 v1.94.0 終端の▼は CSS の三角（.lo-end::after）で描く＝茎と地続きにするため。
+             ⚠ 中にアイコンを入れない。入れると線のV字が戻って、また先が浮いて見える。 */
+          h += '<span class="lo-end"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '" title="下へドラッグで返却日を伸ばせます"></span>';
         }
         h += ov + '</div>';
       } else {
-        h += '<div class="lo-cell lo-free' + (isToday ? ' lo-today' : '') + evCls + dayMods + '"' + attrs + '>' + gh + ov + '</div>';
+        h += '<div class="lo-cell lo-free' + (isToday ? ' lo-today' : '') + evCls + dayMods + '"' + attrs + '>' + dayBg + gh + ov + '</div>';
       }
     });
   }

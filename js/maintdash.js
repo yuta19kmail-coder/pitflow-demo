@@ -18,8 +18,10 @@ function _mdAmount(c){
   if (c.estAmount   != null) return c.estAmount;
   return window.pitEstAmount ? pitEstAmount(c.workType, window.pitTeamKey?pitTeamKey(c):'default') : 0;
 }
-function _mdDone(c){   return c.status === 'workDone' || c.status === 'returned'; }
-function _mdInShop(c){ return ['check','estim','contact','parts','work'].indexOf(c.status) >= 0; }
+/* 🔴 v1.99.0 「売上なしでアーカイブ」した車は、完了にも残にも数えない（物差し＝pitCardNoSale） */
+function _mdNoSale(c){ return !!(window.pitCardNoSale && pitCardNoSale(c)); }
+function _mdDone(c){   return !_mdNoSale(c) && (c.status === 'workDone' || c.status === 'returned'); }
+function _mdInShop(c){ return !_mdNoSale(c) && ['check','estim','contact','parts','work'].indexOf(c.status) >= 0; }
 function _mdPd(s){ const p = String(s||'').split('-'); return new Date(+p[0], (+p[1])-1, +p[2]); }
 function _mdEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _mdMan(n){ return (Math.round(n/1000)/10).toLocaleString() + '万'; }
@@ -29,6 +31,7 @@ function _mdCalc(divId, cards, moS, moE, wkS, wkE){
   let mC=0,mA=0, wC=0,wA=0, rC=0,rA=0;
   cards.forEach(function(c){
     if (_mdCourse(c) !== divId) return;
+    if (_mdNoSale(c)) return;   /* 🔴 v1.99.0 売上なし＝完了にも残にも数えない */
     const amt = _mdAmount(c);
     if (_mdDone(c)){
       /* 🔴 v1.61.0 数える日は物差し1本（js/sales-count.js）から。返車済み＝実績カウント日／作業完了＝返車予定日 */

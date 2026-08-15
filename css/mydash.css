@@ -208,3 +208,72 @@ body.md-edit .myd-fabbar { position: fixed; right: 22px; bottom: 22px; margin: 0
 /* トースト */
 .md-toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: var(--brand); color: #fff; font-weight: 700; font-size: 13px; padding: 10px 18px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); opacity: 0; transition: opacity .18s; z-index: 90; pointer-events: none; }
 .md-toast.show { opacity: 1; }
+
+/* =========================================================
+   🔴 v1.85.0 中身（チップ）＝「誰の何の車か」を出す
+   ---------------------------------------------------------
+   ◎なぜ（ゆうた 2026-08-12）
+     「預かり中20台」だけでは動けない。山田 アクア／田中 プリウス が要る。
+   ◎かたち
+     予約の月ビューのチップと同じ見た目にそろえてある（覚え直しが要らない）。
+   ========================================================= */
+.md-lnum { display: flex; align-items: baseline; gap: 7px; margin-bottom: 9px; }
+.md-lnum b { font-size: 19px; font-weight: 800; letter-spacing: -.4px; line-height: 1; }
+.md-lnum small { font-size: 11px; color: var(--text2); font-weight: 700; }
+.md-lnum span { font-size: 11px; color: var(--text3); }
+.md-lnum.zero b { color: var(--text3); }              /* 0＝やることが無い。静かに沈める */
+
+.md-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.md-cp {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 7px;
+  background: var(--bg3); border: 1px solid var(--border); font-size: 12px; color: var(--text);
+  white-space: nowrap; max-width: 100%; overflow: hidden;
+}
+.md-cp.md-click { cursor: pointer; }
+.md-cp.md-click:hover { border-color: var(--brand); }
+.md-cp.hot { border-color: rgba(239, 68, 68, .55); }  /* 急ぎ・期限を過ぎているもの */
+.md-cp.hot .md-cp-t { color: var(--red, #ef4444); }
+.md-cp-t { color: var(--text2); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.md-cp-w { overflow: hidden; text-overflow: ellipsis; }
+.md-cp-n { font-size: 11px; color: var(--text3); }
+.md-cp-n.amt { color: var(--text2); font-variant-numeric: tabular-nums; }
+.md-cp-d {                                            /* 代車あり */
+  display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+  border-radius: 4px; font-size: 10px; font-weight: 800;
+  background: rgba(245, 158, 11, .2); color: var(--orange, #f59e0b); border: 1px solid rgba(245, 158, 11, .5);
+}
+.md-cp-more { color: var(--text3); border-style: dashed; }
+.md-cp-none { font-size: 11.5px; color: var(--text3); padding: 2px 0 4px; }
+.md-bothsep { height: 10px; }
+
+/* 見せ方の切替チップ（カスタマイズ中だけ／サイズチップの右） */
+.md-vwsep { width: 7px; display: inline-block; }
+.md-vwchip {
+  font-size: 10px; font-weight: 800; border: 1px solid var(--border2, var(--border));
+  background: var(--bg3); color: var(--text2); border-radius: 6px; padding: 2px 7px; cursor: pointer;
+}
+.md-vwchip:hover { border-color: var(--brand); color: #fff; background: var(--brand); }
+.md-vwchip.on { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+/* 0 の数字は色を捨てる（件数があるときと同じ色で主張させない） */
+.md-kpi.zero .md-n { color: var(--text3) !important; }
+
+/* カスタマイズ中は道具が増えるので、見出しを折り返して**タイトルを削らない**
+   （小サイズだと「預..」のように潰れていた） */
+body.md-edit .md-bh { flex-wrap: wrap; row-gap: 4px; }
+body.md-edit .md-bh h3 { max-width: none; }
+
+/* =========================================================
+   🔴 v1.87.0 押して開いたとき（数字→細／中身→中）
+   ---------------------------------------------------------
+   ・細＝チップ（.md-chips）／中＝盤面と同じカード（.pit-card.pcm）
+   ・カードの絵そのものは reserve.js の cardHtml を借りている。ここでは並べ方だけ。
+   ========================================================= */
+.md-deep-t { font-size: 11px; color: var(--text3); font-weight: 700; margin: 2px 0 7px; }
+.md-cards { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.md-cards .pit-card.pcm { flex: 0 0 204px; width: 204px; max-width: 204px; cursor: pointer; }
+.md-more .md-open { margin-top: 10px; }
+@media (max-width: 760px) {
+  .md-cards { flex-direction: column; }
+  .md-cards .pit-card.pcm { flex: 1 1 auto; width: 100%; max-width: none; }
+}

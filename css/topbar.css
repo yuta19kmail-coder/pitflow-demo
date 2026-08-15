@@ -24,18 +24,24 @@
   --panel-sheen: rgba(255,255,255,0.30);
 }
 
-/* ===== ④ ライト・リキッド（淡グリーン/パステル＋ガラス） ===== */
+/* ===== ④ ライト・リキッド（v1.91.0：いまの CarFlow に合わせた白グレー＋ガラス） =====
+   🔴 2026-08-13（ゆうた指摘）ライトと同じく、ここも**いまの CarFlow に合わせた**。
+      地の色は CarFlow `css/base.css` の `[data-theme="light-liquid"]` をそのまま写す。
+   🟢 **ブランド色（緑）だけ PitFlow のまま。** 背景のふわっとした丸も、CarFlow は青だが
+      **PitFlow は左上だけ淡い緑**にしてある（アプリの見分けが付くように）。
+      ⚠ CarFlow と完全に同じにしたければ、この1行を `#CFE1F7` に戻すだけ。 */
 :root[data-theme="light-liquid"] {
-  --bg:#f4f6f3;--bg1:#f4f6f3;--bg2:#ffffff;--bg3:#eef2ec;--bg4:#e3e8df;
-  --border:#dde3d8;--border2:#c6cfbe;
-  --text:#20261f;--text1:#20261f;--text2:#4a5346;--text3:#5c6556;
-  --green:#0a7f5b;--blue:#2f7ad6;--orange:#b06a12;--red:#c0362f;
+  --bg:#F4F6F9;--bg1:#F4F6F9;--bg2:#FFFFFF;--bg3:#EFF2F6;--bg4:#E5E8EE;
+  --border:#DDE3EC;--border2:#C6CFDC;
+  --text:#1F2937;--text1:#1F2937;--text2:#49535F;--text3:#5C6573;
+  --green:#10B981;--blue:#3A82F6;--orange:#F59E0B;--red:#EF4444;
   --brand:#1f7a4d;--brand-deep:#155e3a;--brand-soft:rgba(31,122,77,.12);--accent:#1f7a4d;
+  --acc:#1f7a4d;--accd:#155e3a;
   --shadow-card:0 4px 16px rgba(31,41,55,.08);
-  --liquid-bg-image: radial-gradient(circle at 15% 14%, #d6efdc 0%, transparent 42%),
-                     radial-gradient(circle at 86% 86%, #e3ecf7 0%, transparent 46%),
-                     linear-gradient(135deg, #f6f9f4 0%, #fbfbf8 100%);
-  --panel-bg-overlay: rgba(255,255,255,0.42);
+  --liquid-bg-image: radial-gradient(circle at 15% 14%, #D3E9DB 0%, transparent 40%),
+                     radial-gradient(circle at 86% 86%, #E8DCF5 0%, transparent 44%),
+                     linear-gradient(135deg, #F6F8FC 0%, #FBF8FA 100%);
+  --panel-bg-overlay: rgba(255,255,255,0.40);
   --panel-blur: 16px;
   --panel-border-overlay: rgba(255,255,255,0.85);
   --panel-sheen: rgba(255,255,255,0.6);
@@ -65,7 +71,7 @@
 :root[data-theme="dark-liquid"] #topbar,
 :root[data-theme="dark-liquid"] #sidebar { background: rgba(15,17,24,0.66) !important; }
 :root[data-theme="light-liquid"] #topbar,
-:root[data-theme="light-liquid"] #sidebar { background: rgba(248,250,247,0.72) !important; }
+:root[data-theme="light-liquid"] #sidebar { background: rgba(250,251,253,0.72) !important; }
 
 /* ===== トップバー要素（CarFlow準拠） ===== */
 /* 畳むボタン（CarFlow .sidebar-toggle 準拠：透明＋枠） */

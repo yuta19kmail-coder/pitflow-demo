@@ -103,6 +103,10 @@
     /* サンプルでは「誰でログインしているか」を特定できないので空を返す＝予約担当は空のまま */
     window.pitCurrentStaffName = function () { return ''; };
     window.pitIsAdmin = function () { return true; };   // サンプルは全部さわれる
+    /* 🔴 v1.84.0 操作ログの「1件だけ消す」に使う。
+       サンプル（練習用サイト）の操作ログは**この端末の中だけの記録**なので、
+       消しても誰にも影響しない＝全員に出してよい。本番だけがマスター限定。 */
+    window.pitIsMaster = function () { return true; };
 
     var authed = false;
     try { authed = localStorage.getItem(FLAG) === '1'; } catch (e) {}
@@ -197,6 +201,16 @@
     return (s && s.name) || m.name || '';
   };
   window.pitIsAdmin = function () { return isAdminRole(window.fb && window.fb.currentMember); };
+
+  /* 🔴 v1.84.0 **マスター（ゆうた）かどうか。** 操作ログを1件消せるのはこの人だけ。
+     ⚠ 「管理（admin）」とは別物。広げないこと。
+        Firestore のルールが `pitAuditLogs` の delete を `_isMaster()` に締めてあるので、
+        ここを admin まで広げると**押せるのに消えないボタン**（サーバー側で拒否）になる。
+        ルールは `CarFlow\carflow\firestore.rules`（全アプリ共通の1枚）にある。 */
+  window.pitIsMaster = function () {
+    var m = window.fb && window.fb.currentMember;
+    return !!(m && m.master === true);
+  };
 
   function kickOut(msg) {
     loginError(msg);

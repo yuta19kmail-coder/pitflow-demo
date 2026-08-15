@@ -248,6 +248,9 @@ window.pitUndRestore = function(id){
       + '</div></div>'
     + '<button class="ta-btn primary" onclick="pitUndRestoreGo(\'' + c.id + '\',\'' + td + '\')">'
       + '<b>今日（' + _undFmtMD(td) + '）の入庫予定にする</b><span>今日の入庫リストに出ます</span></button>'
+    /* 🔴 v1.101.2（ゆうた指定）**上の「今日」と、下の「日付を選ぶ＋ボタン」を線で区切る。**
+       ⚠ ボタン→日付→ボタン と並んでいると、どの日付がどのボタンのものか分からない。 */
+    + '<div class="ta-sep"></div>'
     + '<label class="ta-f">日付を選ぶ<input type="date" id="und-rs-date" value="' + td + '" min="' + td + '"></label>'
     + '<button class="ta-btn" onclick="pitUndRestoreGo(\'' + c.id + '\')">'
       + '<b>この日の入庫予定にする</b><span>選んだ日の予約カレンダーに入ります</span></button>'

@@ -32,12 +32,27 @@
 
    🔴 **写しを作らないこと。** 期間で絞る集計は必ずこの3本を通す。
       （sales.js / mydash.js / mech-summary.js / maintdash.js が呼んでいる）
+
+   ◎ v1.99.0（2026-08-15・ゆうた指定）**「売上なしでアーカイブ」した車**
+     🔴 **売上0円で返した車は、実績にも売上にも一切乗せない。** ただし**来店した事実は残す**
+        （＝お客様の来店履歴には出す。次に来た時に前回なにをしたか分かるように）。
+     🔴 **その車かどうかの物差しは `pitCardNoSale(c)` 1本。** 画面ごとに `c.noSale` を直に見ないこと。
+        ⚠ 印が付いた車は `pitSalesTier` が **null**／`pitSalesInRange` が **false**／
+           `pitSalesCountDate` が **''**（数える日が無い）を返す。＝期間の集計を通る道は全部ふさいである。
+     🔴 **実績カウント日（completedAt）は入れない。** 実績カレンダー・月次の実績・ダッシュボードは
+        全部この日付で拾っているので、**日付を入れない＝どこにも数えられない**が一番事故が少ない（二重の守り）。
+
    ⚠ 読み込みは state.js より後ろ、使う側（sales.js / mydash.js …）より前。
    ======================================== */
 (function(){
   'use strict';
 
   var CONFIRMED = ['parts','work','workDone','outsource'];   // 受注済＝パーツ待ち以降
+
+  /* ===== ⓪「売上なしでアーカイブ」した車か（v1.99.0） =====
+     🔴 **判定はここ1か所。** 他のファイルは `pitCardNoSale(c)` を呼ぶだけにすること。
+     ⚠ 昔のデータには印が無い＝false。印の付け方は card-view.js の「売上なしでアーカイブする」。 */
+  function pitCardNoSale(c){ return !!(c && c.noSale); }
 
   function s(v){ return (v == null) ? '' : String(v); }
   function n(v){ v = +v; return isFinite(v) ? v : 0; }
@@ -66,6 +81,7 @@
      ⚠ ここで日付を組み立てないこと。**物差しは return-slot.js の 1本**。 */
   function pitSalesCountDate(c){
     if (!c) return '';
+    if (pitCardNoSale(c)) return '';        /* 🔴 v1.99.0 売上なし＝数える日そのものが無い */
     /* 実績＝実績カウント日が正。返車日は予備（v1.57.0 で completedAt が売上の基準になった） */
     if (c.status === 'returned') return s(c.completedAt) || s(c.returnDateFinal) || s(c.returnDate);
     if (window.pitReturnDates){
@@ -82,6 +98,7 @@
   /* ===== ②確度の区分（状態だけで決まる。期間は見ない） ===== */
   function pitSalesTier(c){
     if (!c || c.status === 'scrap') return null;
+    if (pitCardNoSale(c)) return null;      /* 🔴 v1.99.0 売上なし＝どの区分にも入れない */
     var st = c.status;
     if (st === 'returned') return 'actual';                                            /* 実績＝返車済み */
     if (st === 'reserved') return 'forecast';                                          /* 予測＝未入庫の予約 */
@@ -94,6 +111,7 @@
   /* ===== ③その期間（月・クォーター）に数えるか ===== */
   function pitSalesInRange(c, fromStr, toStr, todayStr){
     if (!c) return false;
+    if (pitCardNoSale(c)) return false;     /* 🔴 v1.99.0 売上なし＝どの期間にも数えない */
     todayStr = todayStr || today();
     var d = pitSalesCountDate(c);
 
@@ -110,6 +128,7 @@
     return isCur;                                  /* 予定日が過ぎている＝当月に寄せる */
   }
 
+  window.pitCardNoSale     = pitCardNoSale;
   window.pitSalesCountDate = pitSalesCountDate;
   window.pitSalesTier      = pitSalesTier;
   window.pitSalesInRange   = pitSalesInRange;

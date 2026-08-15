@@ -185,6 +185,15 @@
   window.PitPhasePopup = {
     /* 移動を横取りすべきか判定。横取りしたら true（呼び出し元は return）。 */
     maybeIntercept: function(card, from, to, commit){
+      /* 🔴 v1.97.0（ゆうた指定）作業完了へ入れる時、点検担当者・整備担当者がどちらも空なら1回聞く。
+         ⚠ 出す順番は **金額のあと**。だから続きの処理（commit）を包んでおいて、
+            金額ポップアップのOKの後ろに置く。金額を聞かない移動なら、そのままここが出る。
+         ⚠ 「担当者が空か」「作業完了の列はどれか」の判断は mech-guard.js の1本。ここに書き写さない。
+         ⚠ 止めない（「このまま進める」で今までどおり動く）。 */
+      var go = commit;
+      if (window.PitMechGuard && PitMechGuard.needed(card, to)){
+        go = function(){ PitMechGuard.open(card, commit); };
+      }
       var mode = null;
       if (from === 'estim'   && to === 'contact') mode = 'estimate';
       else if (from === 'contact' && to === 'parts') mode = 'order';
@@ -195,8 +204,12 @@
             そのまま通すと受注金額が空のまま実績に乗るので、ここで1回だけ聞く。
          ⚠ 連絡中→パーツ待ち（＝関門をきちんと通った）は今までどおり 'order'。 */
       else if (isJump(from, to)) mode = 'quick';
-      if (!mode) return false;
-      pending = { card: card, from: from, to: to, commit: commit, mode: mode };
+      if (!mode){
+        /* 金額は聞かない移動。担当者の確認だけ要るなら、それだけ出す。 */
+        if (go !== commit){ go(); return true; }
+        return false;
+      }
+      pending = { card: card, from: from, to: to, commit: go, mode: mode };
       openModal(card, mode);
       return true;
     },

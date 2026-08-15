@@ -633,7 +633,7 @@
         const wt=(state.workTypes||[]).find(w=>w.id===c.workType);
         const wl=wt?wt.label:(c.workType||'—');
         const st=(typeof statusLabel==='function')?statusLabel(c.status):(c.status||'');
-        const amt=(c.estAmount!=null&&c.estAmount!=='')?('¥'+Number(c.estAmount).toLocaleString()):'—';
+        const amt=_cardCancelled(c)?'キャンセル':_cardNoSale(c)?'売上なし':((c.estAmount!=null&&c.estAmount!=='')?('¥'+Number(c.estAmount).toLocaleString()):'—');
         const dt=_doneDate(c)||'日付未定';
         let loa='';
         /* 🔴 v1.83.0（ゆうた指定）**過去の入庫＝終わった貸出は「〇/〇〜〇/〇」も出す。**
@@ -658,6 +658,8 @@
   /* ===== 顧客詳細（グラフィカル・一覧の名前クリックで開く／編集・削除もここから） ===== */
   function _statusLbl(c){
     if(c.status==='reserved') return '予約';
+    if(_cardCancelled(c)) return 'キャンセル';   /* 🔴 v1.101.0 人が押した予約キャンセル */
+    if(_cardNoSale(c)) return '売上なし';   /* 🔴 v1.99.0 実績ではないので「返車済み」とは言わない */
     if(c.status==='returned') return '返車済み';
     const b=(state.boards||[]).find(x=>x.id===c.boardId)||(state.boards||[])[0];
     const col=b&&(b.cols||[]).find(x=>x.id===c.status);
@@ -671,7 +673,24 @@
         これは実績ビューが見ているのと同じ印で、当日ビューの「返車済みにする」で入り、
         **同時に売上（amountFinal）も確定値で固められる**。
      ⚠ 作業完了（workDone）はまだ返車前なので**入れない**。 */
-  function _cardDone(c){ return !!(c && c.status==='returned' && String(c.completedAt||'').trim()); }
+  /* 🔴 v1.99.0（ゆうた指定）**「売上なしでアーカイブ」した車も来店履歴には出す。**
+     ゆうた＝「実績には反映させずに、あくまで来店しただけの扱いで、
+              ただ次回以降に内容を把握できるようにしたい」
+     ⚠ 実績・売上には一切乗らない（物差し＝sales-count.js の pitCardNoSale が全部ふさいでいる）。
+        ここは**来店の事実だけ**を残す入口。 */
+  function _cardNoSale(c){ return !!(window.pitCardNoSale && pitCardNoSale(c)); }
+  /* 🔴 v1.101.0（ゆうた指定）**人が押した「予約キャンセル」も来店履歴に残す。**
+     ゆうた＝「予約キャンセル。これは顧客情報の来店履歴に**キャンセルの旨を記載し、
+              アーカイブとして残す**」
+     ⚠ **自動で入る「未入庫（来なかった）」は出さない**（別物・ゆうた確定）。
+        見分けは `c.cancelled`（人が押した）と `c.noShow`（自動）。 */
+  function _cardCancelled(c){ return !!(c && c.status==='cancelled' && c.cancelled); }
+  function _cardDone(c){
+    if (!c) return false;
+    if (_cardNoSale(c)) return true;
+    if (_cardCancelled(c)) return true;
+    return !!(c.status==='returned' && String(c.completedAt||'').trim());
+  }
   window.pitCardIsDone = _cardDone;
   /* その人のカード全部（予約中も含む）。件数の案内に使う */
   function _custCardsAll(cust){
@@ -686,7 +705,12 @@
     return _custCardsAll(cust).filter(_cardDone).slice()
       .sort((a,b)=>(_doneDate(b)||'').localeCompare(_doneDate(a)||''));
   }
-  function _doneDate(c){ return c.completedAt || c.returnDate || c.reserveDate || ''; }
+  /* 売上なしの車は実績カウント日を持たない＝**来た日（入庫日）**を履歴の日付にする */
+  function _doneDate(c){
+    if (_cardCancelled(c)) return c.reserveDate || c.cancelledAt || '';   /* 来るはずだった日 */
+    if (_cardNoSale(c)) return c.reserveDate || c.returnDate || '';
+    return c.completedAt || c.returnDate || c.reserveDate || '';
+  }
   /* v0.93.0 LINE状態→表示HTML（NG=地味ピル／登録済+番号=Lステップボタン）。未案内は出さない。 */
   function _lineHtml(o){
     var st=(o&&o.lineStatus)||'';
@@ -768,9 +792,14 @@
     const archived=archVehs(cust);
     const cards=_custCards(cust);                       /* 実績になったものだけ（v1.54.0） */
     const openCards=_custCardsAll(cust).filter(c=>!_cardDone(c));   /* いま予約・作業中のもの */
-    const visits=cards.length;
+    /* 🔴 v1.101.0 キャンセルは**来ていない**ので「来店回数」には数えない。
+       ⚠ ただし**履歴には出す**ので、一覧を出すかどうかは別の数（histN）で見ること。
+          ここを1つの数で兼ねると、キャンセルだけのお客様で履歴が丸ごと消える。 */
+    const histN=cards.length;
+    const visits=cards.filter(function(c){ return !_cardCancelled(c); }).length;
     /* 🔴 v1.54.0 金額は**確定額（返車時に固めたもの）**を使う。まだ無ければ概算で埋める */
-    const total=cards.reduce(function(s,c){ const a=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(Number(c.estAmount)||0); return s+(isFinite(a)?a:0); },0);
+    const total=cards.reduce(function(s,c){ if(_cardCancelled(c)||_cardNoSale(c)) return s;   /* 🔴 キャンセル・売上なしは金額に入れない */
+      const a=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(Number(c.estAmount)||0); return s+(isFinite(a)?a:0); },0);
     let last=cust.updatedAt||0; vehicles.forEach(function(v){ if((v.updatedAt||0)>last) last=v.updatedAt||0; });
     const yen=function(n){ return '¥'+Number(n||0).toLocaleString('ja-JP'); };
 
@@ -860,15 +889,19 @@
     // 来店履歴
     /* 🔴 v1.54.0 来店履歴＝実績になったものだけ。予約・作業中のものは件数だけ添える（ゆうた指定） */
     h+='<div class="cd-sec"><div class="cd-sech"><div class="cd-sect"><i data-ic=clock data-ics=16></i> 来店履歴 <span class="cd-cnt">'+
-       (visits?('直近'+Math.min(visits,12)+'件'):'なし')+
+       (histN?('直近'+Math.min(histN,12)+'件'):'なし')+
        (openCards.length?('　／　予約・作業中 '+openCards.length+'件'):'')+'</span></div></div>';
-    if(visits){
+    if(histN){
       h+='<div class="cd-hist">';
       cards.slice(0,12).forEach(function(c){
         const wt=(state.workTypes||[]).find(w=>w.id===c.workType);
         const wl=wt?wt.label:(c.workType||'—'); const wc=wt?wt.color:'#64748b';
         const amt=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(c.estAmount!=null&&c.estAmount!==''?Number(c.estAmount):null);
-        const amtStr=(amt!=null&&isFinite(amt))?yen(amt):'—';
+        /* 🔴 v1.99.0（ゆうた確定）売上なしは **¥0 ではなく「売上なし」**と書く。
+           0円と書くと「金額の入れ忘れ」と見分けがつかないため。 */
+        const amtStr=_cardCancelled(c)?'<span class="cd-hnosale">キャンセル</span>'
+                    :_cardNoSale(c)?'<span class="cd-hnosale">売上なし</span>'
+                    :((amt!=null&&isFinite(amt))?yen(amt):'—');
         /* 🔴 v1.83.0 同上＝来店履歴にも借りていた期間を出す */
         let loa='';
         if(c.needLoaner){
@@ -877,12 +910,17 @@
           const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
           loa=' ・ <span class="cd-loa"><i data-ic=van data-ics=16></i>代車'+(nm?('（'+esc(nm)+'）'):'')+(pr?(' '+esc(pr)):'')+'</span>';
         }
-        const menuTxt=c.menu?esc(String(c.menu).split('\n')[0]):'';
+        let menuTxt=c.menu?esc(String(c.menu).split('\n')[0]):'';
+        /* 🔴 v1.101.0 キャンセルは**理由**を出す（次に来た時に経緯が分かるように） */
+        if(_cardCancelled(c)) menuTxt='キャンセル'+(c.cancelReason?('：'+esc(c.cancelReason)):'')
+                                     +(c.cancelledAt?('　'+esc(c.cancelledAt)):'')+(c.cancelledBy?('　'+esc(c.cancelledBy)):'');
         // ステータスバッジ：予約→予約カレンダー／返車済み→実績カレンダー（行クリックは予約詳細）
-        const isResv=(c.status==='reserved'), isRet=(c.status==='returned');
+        /* 売上なしの車は実績カレンダーに載っていないので、バッジから飛ばさない（飛んでも無い） */
+        const isNS=_cardNoSale(c)||_cardCancelled(c);
+        const isResv=(c.status==='reserved'), isRet=(c.status==='returned'&&!isNS);
         const stClick=isResv?("event.stopPropagation();pitGotoReserveDate('"+esc(c.reserveDate||'')+"')")
                     :isRet?("event.stopPropagation();pitGotoResultMonth('"+esc(c.returnDate||c.reserveDate||'')+"')"):'';
-        const stBadge='<span class="cd-hst'+((isResv||isRet)?' clickable':'')+'"'+(stClick?(' onclick="'+stClick+'" title="'+(isResv?'予約カレンダーへ':'実績カレンダーへ')+'"'):'')+'>'+esc(_statusLbl(c))+(isResv?' <i data-ic=calendar data-ics=16></i>':isRet?' <i data-ic=chart data-ics=16></i>':'')+'</span>';
+        const stBadge='<span class="cd-hst'+(isNS?' nosale':'')+((isResv||isRet)?' clickable':'')+'"'+(stClick?(' onclick="'+stClick+'" title="'+(isResv?'予約カレンダーへ':'実績カレンダーへ')+'"'):'')+'>'+esc(_statusLbl(c))+(isResv?' <i data-ic=calendar data-ics=16></i>':isRet?' <i data-ic=chart data-ics=16></i>':'')+'</span>';
         h+='<div class="cd-hrow clickable" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
            '<div class="cd-hdt">'+esc(_doneDate(c)||'日付未定')+'</div>'+
            '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+

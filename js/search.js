@@ -40,6 +40,10 @@
   // ステータスの日本語ラベル
   function statusLabel(c) {
     if (c.status === 'reserved') return '予約';
+    /* 🔴 v1.101.0 キャンセル＝人が決めたもの／未入庫＝来なかっただけ。**別物なので言い分ける。** */
+    if (c.status === 'cancelled') return c.cancelled ? 'キャンセル' : '未入庫';
+    /* 🔴 v1.99.0 売上なしでアーカイブした車は、探した人が取り違えないよう「売上なし」と言い切る */
+    if (window.pitCardNoSale && pitCardNoSale(c)) return '売上なし';
     if (c.status === 'returned') return '返車済み';
     const board = (state.boards || []).find(b => b.id === c.boardId) || (state.boards || [])[0];
     const col = board && (board.cols || []).find(x => x.id === c.status);
@@ -141,7 +145,10 @@
     const stBadge = '<span class="psr-st" style="border-color:' + team + ';color:' + team + '">' + esc(st) + '</span>';
     // 日時：返車済み＝完了日(＋金額)、それ以外＝予約日(＋時刻・期間)
     let dstr;
-    if (c.status === 'returned') {
+    if (window.pitCardNoSale && pitCardNoSale(c)) {
+      /* 🔴 v1.99.0 売上なし＝金額を出さない。来た日（入庫日）と「売上なし」だけ */
+      dstr = (c.reserveDate || c.returnDate || '') + ' 来店　売上なし';
+    } else if (c.status === 'returned') {
       const amt = (c.amountFinal != null && c.amountFinal !== '') ? Number(c.amountFinal) : null;
       dstr = (c.returnDate || '') + ' 完了' + ((amt != null && isFinite(amt)) ? ('　¥' + amt.toLocaleString('ja-JP')) : '');
     } else {

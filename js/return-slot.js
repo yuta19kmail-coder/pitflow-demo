@@ -165,8 +165,19 @@
      --------------------------------------------------------------- */
   function pitReturnPlace(c){
     if (!c) return null;
-    if (!c.returnStage) return null;                                   // まだ作業中（盤面にいる）
-    if (c.status === 'returned' || c.status === 'scrap') return null;  // もう実績・廃車
+    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return null;  // もう実績・廃車・未入庫
+    if (!c.returnStage){
+      /* 🔴 v1.101.0（ゆうた指定）**待ち・当日返しで、返るはずの日を過ぎてもまだ手元にある車**は
+         「返車日未定」に出す。＝日が過ぎるとどの一覧からも消えて、取り残しに気づけなかった。
+         ⚠ 盤面からは外さない（作業はまだ続いている）。**データも書き換えない**
+            ＝入庫日は本当に入庫した日なので消せない。だから「出す側」で拾う。
+         ⚠ まだ入庫していない車（reserved）は入庫側の話なので、ここでは拾わない。 */
+      if (pitDropIsSameDay(c) && c.status !== 'reserved'){
+        var _d = pitReturnC(c) || String(c.reserveDate || '');
+        if (_d && _d < _today()) return 'dateTbd';
+      }
+      return null;                                                     // まだ作業中（盤面にいる）
+    }
     if (c.returnStage === 'callWait') return 'callWait';
     if (!c.returnDate) return 'dateTbd';
     if (window.pitTimeTbd ? pitTimeTbd(c.returnTime) : !c.returnTime) return 'timeTbd';

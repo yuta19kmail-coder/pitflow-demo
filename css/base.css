@@ -35,10 +35,17 @@
   --shadow-card:0 3px 12px rgba(0,0,0,.35);
 }
 
-/* ===== ライトテーマ（CarFlowのベージュ系を踏襲・アクセントだけコーポレートグリーン） ===== */
+/* ===== ライトテーマ（v1.91.0：いまの CarFlow に合わせた白グレー系） =====
+   🔴 2026-08-13（ゆうた指摘）**PitFlow のライトだけ「旧 CarFlow のベージュ」のままだった。**
+      いまの CarFlow は白グレーの「くっきりSaaS」＝ページ背景を少し濃いグレーにして
+      白いカードを浮かせ、枠線と影で輪郭を立てる作り。**そちらに合わせた。**
+   🔴 **地の色（背景・枠・文字・影）は CarFlow `css/base.css` の `[data-theme="light"]` をそのまま写す。**
+      直す時は CarFlow 側を見て、値をコピーすること。ここで別の色を考えない。
+   🔴 **ブランド色（緑）だけは PitFlow のまま**＝全アプリ共通の決めごと
+      （地の色はそろえる／アクセントはアプリごと）。CarFlow の青を持ってこないこと。 */
 :root[data-theme="light"]{
-  --bg:#f5f1ea;--bg1:#f5f1ea;--bg2:#fffdf8;--bg3:#ece5d6;--bg4:#ddd4bf;
-  --border:#c8bfa8;--border2:#a89d80;
+  --bg:#EBEEF3;--bg1:#EBEEF3;--bg2:#FFFFFF;--bg3:#E3E7EE;--bg4:#D6DCE5;
+  --border:#D4DAE3;--border2:#B6BFCC;
   /* 🔴 v1.56.2（ゆうた報告）**--text1 を書き忘れていた。**
      ライトだけ --text1 が**ダークの値（ほぼ白 #e8eaf6）のまま残り**、明るい背景に白文字＝見えなかった。
      予約詳細カードの **電話・予約時内容の本文・タブ名・代車の残り日数**、ほか
@@ -46,9 +53,10 @@
      ⚠ ダーク（base.css）とリキッド2つ（topbar.css）には元から入っていたので、ライトだけ漏れていた。
      🔴 **テーマを1つ足したら、--text / --text1 / --text2 / --text3 を必ず4つとも書くこと。**
         書き忘れても画面は落ちないので、誰も気づかない。 */
-  --text:#2a2620;--text1:#2a2620;--text2:#5a4f3f;--text3:#8a7d65;
+  --text:#1A2230;--text1:#1A2230;--text2:#49535F;--text3:#5C6573;
 
-  --green:#057a5b;--blue:#1e5fc2;--orange:#9a4a05;--red:#a31818;
+  /* 警告3段。⚠ ベージュ地に合わせて濃くしてあったが、白グレー地では沈むので CarFlow の値にそろえた。 */
+  --green:#10B981;--blue:#2563EB;--orange:#F59E0B;--red:#EF4444;
 
   --brand:#1f7a4d;
   --brand-deep:#155e3a;
@@ -61,7 +69,8 @@
 
   --sidebar:220px;--topbar:54px;--tabs:46px;--action:56px;
   --r:8px;--r2:12px;
-  --shadow-card:0 2px 8px rgba(80,60,30,.12);
+  /* 白カードを浮かせる薄い影（CarFlow と同じ） */
+  --shadow-card:0 1px 3px rgba(16,24,40,.10), 0 1px 2px rgba(16,24,40,.06);
 }
 
 html,body{

@@ -201,9 +201,9 @@
       <h3>🔴 赤枠と🟡黄枠（v1.76.0）</h3>
       <p>入力チェックが<strong>2段</strong>になりました。</p>
       <ul>
-        <li><strong>🔴 赤＝入れないと保存できません</strong>：<strong>カナ／初回・リピーター／TEL／入庫日／受付タイプ／作業タイプ</strong>。
+        <li><strong>🔴 赤＝入れないと保存できません</strong>：<strong>カナ／初回・リピーター／入庫日／受付タイプ／作業タイプ</strong>。
           代車を「必要」にした時の<strong>使用代車・貸出から・貸出まで</strong>、車検の<strong>諸費用</strong>も赤です。</li>
-        <li><strong>🟡 黄＝空でも保存できます</strong>：<strong>お客様名（漢字）／国産車・輸入車／メーカー／車種／入庫時刻／作業内容</strong>。
+        <li><strong>🟡 黄＝空でも保存できます</strong>：<strong>お客様名（漢字）／<span style="color:#eab308">TEL</span>／国産車・輸入車／メーカー／車種／入庫時刻／作業内容</strong>。
           <strong>1回だけ</strong>「このまま保存しますか？」と聞かれ、<strong>「このまま保存する」で通ります</strong>（あとから入れられます）。</li>
       </ul>
       <p>赤が空のまま保存を押すと <strong>「保存できません。足りない項目があります」</strong> と出て、<strong>足りない項目の名前が並びます</strong>。

@@ -12,9 +12,19 @@
        **「✓ 確認する（OK）」を押して初めて既読**（読み飛ばしを防ぐ）。
      ・既読は人ごとに覚える（本番＝userPrefs／サンプル＝この端末）。
 
-   ◎運用ルール 🔴
-     **画面が変わった／新しい機能が付いた／操作が変わったら、PIT_NEWS の先頭に1件足す。**
-     裏の計算とバグ修正は書かない（開発全体メモ「お知らせのきまり」参照）。
+   ◎運用ルール 🔴（2026-08-15 ゆうた変更・ここが今のきまり）
+     **お知らせは、機能を変えた全部に出すのではない。**
+       ① **よっぽど大きいもの**（毎日の段取りが変わる・今までのやり方が通らなくなる）
+       ② **ゆうたが「お知らせにも」と言ったもの**
+     この2つだけ、PIT_NEWS の先頭に1件足す。
+     ⚠ **迷ったら足さない。**「あとから足す」はできるが、出してしまったものは引っ込められない
+        （読んだ人の記憶と食い違うため）。**足すか迷ったらゆうたに聞く。**
+     ⚠ 小さな見た目の直し・ボタンの整理・裏の計算・バグ修正は**書かない**。
+     ⚠ お知らせは **1回のログインで3件まで**しか出ない。たくさん貯めると、
+        全部消すのに何回もログインし直すことになる。＝**貯めないことが運用そのもの。**
+     ⚠ これは **今後の運用ルール**。すでに書いてあるお知らせは**そのまま残す**（消して回らない）。
+     （それまでのきまり＝「画面が変わったら毎回1件」は、貯まりすぎるのでやめた）
+
      seed:true … 出した時点で全員既読扱い（過去ぶんのまとめ）。ポップアップは出ない。
 
    ◎どこに残るか
@@ -26,6 +36,191 @@
 /* ===== お知らせ本体（version＝載った版、date＝YYYY-MM-DD）=====
    🔴 新しいものを **配列の先頭** に足すこと（並べ替えはコードがやるが、書く側も上から読める方がよい）。 */
 window.PIT_NEWS = [
+
+/* ────────── 2026-08-15 ────────── */
+{
+  id: 'n-20260815-overdue', version: '1.101.0', date: '2026-08-15',
+  title: '日付を過ぎた予約・返車が、ひとりでに「未定」へ移るようになりました',
+  body: `
+    <p>日付が過ぎたのに片付いていない車が、<b>どのカレンダーにも出ないまま消えてしまう</b>状態をやめました。
+       過ぎたものは<b>かならず「未定」のどこかの箱に落ちます</b>。</p>
+
+    <p><b>▼ 入庫日を過ぎても入庫済みにならなかった予約</b></p>
+    <p><b>予約 → 未定 → 未入庫</b> に自動で移ります。連絡が来たら<b>「↩ 予約に戻す」</b>で戻せます
+       （入庫日は入れ直してください）。※ 1ヶ月たつと自動でアーカイブされます。</p>
+    <p>🔴 <b>仮予約と承認待ちは動きません。</b>承認され忘れが見えなくなると困るためです。</p>
+
+    <p><b>▼ 返車予定日を過ぎてもまだ返していない車</b></p>
+    <p>返車日を<b>いったん空</b>にして、<b>返車 → 未定 → 返車日未定</b> へ移します。
+       新しい返車日が決まったら、そこから入れてください。</p>
+    <p><b>待ち・当日返し</b>の車も、その日に返せなかったら「返車日未定」に出ます
+       （作業はまだ続いているので、<b>タスクボードには残ったまま</b>です）。</p>
+    <p>⚠ どの車も、<b>いつ・なぜ動いたかはカードのフローに残ります</b>。</p>
+
+    <p><b>▼ まだ入庫していない車の「⋮」メニュー</b></p>
+    <ul>
+      <li>仮予約にする</li>
+      <li><b>承認予約にする</b>（承認待ちBOXへ入ります。仮予約とは別物です）</li>
+      <li><b>入庫中にする</b>（当日ビューの「入庫済みにする」と同じです）</li>
+      <li><b>予約キャンセルにする</b>（下記）</li>
+      <li>消去する</li>
+    </ul>
+
+    <p><b>▼ 予約キャンセルにする</b></p>
+    <p>お客様から<b>キャンセルの連絡があった時</b>に押します。理由を1行入れられます（任意）。</p>
+    <ul>
+      <li>お客様の<b>来店履歴に「キャンセル」と理由が残ります</b>（次に来た時に経緯が分かります）</li>
+      <li>その場でアーカイブされます。<b>来店回数にも金額にも数えません</b></li>
+    </ul>
+    <p>🔴 自動で入る<b>「未入庫」</b>（＝来なかっただけ）とは<b>別物</b>です。未入庫は来店履歴には残りません。</p>`
+},
+{
+  id: 'n-20260815-maintcheck', version: '1.100.0', date: '2026-08-15',
+  title: '【メカ】整備タブの「作業チェック」の項目が入れ替わりました',
+  body: `
+    <p>予約詳細の<b>整備</b>タブにある<b>作業チェック</b>を、実際にやることの一覧に入れ替えました。</p>
+    <ul>
+      <li>オイル入れ</li>
+      <li>タイヤローテーション</li>
+      <li>タイヤエア調整</li>
+      <li>LLC・ウォッシャー補充</li>
+      <li>タイヤ増締め</li>
+      <li>ライト回りチェック</li>
+      <li>サイドスリップ調整</li>
+    </ul>
+    <p><b>車検でも一般整備でも同じ7つ</b>です（これまでは作業タイプで中身が変わっていました）。</p>
+    <p><b>「予約を編集」の画面にも同じ7つが出ます。</b>これまでは詳細と編集で<b>別々の項目</b>が出ていて、
+       どちらで✓を付けたのか分からなくなっていました。これからは<b>どちらで付けても同じ✓</b>です。</p>
+    <p>⚠ 入れ替え前に付いていた✓は、項目そのものが違うので<b>引き継いでいません</b>。
+       いま作業中の車は、お手数ですが付け直してください。</p>`
+},
+{
+  id: 'n-20260815-nosale', version: '1.99.0', date: '2026-08-15',
+  title: 'カード詳細の「⋮」メニューが3つになりました／売上0円の車の片付け方',
+  body: `
+    <p><b>▼ 入庫済みの車の「⋮」は、この3つだけになりました</b></p>
+    <ul>
+      <li><b>予約に戻す</b>… 入庫そのものを取り消して、予約カレンダーの状態に戻します</li>
+      <li><b>売上なしでアーカイブする</b>… 売上0円で返した車を片付けます（下記）</li>
+      <li><b>消去する</b>… 今までの「削除する」と同じです</li>
+    </ul>
+    <p>🔴 <b>「フェーズ移動」はなくなりました。</b>工程は今までどおり<b>ドラッグ</b>か
+       カードの<b>◀▶</b>で動かしてください。
+       ここから飛ばすと、<b>確定金額を入れる画面や、担当者の確認を通らずに</b>先へ進めてしまうためです。</p>
+    <p>入庫済みの車に「仮予約にする」は出ません。まだ入庫していない予約では今までどおり出ます。</p>
+
+    <p><b>▼ 売上なしでアーカイブする</b></p>
+    <p>点検したけど<b>結局なにもせず0円で返した</b>ような車を、ここから片付けられます。</p>
+    <ul>
+      <li>タスクボードから消えます。<b>フロー・作業内容・担当者はそのまま残ります</b></li>
+      <li>お客様の<b>来店履歴には「売上なし」で残ります</b>（次に来た時に前回なにをしたか分かります）</li>
+      <li>🔴 <b>実績・売上・台数には入りません。</b>実績カレンダーにも出ません</li>
+      <li>やり直したい時は、同じ「⋮」の<b>「予約に戻す」</b>で戻せます</li>
+    </ul>
+
+    <p><b>▼ 予約に戻す</b></p>
+    <p>入庫してから付いたもの（工程・完TEL・返車の予定・確定売上・PITの枠）だけを取り消します。
+       <b>代車の貸出はそのまま残ります</b>ので、要らなければ代車カレンダーから取り消してください。</p>`
+},
+{
+  id: 'n-20260815-todaydiv', version: '1.98.0', date: '2026-08-15',
+  title: '当日ビュー：担当者が空のところに「1課／2課」が出るようになりました',
+  body: `
+    <p>当日ビューで、<b>時間の横の縦長バッジ</b>にフロント担当が入っていないと、これまで<b>真っ白</b>でした。</p>
+    <p>担当者がまだ決まっていない時は、代わりに<b>その車の課（1課・2課）</b>を出します。色はそのまま
+       <b>1課＝緑・2課＝ピンク</b>です（設定で課の色を変えれば、ここも一緒に変わります）。</p>
+    <p>人の名前が入ればこれまでどおり名前に変わります。課のボタンも空の時だけ、今までどおり空欄です。</p>`
+},
+{
+  id: 'n-20260815-donecheck', version: '1.97.0', date: '2026-08-15',
+  title: '当日返車の車に関門が付きました／作業完了で担当者を聞くようになりました',
+  body: `
+    <p><b>▼ 当日返しの車は、完TELを通すまで「返車済み」にできません</b></p>
+    <p>待ち・当日返しの車が、盤面を通らずに当日ビューの返車に出るのは<b>今までどおり</b>です。
+       ただし<b>「返車済みにする」がグレーで押せなく</b>なりました。押せない理由もその場に出ます。</p>
+    <p>正しい順番はこうです。<b>入庫済みにする → タスクボードで作業 → 完TEL済（または完TEL依頼）へドラッグ</b>。
+       ここで確定金額を入れると、当日ビューの<b>「返車済みにする」が押せるようになります</b>。
+       <span style="opacity:.75">※これまでは、金額も担当者も入っていない車をそのまま実績に固められてしまいました。</span></p>
+
+    <p><b>▼ 完TEL済／完TEL依頼へドラッグすると、先に1枚聞きます</b></p>
+    <p>待ち・当日返しの車だけ、金額を入れる前に<b>「通常の完TEL済みにする」か「実績化する」か</b>を聞きます。</p>
+    <ul>
+      <li><b>通常</b>＝今までどおり。返車予定日を入れて返車カレンダーに置きます。
+        日付を変えれば返車カレンダーもそちらへ動き、当日ビューからは消えます。
+        予定そのままなら当日ビューに残るので、お客様に渡した時に「返車済みにする」を押してください</li>
+      <li><b>実績化する</b>＝<b>もうその場で渡した</b>時。返車済みとして実績（確定売上）に固め、
+        当日ビューからは自動で消えます。返車カレンダーには置きません</li>
+    </ul>
+    <p>預かりの車は今までどおりで、この1枚は出ません。</p>
+
+    <p><b>▼ 作業完了に入れた時、担当者が空なら聞きます</b></p>
+    <p>点検担当者・整備担当者が<b>どちらも空</b>のまま作業完了へ動かすと、注意が出ます。
+       <b>そのポップアップの中でそのまま担当者を選べます</b>（カード詳細の整備タブと同じチップ・配分の帯も出ます）。
+       急いでいる時は<b>「このまま進める」</b>でそのまま動かせます。片方でも入っていれば出ません。</p>`
+},
+{
+  id: 'n-20260815-ctx3off', version: '1.96.0', date: '2026-08-15',
+  title: 'カードの右クリックから「返車済みにする」「工程を変える」「急ぎにする」を外しました',
+  body: `
+    <p>予約カードを<b>右クリック</b>した時に出るメニューから、この3つを<b>なくしました</b>。</p>
+    <ul>
+      <li><b>返車済みにする</b></li>
+      <li><b>工程を変える</b></li>
+      <li><b>急ぎにする／急ぎを外す</b></li>
+    </ul>
+    <p><b>▼ できなくなったわけではありません。</b>今までどおりのやり方でどうぞ。</p>
+    <ul>
+      <li><b>返車済み</b>＝当日ビューの<b>返車</b>から。実績（確定売上）に固まる大事な操作なので、
+        右クリックのついでで押せてしまうのをやめました</li>
+      <li><b>工程を変える</b>＝タスクボードで<b>カードをドラッグ</b>して別の列へ</li>
+      <li><b>急ぎ</b>＝カードの<b>詳細</b>を開いて付け外し</li>
+    </ul>
+    <p>右クリックには <b>詳細を開く／別タブで開く／表紙を印刷／コピー</b> が残っています。</p>`
+},
+{
+  id: 'n-20260815-calshort', version: '1.90.0', date: '2026-08-15',
+  title: '休みと「いつもと時間が違う日」が、カレンダーで分かるようになりました',
+  body: `
+    <p>MHSで付けた <b>休み</b> と <b>午前休み・午後休み・早締め</b> が、PitFlow のカレンダーに出るようになりました。</p>
+    <p><b>▼ 色は3つだけ覚えてください</b></p>
+    <ul>
+      <li>🔴 <b>赤＝休み</b>（定休・お盆休みなど）</li>
+      <li>🟠 <b>オレンジ＝いつもと時間が違う日</b>（午前休み・午後休み・〜15:00締）
+        <span style="opacity:.75">※これまで灰色で、休みの赤の隣に埋もれていました</span></li>
+      <li>🟢 <b>緑＝特別営業</b>（ふだん休みの日に開ける日）</li>
+    </ul>
+    <p><b>▼ 出るようになった場所</b></p>
+    <ul>
+      <li>🔴 <b>当日ビュー</b>＝いままで<b>何も出ていませんでした</b>。日付の横の札と、<b>入庫・返車の上に横1本の帯</b>が出ます。
+        帯には <b>「午前休み・棚卸し　受付 13:00〜17:00」</b> のように<b>何時から受けられるか</b>が書いてあります</li>
+      <li>🔴 <b>空きカレンダー・新規予約の右パネル</b>＝<b>いつもと時間が違う日の右上に小さなオレンジの ◐</b>。
+        <b>日付にカーソルを乗せる（スマホは長押し）と、受付時間と空き台数</b>が出ます。
+        <span style="opacity:.75">※これまで、午前休みの日も朝9時から開いている日と全く同じに見えていました</span></li>
+      <li><b>予約・返車の当日／週／月／2ヶ月</b>＝札の色がオレンジになりました（場所は今までと同じ）</li>
+    </ul>
+    <p>⚠ <b>受け付けられる台数（3/5 など）は変えていません。</b>午前休みの日でも枠は今までどおりです。
+    <b>○△満 の見方も変わりません。</b></p>
+    <p>👉 <b>休みや短縮を決めるのは、今までどおり MHS の定休日カレンダー</b>です。PitFlow はそれを読んで出しているだけなので、
+    直したい時は MHS 側で直してください。</p>
+  `
+},
+{
+  id: 'n-20260815-tel-yellow', version: '1.89.0', date: '2026-08-15',
+  title: '【新規予約】TEL が「入れないと保存できない」ではなくなりました',
+  body: `
+    <p><b>電話番号（TEL）が 🔴赤（必須）から 🟡黄（入れたほうがいい）に変わりました。</b>
+    <b>TEL が空でも、予約が保存できます。</b></p>
+    <p>その場で番号を聞き出せなくても、まず予約を取ってしまえます。
+    空のまま保存すると<b>「このまま保存しますか？」と1回だけ聞かれる</b>ので、
+    <b>「このまま保存する」</b>で通してください（あとから入れられます）。</p>
+    <p><b>▼ いまの 🔴赤（これが空だと保存できません）</b><br>
+    <b>カナ</b>／<b>初回・リピーター</b>／<b>入庫日</b>／<b>受付タイプ</b>（預かり・待ち など）／<b>作業タイプ</b><br>
+    代車を「必要」にした時の <b>使用代車・貸出から・貸出まで</b>、車検の <b>諸費用</b> も今までどおり赤です。</p>
+    <p><b>▼ いまの 🟡黄（空でも保存できます・1回だけ聞きます）</b><br>
+    <b>お客様名（漢字）</b>／<b>TEL</b>／<b>国産車・輸入車</b>／<b>メーカー</b>／<b>車種</b>／<b>入庫時刻</b>／<b>作業内容</b></p>
+    <p>⚠ <b>お名前のカナは今までどおり必須</b>です。ほかの決まりは何も変わっていません。</p>
+  `
+},
 
 /* ────────── 2026-08-14 ────────── */
 {
@@ -558,7 +753,13 @@ window.PIT_NEWS = [
 (function () {
   'use strict';
 
+  /* 練習用サイト（この端末だけ）の置き場。本番は下の LS_MINE（人ごと）を使う。 */
   var LS_READ = 'pitflow_news_read_v1';
+  /* 🔴 v1.88.0 本番でも「この端末の控え」を必ず残す（人ごと）。
+     ⚠ これが今回の直しの肝。クラウドが読めない／書けない時に、
+        控えが無いと**確認済みが空っぽ扱い**になり、同じお知らせがまた出る。 */
+  function LS_MINE(uid) { return 'pitflow_news_read_v1:' + uid; }
+
   /* 🔴 ログイン直後に一度に出すポップアップの上限。
      ⚠ CarFlow は未読を全部つなげて出すが、PitFlow は入れ替え時点で未読が16件ある。
         16連続でモーダルが出ると、現場は中身を読まずに閉じるだけになる。
@@ -566,11 +767,19 @@ window.PIT_NEWS = [
         次にログインした時は、続きの3件が出る。 */
   var POPUP_MAX = 3;
 
-  var _read = null;      // 既読の id の入れ物
+  var _read = null;      // 既読の id の入れ物（分からない間は null）
   /* 🔴 v1.68.1 いま抱えている既読が「どこの・誰のぶんか」の印。
      ⚠ これが無いと、**ログインが済む前**に読んだ「この端末の控え（＝からっぽ）」を
         本物として抱えたまま二度と読み直さない。＝毎回ぜんぶ未読に戻る。 */
   var _readKey = null;
+  /* 🔴 v1.88.0 いまの既読が「信用できるか」。
+     クラウドをちゃんと読めた時だけ true。読めていない時に新着の窓を出すと、
+     **確認済みのお知らせをもう一度出してしまう**（ゆうた報告の症状そのもの）。 */
+  var _trusted = false;
+  var _loading = null;   // 走っている読み込み（同じものを2本走らせない）
+  var _pend = [];        // まだクラウドに送れていない分（送れるまで持ち続ける）
+  var _retryT = 0, _retryN = 0;
+  var _inboxTried = false;   /* 受信箱の描き直しを1回だけにする印 */
 
   function LIST() { return (window.PIT_NEWS || []).slice(); }
 
@@ -580,6 +789,7 @@ window.PIT_NEWS = [
     });
   }
   function cloud() { return window.PIT_CLOUD && window.fb && window.fb.ready && window.fb.currentUser; }
+  function myUid() { return cloud() ? window.fb.currentUser.uid : null; }
 
   /* 版くらべ（"1.67.0" > "1.65.1"）。小さいほど古い。 */
   function verNum(v) {
@@ -587,6 +797,25 @@ window.PIT_NEWS = [
     return (p[0] || 0) * 10000 + (p[1] || 0) * 100 + (p[2] || 0);
   }
   function verCmp(a, b) { return verNum(a) - verNum(b); }
+
+  /* ---- 端末の控え（人ごと） ----
+     🔴 確認を押したら、通信より先に**必ずここへ書く**。
+        クラウドは落ちることがあるが、ここは落ちない。 */
+  function lsGet(k) { try { var a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function lsPut(k, arr) { try { localStorage.setItem(k, JSON.stringify(arr || [])); } catch (e) {} }
+  function lsAdd(ids) {
+    var uid = myUid();
+    var k = uid ? LS_MINE(uid) : (window.PIT_CLOUD ? null : LS_READ);
+    if (!k) return;                       /* ログイン待ちの間は誰のぶんか決まらない＝控えない */
+    var a = lsGet(k), ch = false;
+    (ids || []).forEach(function (id) { if (a.indexOf(id) < 0) { a.push(id); ch = true; } });
+    if (ch) lsPut(k, a);
+  }
+  function uni(a, b) {
+    var out = (a || []).slice();
+    (b || []).forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
+    return out;
+  }
 
   /* ---- 既読 ----
      🔴 v1.68.1 既読の置き場は3通りある。取り違えると「確認したのにまた出る」になる。
@@ -600,59 +829,91 @@ window.PIT_NEWS = [
   }
   function loadRead() {
     var key = readKey();
-    if (_read && _readKey === key && key !== 'wait') return Promise.resolve(_read);
+    if (_read && _readKey === key && key !== 'wait' && _trusted) return Promise.resolve(_read);
+    if (_loading && _loading.key === key) return _loading.p;   /* 同じ読み込みを2本走らせない */
 
     if (key === 'wait') {
       /* ログインの返事を待っている最中。ここで控えを読むと、
          そのあとクラウドを一度も見ないまま「ぜんぶ未読」で固まる。 */
       if (!_read) { _read = []; _readKey = 'wait'; }
+      _trusted = false;
       return Promise.resolve(_read);
     }
 
     if (key === 'local') {
-      try { _read = JSON.parse(localStorage.getItem(LS_READ) || '[]'); } catch (e) { _read = []; }
-      _readKey = 'local';
+      _read = lsGet(LS_READ); _readKey = 'local'; _trusted = true;
       return Promise.resolve(_read);
     }
 
-    var keep = (_read || []).slice();   // 読み込みの最中に押された「確認」を落とさない
-    return window.fb.company().collection('userPrefs').doc(window.fb.currentUser.uid).get()
+    var uid = window.fb.currentUser.uid;
+    var mine = lsGet(LS_MINE(uid));                 /* この端末で確認したぶん（絶対に落ちない控え） */
+    var keep = uni(mine, uni(_read || [], _pend));  /* 読み込みの最中に押された「確認」も落とさない */
+    var p = window.fb.company().collection('userPrefs').doc(uid).get()
       .then(function (d) {
         var arr = ((d.exists && (d.data() || {}).pitNewsRead) || []).slice();
-        keep.forEach(function (id) { if (arr.indexOf(id) < 0) arr.push(id); });
-        _read = arr; _readKey = key;
+        var merged = uni(arr, keep);
+        _read = merged; _readKey = key; _trusted = true; _inboxTried = false;
+        _loading = null; _retryN = 0;
+        /* 控えにあってクラウドに無いぶん＝前に送れていなかった分。ここで送り直す（自己修復）。 */
+        var miss = keep.filter(function (id) { return arr.indexOf(id) < 0; });
+        if (miss.length) pushCloud(miss);
+        lsPut(LS_MINE(uid), merged);
         return _read;
       })
       .catch(function (e) {
         console.warn('[news] 既読の読み込みに失敗', e);
-        _read = keep;
-        _readKey = null;              // 印は付けない＝次に呼ばれた時にもう一度読みに行く
+        /* 🔴 読めなかった時は「端末の控え」で我慢する＝**確認済みは二度と出さない**。
+           ただし信用できない印を付けて、あとでもう一度読みに行く。 */
+        _read = keep; _readKey = null; _trusted = false;
+        _loading = null;
+        retryLater();
         return _read;
       });
+    _loading = { key: key, p: p };
+    return p;
   }
-  /* 既読を残す。
-     🔴 クラウドへは **足したぶんだけ**（arrayUnion）送る。
-        一覧を丸ごと上書きすると、読み込みに失敗していた時に
-        **クラウドに入っている既読を消してしまう**（v1.68.0 の事故）。 */
+  /* 読み込みに失敗したら、間を空けてもう一度取りに行く（5秒→15秒→45秒） */
+  function retryLater() {
+    if (_retryN >= 3) return;
+    var wait = [5000, 15000, 45000][_retryN++] || 45000;
+    clearTimeout(_retryT);
+    _retryT = setTimeout(function () { loadRead().then(paintBadge); }, wait);
+  }
+
+  /* クラウドへ足したぶんだけ送る。
+     🔴 一覧を丸ごと上書きしない（v1.68.0 の事故）。
+     🔴 v1.88.0 送れなかったら _pend に残し、次の読み込みで送り直す。 */
+  function pushCloud(ids) {
+    if (!ids || !ids.length) return;
+    if (!cloud()) { ids.forEach(function (id) { if (_pend.indexOf(id) < 0) _pend.push(id); }); return; }
+    var FV = window.fb.FieldValue;
+    var payload = (FV && FV.arrayUnion)
+      ? { pitNewsRead: FV.arrayUnion.apply(null, ids) }
+      : { pitNewsRead: uni(lsGet(LS_MINE(window.fb.currentUser.uid)), ids) };
+    window.fb.company().collection('userPrefs').doc(window.fb.currentUser.uid)
+      .set(payload, { merge: true })
+      .then(function () {
+        _pend = _pend.filter(function (id) { return ids.indexOf(id) < 0; });
+      })
+      .catch(function (e) {
+        console.warn('[news] 既読の記録に失敗（端末には残っています）', e);
+        ids.forEach(function (id) { if (_pend.indexOf(id) < 0) _pend.push(id); });
+        setTimeout(function () { pushCloud(_pend.slice()); }, 8000);
+      });
+  }
+  /* 既読を残す。まず端末（落ちない）→ そのあとクラウド。 */
   function saveRead(add) {
-    if (cloud()) {
-      var ids = (add && add.length) ? add : (_read || []);
-      if (!ids.length) return;
-      var FV = window.fb.FieldValue;
-      var payload = (FV && FV.arrayUnion)
-        ? { pitNewsRead: FV.arrayUnion.apply(null, ids) }
-        : { pitNewsRead: (_read || []).slice() };
-      window.fb.company().collection('userPrefs').doc(window.fb.currentUser.uid)
-        .set(payload, { merge: true })
-        .catch(function (e) { console.warn('[news] 既読の記録に失敗', e); });
-    } else {
-      try { localStorage.setItem(LS_READ, JSON.stringify(_read || [])); } catch (e) {}
-    }
+    var ids = (add && add.length) ? add : (_read || []);
+    if (!ids.length) return;
+    lsAdd(ids);
+    if (window.PIT_CLOUD) pushCloud(ids);
   }
   /* 人が入れ替わった時に忘れる（ログアウト時に auth-pit.js が呼ぶ）。
-     ⚠ 忘れないと、次に入った人に前の人の既読が引き継がれてポップアップが出ない。 */
+     ⚠ 忘れるのは**画面が抱えている分だけ**。端末の控えは人ごと（uid別）なので、
+        次に入った人には効かない＝混ざらない。 */
   window.pitNewsForget = function () {
-    _read = null; _readKey = null;
+    _read = null; _readKey = null; _trusted = false;
+    _loading = null; _pend = []; _retryN = 0; _inboxTried = false; clearTimeout(_retryT);
     window._nwPopShown = false;
     window._nwQueue = null; window._nwQueueIdx = 0;
     paintBadge();
@@ -669,7 +930,7 @@ window.PIT_NEWS = [
   }
   window.pitNewsReadAll = function () {
     var all = LIST().map(function (a) { return a.id; });
-    _read = all.slice();
+    _read = uni(_read || [], all);
     saveRead(all); paintBadge(); renderNews();
   };
 
@@ -687,7 +948,9 @@ window.PIT_NEWS = [
   function paintBadge() {
     var item = document.querySelector('.si-item[data-view="news"]');
     if (!item) return;
-    var n = (_read === null) ? 0 : unread().length;
+    /* 🔴 v1.88.0 既読がまだ分からない間（ログイン待ち・読み込み前）は丸を出さない。
+       ⚠ ここで出すと、入った瞬間に「27」と出てから減る＝毎回ぜんぶ未読に見える。 */
+    var n = (_read === null || (window.PIT_CLOUD && !_trusted)) ? 0 : unread().length;
     var b = item.querySelector('.si-newsbadge');
     if (!n) { if (b) b.remove(); return; }
     if (!b) { b = document.createElement('span'); b.className = 'si-newsbadge'; item.appendChild(b); }
@@ -699,7 +962,10 @@ window.PIT_NEWS = [
   function renderNews() {
     var box = document.getElementById('news-body');
     if (!box) return;
-    if (_read === null) {
+    /* 🔴 v1.88.0 まだ既読が読めていない時も、もう一度取りに行ってから描く。
+       ⚠ 読めていないまま描くと、確認済みのお知らせが未読の顔で並ぶ。 */
+    if (_read === null || (window.PIT_CLOUD && !_trusted && !_inboxTried)) {
+      _inboxTried = true;                 /* ⚠ 一度だけ。戻さないと読めない時に無限に描き直す */
       box.innerHTML = '<div class="nw-loading">読み込んでいます…</div>';
       loadRead().then(function () { renderNews(); });
       return;
@@ -817,6 +1083,16 @@ window.PIT_NEWS = [
           （お知らせそのものを試す test_news.mjs だけは、この印を付けずに開く） */
     try { if (/[?&]nonews=1/.test(location.search)) return; } catch (e) {}
     loadRead().then(function () {
+      /* 🔴 v1.88.0 既読が読めていない時は**絶対に出さない**。
+         ⚠ ここを出してしまうと、確認済みのお知らせをもう一度出すことになる
+            ＝「確認したのにまた出る」（ゆうた報告）の正体。
+            読めるようになるまで、少し待ってからもう一度試す。 */
+      if (window.PIT_CLOUD && !_trusted) {
+        if ((window._nwPopWait = (window._nwPopWait || 0) + 1) <= 4) {
+          setTimeout(window.pitNewsMaybePopup, 4000);
+        }
+        return;
+      }
       var u = unreadOldFirst();
       if (!u.length) return;
       window._nwPopShown = true;

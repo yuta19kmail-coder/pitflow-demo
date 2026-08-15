@@ -5,8 +5,12 @@
    実績＝作業完了日(completedAt)に「作業完了 or 返車済み」になったカード。
    ======================================== */
 
+/* 🔴 v1.99.0 「売上なしでアーカイブ」した車は実績に出さない（物差しは sales-count.js の pitCardNoSale 1本）。
+   ⚠ そもそも実績カウント日を入れない作りだが、**昔のデータや手直しで日付が入っていても出さない**
+      ように、ここでも止める（二重の守り）。 */
 function _resultDayCards(dateStr){
   return (state.cards || []).filter(function(c){
+    if (window.pitCardNoSale && pitCardNoSale(c)) return false;
     return c && c.completedAt === dateStr && (c.status === 'workDone' || c.status === 'returned');
   });
 }

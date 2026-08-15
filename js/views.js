@@ -11,7 +11,19 @@ function showView(viewId){
      ⚠ 聞くのは1回だけ。答えが返ってから改めて showView をやり直す（写しを作らない）。 */
   if (state.currentView === 'loaner' && viewId !== 'loaner'
       && window.pitLoanerAskLeave && pitLoanerAskLeave(viewId)) return;
+  /* 🔴 v1.95.0 **切り替える前のビュー**を覚えておく。
+     ⚠ 画面のどこかが変わるたびに `showView(state.currentView)` で背後を描き直す作りなので、
+        描き直し側からは「新しく開いたのか／同じ画面を描き直しただけなのか」が分からない。
+        分からないと、代車カレンダーのように**スクロール位置を持っている画面が毎回いちばん上に戻る**。
+     ⚠ 使うのは「同じ画面の描き直しか？」の判定だけ。画面の出し分けには使わないこと。 */
+  window._pitPrevView = state.currentView || '';
   state.currentView = viewId;
+  /* 🔴 v1.101.0（ゆうた指定）**当日を過ぎたものを、描く前に正しい箱へ落とす。**
+     ・入庫日を過ぎた本予約 → 予約・未定の「未入庫」
+     ・返車予定日を過ぎてまだ返していない車 → 日付を空にして「返車日未定」
+     ⚠ 中身は overdue-pit.js の1本。ここで条件を書き写さないこと。
+     ⚠ 変わったものが無ければ保存しない作りなので、毎回呼んでよい。 */
+  if (window.pitAutoOverdue) { try { pitAutoOverdue(); } catch(e){} }
   // 付箋の表示先を既定（ダッシュボード）へ戻す。マイダッシュボードは renderMyDash 内で自分の器へ切替。
   window.PIT_BN_TARGET = 'board-notes-area';
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));

@@ -230,23 +230,39 @@
     const _hid = (typeof _cardBodyId !== 'undefined' && _cardBodyId) ? _cardBodyId : 'md-body';
     const _host = document.getElementById(_hid) || document;
     const box = _host.querySelector('#cf-recall-list'); if(!box) return;
-    const q=norm(qstr);
-    if(!q){ box.innerHTML=''; box.style.display='none'; return; }
+    /* 🔴 v1.102.0（ゆうた報告「ダッシュボードのマスター検索に比べて、新規予約での検索の結果が薄い。
+                     なんか件数制限みたいなものがある」）
+       ◎前まで（薄かった理由は3つ）
+         ① **10件で打ち切っていた**（しかも「何件あるか」も出さないので、気づけない）
+         ② **スペース区切りが効かない**＝「山田 アクア」と2語で打つと 0件（全文一致しか見ていなかった）
+         ③ **全角の英数字をならしていなかった**＝全角で打ったナンバー・電話が当たらない
+       ◎これから
+         🔴 **探し方はマスター検索と同じ物差し**（search.js の `pitSearchNorm` / `pitSearchWords`）。
+            ⚠ ここに書き写さないこと。写すと、また片方だけ直って食い違う。
+         🔴 **上限は30件**（マスター検索と同じ）。**超えたら「◯件中 上位30件」と正直に出す。**
+            ＝ 出し切れていないことが分かれば、もう1語足して絞れる。 */
+    const words = (window.pitSearchWords ? pitSearchWords(qstr) : (norm(qstr) ? [norm(qstr)] : []));
+    if(!words.length){ box.innerHTML=''; box.style.display='none'; return; }
+    const nz = window.pitSearchNorm || norm;
     const entries=[];
     /* 🔴 v1.49.0 アーカイブした顧客・車両は呼び出しの候補に出さない（archive-pit.js が判定）。
        ⚠ 顧客をアーカイブすると、その車も全部まとめて候補から消える。 */
     const _vis = c => (window.PitArchive ? PitArchive.custVisible(c) : true);
     const _vveh = (c,v) => (window.PitArchive ? !PitArchive.vehArchived(c,v) : true);
+    const _hit = arr => { const blob = nz(arr.filter(Boolean).join(' ')); return words.every(w => blob.indexOf(w) >= 0); };
     list().filter(_vis).forEach(function(cust){
-      const pm = norm(cust.name).includes(q)||norm(cust.kana).includes(q)||(cust.contacts||[]).some(ct=>norm(ct.tel).includes(q));
-      (cust.vehicles||[]).filter(v=>_vveh(cust,v)).forEach(function(v){
-        const vm = norm(v.plate).includes(q)||norm(v.car).includes(q)||norm(v.maker).includes(q);
-        if(pm||vm) entries.push({cust:cust, v:v});
+      /* 人の手がかり（名前・カナ・電話）は**どの車の行にも付けて**見る。
+         ＝名前で引けばその人の車が全部出る／「名前＋車種」の2語でも当たる。 */
+      const who = [cust.name, cust.kana].concat((cust.contacts||[]).map(ct=>ct&&ct.tel));
+      const vehs = (cust.vehicles||[]).filter(v=>_vveh(cust,v));
+      vehs.forEach(function(v){
+        if(_hit(who.concat([v.plate, v.maker, v.car]))) entries.push({cust:cust, v:v});
       });
-      if(pm && !(cust.vehicles||[]).filter(v=>_vveh(cust,v)).length) entries.push({cust:cust, v:null});
+      if(!vehs.length && _hit(who)) entries.push({cust:cust, v:null});
     });
-    entries.sort((a,b)=>norm(a.cust.kana+a.cust.name).localeCompare(norm(b.cust.kana+b.cust.name),'ja'));
-    const shown=entries.slice(0,10);
+    entries.sort((a,b)=>nz(a.cust.kana+a.cust.name).localeCompare(nz(b.cust.kana+b.cust.name),'ja'));
+    const RECALL_MAX = 30;
+    const shown=entries.slice(0,RECALL_MAX);
     if(!shown.length){ box.innerHTML=''; box.style.display='none'; return; }
     box.innerHTML=shown.map(function(e){
       const t=e.v?teamInfo(e.v):{label:'',color:'#64748b'};
@@ -254,7 +270,11 @@
       const vtxt=e.v?(esc(vehLabel(e.v))+(e.v.plate?' / '+esc(e.v.plate):'')):'（車両なし）';
       return '<button type="button" class="cf-recall-item" onclick="custPick(\''+e.cust.id+'\',\''+(e.v?e.v.id:'')+'\')">'+
         '<b>'+esc(custDispName(e.cust)||'(無名)')+'</b> <span>'+vtxt+tag+'</span></button>';
-    }).join('');
+    }).join('')
+    /* 🔴 出し切れていない時は黙って切らない。何件あるかを出す（マスター検索と同じ考え方）。 */
+    + (entries.length>RECALL_MAX
+        ? '<div class="cf-recall-more">'+entries.length+'件あります（上位'+RECALL_MAX+'件）。名前と車種など、スペースで区切ってもう1語足すと絞れます</div>'
+        : '');
     box.style.display='block';
   };
   window.custPick=function(custId,vehId){

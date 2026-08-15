@@ -31,6 +31,18 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+
+  /* 🔴 v1.102.0（ゆうた報告「新規予約での検索の結果が薄い」）
+     **探し方（文字のならし方・スペース区切りのAND）をここから配る。**
+     ＝新規予約の「呼び出し」（customers.js の custSuggest）が**同じ規則**で探せるようにする。
+     ⚠ 向こうに書き写さないこと。写した瞬間、片方だけ直して「マスター検索では出るのに呼び出しでは出ない」が戻る。
+       ・pitSearchNorm(s)   … 空白を消す／全角英数→半角／カタカナ→ひらがな／小文字
+       ・pitSearchWords(q)  … スペースで区切って語にする（全部含む＝AND） */
+  window.pitSearchNorm = norm;
+  window.pitSearchWords = function (qStr) {
+    const raw = String(qStr || '').trim();
+    return raw ? raw.split(/\s+/).map(norm).filter(Boolean) : [];
+  };
   // N日前の日付文字列（YYYY-MM-DD）＝返車済みの「直近1か月」判定に使う
   function _daysAgoStr(n) {
     const d = new Date(); d.setDate(d.getDate() - n);

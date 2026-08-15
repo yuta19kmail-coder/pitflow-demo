@@ -239,8 +239,8 @@
        ◎これから
          🔴 **探し方はマスター検索と同じ物差し**（search.js の `pitSearchNorm` / `pitSearchWords`）。
             ⚠ ここに書き写さないこと。写すと、また片方だけ直って食い違う。
-         🔴 **上限は30件**（マスター検索と同じ）。**超えたら「◯件中 上位30件」と正直に出す。**
-            ＝ 出し切れていないことが分かれば、もう1語足して絞れる。 */
+         🔴 **上限なし＝全件出す**（v1.102.1・ゆうた指定「どっちも顧客検索の上限は設けないで全件出して」）。
+            ⚠ 数が多い時だけ、頭に「◯件」と「もう1語足すと絞れる」を出す。**黙って切らない・勝手に絞らない。** */
     const words = (window.pitSearchWords ? pitSearchWords(qstr) : (norm(qstr) ? [norm(qstr)] : []));
     if(!words.length){ box.innerHTML=''; box.style.display='none'; return; }
     const nz = window.pitSearchNorm || norm;
@@ -261,20 +261,18 @@
       if(!vehs.length && _hit(who)) entries.push({cust:cust, v:null});
     });
     entries.sort((a,b)=>nz(a.cust.kana+a.cust.name).localeCompare(nz(b.cust.kana+b.cust.name),'ja'));
-    const RECALL_MAX = 30;
-    const shown=entries.slice(0,RECALL_MAX);
-    if(!shown.length){ box.innerHTML=''; box.style.display='none'; return; }
-    box.innerHTML=shown.map(function(e){
+    if(!entries.length){ box.innerHTML=''; box.style.display='none'; return; }
+    const HINT_FROM = 30;   /* この数を超えたら「何件出ているか」を添える（切るための数ではない） */
+    box.innerHTML=(entries.length>HINT_FROM
+        ? '<div class="cf-recall-more">'+entries.length+'件（全部出しています）。名前と車種など、スペースで区切ってもう1語足すと絞れます</div>'
+        : '')
+      +entries.map(function(e){
       const t=e.v?teamInfo(e.v):{label:'',color:'#64748b'};
       const tag=t.label?(' <i style="color:'+t.color+'">●</i>'+esc(t.label)):'';
       const vtxt=e.v?(esc(vehLabel(e.v))+(e.v.plate?' / '+esc(e.v.plate):'')):'（車両なし）';
       return '<button type="button" class="cf-recall-item" onclick="custPick(\''+e.cust.id+'\',\''+(e.v?e.v.id:'')+'\')">'+
         '<b>'+esc(custDispName(e.cust)||'(無名)')+'</b> <span>'+vtxt+tag+'</span></button>';
-    }).join('')
-    /* 🔴 出し切れていない時は黙って切らない。何件あるかを出す（マスター検索と同じ考え方）。 */
-    + (entries.length>RECALL_MAX
-        ? '<div class="cf-recall-more">'+entries.length+'件あります（上位'+RECALL_MAX+'件）。名前と車種など、スペースで区切ってもう1語足すと絞れます</div>'
-        : '');
+    }).join('');
     box.style.display='block';
   };
   window.custPick=function(custId,vehId){

@@ -256,9 +256,15 @@
     };
     let html = '';
     html += sec('<i data-ic=folder data-ics=16></i>', 'カード', recent, '');                       // 予約・作業中・直近1か月の返車済み
+    /* 🔴 v1.102.1（ゆうた指定）**顧客は上限なし＝全件出す。**
+       ⚠ カード（入庫予約・過去入庫）は今までどおり上位30件。
+          あちらは「探して開く」もので、多すぎると逆に見つからない。顧客は台帳なので全部見せる。
+       ⚠ 数が多い時は、何件出しているかを出したうえで「もう1語足すと絞れる」と添える（黙って切らない）。 */
     if (custHits.length) {
-      html += '<div class="psr-head"><i data-ic=user data-ics=16></i> 顧客 ' + custHits.length + '件' + (custHits.length > MAX ? '（上位' + MAX + '件）' : '') + '</div>';
-      html += custHits.slice(0, MAX).map(custRow).join('');
+      html += '<div class="psr-head"><i data-ic=user data-ics=16></i> 顧客 ' + custHits.length + '件'
+            + (custHits.length > MAX ? '<span style="color:var(--text3)">　全部出しています。スペースで区切ってもう1語足すと絞れます</span>' : '')
+            + '</div>';
+      html += custHits.map(custRow).join('');
     }
     html += sec('<i data-ic=box data-ics=16></i>', '過去入庫', past, '<span style="color:var(--text3)">（1か月より前の返車済み）</span>');
     box.innerHTML = html;

@@ -918,8 +918,16 @@ window.PIT_NEWS = [
     window._nwQueue = null; window._nwQueueIdx = 0;
     paintBadge();
   };
-  /* seed:true（出した時点で全員既読扱い）か、記録に入っていれば既読 */
+  /* 既読かどうかを決めるのはここ1か所。
+     🔴 v1.102.2（ゆうた指定）**練習用サイト（デモ版）では、お知らせは最初から全部既読。**
+        🗣「デモ版だけお知らせは強制的に全部既読にしてもらっていい？
+            いちいち開くたびにニュースが出てきてうざい」
+        ＝デモ版は**何度も開き直して触る**ものなので、毎回ポップアップが出ると邪魔になる。
+        ⚠ **本番には1ミリも影響しない**（デモ版の旗が立っている時だけ）。
+        ⚠ **記録には書かない**＝「読んだことにする」だけ。だから受信箱では今までどおり全部読める。
+     ⚠ seed:true（出した時点で全員既読扱い）は今までどおり。 */
   function isRead(a) {
+    if (window.pitIsDemo && pitIsDemo()) return true;
     if (a && a.seed) return true;
     return !!(_read && _read.indexOf(a.id) >= 0);
   }

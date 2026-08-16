@@ -10,7 +10,7 @@
   border-left:3px solid var(--brand);
   border-radius:var(--r);
   padding:8px 10px;
-  cursor:grab;
+  cursor:pointer;
   user-select:none;
   display:flex;
   flex-direction:column;
@@ -19,7 +19,7 @@
   transition:transform .08s, box-shadow .08s;
 }
 .pit-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.4)}
-.pit-card:active{cursor:grabbing}
+.pit-card:active{cursor:pointer}
 .pit-card .pc-line1{
   display:flex;align-items:center;gap:6px;
   font-size:12px;color:var(--text2);
@@ -190,9 +190,9 @@
 .reserve-week-event:hover{background:var(--brand)}
 /* 週ビュー ミニカード（C案）＝列幅に追従。当日タブのタスクカードを縮めた見た目。 */
 .reserve-week-cell{ font-size:11px; }
-.rwk-card{ background:var(--bg2); border:1px solid var(--border2); border-left:4px solid var(--green); border-radius:7px; padding:5px 7px; cursor:grab; min-width:0; margin-bottom:4px; }
+.rwk-card{ background:var(--bg2); border:1px solid var(--border2); border-left:4px solid var(--green); border-radius:7px; padding:5px 7px; cursor:pointer; min-width:0; margin-bottom:4px; }
 .rwk-card:last-child{ margin-bottom:0; }
-.rwk-card:active{ cursor:grabbing; }
+.rwk-card:active{ cursor:pointer; }
 .rwk-card.rwk-claim{ border-color:#ef4444 !important; box-shadow:0 0 0 1px #ef444455; }
 .rwk-r{ display:flex; align-items:center; gap:5px; min-width:0; }
 .rwk-r + .rwk-r{ margin-top:3px; }

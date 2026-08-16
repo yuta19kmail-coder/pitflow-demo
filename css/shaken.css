@@ -59,7 +59,7 @@
 .shk-decell{ padding:4px 5px 5px; min-height:42px; }
 .shk-decell.off{ min-height:0; height:100%; background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
 .shk-decell.drop{ outline:2px dashed var(--brand,#1f7a4d); outline-offset:-3px; background:rgba(31,122,77,.14); }
-.shk-chip{ position:relative; overflow:visible; display:block; max-width:100%; border:1px solid var(--border); border-left:3px solid var(--green); border-radius:6px; padding:3px 8px; background:var(--bg3); cursor:grab; margin-bottom:4px; line-height:1.28; }
+.shk-chip{ position:relative; overflow:visible; display:block; max-width:100%; border:1px solid var(--border); border-left:3px solid var(--green); border-radius:6px; padding:3px 8px; background:var(--bg3); cursor:pointer; margin-bottom:4px; line-height:1.28; }
 /* 済（完了）チップ＝右上に赤い「済」スタンプ（緑チップと見分けやすく）v0.124.2 */
 .shk-chip.shk-done::after{
   content:"済"; position:absolute; top:-7px; right:-5px; transform:rotate(-12deg);
@@ -85,7 +85,7 @@
 .shk-gsc.pm{ border-right:1px solid var(--daybd); }
 .shk-gcar .shk-gsc:last-child{ border-right:0; }
 .shk-gsc.off{ background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
-.shk-bar{ height:20px; width:100%; background:rgba(29,185,122,.24); border-top:1px solid #1db97a66; border-bottom:1px solid #1db97a66; cursor:grab; }
+.shk-bar{ height:20px; width:100%; background:rgba(29,185,122,.24); border-top:1px solid #1db97a66; border-bottom:1px solid #1db97a66; cursor:pointer; }
 .shk-bar.dragging{ opacity:.4; }
 .shk-bar.imp{ background:rgba(236,72,153,.22); border-color:#ec489966; }
 .shk-bar.l{ border-left:1px solid #1db97a66; border-top-left-radius:6px; border-bottom-left-radius:6px; margin-left:2px; }

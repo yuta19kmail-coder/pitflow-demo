@@ -80,7 +80,7 @@
 .si-item{
   display:flex;align-items:center;gap:10px;
   padding:10px 16px;
-  cursor:pointer;
+  cursor:default;
   font-size:13px;
   color:var(--text);
   border-left:3px solid transparent;

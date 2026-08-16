@@ -80,10 +80,10 @@
 /* ===== 🔀 v1.30.0 カプセルの並び替え（work-content.js の pointer 版）=====
    ⚠ touch-action:none ＝タブレットで指を動かした時に、画面のスクロールに持っていかれないため。
    ⚠ ×（削除）ボタンの上だけは今までどおり押せるようにする。 */
-.wc-s-chips[data-wc-grp] .wc-s-chip{ cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+.wc-s-chips[data-wc-grp] .wc-s-chip{ cursor:pointer; touch-action:none; user-select:none; -webkit-user-select:none; }
 .wc-s-chips[data-wc-grp] .wc-s-chip button{ cursor:pointer; touch-action:auto; }
-.wc-s-chip.wc-s-drag{ opacity:.6; cursor:grabbing; border-color:var(--brand); box-shadow:0 4px 14px rgba(0,0,0,.35); }
-body.wc-s-dragging{ cursor:grabbing; }
+.wc-s-chip.wc-s-drag{ opacity:.6; cursor:pointer; border-color:var(--brand); box-shadow:0 4px 14px rgba(0,0,0,.35); }
+body.wc-s-dragging{ cursor:pointer; }
 body.wc-s-dragging .wc-s-chip{ transition:transform .12s ease; }
 
 .wc-s-syms{ display:flex; flex-direction:column; gap:8px; }

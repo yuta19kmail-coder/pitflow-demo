@@ -64,9 +64,9 @@
   border:1px solid var(--border2);   /* ピットボードと同じくはっきり角丸で囲む */
   border-left-width:4px;             /* 左ライン＝国産緑/輸入ピンク（JSで色指定） */
   border-radius:8px;
-  cursor:grab;
+  cursor:pointer;
 }
-.pit-card.pcm:active{ cursor:grabbing; }
+.pit-card.pcm:active{ cursor:pointer; }
 /* PITカードと同じ2行構成：1行目=客名＋様／右に内容・代車、2行目=車種／右に担当 */
 .pcm-r{ display:flex; align-items:center; gap:6px; min-width:0; }
 .pcm-r + .pcm-r{ margin-top:3px; }
@@ -189,11 +189,11 @@
 .vh-btn:hover, .tb-btn:hover{ border-color:var(--brand); }
 
 /* ===== ドラッグ＆ドロップ ===== */
-.pit-card[draggable="true"]{ cursor:grab; }
-.pit-card[draggable="true"]:active{ cursor:grabbing; }
+.pit-card[draggable="true"]{ cursor:pointer; }
+.pit-card[draggable="true"]:active{ cursor:pointer; }
 .dnd-dragging{ opacity:.45; }
 .pit-card.dnd-dragging{ opacity:.45; transform:scale(.98); }
-.reserve-month-event[draggable="true"], .reserve-week-event[draggable="true"]{ cursor:grab; }
+.reserve-month-event[draggable="true"], .reserve-week-event[draggable="true"]{ cursor:pointer; }
 /* ドロップ先のハイライト */
 [data-drop].dnd-over{
   outline:2px dashed var(--brand);
@@ -487,8 +487,8 @@
 .lo-evs{ position:absolute; right:0; top:0; bottom:0; width:5px; opacity:.85; }
 .lo-evt-tag{ position:absolute; right:6px; top:2px; z-index:1; font-size:8.5px; font-weight:800; color:#fff; border-radius:4px; padding:1px 4px; white-space:nowrap; max-width:80%; overflow:hidden; text-overflow:ellipsis; }
 /* ラベル札＝チーム色カード（クリックで操作メニュー／ドラッグで移動） */
-.lo-badge{ background:var(--lo-team, var(--brand)); color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.4); cursor:grab; text-align:left; }
-.lo-badge:active{ cursor:grabbing; }
+.lo-badge{ background:var(--lo-team, var(--brand)); color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.4); cursor:pointer; text-align:left; }
+.lo-badge:active{ cursor:pointer; }
 /* 3行カード（必要最小の高さ＝約1.5日分・最大幅維持・はみ出しは…） */
 .lo-badge.full{ position:absolute; z-index:2; top:2px; left:4px; right:4px; height:56px; border-radius:8px; padding:4px 7px; overflow:hidden; }
 .lo-badge.full .lo-lbl.full{ display:flex; flex-direction:column; gap:1px; height:100%; min-width:0; overflow:hidden; }
@@ -915,8 +915,8 @@
 .cf-line-wrap .cf-line-status{ flex:0 0 auto; width:auto; }
 .cf-line-wrap input.cf-input{ flex:1 1 5.5em; min-width:0; }
 /* v0.92.4 Lステップボタン＝「その他連絡先」(.cf-contacts-btn)に準じた大きさ。LINE緑のアクセント。ドラッグ可。 */
-.cf-line-link{ flex:0 0 auto; background:#1db97a; border:1px solid #1db97a; color:#06281d; border-radius:8px; padding:7px 13px; font-size:12.5px; font-weight:800; text-decoration:none; white-space:nowrap; cursor:grab; box-shadow:0 1px 6px rgba(29,185,122,.35); }
-.cf-line-link:active{ cursor:grabbing; }
+.cf-line-link{ flex:0 0 auto; background:#1db97a; border:1px solid #1db97a; color:#06281d; border-radius:8px; padding:7px 13px; font-size:12.5px; font-weight:800; text-decoration:none; white-space:nowrap; cursor:pointer; box-shadow:0 1px 6px rgba(29,185,122,.35); }
+.cf-line-link:active{ cursor:pointer; }
 .cf-line-link:hover{ filter:brightness(1.08); }
 /* v0.92.7 登録済の埋め込みラベル＝地味に（ハイライトしない）。Lステップボタンを主役に。 */
 .cf-line-done{ flex:0 0 auto; color:var(--text3); font-size:12px; font-weight:600; white-space:nowrap; }
@@ -1392,10 +1392,10 @@ th.cfs-lg-d{ z-index:3; }
 /* ▬ 区切りライン（board-line.js）＝掴んでカードのあいだへ落とす。
    🔴 v1.37.0（ゆうた指定）実線・文字だけ（アイコンも「ここからドラッグ」も出さない）。
    ⚠ 完TEL済との間隔は残す（用途が別なので、くっつけない）。 */
-.kb-lineadd{ cursor:grab; user-select:none;
+.kb-lineadd{ cursor:pointer; user-select:none;
   color:#e0a33a; border-color:rgba(224,163,58,.55); background:rgba(224,163,58,.09);
   margin-right:14px; }
-.kb-lineadd:active{ cursor:grabbing; }
+.kb-lineadd:active{ cursor:pointer; }
 .kb-lineadd:hover{ background:rgba(224,163,58,.18); border-color:#e0a33a; }
 /* ⚠ 明るいテーマだと #e0a33a は下地に溶けて読みにくいので、文字と枠だけ一段濃くする（色みは同じ橙のまま） */
 [data-theme^="light"] .kb-lineadd{ color:#a86a10; border-color:rgba(168,106,16,.5); background:rgba(224,163,58,.14); }
@@ -1403,8 +1403,8 @@ th.cfs-lg-d{ z-index:3; }
 
 /* 盤面に入ったライン。カードとカードのあいだに挟まる。
    ⚠ v1.37.0 ✕ は廃止（消すのは枠の外へドラッグ）。名前は入っている時だけ出る。 */
-.kb-line{ display:flex; align-items:center; gap:7px; margin:5px 2px; padding:3px 2px; cursor:grab; user-select:none; }
-.kb-line:active{ cursor:grabbing; }
+.kb-line{ display:flex; align-items:center; gap:7px; margin:5px 2px; padding:3px 2px; cursor:pointer; user-select:none; }
+.kb-line:active{ cursor:pointer; }
 .kb-line-bar{ flex:1 1 auto; height:0; border-top:2px dashed #e0a33a; }
 .kb-line-t{ flex:0 0 auto; max-width:60%; font-size:10.5px; font-weight:800; color:#e0a33a;
   background:rgba(224,163,58,.14); border:1px solid rgba(224,163,58,.5); border-radius:999px;
@@ -1523,7 +1523,7 @@ th.cfs-lg-d{ z-index:3; }
 .rml-ev:hover{ filter:brightness(1.12); transform:translateY(-1px); }
 .rml-ev b{ font-size:11px; }
 .rml-ev.urgent{ border-color:#ef4444; color:#ef4444; }
-.rml-ev[draggable="true"]{ cursor:grab; }
+.rml-ev[draggable="true"]{ cursor:pointer; }
 .rml-wt{ font-size:9.5px; font-weight:700; margin-left:6px; color:var(--text3); }
 
 /* ===== 🗓 予約の埋まり＝横軸の無限カレンダー（v0.25.0） ===== */

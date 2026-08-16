@@ -39,7 +39,7 @@ body:not(.md-edit) .md-box:not(.md-noexp):hover { border-color: var(--border2, v
 .md-tools { margin-left: auto; display: none; gap: 3px; align-items: center; flex-wrap: wrap; }
 body.md-edit .md-tools { display: flex; }
 body.md-edit .md-caret { display: none; }
-.md-grip { cursor: grab; color: var(--text3); display: none; }
+.md-grip { cursor: pointer; color: var(--text3); display: none; }
 body.md-edit .md-grip { display: inline; }
 body.md-edit .md-box { outline: 1px dashed var(--border2, var(--border)); }
 .md-box.md-dragover { outline: 2px dashed var(--brand); }

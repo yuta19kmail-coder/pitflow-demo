@@ -124,3 +124,9 @@
 .shk-psel{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:10px; }
 .shk-chip.locked{ cursor:pointer; }
 .shk-chip.locked:hover{ filter:brightness(1.1); }
+
+/* v1.108.0 決定チップの印（済／再検）。ゆうた確定＝両方出すが印で区別する */
+.shk-mk{ display:inline-block; margin-right:4px; padding:0 4px; border-radius:4px;
+         font-size:9px; font-weight:800; line-height:1.5; vertical-align:1px; }
+.shk-mk-done{ background:rgba(120,120,120,.22); color:var(--text2); }
+.shk-mk-recheck{ background:rgba(239,68,68,.18); color:#ef4444; }

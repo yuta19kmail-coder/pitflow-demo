@@ -10,10 +10,13 @@
   function pad(n){ return (n<10?'0':'')+n; }
   function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
-  function surname(c){ return (window.pitSurname?pitSurname(c.customer):(c.customer||''))||'（未入力）'; }
-  function carLabel(c){ return (c.car||c.maker||c.plate||'').toString(); }
-  function team(c){ return c.boardId==='import'?'#ec4899':'#1db97a'; }
-  function isShaken(c){ var ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:(c.workType?[c.workType]:[]); return ids.indexOf('shaken')>=0; }
+  /* 🔴 v1.108.0 名前・車名・色・車検の判定は pit-share.js の物差し1本（車検予定ボードと同じ答え）。
+     ⚠ ここだけ独自だったせいで、カナだけのお客様が「（未入力）」になり、
+        課の色を「輸入車ならピンク」と車から逆算していた。 */
+  function surname(c){ return (window.pitCustSurname?pitCustSurname(c):(c.customer||''))||'（未入力）'; }
+  function carLabel(c){ return window.pitCarLabel?pitCarLabel(c):((c.car||c.maker||c.plate||'').toString()); }
+  function team(c){ return window.pitDivisionColor?pitDivisionColor(c):'#1db97a'; }
+  function isShaken(c){ return window.pitIsShaken?pitIsShaken(c):false; }
   function ins(c){ return c.inspSchedule||{}; }
   function todayIso(){ var t=new Date(); t.setHours(0,0,0,0); return ymd(t); }
 

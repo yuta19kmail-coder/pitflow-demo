@@ -645,7 +645,8 @@
 /* 🔴 v1.104.0（ゆうた指定）時間帯（09:00-10:00）は **3段** に折る。
    時間の列は 62px しかなく、1行だと右がはみ出て隠れていた。
    ⚠ 行の高さは 56px 固定なので、3段の時だけ文字を落として収める（1行の時は今までどおり大きいまま）。 */
-.tr-time.is-range{ font-size:12.5px; line-height:1.14; text-align:center; }
+/* ⚠ 揃えは**左詰め**（ゆうた指定 2026-08-16）。10:00 のような1行の時と頭がそろう。真ん中寄せにしない。 */
+.tr-time.is-range{ font-size:12.5px; line-height:1.14; text-align:left; }
 .tr-time.is-range .tt-l{ display:block; }
 .tr-time.is-range .tt-sep{ font-size:9.5px; line-height:1; color:var(--text3); font-weight:700; }
 .tr-front{

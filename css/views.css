@@ -642,6 +642,12 @@
 .today-row.in-break{ background:rgba(234,179,8,.05); }
 
 .tr-time{ color:var(--text); font-weight:800; font-size:15px; white-space:nowrap; }
+/* 🔴 v1.104.0（ゆうた指定）時間帯（09:00-10:00）は **3段** に折る。
+   時間の列は 62px しかなく、1行だと右がはみ出て隠れていた。
+   ⚠ 行の高さは 56px 固定なので、3段の時だけ文字を落として収める（1行の時は今までどおり大きいまま）。 */
+.tr-time.is-range{ font-size:12.5px; line-height:1.14; text-align:center; }
+.tr-time.is-range .tt-l{ display:block; }
+.tr-time.is-range .tt-sep{ font-size:9.5px; line-height:1; color:var(--text3); font-weight:700; }
 .tr-front{
   writing-mode:vertical-rl; text-orientation:upright;
   font-size:11px; font-weight:800; color:#fff; border-radius:5px;

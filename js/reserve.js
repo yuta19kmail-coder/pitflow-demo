@@ -134,7 +134,8 @@ function weekMiniCard(c, slotHH, isRet){
   });
   const staff = c.frontStaff || c.staff || '';
   const _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
-  const _stf = (window.pitSurname ? pitSurname(staff) : staff);
+  /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
+  const _stf = (window.pitStaffShort ? pitStaffShort(staff) : (window.pitSurname ? pitSurname(staff) : staff));
   let h = '<div class="rwk-card' + (c.codeRed ? ' rwk-claim' : '') + '" draggable="true" data-card-id="' + c.id + '" onclick="openDetail(\'' + c.id + '\')" style="border-left-color:' + teamColor + ';">';
   h += '<div class="rwk-r">' + (_showT ? '<span class="rwk-t">' + at(_tv) + '</span>' : '')
      + '<span class="rwk-name">' + _nm + ' 様</span><span class="rwk-badges">' + badges + '</span></div>';
@@ -521,7 +522,8 @@ function cardHtml(c, opts){
     if (_ct.length) h += '<div class="pcm-cau">' + _ct.slice(0, 3).map(function(x){ return '<span class="pcm-caut">' + x + '</span>'; }).join('') + '</div>';
     /* 名前・車種・担当の title は撤去（ホバー情報カード card-hover.js で全文表示するため二重ツールチップを防ぐ） */
     var _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
-    var _stf = (window.pitSurname ? pitSurname(staff) : staff);
+    /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
+    var _stf = (window.pitStaffShort ? pitStaffShort(staff) : (window.pitSurname ? pitSurname(staff) : staff));
     // 仮予約は「様」のすぐ後ろに小さな「仮」をインライン表示。名前が長い時は名前だけ…省略し「…様 仮」は必ず残る（v0.100.1）
     var _kn = c.tentative ? '<span class="kari-name" title="仮予約">仮</span>' : '';
     /* 🔵 v1.74.0 承認待ちは「様」のすぐ後ろに「承」（仮と同じ置き場所・色ちがい） */

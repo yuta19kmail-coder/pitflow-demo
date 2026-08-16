@@ -938,7 +938,8 @@ function _cfsDayListHtml(c){
   function evHtml(x, t){
     const imp = (x.boardId==='import');
     const isHl = who && (x.frontStaff||'').trim()===who;
-    const front = (window.pitSurname ? pitSurname(x.frontStaff||'') : (x.frontStaff||'')) || '—';
+    /* 🔴 v1.104.0 自社（小林モータース）は狭いバッジだと入らないので「コバモ」（pit-share.js の1本） */
+    const front = (window.pitStaffShort ? pitStaffShort(x.frontStaff||'') : (window.pitSurname ? pitSurname(x.frontStaff||'') : (x.frontStaff||''))) || '—';
     const car = (x.car || '').trim();   // v0.84.1 メーカーは出さない＝車種のみ
     const nm = ((window.pitCustSurname ? pitCustSurname(x) : (x.customer||'')) || '（未入力）');   // v0.86.1 名字だけ（法人はフル）
     return '<div class="dl-ev'+(imp?' imp':'')+(isHl?' hl':'')+'">'

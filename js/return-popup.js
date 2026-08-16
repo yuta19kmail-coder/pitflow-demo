@@ -318,12 +318,9 @@
         c.status = 'returned';
         c.completedAt = rd;
         /* 🔴 拾う順番は当日ビューの「返車済みにする」と同じ＝確定→受注→見積→概算 */
+        /* 🔴 v1.103.0 拾う順番は pit-share.js の1本（当日ビューの「返車済みにする」と同じ道）。 */
         if (c.amountFinal == null || c.amountFinal === ''){
-          var _amt = [c.amountOrder, c.amountQuote, c.estAmount].find(function(v){ return v != null && v !== ''; });
-          if (_amt == null && window.pitEstAmount){
-            try { _amt = pitEstAmount(c.workType, window.pitTeamKey ? pitTeamKey(c) : 'default'); } catch(e){}
-          }
-          c.amountFinal = (_amt != null && _amt !== '') ? Number(_amt) : 0;
+          c.amountFinal = window.pitFinalAmountOf ? pitFinalAmountOf(c) : 0;
         }
         if (window.logFlow) logFlow(c, (isDone ? '完TEL済' : '完TEL依頼') + ' → 実績化（返車済み・' + rd + '）');
         if (window.pitLog) pitLog('実績化した（返車済み）', { cardId: c.id, kind: 'out',

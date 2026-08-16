@@ -49,10 +49,10 @@
 
   var CONFIRMED = ['parts','work','workDone','outsource'];   // 受注済＝パーツ待ち以降
 
-  /* ===== ⓪「売上なしでアーカイブ」した車か（v1.99.0） =====
-     🔴 **判定はここ1か所。** 他のファイルは `pitCardNoSale(c)` を呼ぶだけにすること。
-     ⚠ 昔のデータには印が無い＝false。印の付け方は card-view.js の「売上なしでアーカイブする」。 */
-  function pitCardNoSale(c){ return !!(c && c.noSale); }
+  /* ===== ⓪「売上なしでアーカイブ」した車か =====
+     🔴 v1.103.0 **判定そのものは `js/pit-share.js` に移した**（MHS からも借りるため）。
+        ここは呼ぶだけ。**条件をここに書き戻さないこと。** */
+  function pitCardNoSale(c){ return window.pitCardNoSale ? window.pitCardNoSale(c) : !!(c && c.noSale); }
 
   function s(v){ return (v == null) ? '' : String(v); }
   function n(v){ v = +v; return isFinite(v) ? v : 0; }
@@ -128,7 +128,6 @@
     return isCur;                                  /* 予定日が過ぎている＝当月に寄せる */
   }
 
-  window.pitCardNoSale     = pitCardNoSale;
   window.pitSalesCountDate = pitSalesCountDate;
   window.pitSalesTier      = pitSalesTier;
   window.pitSalesInRange   = pitSalesInRange;

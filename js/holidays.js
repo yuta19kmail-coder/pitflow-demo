@@ -27,7 +27,13 @@
     return 0;
   }
 
+  /* 🔴 2026-08-16 _shared 本体になった（PitFlow と CarFlow が同じものを使う）。
+     描き直しのやり方だけアプリで違うので差し込み口を用意した（差し込まなければ今までどおり）。 */
   function rerender () {
+    if (typeof window.PIT_CAL_REDRAW === 'function') {
+      try { window.PIT_CAL_REDRAW(); } catch (e) {}
+      return;
+    }
     if (window.state && state.currentView && typeof showView === 'function') {
       try { showView(state.currentView); } catch (e) {}
     }

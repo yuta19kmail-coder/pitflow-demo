@@ -78,10 +78,18 @@
              .collection('appSummaries').doc('mhsCalendar');
   }
   /* 予定（mhs-pit.js）と同じ作り＝届いたら、いま開いている画面だけ描き直す */
+  /* 🔴 2026-08-16 このファイルは **_shared 本体**になった（PitFlow と CarFlow が同じものを使う）。
+     描き直しのやり方だけアプリで違うので、アプリ側から差し込めるようにした。
+     ⚠ 差し込まなければ PitFlow の書き方（showView）で動く＝今までと同じ。
+     　 CarFlow は index.html で window.PIT_CAL_REDRAW に「カレンダーを描き直す関数」を入れる。 */
   var _rt = null;
   function _redraw() {
     clearTimeout(_rt);
     _rt = setTimeout(function () {
+      if (typeof window.PIT_CAL_REDRAW === 'function') {
+        try { window.PIT_CAL_REDRAW(); } catch (e) {}
+        return;
+      }
       try { if (window.state && state.currentView && window.showView) showView(state.currentView); } catch (e) {}
       try { if (window.pitCardRepaint) window.pitCardRepaint(); } catch (e) {}
     }, 150);

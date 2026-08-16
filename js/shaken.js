@@ -11,12 +11,18 @@
   var DOW='日月火水木金土', DAYS=12;
   function ymdL(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
-  function surname(c){ return (window.pitSurname?pitSurname(c.customer):(c.customer||''))||'（未入力）'; }
-  function team(c){ return c.boardId==='import'?'#ec4899':'#1db97a'; }
-  function carLabel(c){ return (c.car||c.maker||c.plate||'').toString(); }
-  function isShaken(c){ var ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:(c.workType?[c.workType]:[]); return ids.indexOf('shaken')>=0; }
+  /* 🔴 v1.108.0 名前・色・車名・車検の判定は **pit-share.js の物差し1本**（MHS・LINEの画像と同じ答え）。
+     ⚠ ここに書き戻さないこと。以前ここだけ独自だったせいで、
+        ・カナだけのお客様が「（未入力）」になる（Todayボードでは 8/15 に直したのに車検だけ残っていた）
+        ・課の色を「輸入車ならピンク」と**車から逆算**していた（8/16 に他画面から追放したやり方） */
+  function surname(c){ return (window.pitCustSurname?pitCustSurname(c):(c.customer||''))||'（未入力）'; }
+  function team(c){ return window.pitDivisionColor?pitDivisionColor(c):'#1db97a'; }
+  function carLabel(c){ return window.pitCarLabel?pitCarLabel(c):((c.car||c.maker||c.plate||'').toString()); }
+  function isShaken(c){ return window.pitIsShaken?pitIsShaken(c):false; }
   function ins(c){ if(!c.inspSchedule||typeof c.inspSchedule!=='object') c.inspSchedule={mode:'manual',slots:{},cutBefore:''}; if(!c.inspSchedule.slots) c.inspSchedule.slots={}; if(!Array.isArray(c.inspSchedule.history)) c.inspSchedule.history=[]; return c.inspSchedule; }
-  function shakenCars(){ return (state.cards||[]).filter(function(c){ return c && isShaken(c) && c.status!=='scrap'; }); }
+  /* 🔴 v1.108.0 廃車だけでなく **予約キャンセル・売上なしでアーカイブ** も外す（pitCardActive 1本）。
+     ⚠ 車検だけキャンセルを素通りさせていて、キャンセルした予約が予定に残っていた。 */
+  function shakenCars(){ return (state.cards||[]).filter(function(c){ return c && isShaken(c) && (window.pitCardActive?pitCardActive(c):c.status!=='scrap'); }); }
   function card(id){ return (state.cards||[]).find(function(c){ return c.id===id; }); }
   function save(){ if(window.PitDB) PitDB.save(); }
   function todayIso(){ var t=new Date(); t.setHours(0,0,0,0); return ymdL(t); }
@@ -35,14 +41,20 @@
   }
 
   function isArrived(c){ return c.status!=='reserved' && c.status!=='returned' && c.status!=='scrap'; }
-  function collect(){
+  /* 🔴 v1.108.0 **その日にどの車が並ぶか（決定バンド）は pitShakenOnDate 1本**で決める。
+     ＝ MHS の当日ビューと前日LINEの画像と、台数も並びも中身も**必ず同じ**になる。
+     ⚠ ここで条件を書き直さないこと。候補（まだ決めていない枠）と未設定・未入庫だけ、この画面固有。 */
+  function collect(days){
     var decCell={};
-    function push(iso,slot,c,kind){ var k=iso+'|'+(slot==='pm'?'pm':'am'); (decCell[k]=decCell[k]||[]).push({c:c,kind:kind}); }
+    (days||[]).forEach(function(d){
+      var rows = window.pitShakenOnDate ? pitShakenOnDate(state.cards||[], d.iso) : [];
+      rows.forEach(function(r){ var k=d.iso+'|'+r.slot; (decCell[k]=decCell[k]||[]).push({c:r.card,kind:r.state,row:r}); });
+    });
     var cands=[], empties=[], unsched=[], cnt={decided:0,done:0,recheck:0,cand:0,unset:0};
     shakenCars().forEach(function(c){ var s=ins(c);
-      (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date){ push(h.date,h.slot,c,'recheck'); cnt.recheck++; } });
-      if(s.result==='done'){ cnt.done++; var dd=s.resultDate||s.decided; if(dd) push(dd,(s.resultSlot||s.decidedSlot),c,'done'); return; }
-      if(s.decided){ cnt.decided++; push(s.decided,s.decidedSlot,c,'decided'); return; }
+      (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date){ cnt.recheck++; } });
+      if(s.result==='done'){ cnt.done++; return; }
+      if(s.decided){ cnt.decided++; return; }
       var slotDays=Object.keys(s.slots||{}).filter(function(k){ return (s.slots[k]||[]).length; });
       if(slotDays.length){ cnt.cand++; cands.push(c); return; }
       if(isArrived(c)){ cnt.unset++; empties.push(c); return; }   // 入庫済みで予定なし＝未設定→予定欄に空行
@@ -51,7 +63,9 @@
     return {decCell:decCell, cands:cands, empties:empties, unsched:unsched, cnt:cnt};
   }
 
+  /* 🔴 v1.108.0 印（済／再検）を必ず出す。ゆうた確定＝**両方出すが、印を付けて区別する**。 */
   function decChip(c, kind){ var car=carLabel(c);
+    var mark = (window.PIT_SHAKEN_MARK && PIT_SHAKEN_MARK[kind]) || '';
     // 決定＝ドラッグ/メニューで編集可。済(done)・再検(recheck)＝ドラッグ抑制、クリックでカード詳細（編集は詳細から）。
     var editable=(kind==='decided');
     // v0.124.1 ドラッグはポインタ方式（下の shkPointer…）で行う＝ネイティブdraggableは使わない。タップ(onclick)は従来どおり。
@@ -59,14 +73,15 @@
     var onclick = editable ? 'shkChipMenu(\''+c.id+'\')' : 'openDetail(\''+c.id+'\')';
     return '<div class="'+cls+'" draggable="false" data-card-id="'+c.id+'"'
       + ' onclick="'+onclick+'" style="border-left-color:'+team(c)+'">'
-      + '<div class="shk-nm">'+esc(surname(c))+'様</div><div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div></div>';
+      + '<div class="shk-nm">'+(mark?'<span class="shk-mk shk-mk-'+kind+'">'+mark+'</span>':'')+esc(surname(c))+'様</div>'
+      + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div></div>';
   }
 
   function renderShaken(){
     var host=document.getElementById('shakencal-body'); if(!host) return;
     var days=rangeDays(), tIso=todayIso();
     var subs=[]; days.forEach(function(d){ subs.push({iso:d.iso,slot:'am',off:d.off}); subs.push({iso:d.iso,slot:'pm',off:d.off}); });
-    var data=collect(), decCell=data.decCell, cnt=data.cnt;
+    var data=collect(days), decCell=data.decCell, cnt=data.cnt;
     var h='';
     // ヘッダ操作
     h+='<div class="shk-head"><div class="shk-nav"><button onclick="shkShift(-7)"><i data-ic=chevLeft data-ics=16></i> 前週</button><b>'+fmtMD(days[0].iso)+' 〜</b><button onclick="shkShift(7)">次週 <i data-ic=chevRight data-ics=16></i></button><button class="shk-now" onclick="shkShift(0)">今週</button></div>';

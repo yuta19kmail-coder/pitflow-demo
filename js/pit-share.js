@@ -20,6 +20,7 @@
      ・売上なしの印     … `pitCardNoSale`
      ・返車の関門       … `pitReturnCanDone`（完TELを通ったか）
      ・実績の金額       … `pitFinalAmountOf`（確定→受注→見積→概算）
+     ・🔧 車検予定       … `pitShakenOnDate`（その日の車検＝絞り込み・並び・中身まで1本）ほか
 
    ◎借りる側（MHS）へ
      このファイルは **`state` が無くても動く**。ただし「課の表」と「概算金額」だけは
@@ -360,6 +361,107 @@ w.pitDivisionColor = pitDivisionColor;
     return (v != null && v !== '') ? Number(v) : 0;
   }
   w.pitFinalAmountOf = pitFinalAmountOf;
+
+  /* ===================================================================
+     🔧 車検予定（v1.108.0・ゆうた指示「MHSのTODAYビューの車検予定をPitFlowから引く部分をちゃんと構築して」）
+     🔴 **ここが車検予定の本家。** PitFlow の車検予定ボード／MHS の当日ビュー／前日LINEの画像が
+        ぜんぶこの1本を通る。直すのはここだけ。
+
+     ⚠ なぜ作ったか＝**本家が無いまま写しだけが動いていた**。
+        「その日の車検予定はこれ」と答える関数が PitFlow に1つも無く（車検ボードの中に閉じていた）、
+        サーバー（前日LINEの画像）だけが独自に書いていた。結果 7か所ズレていた：
+          済んだ車が予定と同じ見た目で出る／再検が消える／担当がフロント担当／
+          カナだけの客が「（未入力）」／車種が空だとメーカーも消える／売上なしの扱いが逆／
+          キャンセルした予約が残る。
+
+     ◎ 用語（似た日付が多いので必ずここを読む）
+        inspSchedule.decided     … 🔴 **陸運局へ行くと決めた日**（＝車検予定日）。入庫日でも返車日でもない
+        inspSchedule.slots       … まだ決めていない「行ける枠」の候補
+        inspSchedule.resultDate  … 実際に行った日（済）。手で変えられるので decided と違うことがある
+        inspSchedule.history[]   … 再検（落ちてもう一度行く）の記録。再検にすると decided は空に戻る
+        vehicles[].shakenDate    … ⚠ **車検満了日**。代車・社用車のもので、これとは別物
+     =================================================================== */
+
+  /* 車検の車か。⚠ 昔は「配列だけ見る」実装と「workType も見る」実装が混ざっていて答えが割れていた。
+     ここは **拾いこぼさない側**（どちらかに入っていれば車検）に揃える。 */
+  function pitIsShaken(c){
+    if (!c) return false;
+    var ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : [];
+    if (ids.indexOf('shaken') >= 0) return true;
+    return c.workType === 'shaken';
+  }
+  w.pitIsShaken = pitIsShaken;
+
+  /* 車名の出し方。車種が空でもメーカーやナンバーがあれば出す（画像だけ空欄になっていた） */
+  function pitCarLabel(c){ return String((c && (c.car || c.maker || c.plate)) || ''); }
+  w.pitCarLabel = pitCarLabel;
+
+  /* 🔴 車検の担当＝**陸運局へ行く（行った）人**（ゆうた確定 2026-08-16）。
+     受付したフロント担当は**別物なので混ぜない**。決まっていなければ空欄。 */
+  function pitShakenStaff(c){ var s = c && c.inspSchedule; return (s && s.resultStaff) || ''; }
+  w.pitShakenStaff = pitShakenStaff;
+
+  /* 午前／午後 */
+  function pitShakenSlot(v){ return (v === 'pm') ? 'pm' : 'am'; }
+  w.pitShakenSlot = pitShakenSlot;
+
+  /* 🔴 まだ生きているカードか＝盤面に残るもの。**廃車・予約キャンセル・売上なしは出さない。**
+     ⚠ 車検予定だけキャンセルを素通りさせていた（ほかの一覧は前から除外していた）。 */
+  function pitCardActive(c){
+    if (!c) return false;
+    if (c.status === 'scrap') return false;
+    if (c.status === 'cancelled' || c.cancelled === true) return false;
+    if (pitCardNoSale(c)) return false;
+    return true;
+  }
+  w.pitCardActive = pitCardActive;
+
+  /* 画面に出す印。'' ＝これから行く／'済' ＝終わった／'再検' ＝落ちてもう一度 */
+  w.PIT_SHAKEN_MARK = { decided: '', done: '済', recheck: '再検' };
+
+  /* 🔴🔴 その日の車検予定を返す。**絞り込み・並び・中身までここで決める。**
+       戻り＝[{ id, state:'decided'|'done'|'recheck', mark, slot:'am'|'pm',
+                name, car, staff, div, divColor, done, card }]
+     ・並び＝午前→午後 → まだ行っていないものが先 → お客様名。**どこで見ても同じ順。**
+     ・cards は PitFlow なら state.cards、MHS/サーバーなら読んだカードの配列。 */
+  function pitShakenOnDate(cards, iso){
+    if (!iso) return [];
+    var out = [];
+    function row(c, state, slotRaw){
+      return {
+        id: c.id, card: c, state: state, mark: w.PIT_SHAKEN_MARK[state] || '',
+        done: (state === 'done'), slot: pitShakenSlot(slotRaw),
+        name: pitCustSurname(c), car: pitCarLabel(c),
+        staff: pitShakenStaff(c),
+        div: pitDivisionLabel(c), divColor: pitDivisionColor(c)
+      };
+    }
+    (cards || []).forEach(function (c) {
+      if (!c || !pitIsShaken(c) || !pitCardActive(c)) return;
+      var s = c.inspSchedule;
+      if (!s || typeof s !== 'object') return;
+      /* ① 再検で行く／行った日（decided は空に戻っているので、ここでしか拾えない） */
+      var hist = Array.isArray(s.history) ? s.history : [];
+      hist.forEach(function (h) {
+        if (h && h.result === 'recheck' && h.date === iso) out.push(row(c, 'recheck', h.slot));
+      });
+      /* ② 済んだ日。⚠ 「済を記録」で行った日を手で変えられるので resultDate が正。無ければ decided */
+      if (s.result === 'done') {
+        var dd = s.resultDate || s.decided;
+        if (dd === iso) out.push(row(c, 'done', s.resultSlot || s.decidedSlot));
+        return;
+      }
+      /* ③ これから行くと決めた日 */
+      if (s.decided === iso) out.push(row(c, 'decided', s.decidedSlot));
+    });
+    out.sort(function (a, b) {
+      if (a.slot !== b.slot) return a.slot === 'am' ? -1 : 1;      /* 午前が先 */
+      if (a.done !== b.done) return a.done ? 1 : -1;               /* これから行くものが先 */
+      return String(a.name).localeCompare(String(b.name), 'ja');   /* あとは名前順＝どこでも同じ */
+    });
+    return out;
+  }
+  w.pitShakenOnDate = pitShakenOnDate;
 
   console.log('[pit-share] ready（PitFlow と MHS が一緒に使う物差し）');
 })(window);

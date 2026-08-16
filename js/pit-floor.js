@@ -566,7 +566,8 @@
     var dropBadge = (dt && (c.dropType2 || DROPC[dt.id])) ? (window.pitDropBadges ? pitDropBadges(c, function(o){ var dc = DROPC[o.id] || '#64748b'; return '<span class="pfv-wt" style="background:' + dc + '22;color:' + dc + ';border-color:' + dc + '66">' + esc(o.label) + '</span>'; }) : '<span class="pfv-wt" style="background:' + _dc + '22;color:' + _dc + ';border-color:' + _dc + '66">' + esc(dt.label) + '</span>') : '';
     var staff = c.frontStaff || c.staff || '';
     var loanerBadge = c.needLoaner ? '<span class="pfv-loaner">代車</span>' : '';
-    var staffNm = (window.pitSurname ? pitSurname(staff) : staff);
+    /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
+    var staffNm = (window.pitStaffShort ? pitStaffShort(staff) : (window.pitSurname ? pitSurname(staff) : staff));
     var custNm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
     var staffBadge = staff ? '<span class="pfv-staff">' + esc(staffNm) + '</span>' : '';
     return '<span class="pfv-r"><b class="pfv-cn">' + esc(custNm) + ' 様</b><span class="pfv-badges">' + loanerBadge + dropBadge + wtBadge + '</span></span>'

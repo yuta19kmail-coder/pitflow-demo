@@ -216,8 +216,9 @@ window.pitTodayTap = function(id, isReturn){
      ◎押せるようになる時
        盤面で 完TEL済／完TEL依頼 へ入れた時（＝returnStage が付いた時）。
        ⚠ 判断はこの1つだけ。預かりの車はもともと完TELを通ってしか一覧に出ないので、今までどおり押せる。 */
-  const canDone = !isReturn || !!c.returnStage;
-  const doneWhy = '<span class="ta-why">まだ完TELを通っていません。タスクボードで完TEL済／完TEL依頼へ入れてください</span>';
+  /* 🔴 v1.103.0 判断も文言も pit-share.js の1本から（MHS の Todayボードも同じものを借りる）。 */
+  const canDone = !isReturn || (window.pitReturnCanDone ? pitReturnCanDone(c) : !!c.returnStage);
+  const doneWhy = '<span class="ta-why">' + (window.PIT_RETURN_WHY || '') + '</span>';
   back.innerHTML =
     '<div class="ta-sheet">' +
       '<div class="ta-head"><b>' + ((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</b>　' +
@@ -346,8 +347,8 @@ window.pitTodayReturn = function(id){
   if (!c) return;
   /* 🔴 v1.97.0 完TELを通っていない車は、ここでも固めない（ボタンを消しただけにしない）。
      ⚠ 判断はアクションシートと同じ1つ＝returnStage が付いているか。 */
-  if (!c.returnStage){
-    if (window.pitToast) pitToast('まだ完TELを通っていません。タスクボードで完TEL済／完TEL依頼へ入れてください');
+  if (window.pitReturnCanDone ? !pitReturnCanDone(c) : !c.returnStage){
+    if (window.pitToast) pitToast(window.PIT_RETURN_WHY || '');
     return;
   }
   const t = ymd(new Date());
@@ -357,10 +358,9 @@ window.pitTodayReturn = function(id){
   /* 🔴 v1.64.0 拾う順番を完TELのポップアップ（return-popup.js）と揃えた＝**確定→受注→見積→概算**。
      ここだけ概算しか見ていなかったので、クイック受注で人が打った受注金額が捨てられていた。
      ⚠ 「いくらの車か」を2か所が別々に決めない。 */
+  /* 🔴 v1.103.0 拾う順番（確定→受注→見積→概算）は pit-share.js の1本。ここに書き写さない。 */
   if (c.amountFinal == null || c.amountFinal === ''){
-    var _amt = [c.amountOrder, c.amountQuote, c.estAmount].find(function(v){ return v != null && v !== ''; });
-    if (_amt == null && window.pitEstAmount) _amt = pitEstAmount(c.workType, window.pitTeamKey ? pitTeamKey(c) : 'default');
-    c.amountFinal = (_amt != null && _amt !== '') ? Number(_amt) : 0;   // 売上を固める
+    c.amountFinal = window.pitFinalAmountOf ? pitFinalAmountOf(c) : 0;   // 売上を固める
   }
   if (window.logFlow && typeof statusLabel === 'function') logFlow(c, '返車完了（実績へ）');
   if (window.PitDB) PitDB.save();
@@ -449,9 +449,11 @@ function todayRow(c, isReturn, inBreak){
   const dt = state.dropTypes.find(d => d.id === c.dropType);
   const teamColor = _todTeamColor(c);
   const time = isReturn ? (c.returnTime || c.reserveTime || '') : (c.reserveTime || '');
-  // フロント担当（縦書きバッジ・1課=緑/2課=ピンク）
-  const isImp = c.boardId === 'import';
-  const frontName = (window.pitSurname ? pitSurname((c.frontStaff || '').trim()) : (c.frontStaff || '').trim());
+  /* フロント担当（縦書きバッジ・1課=緑/2課=ピンク／課が空ならグレー）
+     🔴 v1.104.0 名前は **pitStaffShort** を通す＝自社（小林モータース）は「コバモ」。
+        幅 22px の縦書きにフルの会社名は入らない（ゆうた指定 2026-08-16）。 */
+  const frontName = (window.pitStaffShort ? pitStaffShort(c.frontStaff || '')
+                                          : (window.pitSurname ? pitSurname((c.frontStaff || '').trim()) : (c.frontStaff || '').trim()));
   /* 🔴 v1.98.0（ゆうた指定）**人が入っていない時は、代わりに課を出す。空欄にしない。**
      ◎なぜ
        時間の横のバッジが真っ白だと「誰の車か手がかりが何も無い」ので、
@@ -460,17 +462,28 @@ function todayRow(c, isReturn, inBreak){
      ⚠ 名前も色も **state.divisions の1本**から引く（既定＝1課は緑・2課はピンク）。ここに直に書かない。
      ⚠ 課のボタンも空なら、今までどおり空欄のまま（無いものを作らない）。 */
   const divLabel = frontName ? '' : (window.pitDivisionLabel ? pitDivisionLabel(c) : '');
-  /* ⚠ 色が入っていない課だった時の保険は**既定の緑**。ここでも車（国産／輸入）から色を作らない。 */
-  const divColor = divLabel ? ((window.pitDivisionColor ? pitDivisionColor(c) : '') || '#1db97a') : '';
+  /* 🔴 v1.104.0（ゆうた指定）**バッジの色は課から引く。課が選ばれていなければグレー。**
+     ⚠ 直す前は人のバッジだけ**車（国産／輸入）から色を作っていた**ので、
+        課を何も押していなくても必ず緑かピンクが付き「入っている」ように見えていた。
+     ⚠ 物差しは pit-share.js の pitDivisionColorOr 1本。ここに色を直に書かない。 */
+  const badgeColor = window.pitDivisionColorOr ? pitDivisionColorOr(c)
+                                               : ((window.pitDivisionColor ? pitDivisionColor(c) : '') || '#8390a6');
+
+  /* 🔴 v1.104.0（ゆうた指定）**時間帯（09:00-10:00）は3段に折る。**
+     時間の列は 62px しかなく、1行だと右がはみ出て隠れていた。折る判断は pitTimeLines 1本。 */
+  const tLines = window.pitTimeLines ? pitTimeLines(time) : (time ? [time] : []);
+  const timeHtml = (tLines.length > 1)
+    ? '<div class="tr-time is-range">' + tLines.map((x,i) => '<span class="tt-l' + (i===1 ? ' tt-sep' : '') + '">' + _todEsc(x) + '</span>').join('') + '</div>'
+    : '<div class="tr-time">' + _todEsc(tLines[0] || '') + '</div>';
 
   let h = '';
   h += '<div class="today-row' + (c.urgent ? ' is-urgent' : '') + (inBreak ? ' in-break' : '') + '" onclick="pitTodayTap(\'' + c.id + '\',' + (isReturn ? 'true' : 'false') + ')" style="--team:' + teamColor + '">';
-  h += '<div class="tr-time">' + time + '</div>';
+  h += timeHtml;
   // 担当フロント縦書きバッジ（人が無ければ課）
   if (frontName){
-    h += '<div class="tr-front" style="background:' + (isImp ? '#ec4899' : '#1db97a') + '">' + frontName + '</div>';
+    h += '<div class="tr-front" style="background:' + _todEsc(badgeColor) + '">' + frontName + '</div>';
   } else if (divLabel){
-    h += '<div class="tr-front is-div" style="background:' + _todEsc(divColor) + '" title="担当者はまだ決まっていません（' + _todEsc(divLabel) + '）">' + _todEsc(divLabel) + '</div>';
+    h += '<div class="tr-front is-div" style="background:' + _todEsc(badgeColor) + '" title="担当者はまだ決まっていません（' + _todEsc(divLabel) + '）">' + _todEsc(divLabel) + '</div>';
   } else {
     h += '<div class="tr-front empty"></div>';
   }

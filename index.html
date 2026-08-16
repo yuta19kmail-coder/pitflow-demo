@@ -120,7 +120,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.106.0</div>
+    <div class="login-ver">v1.107.0</div>
   </div>
 </div>
 
@@ -134,7 +134,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.106.0</span>
+    <span class="ver">v1.107.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -910,7 +910,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/blank-cards.js?v=5"></script><!-- 空の予約カードを残さない（settings.js / views.js / card-detail.js より後ろ） -->
 <script src="js/reset-pit.js?v=2"></script><!-- 本番データの初期化／デモ版の「まっさらにする」（settings.js より後ろ） -->
 <script src="js/import-cloud.js?v=3"></script><!-- 顧客データの取込（本番・分割送信／settings.js より後ろ） -->
-<script src="js/coreflow-sync.js?v=ca024d30"></script><!-- 同期ランプ共通部品（PitFlowではふきだしだけ借りる。sync-pit.js より後ろ） -->
+<script src="js/coreflow-sync.js?v=2e2dc585"></script><!-- 同期ランプ共通部品（PitFlowではふきだしだけ借りる。sync-pit.js より後ろ） -->
 <script src="js/deeplink-pit.js?v=1"></script><!-- ?card= でカードを直接開く（MHS Todayボードの「詳細を見る」の受け口）。card-detail.js / views.js より後ろ -->
 <script src="js/ctxmenu-pit.js?v=3"></script><!-- 🖱 右クリックメニュー（全ビュー共通）。対象を探すだけなので、どのビューのJSより後ろに置く -->
 <script src="js/mhs-pit.js?v=2"></script><!-- 📡 MHSの予定を読む（新規予約の「担当の予定」）。card-detail.js より後ろ -->
@@ -918,5 +918,9 @@ window.PIT_DEMO = true;</script>
 <script>/* 本番（クラウド保存）では開発用の入口を隠す＝実データにサンプルを混ぜないため */
 (function(){ if(!window.PIT_CLOUD) return; var n=document.querySelectorAll("[data-dev-only]");
   for(var i=0;i<n.length;i++) n[i].style.display="none"; })();</script>
+
+<!-- ↩ 戻る（通ってきた画面順に戻る）。共通部品＝_shared/coreflow-nav.js。アプリ側のコードは書き換えず、画面切替の関数を包むだけ -->
+<script src="js/coreflow-nav.js?v=73ae9af1"></script>
+<script>CoreflowNav.wire({ fn:'showView', home:'dashboard' });</script>
 </body>
 </html>

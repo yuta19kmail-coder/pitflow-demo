@@ -1,5 +1,5 @@
 /* ========================================
-   errcode-pit.js ── エラー番号（PitFlow v1.110.0）
+   errcode-pit.js ── PitFlow のエラー番号の台帳（v1.110.0）
    ----------------------------------------
    ◎なぜ作ったか（2026-08-17・ゆうた指定）
      🗣「**全てのエラー系のメッセージに固有のエラー番号を付けたい。
@@ -28,18 +28,19 @@
      🔴 台帳は**このファイル1本**。一覧表（HTML）もここから作る＝写しを作らない。
         `node test_errcode.mjs` で、重複・台帳もれ・一覧表のズレを見張っている。
 
+   ◎このファイルの役目＝**台帳だけ**
+     出し方（画面のどこに、どんな見た目で出すか・押すとコピー）は
+     **`_shared\\coreflow-errcode.js`（全アプリ共通の本体）**が持っている。ここでは持たない。
+
    ◎使いかた
-     pitToast('やめました', 'PF-4002')                        … トーストの末尾に番号
-     pitAlert('保存できません', { code:'PF-1002', detail:… }) … 窓の中に番号
+     pitToast('やめました', 'PF-4002')                        … トーストの2行目・右端に error：PF-4002
+     pitAlert('保存できません', { code:'PF-1002', detail:… }) … 窓のボタン行の左端に error：PF-1002
      pitAsk('それでも入れますか？', { code:'PF-1010' })
      ⚠ 番号は**押すとコピーできる**（LINEやチャットにそのまま貼れる）。
    ======================================== */
 (function (w) {
   'use strict';
 
-  /* ===== 台帳 =====================================================
-     [番号, 分野, 何が起きたか, どこで出るか, 出た人がどうすればいいか]
-     ⚠ 並びは番号順。足す時は**いちばん近い番号の次**を取る（飛んでいてよい）。 */
   var LIST = [
     /* ---- 0xxx 全体 ---- */
     ['PF-0001','全体','データを保存できなかった（この端末の保存容量が足りない）','どの画面でも','いらない練習データを片付けてから、もう一度保存する'],
@@ -117,67 +118,11 @@
     ['PF-9040','メンバー','メンバーの設定を保存できなかった','メンバー','もう一度保存する。続くなら番号を伝える']
   ];
 
-  var MAP = {};
-  LIST.forEach(function (r){ MAP[r[0]] = { code:r[0], area:r[1], what:r[2], where:r[3], how:r[4] }; });
+  /* 🔴 出し方は共通部品（_shared\coreflow-errcode.js）に任せる。ここは台帳を渡すだけ。 */
+  if (w.CFErr) w.CFErr.load('PF', LIST);
+  else if (w.console) console.warn('[errcode-pit] coreflow-errcode.js が読み込まれていません');
 
-  w.PIT_ERR_LIST = LIST;
-  w.pitErrInfo   = function (code){ return MAP[code] || null; };
-  w.pitErrKnown  = function (code){ return !!MAP[code]; };
-
-  /* 押すとコピーできる番号の札（トースト用・要素で返す） */
-  function chip(code){
-    var s = document.createElement('span');
-    s.className = 'pit-ec';
-    s.setAttribute('data-ec', code);
-    s.setAttribute('role', 'button');
-    s.setAttribute('title', '押すと番号をコピーします');
-    s.textContent = code;
-    return s;
-  }
-  w.pitErrChip = chip;
-
-  /* 番号をクリップボードへ。⚠ 失敗しても黙って終わる（コピーできない端末がある） */
-  function copy(code){
-    var done = function (){
-      var el = document.getElementById('pit-ec-hint');
-      if (!el){ el = document.createElement('div'); el.id = 'pit-ec-hint'; el.className = 'pit-ec-hint'; document.body.appendChild(el); }
-      el.textContent = code + ' をコピーしました';
-      el.classList.add('show');
-      clearTimeout(w._pitEcT); w._pitEcT = setTimeout(function (){ el.classList.remove('show'); }, 1600);
-    };
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(done, function(){}); return; }
-      var t = document.createElement('textarea'); t.value = code; t.style.position='fixed'; t.style.opacity='0';
-      document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); done();
-    } catch (e) {}
-  }
-  w.pitErrCopy = copy;
-
-  /* どこに出ている番号でも、押したらコピー（1本で受ける＝窓ごとに配線しない） */
-  document.addEventListener('click', function (ev){
-    var el = ev.target && ev.target.closest && ev.target.closest('.pit-ec');
-    if (!el) return;
-    ev.preventDefault(); ev.stopPropagation();
-    copy(el.getAttribute('data-ec') || el.textContent || '');
-  }, true);
-
-  /* 窓（ui-dialog.js）に番号の札を差し込む。
-     ⚠ ui-dialog.js は全アプリ共通の本体なので、ここでは**触らずに後から足す**。
-        窓は同期で組み立てられるので、開いた直後に差し込める。 */
-  w.pitErrInject = function (code){
-    if (!code) return;
-    try {
-      var card = document.getElementById('uid-card'); if (!card) return;
-      if (card.querySelector('.pit-ec')) return;
-      var row = document.createElement('div');
-      row.className = 'pit-ec-row';
-      row.appendChild(document.createTextNode('番号 '));
-      row.appendChild(chip(code));
-      var btns = card.querySelector('.uid-b');
-      if (btns) card.insertBefore(row, btns); else card.appendChild(row);
-    } catch (e) {}
-  };
-
-  /* 見張り用＝台帳そのもの（test_errcode.mjs が読む） */
-  w.pitErrAll = function (){ return LIST.map(function (r){ return r.slice(); }); };
+  /* 昔の呼び方も残しておく（この中だけで使う） */
+  w.pitErrAll  = function (){ return w.CFErr ? CFErr.all() : LIST.map(function (r){ return r.slice(); }); };
+  w.pitErrInfo = function (code){ return w.CFErr ? CFErr.info(code) : null; };
 })(window);

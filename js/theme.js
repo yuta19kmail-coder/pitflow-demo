@@ -26,7 +26,7 @@
     var t = document.getElementById('pf-toast');
     if (!t) { t = document.createElement('div'); t.id = 'pf-toast'; t.className = 'pf-toast'; document.body.appendChild(t); }
     t.textContent = msg;
-    if (code && window.pitErrChip) t.appendChild(pitErrChip(code));
+    if (code && window.CFErr) CFErr.toast(t, code);   /* 2行目の右端に error：PF-0412 */
     t.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(function () { t.classList.remove('show'); }, 1700);
   }
   window.showToast = window.showToast || showToast;

@@ -66,20 +66,16 @@
   window.pitPlainText = _plain;   /* トーストなど「文字だけの場所」でも使える */
 
   /* 🔴 v1.110.0 エラー番号（`code:'PF-0412'`）。
-     窓（ui-dialog.js）は**全アプリ共通の本体**なので、ここでは触らずに
-     開いた直後へ番号の札を差し込む（errcode-pit.js の pitErrInject）。
-     ⚠ 窓は同期で組み立てられるので、呼んだ直後にはもう出来ている。 */
+     ⚠ **ここでは何もしない。**窓（`_shared\\ui-dialog.js` 本体）が `code` を見て、
+        ボタン行の左端に `error：PF-0412` を出す（押すとコピー）。
+        `_clean` が落とさないよう、`code` は素通しにしてある。 */
   function _code(opt){ return (opt && opt.code) ? String(opt.code) : ''; }
-  function _mark(code, p){
-    if (code && window.pitErrInject) { try { pitErrInject(code); } catch (e) {} }
-    return p;
-  }
 
   /* 知らせるだけ（OKボタン1つ）。戻り値は Promise だが、待たなくてよい場面がほとんど。 */
   window.pitAlert = function (msg, opt) {
     var code = _code(opt);
     msg = _plain(msg); opt = _clean(opt);
-    if (_has()) return _mark(code, UI.alert(msg, opt || {}));
+    if (_has()) return UI.alert(msg, opt || {});
     try { window.alert(msg + (opt && opt.detail ? '\n\n' + opt.detail : '') + (code ? '\n\n番号 ' + code : '')); } catch (e) {}
     return Promise.resolve(true);
   };
@@ -88,7 +84,7 @@
   window.pitAsk = function (msg, opt) {
     var code = _code(opt);
     msg = _plain(msg); opt = _clean(opt);
-    if (_has()) return _mark(code, UI.confirm(msg, opt || {}));
+    if (_has()) return UI.confirm(msg, opt || {});
     return Promise.resolve(!!window.confirm(msg + (opt && opt.detail ? '\n\n' + opt.detail : '')));
   };
 
@@ -96,7 +92,7 @@
   window.pitAskText = function (msg, value, opt) {
     var code = _code(opt);
     msg = _plain(msg); opt = _clean(opt);
-    if (window.UI && UI.prompt) return _mark(code, UI.prompt(msg, value == null ? '' : value, opt || {}));
+    if (window.UI && UI.prompt) return UI.prompt(msg, value == null ? '' : value, opt || {});
     var v = window.prompt(msg, value == null ? '' : value);
     return Promise.resolve(v == null ? null : v);
   };

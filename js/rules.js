@@ -352,7 +352,7 @@
       document.body.appendChild(el);
     }
     el.textContent = msg;
-    if (code && window.pitErrChip) el.appendChild(pitErrChip(code));
+    if (code && window.CFErr) CFErr.toast(el, code);   /* 2行目の右端に error：PF-0412 */
     el.classList.add('show');
     clearTimeout(window._pitToastT);
     window._pitToastT = setTimeout(function () { el.classList.remove('show'); }, 3200);

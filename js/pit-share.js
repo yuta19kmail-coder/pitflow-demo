@@ -514,24 +514,64 @@ w.pitDivisionColor = pitDivisionColor;
     if (!m) return '';
     return (m.indexOf('代車') === 0) ? m : ('代車：' + m);
   }
+  /* ══════════════════════════════════════════════════════════════════════════
+     🔴🔴 v1.112.2（2026-08-17 ゆうた「まだ治ってないな」／具体例 X76098）
+     ── **自動で出していた文字が、カードに本当に書き込まれてしまっていた。**
+        当日メモは「押す→入力欄→どこかをクリック（＝確定）」で保存される作り。
+        入力欄の初期値は**画面に出ている文字**なので、
+        **押して、何も打たずに閉じただけで「代車：ハスラー」が本物の文字として保存される。**
+        こうなると **表示の直し（v1.112.1）では消えない。** 実際これが残っていた。
+     🔴 直しかた（2本立て）
+        ① **保存しない**＝確定した文字が「自動で出していたぶんそのまま」なら、空として保存する。
+           　（下の pitTodayNoteAutoLike。呼ぶ側＝当日ビューと MHS が確定の直前に通す）
+        ② **すでに書き込まれてしまったものは、自動ぶんとして読み替える**＝
+           　保存されている文字が自動ぶんと**1文字も違わない**なら、いまの代車で作り直す。
+           　代車が無ければ**何も出さない**＝ゆうたの見ている X76098 はこれで消える。
+           　さらに次に誰かがそのメモを触れば、①で**空に片付く**（掃除の道具は要らない）。
+     ⚠ ②は **完全一致だけ**。「代車：ハスラー・遅れるかも」は人が書いた文字なので**触らない。**
+     ══════════════════════════════════════════════════════════════════════════ */
+  /* その文字は「自動で出していたぶん」そのものか（＝人が書いた文字ではないか） */
+  function pitTodayNoteAutoLike(v){
+    v = String(v == null ? '' : v).trim();
+    if (!v) return false;
+    var ls = _loaners();
+    for (var i = 0; i < ls.length; i++){
+      var l = ls[i]; if (!l) continue;
+      var m = String(l.model || '').trim() || String(l.name || '').trim();
+      if (!m) continue;
+      var s = (m.indexOf('代車') === 0) ? m : ('代車：' + m);
+      if (v === s) return true;          /* 🔴 完全一致だけ。後ろに何か足してあれば人の文字 */
+    }
+    return false;
+  }
   /* 🔴 当日ビュー・MHS Todayボードが画面に出す当日メモの文字。**両方ここを通す。**
      ⚠ 返す文字が空でないからといって、保存されているとは限らない（保存は c.todayNote だけ）。
         入力欄を開く時も**この文字を初期値にする**＝一部だけ消して直せる。 */
   function pitTodayNoteText(c){
     if (!c) return '';
     var v = String(c.todayNote || '').trim();
-    return v || pitLoanerNote(c);
+    if (!v || pitTodayNoteAutoLike(v)) return pitLoanerNote(c);   /* ← ②の読み替え */
+    return v;
   }
-  /* その文字が「自動で出しているぶん」か（保存されていないか）。見た目は変えないが、
-     試験と、将来ここを変えたくなった時のために答えられるようにしておく。 */
+  /* その文字が「自動で出しているぶん」か（人が書いた文字ではないか） */
   function pitTodayNoteIsAuto(c){
-    return !!c && !String(c.todayNote || '').trim() && !!pitLoanerNote(c);
+    if (!c) return false;
+    var v = String(c.todayNote || '').trim();
+    if (v && !pitTodayNoteAutoLike(v)) return false;
+    return !!pitLoanerNote(c);
+  }
+  /* 🔴 保存する直前に必ず通す。自動ぶんそのままなら**空**にして、カードに書き込まない。
+     ＝ 押して閉じただけで文字が焼き付くのを止める／すでに焼き付いたものも触れば片付く。 */
+  function pitTodayNoteToSave(v){
+    return pitTodayNoteAutoLike(v) ? '' : String(v == null ? '' : v).trim();
   }
   w.pitLoanerModel     = pitLoanerModel;
   w.pitLoanerOf        = pitLoanerOf;
   w.pitLoanerNote      = pitLoanerNote;
-  w.pitTodayNoteText   = pitTodayNoteText;
-  w.pitTodayNoteIsAuto = pitTodayNoteIsAuto;
+  w.pitTodayNoteText     = pitTodayNoteText;
+  w.pitTodayNoteIsAuto   = pitTodayNoteIsAuto;
+  w.pitTodayNoteAutoLike = pitTodayNoteAutoLike;
+  w.pitTodayNoteToSave   = pitTodayNoteToSave;
 
   console.log('[pit-share] ready（PitFlow と MHS が一緒に使う物差し）');
 })(window);

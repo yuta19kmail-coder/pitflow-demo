@@ -62,7 +62,13 @@ window.pitTodayNoteEdit = function(el){
   inp.addEventListener('click', function(e){ e.stopPropagation(); });
   inp.addEventListener('keydown', function(e){ e.stopPropagation(); if (e.key === 'Enter'){ inp.blur(); } else if (e.key === 'Escape'){ inp._cancel = true; inp.blur(); } });
   inp.addEventListener('blur', function(){
-    if (!inp._cancel){ c.todayNote = inp.value.trim(); if (window.PitDB) PitDB.save(); }
+    /* 🔴 v1.112.2 保存する前に物差しへ通す。**自動で出していた文字そのままなら空にする**
+       ＝ 押して何も打たずに閉じただけで「代車：ハスラー」が焼き付くのを止める。
+       ⚠ ここを inp.value.trim() に戻すと、また同じ事故が起きる（2026-08-17 実害あり）。 */
+    if (!inp._cancel){
+      c.todayNote = window.pitTodayNoteToSave ? pitTodayNoteToSave(inp.value) : inp.value.trim();
+      if (window.PitDB) PitDB.save();
+    }
     var tmp = document.createElement('div'); tmp.innerHTML = _todNoteSpan(c);
     inp.replaceWith(tmp.firstChild);
   });

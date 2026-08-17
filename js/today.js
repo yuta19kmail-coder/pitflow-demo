@@ -33,8 +33,17 @@ function _hm(min){ return String(Math.floor(min/60)).padStart(2,'0') + ':' + Str
 
 /* 当日メモ（クイック引継ぎ）＝当日ビューのナンバー横に1行。c.todayNote に保持（当日中の共有用に保存はするが、フェーズが変わった後は気にしない）v0.123.0 */
 function _todEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* 🚗 v1.111.0（2026-08-17 ゆうた確定）**空っぽなら「代車：ハスラー」を出す。**
+   ・書いてあればそれを出す ／ 全部消せばまた代車名に戻る（誤って消しても救われる）
+   ・🔴 見た目は打ち込んだメモとまったく同じ（薄くしない・点線も付けない）＝ゆうた指定
+   ・🔴 文字を作る所は `js/pit-share.js` の `pitTodayNoteText` 1本。**ここで組み立てない**
+     （MHS の Todayボードが同じものを借りる。写しを作るとまた片方だけ古くなる）
+   ⚠ 出しているだけで保存はしていない。保存されるのは人が触って確定した時だけ。 */
+function _todNoteText(c){
+  return window.pitTodayNoteText ? pitTodayNoteText(c) : (c.todayNote || '');
+}
 function _todNoteSpan(c){
-  var v = c.todayNote || '';
+  var v = _todNoteText(c);
   return '<span class="tr-note' + (v ? '' : ' empty') + '" data-id="' + c.id + '" onclick="event.stopPropagation();pitTodayNoteEdit(this)" title="クリックで当日メモ（例：間に合わないかも）">'
        + (v ? _todEsc(v) : '&nbsp;') + '</span>';
 }
@@ -44,7 +53,10 @@ window.pitTodayNoteEdit = function(el){
   var c = (state.cards || []).find(function(x){ return x.id === id; });
   if (!c) return;
   var inp = document.createElement('input');
-  inp.type = 'text'; inp.className = 'tr-note-input'; inp.value = c.todayNote || '';
+  /* 🔴 v1.111.0 初期値は**画面に出ている文字**（＝空なら代車名が入った状態で始まる）。
+     ここを c.todayNote に戻すと「代車：ハスラー と見えているのに、押すと空」になり、
+     ゆうたの言う「一部だけ消して ハスラー・遅れるかも にする」ができなくなる。 */
+  inp.type = 'text'; inp.className = 'tr-note-input'; inp.value = _todNoteText(c);
   inp.setAttribute('placeholder', '当日の引継ぎ（例：間に合わないかも）');
   inp.setAttribute('maxlength', '60');
   inp.addEventListener('click', function(e){ e.stopPropagation(); });

@@ -39,7 +39,9 @@
   var HOOK = {
     divisions: function () { return (w.state && Array.isArray(w.state.divisions)) ? w.state.divisions : []; },
     estAmount: function (workType, team) { return w.pitEstAmount ? w.pitEstAmount(workType, team) : 0; },
-    teamKey:   function (c) { return w.pitTeamKey ? w.pitTeamKey(c) : ((c && c.boardId === 'import') ? 'import' : 'default'); }
+    teamKey:   function (c) { return w.pitTeamKey ? w.pitTeamKey(c) : ((c && c.boardId === 'import') ? 'import' : 'default'); },
+    /* 🚗 代車マスタ（v1.111.0）。PitFlow は state.loaners、MHS は借りた写しを渡す */
+    loaners:   function () { return (w.state && Array.isArray(w.state.loaners)) ? w.state.loaners : []; }
   };
   function _divisions(){ try { return HOOK.divisions() || []; } catch (e) { return []; } }
   w.PitShare = {
@@ -48,6 +50,7 @@
       if (typeof o.divisions === 'function') HOOK.divisions = o.divisions;
       if (typeof o.estAmount === 'function') HOOK.estAmount = o.estAmount;
       if (typeof o.teamKey   === 'function') HOOK.teamKey   = o.teamKey;
+      if (typeof o.loaners   === 'function') HOOK.loaners   = o.loaners;
     }
   };
 
@@ -462,6 +465,63 @@ w.pitDivisionColor = pitDivisionColor;
     return out;
   }
   w.pitShakenOnDate = pitShakenOnDate;
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     🚗 代車の呼び名と、当日メモに出す1行（PitFlow v1.111.0 / MHS v1.21.0・2026-08-17）
+     --------------------------------------------------------------------------
+     🗣 ゆうた「当日ビューの代車バッジに代車名（ハスラー等）を欲しい」
+        → モックで詰めた結果 **バッジではなく1行メモに出す**ことにした（ゆうた確定）。
+           右のバッジ枠は 64px しかなく、相談・洗車と同居しているため。
+
+     🔴🔴 きまり（とてもかんたん。ここを複雑にしないこと）
+        ・当日メモが **空っぽ** → `代車：ハスラー` を出す
+        ・**何か書いてある** → それをそのまま出す
+        ・**全部消した**     → また空っぽなので **代車名に戻る**
+        ＝ 誤って消しても、いったん全部消せば必ず元に戻る。
+        ＝ だから「人が一度さわったか」を覚える必要が無い。**覚えないのが正しい。**
+
+     🔴 見た目は **打ち込んだメモとまったく同じ**（薄くしない・点線も付けない）＝ゆうた指定。
+     ⚠ 代車が付いている車は、メモを空っぽのままには**できない**（必ず代車名が出る）。
+        これは「誤って消しても戻る」と表裏。ゆうた納得ずみ。
+     ⚠ 番号は付けない（「ハスラー」であって「ハスラー（5）」ではない）＝ゆうた確定。
+        番号付きの呼び名が要る所（代車カレンダー）は loaner.js の `_loName` のまま。**混ぜないこと。**
+     ══════════════════════════════════════════════════════════════════════════ */
+  /* 代車マスタ。PitFlow は state.loaners、MHS は借りた写しを差し込み口から渡す */
+  function _loaners(){ try { return HOOK.loaners() || []; } catch (e) { return []; } }
+  /* 🔴 代車の呼び名（車種名だけ）。**ここが本家。** loaner.js からは移設した。
+     車種が未登録の代車だけ、今までどおり元の名前（「代車5」）で埋める＝空にしない。 */
+  function pitLoanerModel(id){
+    if (!id) return '';
+    var l = _loaners().filter(function (x) { return x && x.id === id; })[0];
+    if (!l) return '';
+    return String(l.model || '').trim() || String(l.name || '').trim() || '';
+  }
+  /* 当日メモに出す既定の1行。代車が決まっていなければ空（＝何も出さない）。
+     ⚠ 車種が未登録の代車は呼び名が「代車9」なので、そのまま頭に付けると
+        **「代車：代車9」**になる。すでに「代車」で始まっていたら付けない。 */
+  function pitLoanerNote(c){
+    if (!c) return '';
+    var m = pitLoanerModel(c.loanerId);
+    if (!m) return '';
+    return (m.indexOf('代車') === 0) ? m : ('代車：' + m);
+  }
+  /* 🔴 当日ビュー・MHS Todayボードが画面に出す当日メモの文字。**両方ここを通す。**
+     ⚠ 返す文字が空でないからといって、保存されているとは限らない（保存は c.todayNote だけ）。
+        入力欄を開く時も**この文字を初期値にする**＝一部だけ消して直せる。 */
+  function pitTodayNoteText(c){
+    if (!c) return '';
+    var v = String(c.todayNote || '').trim();
+    return v || pitLoanerNote(c);
+  }
+  /* その文字が「自動で出しているぶん」か（保存されていないか）。見た目は変えないが、
+     試験と、将来ここを変えたくなった時のために答えられるようにしておく。 */
+  function pitTodayNoteIsAuto(c){
+    return !!c && !String(c.todayNote || '').trim() && !!pitLoanerNote(c);
+  }
+  w.pitLoanerModel     = pitLoanerModel;
+  w.pitLoanerNote      = pitLoanerNote;
+  w.pitTodayNoteText   = pitTodayNoteText;
+  w.pitTodayNoteIsAuto = pitTodayNoteIsAuto;
 
   console.log('[pit-share] ready（PitFlow と MHS が一緒に使う物差し）');
 })(window);

@@ -568,6 +568,37 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitLoanerModel     = pitLoanerModel;
   w.pitLoanerOf        = pitLoanerOf;
   w.pitLoanerNote      = pitLoanerNote;
+  /* ══════════════════════════════════════════════════════════════════════════
+     🏷 ナンバーの場所に出すもの（PitFlow v1.113.0 / MHS v1.22.0・2026-08-17 ゆうた指定）
+     --------------------------------------------------------------------------
+     🗣 ゆうた「**初回は必ずナンバーが入ってない。**だから当日ボードの
+        　　　　 **初回にチェックが入っている場合は、通常ナンバーが出るところに『初回顧客』**と出したい。
+        　　　　 **客自体はリピーターだが車が初めての場合は『初回車両』**
+        　　　　 （＝リピーターでナンバーが入っていない場合が該当する）」
+
+     | 予約編集の「初回／リピーター」 | ナンバー | 出すもの |
+     |---|---|---|
+     | **初回**       | （たいてい空） | **初回顧客** |
+     | **リピーター** | 空             | **初回車両** |
+     | リピーター     | 入っている     | ナンバーをそのまま |
+     | **まだ選んでいない** | 空       | **何も出さない** |
+
+     🔴 **「まだ選んでいない」を初回だと決めつけない。**
+        まだ分かっていないものを代わりのもので埋めない（v1.88.0 の決めごと）。
+        予約詳細の印も「選んでいなければ何も出さない」で揃っている（card-view.js の repeatBadge）。
+     ⚠ 初回でナンバーが入っている珍しい時も「初回顧客」を優先する（ゆうた指定のとおり）。
+     🔴 判断はここ1本。PitFlow の当日ビューも MHS の Todayボードもこれを通す。各画面で書かない。
+     ══════════════════════════════════════════════════════════════════════════ */
+  function pitTodayPlate(c){
+    if (!c) return { text: '', kind: '' };
+    var rep   = String(c.repeat || '').trim();
+    var plate = String(c.plate  || '').trim();
+    if (rep === 'first')                 return { text: '初回顧客', kind: 'first' };
+    if (rep === 'repeater' && !plate)    return { text: '初回車両', kind: 'firstcar' };
+    return { text: plate, kind: plate ? 'plate' : '' };
+  }
+  w.pitTodayPlate = pitTodayPlate;
+
   w.pitTodayNoteText     = pitTodayNoteText;
   w.pitTodayNoteIsAuto   = pitTodayNoteIsAuto;
   w.pitTodayNoteAutoLike = pitTodayNoteAutoLike;

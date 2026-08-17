@@ -665,6 +665,15 @@
 /* ナンバー横の当日メモ（クイック引継ぎ）＝当日ビュー内だけ v0.123.0 */
 .tr-plateline{ display:flex; align-items:center; gap:8px; margin-top:1px; min-width:0; }
 .tr-plateline .tr-plate{ margin-top:0; flex:none; }
+/* 🏷 v1.113.0（ゆうた指定 2026-08-17）ナンバーの場所に出す「初回顧客」「初回車両」。
+   🔴 初回はナンバーが入っていないので、その場所が空欄になっていた。そこに札を出す。
+   ⚠ ナンバーと同じ場所・同じ大きさ。**色と太さだけで見分ける**（行の高さ56pxは変えない）。 */
+.tr-plate.is-first,
+.tr-plate.is-firstcar{ font-weight:800; border-radius:4px; padding:0 5px; border:1px solid; }
+.tr-plate.is-first   { color:#378ADD; background:rgba(55,138,221,.12);  border-color:rgba(55,138,221,.5); }
+.tr-plate.is-firstcar{ color:#8b5cf6; background:rgba(139,92,246,.12);  border-color:rgba(139,92,246,.5); }
+[data-theme="light"] .tr-plate.is-first   { color:#1d4ed8; }
+[data-theme="light"] .tr-plate.is-firstcar{ color:#6d28d9; }
 .tr-note{ flex:1; min-width:0; font-size:12px; font-weight:800; color:var(--orange); background:transparent; border:none; border-radius:5px; padding:1px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:text; }
 .tr-note:hover{ background:rgba(255,255,255,.05); }   /* 枠は出さず、ホバー時だけうっすら */
 .tr-note.empty{ color:var(--text3); font-weight:400; opacity:.4; }   /* 未入力は控えめ＝「なにもないエリア」。クリックで入力 */

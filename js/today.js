@@ -509,7 +509,12 @@ function todayRow(c, isReturn, inBreak){
   h += '<div class="tr-headline"><span class="tr-customer">' + ((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）') + ' 様</span>'
      + (c.car ? '<span class="tr-carname">' + c.car + '</span>' : '') + '</div>';
   // ナンバー＋当日メモ（クイック引継ぎ）を1行で。メモはクリックで直入力＝当日ビュー内だけの簡単メモ v0.123.0
-  h += '<div class="tr-plateline">' + (c.plate ? '<span class="tr-plate">' + c.plate + '</span>' : '') + _todNoteSpan(c) + '</div>';
+  /* 🏷 v1.113.0 ナンバーの場所＝初回なら「初回顧客」／リピーターでナンバーが無ければ「初回車両」。
+     🔴 判断は pit-share.js の pitTodayPlate 1本。ここで書かない（MHS も同じものを借りる）。 */
+  const _pl = window.pitTodayPlate ? pitTodayPlate(c) : { text: (c.plate || ''), kind: (c.plate ? 'plate' : '') };
+  h += '<div class="tr-plateline">'
+     + (_pl.text ? '<span class="tr-plate' + (_pl.kind && _pl.kind !== 'plate' ? ' is-' + _pl.kind : '') + '">' + _todEsc(_pl.text) + '</span>' : '')
+     + _todNoteSpan(c) + '</div>';
   h += '</div>';
 
   // 右側タグ：固定3スロット（添え物｜受付タイプ｜作業タイプ）で全幅揃え

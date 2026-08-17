@@ -70,7 +70,7 @@
       + '  </div>'
       + '</div></div>';
     document.body.appendChild(bd);
-    bd.addEventListener('click', function(e){ if (e.target.id==='pp-backdrop') PitPhasePopup.close(false); });
+    pitModalOutside(bd, function(){ PitPhasePopup.close(false); });
   }
 
   function statusName(s){ return (window.statusLabel ? statusLabel(s) : s); }

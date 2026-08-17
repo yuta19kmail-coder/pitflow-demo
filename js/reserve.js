@@ -421,7 +421,7 @@ window.pitReserveDayPopup = function(dateStr, mode){
     back = document.createElement('div');
     back.id = 'pit-day-pop';
     back.className = 'modal-backdrop';
-    back.addEventListener('click', function(e){ if (e.target.id === 'pit-day-pop') pitReserveDayPopClose(); });
+    pitModalOutside(back, function(){ pitReserveDayPopClose(); });
     document.body.appendChild(back);
   }
   const d = new Date(dateStr + 'T00:00:00');

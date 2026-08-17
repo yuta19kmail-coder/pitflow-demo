@@ -179,7 +179,7 @@
     inp.addEventListener('input', function () {
       btn.disabled = (inp.value.trim() !== '初期化');
     });
-    o.addEventListener('click', function (ev) { if (ev.target === o) close(); });
+    pitModalOutside(o, function(){ close(); });
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 30);
   };
 

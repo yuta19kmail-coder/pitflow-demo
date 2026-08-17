@@ -68,7 +68,7 @@
       + '</div></div>';
     document.body.appendChild(bd);
     /* 外側を押した＝やめる（移動しない）。入れた担当者はそのまま残す（本当の情報なので捨てない）。 */
-    bd.addEventListener('click', function (e){ if (e.target.id === 'mg-backdrop') PitMechGuard.close(0); });
+    pitModalOutside(bd, function (){ PitMechGuard.close(0); });
     /* チップを押されたら、その場で描き直す（配分バーもライブで動く） */
     if (window.PitMechPick) PitMechPick.on('mg', function (c){
       try { if (window.PitDB) PitDB.save(); } catch(err){}

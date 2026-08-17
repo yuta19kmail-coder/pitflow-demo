@@ -395,7 +395,7 @@ window.fleetOpenDetail = function (id) {
     ov = document.createElement('div');
     ov.id = 'fleet-detail';
     ov.className = 'modal-backdrop show';
-    ov.addEventListener('click', function (ev) { if (ev.target === ov) fleetCloseDetail(); });
+    pitModalOutside(ov, function(){ fleetCloseDetail(); });
     document.body.appendChild(ov);
   }
   ov.innerHTML = '<div class="modal-box fd-box">' + h + '</div>';

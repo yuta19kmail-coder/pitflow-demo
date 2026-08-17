@@ -1722,7 +1722,7 @@
       + '<div class="cv-shpb-act"><button class="cv-shbtn '+(isDone?'ok':'re')+'" onclick="cvShConfirm(\''+kind+'\')">記録する</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
       + '</div>';
     let back=document.getElementById('cv-shpop');
-    if(!back){ back=document.createElement('div'); back.id='cv-shpop'; back.className='modal-backdrop'; back.addEventListener('click',function(e){ if(e.target.id==='cv-shpop') cvShClose(); }); document.body.appendChild(back); }
+    if(!back){ back=document.createElement('div'); back.id='cv-shpop'; back.className='modal-backdrop'; pitModalOutside(back, cvShClose); document.body.appendChild(back); }
     back.innerHTML='<div class="pdp-box cv-shbox"><div class="pdp-head"><span>'+title+'</span><button class="pdp-x" onclick="cvShClose()"><i data-ic=close data-ics=16></i></button></div>'+body+'</div>';
     back.classList.add('show');
   };

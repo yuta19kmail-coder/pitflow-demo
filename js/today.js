@@ -199,7 +199,7 @@ window.pitTodayTap = function(id, isReturn){
     back = document.createElement('div');
     back.id = 'today-action';
     back.className = 'modal-backdrop';
-    back.addEventListener('click', e => { if (e.target.id === 'today-action') pitTodayActionClose(); });
+    pitModalOutside(back, function(){ pitTodayActionClose(); });
     document.body.appendChild(back);
   }
   const wt = state.workTypes.find(w => w.id === c.workType);

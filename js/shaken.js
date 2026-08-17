@@ -259,7 +259,7 @@
 
   function pop(title, body){
     var back=document.getElementById('shk-pop');
-    if(!back){ back=document.createElement('div'); back.id='shk-pop'; back.className='modal-backdrop'; back.addEventListener('click',function(e){ if(e.target.id==='shk-pop') closePop(); }); document.body.appendChild(back); }
+    if(!back){ back=document.createElement('div'); back.id='shk-pop'; back.className='modal-backdrop'; pitModalOutside(back, closePop); document.body.appendChild(back); }
     back.innerHTML='<div class="pdp-box shk-box"><div class="pdp-head"><span>'+title+'</span><button class="pdp-x" onclick="shkClosePop()"><i data-ic=close data-ics=16></i></button></div><div class="shk-popbody">'+body+'</div></div>';
     back.classList.add('show');
   }

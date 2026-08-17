@@ -334,7 +334,12 @@
       btn.addEventListener('mousedown', function (e){ e.preventDefault(); });
       btn.addEventListener('click', function (){ commit(btn.dataset.val); if (mainEl) mainEl.focus(); });
     });
-    wrap.addEventListener('focusout', function (e){ if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('open'); });
+    /* 🔴 v1.109.0 o.keepOpen＝**一度開いた候補パネルを閉じない**。
+       ⚠ 窓（完TEL済）の中では、このパネルが**場所を取る作り**（.rp-timeguide は position:static）。
+          閉じると下のボタンが上へ跳ねるので、「押した所」と「離した所」がズレて
+          **押したはずのボタンが効かない**（外側を押した扱いになる）。ゆうた報告の『やめました』の元。 */
+    if (!o.keepOpen)
+      wrap.addEventListener('focusout', function (e){ if (!wrap.contains(e.relatedTarget)) wrap.classList.remove('open'); });
   }
   window.pitTimeGuideBind = pitTimeGuideBind;
 

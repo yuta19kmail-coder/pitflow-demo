@@ -235,7 +235,7 @@ window.pitUndRestore = function(id){
     back = document.createElement('div');
     back.id = 'pit-und-restore';
     back.className = 'modal-backdrop';
-    back.addEventListener('click', e => { if (e.target.id === 'pit-und-restore') pitUndRestoreClose(); });
+    pitModalOutside(back, function(){ pitUndRestoreClose(); });
     document.body.appendChild(back);
   }
   const nm = (window.pitCustName ? pitCustName(c) : c.customer) || '（未入力）';

@@ -82,7 +82,9 @@
       + '  </div>'
       + '</div></div>';
     document.body.appendChild(bd);
-    bd.addEventListener('click', function(e){ if (e.target.id==='rp-backdrop') PitReturnPopup.close(false); });
+    /* 🔴 v1.109.0 外側を押したらやめる＝**押し始めが外側の時だけ**（modal-outside.js 1本）。
+       ⚠ 返車時間の候補パネルが閉じてボタンが跳ねると、押したのに『やめました』になっていた。 */
+    pitModalOutside(bd, function(){ PitReturnPopup.close(false); });
   }
 
   function setWash(on){   // 洗車備考は要/不要にかかわらず常時表示
@@ -144,7 +146,8 @@
       el('rp-time-slot').innerHTML = window.pitTimeGuideHtml
         ? pitTimeGuideHtml(card.returnTime || '', { list: window.PIT_RETURN_TIME_QUICK, cls: 'rp-timeguide' })
         : '<input class="cf-input cf-time-main" type="text" value="'+esc(card.returnTime||'')+'">';
-      if (window.pitTimeGuideBind) pitTimeGuideBind(el('rp-time-slot').querySelector('.cf-time'), {});
+      /* 🔴 v1.109.0 keepOpen＝開いた候補パネルを閉じない（閉じるとボタンが跳ねて押せなくなる） */
+      if (window.pitTimeGuideBind) pitTimeGuideBind(el('rp-time-slot').querySelector('.cf-time'), { keepOpen: true });
     }
 
     // 洗車＝デフォ要／お礼LINE＝デフォ要（初回＝盤面からのドラッグ時は必ず要。再編集時は保存値を尊重）
@@ -186,7 +189,7 @@
       + '  <div class="rk-note">どちらを選んでも、このあと金額の入力に進みます。</div>'
       + '</div></div>';
     document.body.appendChild(bd);
-    bd.addEventListener('click', function(e){ if (e.target.id==='rk-backdrop') PitReturnPopup.kind(null); });
+    pitModalOutside(bd, function(){ PitReturnPopup.kind(null); });
   }
   /* この1枚を出すか＝**待ち・当日返しで、まだ完TELを通っていない車**だけ */
   function needKind(card){

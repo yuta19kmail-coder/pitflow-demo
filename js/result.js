@@ -95,7 +95,7 @@ window.pitResultDayPopup = function(dateStr){
     back = document.createElement('div');
     back.id = 'pit-day-pop';
     back.className = 'modal-backdrop';
-    back.addEventListener('click', function(e){ if (e.target.id === 'pit-day-pop' && window.pitReserveDayPopClose) pitReserveDayPopClose(); });
+    pitModalOutside(back, function(){ if (window.pitReserveDayPopClose) pitReserveDayPopClose(); });
     document.body.appendChild(back);
   }
   const d = new Date(dateStr + 'T00:00:00');

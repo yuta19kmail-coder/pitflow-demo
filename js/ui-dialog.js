@@ -20,7 +20,9 @@
 //     UI.prompt('ノートの名前は？', '新しいノート').then(v => { if(v==null)return; ... })
 //     UI.confirm('カードを削除しますか？', {danger:true}).then(ok => { if(!ok)return; ... })
 //     UI.alert('保存しました')
-//   オプション: {title, detail, ok, cancel, danger, placeholder, multiline, selectAll}
+//   オプション: {title, detail, ok, cancel, danger, placeholder, multiline, selectAll, code}
+//     code … エラー番号（'PF-1002'）。渡すとボタン行の左端に error：PF-1002 と出て、押すとコピーできる。
+//            🔴 付けるのは「通らなかった」時だけ（決めごとは _shared\coreflow-errcode.js の頭）。
 // ========================================
 (function () {
   var ROOT=null, CUR=null;
@@ -49,7 +51,10 @@
       '#uid-card .uid-b button.pri{background:var(--accd,#db2777);border-color:var(--accd,#db2777);color:#fff}',
       '#uid-card .uid-b button.pri:hover{filter:brightness(1.12)}',
       '#uid-card .uid-b button.danger{background:#dc2626;border-color:#dc2626;color:#fff}',
-      '#uid-card .uid-b button.danger:hover{filter:brightness(1.12)}'
+      '#uid-card .uid-b button.danger:hover{filter:brightness(1.12)}',
+      /* 🔢 2026-08-17 エラー番号（ゆうた確定＝A案）。ボタンと同じ行の左端に、枠なしでサラッと。
+         ⚠ 窓の高さを増やさないために、行を足さずにボタン行へ相乗りさせている。 */
+      '#uid-card .uid-b .cf-ec{margin-right:auto;align-self:center}'
     ].join('');
     document.head.appendChild(st);
   }
@@ -97,6 +102,8 @@
           : '<input type="text" id="uid-in" value="'+esc(o.value||'')+'" placeholder="'+esc(o.placeholder||'')+'">';
       }
       h+='<div class="uid-b">';
+      /* 🔢 2026-08-17 エラー番号。`code:'PF-1002'` を渡された時だけ出す（押すとコピー＝coreflow-errcode.js）。 */
+      if(o.code) h+='<span class="cf-ec" data-ec="'+esc(o.code)+'" role="button" title="押すと番号をコピーします">error：'+esc(o.code)+'</span>';
       if(o.cancel!==false) h+='<button type="button" id="uid-no">'+esc(o.cancel||'やめる')+'</button>';
       h+='<button type="button" id="uid-ok" class="'+(o.danger?'danger':'pri')+'">'+esc(o.ok||(isInput?'OK':'はい'))+'</button></div>';
       card.innerHTML=h;

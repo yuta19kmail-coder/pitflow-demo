@@ -496,12 +496,21 @@ w.pitDivisionColor = pitDivisionColor;
     if (!l) return '';
     return String(l.model || '').trim() || String(l.name || '').trim() || '';
   }
-  /* 当日メモに出す既定の1行。代車が決まっていなければ空（＝何も出さない）。
+  /* 🔴🔴 v1.112.1（2026-08-17 ゆうた報告「**代車だしてない人に代車のメモが入ってる**」）
+     ── **代車を出しているかどうかは `needLoaner` で決まる。`loanerId` だけを見てはいけない。**
+     ⚠ 「代車：必要 → 不要」に戻しても **`loanerId` は消えない**（貸出そのものは代車カレンダーで別に取り消す作り）。
+        だから `loanerId` だけを見ると、**代車を出していない車にも代車名が出る**。実際に出た。
+     🔴 アプリ全体が `needLoaner` で判断している（予約詳細・ホバー・表紙の印刷ぜんぶ）。**ここも合わせる。**
+     🔴 「この車に出している代車の呼び名」を聞くのは**この関数1本**。各画面で組み立てないこと。 */
+  function pitLoanerOf(c){
+    if (!c || !c.needLoaner) return '';      /* ← 代車を出していない車は、ここで終わり */
+    return pitLoanerModel(c.loanerId);       /* まだ決まっていなければ空（＝何も出さない） */
+  }
+  /* 当日メモに出す既定の1行。代車を出していない／まだ決まっていなければ空。
      ⚠ 車種が未登録の代車は呼び名が「代車9」なので、そのまま頭に付けると
         **「代車：代車9」**になる。すでに「代車」で始まっていたら付けない。 */
   function pitLoanerNote(c){
-    if (!c) return '';
-    var m = pitLoanerModel(c.loanerId);
+    var m = pitLoanerOf(c);
     if (!m) return '';
     return (m.indexOf('代車') === 0) ? m : ('代車：' + m);
   }
@@ -519,6 +528,7 @@ w.pitDivisionColor = pitDivisionColor;
     return !!c && !String(c.todayNote || '').trim() && !!pitLoanerNote(c);
   }
   w.pitLoanerModel     = pitLoanerModel;
+  w.pitLoanerOf        = pitLoanerOf;
   w.pitLoanerNote      = pitLoanerNote;
   w.pitTodayNoteText   = pitTodayNoteText;
   w.pitTodayNoteIsAuto = pitTodayNoteIsAuto;

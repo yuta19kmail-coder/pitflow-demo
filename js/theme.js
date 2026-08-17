@@ -21,10 +21,13 @@
 
   // ---- トースト ----
   var _tt;
-  function showToast(msg) {
+  /* 🔴 v1.110.0 第2引数＝エラー番号（PF-0412）。pitToast と同じ決めごと。 */
+  function showToast(msg, code) {
     var t = document.getElementById('pf-toast');
     if (!t) { t = document.createElement('div'); t.id = 'pf-toast'; t.className = 'pf-toast'; document.body.appendChild(t); }
-    t.textContent = msg; t.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(function () { t.classList.remove('show'); }, 1700);
+    t.textContent = msg;
+    if (code && window.pitErrChip) t.appendChild(pitErrChip(code));
+    t.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(function () { t.classList.remove('show'); }, 1700);
   }
   window.showToast = window.showToast || showToast;
   if (!window.pitToast) window.pitToast = showToast;
@@ -123,7 +126,7 @@
 
   // ---- 同期（サンプル）----
   window.pitSyncSample = function () {
-    showToast('同期はサンプルです（本番のGoogleログイン＋クラウド保存の接続後に有効になります）');
+    showToast('同期はサンプルです（本番のGoogleログイン＋クラウド保存の接続後に有効になります）', 'PF-0040');
   };
 
   function initUI() { refreshThemeUI(); refreshFontUI(); if (window.pitRenderTopUser) pitRenderTopUser(); }

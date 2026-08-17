@@ -340,8 +340,10 @@
   /* 公開版＝常に反映済み（本番）設定で判定。ダッシュボード・予約警告が使う */
   window.pitVerdict = function (dStr) { return _verdictC(state.settings, dStr); };
 
-  /* ささやかなトースト（ブロックしないお知らせ） */
-  window.pitToast = function (msg) {
+  /* ささやかなトースト（ブロックしないお知らせ）
+     🔴 v1.110.0 第2引数＝エラー番号（PF-0412）。渡すと末尾に押せる札が付く。
+        ⚠ 付けるのは「通らなかった」時だけ。成功のお知らせには付けない（errcode-pit.js の決めごと）。 */
+  window.pitToast = function (msg, code) {
     let el = document.getElementById('pit-toast');
     if (!el) {
       el = document.createElement('div');
@@ -350,6 +352,7 @@
       document.body.appendChild(el);
     }
     el.textContent = msg;
+    if (code && window.pitErrChip) el.appendChild(pitErrChip(code));
     el.classList.add('show');
     clearTimeout(window._pitToastT);
     window._pitToastT = setTimeout(function () { el.classList.remove('show'); }, 3200);
@@ -398,7 +401,7 @@
       const sub  = dLabel + '・' + tName + (why ? '　' + why : '');
       const msg  = 'それでも予約を入れますか？';
       if (window.pitAsk){
-        pitAsk(head, { detail: sub + '\n\n' + msg + '（最終判断は人でOKです）',
+        pitAsk(head, { code: 'PF-1010', detail: sub + '\n\n' + msg + '（最終判断は人でOKです）',
                        ok: 'それでも入れる', cancel: 'やめる' })
           .then(function (ok) { fin(ok ? newDate : (oldDate || '')); });
         return;
@@ -408,7 +411,7 @@
       return;
     }
     /* ⚠ トーストも「文字だけ」の場所。念のため飾りを落としてから出す（v1.75.1）。 */
-    if (tv.mark === '△') pitToast('△ ' + dLabel + ' ' + tName + '：' + (window.pitPlainText ? pitPlainText(tv.reason) : tv.reason));
+    if (tv.mark === '△') pitToast('△ ' + dLabel + ' ' + tName + '：' + (window.pitPlainText ? pitPlainText(tv.reason) : tv.reason), 'PF-1011');
     fin(newDate);
   };
 

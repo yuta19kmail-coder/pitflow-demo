@@ -436,7 +436,7 @@
       .then(function () { return true; })
       .catch(function (e) {
         console.error('[members] 保存に失敗', e);
-        if (window.showToast) showToast('メンバーの設定を保存できませんでした');
+        if (window.showToast) showToast('メンバーの設定を保存できませんでした', 'PF-9040');
         return false;
       });
   }

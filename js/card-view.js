@@ -1103,7 +1103,7 @@
       Object.keys(snap).forEach(function(k){ card[k] = snap[k]; });
     }
     editRelease();
-    if (window.pitToast) pitToast('編集をキャンセルしました');
+    if (window.pitToast) pitToast('編集をキャンセルしました', 'PF-1050');
     backToView(card);
   };
 

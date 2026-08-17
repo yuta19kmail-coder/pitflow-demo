@@ -138,7 +138,7 @@
     if (welcomed()) return false;
     if (!w.pitAlert) return false;                 /* ask-pit.js より後ろで呼ぶ前提 */
     try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) {}
-    pitAlert('ここは練習用のデモ版です', {
+    pitAlert('ここは練習用のデモ版です', { code:'PF-0010',
       detail:
         '本番のデータには一切つながっていません。何をしても、実際の予約やお客様の情報は変わりません。\n\n' +
         '・保存されるのは、いま見ているこの端末の中だけです\n' +

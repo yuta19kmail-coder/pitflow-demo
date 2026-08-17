@@ -54,14 +54,14 @@
       /* カードが読み込み済みなのに無い＝消された／別会社のID */
       if (window.PitDB && PitDB._loaded){
         stripParam();
-        if (window.pitToast) pitToast('そのカードは見つかりませんでした（削除された可能性があります）');
+        if (window.pitToast) pitToast('そのカードは見つかりませんでした（削除された可能性があります）', 'PF-0050');
         return;
       }
     }
 
     if (Date.now() - started > WAIT_MS){
       stripParam();
-      if (window.pitToast) pitToast('カードを開けませんでした。検索から探してください');
+      if (window.pitToast) pitToast('カードを開けませんでした。検索から探してください', 'PF-0051');
       return;
     }
     setTimeout(tick, STEP_MS);

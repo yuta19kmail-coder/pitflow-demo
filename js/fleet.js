@@ -261,7 +261,7 @@ function flEventSubmit(){
   const label = (document.getElementById('flev-label').value || '').trim();
   let from = document.getElementById('flev-from').value;
   let to   = document.getElementById('flev-to').value;
-  if (!vehicleId || !from){ pitAlert('車両と開始日を入れてください'); return; }
+  if (!vehicleId || !from){ pitAlert('車両と開始日を入れてください', { code:'PF-3030' }); return; }
   if (!to || to < from) to = from;
   if (_flEvtEditId){
     const ev = _flEvents().find(function(e){ return e.id === _flEvtEditId; });
@@ -520,7 +520,7 @@ function fleetSubmit(){
     okId = _fleetSubmitInner();
   } catch (err) {
     console.error('[fleet] 保存でエラー', err);
-    pitAlert('保存できませんでした。\n' + (err && err.message ? err.message : err));
+    pitAlert('保存できませんでした。\n' + (err && err.message ? err.message : err), { code:'PF-3032' });
     return;
   }
   if (okId === false) return;   /* 入力もれ＝入れ直してもらうので、開いたまま */
@@ -528,7 +528,7 @@ function fleetSubmit(){
   try { renderFleet(); }
   catch (e) {
     console.error('[fleet] 画面の描き直しでエラー', e);
-    if (window.showToast) showToast('保存しました（画面の更新でつまずいたので、開き直してください）');
+    if (window.showToast) showToast('保存しました（画面の更新でつまずいたので、開き直してください）', 'PF-3033');
   }
 }
 function _fleetSubmitInner(){
@@ -546,7 +546,7 @@ function _fleetSubmitInner(){
   const seats = ((document.getElementById('fl-seats') || {}).value || '').trim() || null;
   const etc=!!document.getElementById('fl-etc').checked, navi=!!document.getElementById('fl-navi').checked, iso=!!document.getElementById('fl-iso').checked;
   const camera=!!(document.getElementById('fl-camera')||{}).checked;
-  if (!model){ pitAlert('車種名を入れてください（例：タント）'); return false; }   /* false＝保存していない（閉じない） */
+  if (!model){ pitAlert('車種名を入れてください（例：タント）', { code:'PF-3031' }); return false; }   /* false＝保存していない（閉じない） */
   if (!Array.isArray(state.companyCars)) state.companyCars = [];
 
   // 入替判定（新規で、その番号が既存の代車に使われている）

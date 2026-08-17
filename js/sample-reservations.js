@@ -133,7 +133,7 @@
   window.seedSampleReservations = function (opts) {
     opts = opts || {};
     if (!Array.isArray(state.customers) || state.customers.length === 0){
-      pitAlert('先に顧客データが必要です（顧客ビューでサンプル投入 or 実データを入れてから実行してください）。');
+      pitAlert('先に顧客データが必要です（顧客ビューでサンプル投入 or 実データを入れてから実行してください）。', { code:'PF-9020' });
       return;
     }
     /* 🔵 v1.75.0 聞くのはアプリ内ダイアログ。⚠ 中身は _go に切り出して呼ぶ（silent の時は聞かずに直行）。 */
@@ -420,7 +420,7 @@
     // ★リロードしない＝読込時の自動処理（顧客の自動入替など）を再実行させない。現在ビューを再描画するだけ。
     if (window.showView) showView(state.currentView || 'dashboard');
     if (ok === false){
-      pitAlert('カードは作りましたが保存に失敗しました（容量オーバーの可能性）。\n台数を減らして再実行してください。');
+      pitAlert('カードは作りましたが保存に失敗しました（容量オーバーの可能性）。\n台数を減らして再実行してください。', { code:'PF-9021' });
     } else {
       pitAlert('サンプルを作り直しました（カード ' + cards.length + ' 枚・前後約2ヶ月）。\n※このサンプルは保存され、リロードしても消えません。\n顧客控えはそのまま保持しています。');
     }

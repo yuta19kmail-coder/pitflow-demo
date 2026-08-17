@@ -57,9 +57,9 @@
     r.onload = function () {
       var d;
       try { d = JSON.parse(String(r.result)); }
-      catch (e) { pitAlert('このファイルは読めませんでした（中身が壊れているようです）'); return; }
+      catch (e) { pitAlert('このファイルは読めませんでした（中身が壊れているようです）', { code:'PF-9001' }); return; }
       if (!d || d._kind !== 'pitflow-settings') {
-        pitAlert('PitFlow の設定ファイルではないようです。\n書き出しで作った「PitFlow設定_日付.json」を選んでください。');
+        pitAlert('PitFlow の設定ファイルではないようです。\n書き出しで作った「PitFlow設定_日付.json」を選んでください。', { code:'PF-9002' });
         return;
       }
       var det = '・予約カード／顧客／代車／自社車両には触りません\n'

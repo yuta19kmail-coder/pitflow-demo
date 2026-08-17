@@ -154,7 +154,7 @@
       const mine = norm(name) || norm(kana);
       const theirs = norm(p.name) || norm(p.kana);
       if(mine && theirs && mine!==theirs){
-        if(window.pitToast) pitToast('このナンバーは「'+(custDispName(p)||'(無名)')+'」様で登録済みです。顧客控えは変更していません');
+        if(window.pitToast) pitToast('このナンバーは「'+(custDispName(p)||'(無名)')+'」様で登録済みです。顧客控えは変更していません', 'PF-6001');
         if(window.pitOpLog) try{ pitOpLog('顧客控えの更新を見送り', 'ナンバー '+rawPlate+' は別のお客様（'+(custDispName(p)||'(無名)')+'）で登録済み'); }catch(e){}
         return;
       }
@@ -294,7 +294,7 @@
          毎回ちがう車なので、車種名はこのあと手で打ってもらう（打った名前がカード・表紙・実績に出る）。 */
       if(isPerVisit(v)){
         c.perVisit=true; c.vehId=v.id; c.plate=''; c.maker=''; c.car='';
-        if(window.pitToast) pitToast('都度車両変動のお客様です。今回の車種名を入力してください');
+        if(window.pitToast) pitToast('都度車両変動のお客様です。今回の車種名を入力してください', 'PF-6002');
       } else {
         c.perVisit=false; c.vehId=v.id;
         c.plate=v.plate||c.plate; c.maker=v.maker||c.maker; c.car=v.car||c.car;
@@ -447,7 +447,7 @@
   }
   function _deny(){
     if(window.UI && UI.alert) UI.alert('戻せるのは管理者だけです', { detail:'アーカイブから戻す操作は、PitFlow の役割が「管理」の人だけができます。' });
-    else pitAlert('戻せるのは管理者だけです。');
+    else pitAlert('戻せるのは管理者だけです。', { code:'PF-0020' });
   }
   window.custArchive=function(id){
     const c=list().find(r=>r.id===id); if(!c) return;

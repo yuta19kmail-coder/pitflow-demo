@@ -228,7 +228,7 @@
       if (bd) bd.classList.remove('show');
       var p = pending; pending = null;
       if (!p) return;
-      if (!ok){ if (window.showToast) showToast('移動をキャンセルしました'); return; }
+      if (!ok){ if (window.showToast) showToast('移動をキャンセルしました', 'PF-2001'); return; }
       var card = p.card;
       if (p.mode === 'outsource'){
         var sel = el('pp-partner');

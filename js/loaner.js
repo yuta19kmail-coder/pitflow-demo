@@ -980,7 +980,7 @@ window.loDraftApply = function(){
   const changedBad = changed.some(function(a){ return bad.has(a.id); });
   /* 🔵 v1.75.0 聞き方は2通りあるが、**続きは _go 1本**（写しを作らない）。 */
   const ask = changedBad
-    ? pitAsk('それでもこのまま反映しますか？', { title:'期間が重複します', danger:true, ok:'反映する',
+    ? pitAsk('それでもこのまま反映しますか？', { code:'PF-3020', title:'期間が重複します', danger:true, ok:'反映する',
               detail:'動かした代車の期間が、別の貸出と重複します。' })
     : pitAsk(changed.length + ' 件の代車変更をまとめて反映します。よろしいですか？', { ok:'反映する' });
   ask.then(function(yes){ if (yes) _go(); });
@@ -1210,8 +1210,8 @@ window.loAddManualBlock = function(prefill){
 window.loSaveManualBlock = function(){
   const g = function(id){ const e = document.getElementById(id); return e ? e.value : ''; };
   const lo = g('lmb-lo'), pp = g('lmb-pp'), cust = g('lmb-cust').trim(), car = g('lmb-car').trim(), from = g('lmb-from'), to = g('lmb-to');
-  if (!lo || !from || !to){ pitAlert('代車と期間を入れてください'); return; }
-  if (to < from){ pitAlert('「まで」は「から」以降にしてください'); return; }
+  if (!lo || !from || !to){ pitAlert('代車と期間を入れてください', { code:'PF-3001' }); return; }
+  if (to < from){ pitAlert('「まで」は「から」以降にしてください', { code:'PF-3002' }); return; }
   const conf = _loConflictAssigns(lo, from, to);
   /* 🔴 v1.80.0 **代車自身の予定（車検入庫・点検）とぶつかっていないかも見る。**
      ⚠ 以前は貸出しか見ておらず、車検に出す予定の代車をそのまま貸せてしまった。 */
@@ -1221,7 +1221,7 @@ window.loSaveManualBlock = function(){
     const parts = [];
     if (conf.length) parts.push('すでに他の貸出・予約と重複します：\n' + _loConflictMsg(conf));
     if (evs.length)  parts.push('この代車自身の予定と重なります：\n' + _loEventMsg(evs));
-    pitAsk('それでも登録しますか？', { title:'期間が重複します', danger:true, ok:'登録する',
+    pitAsk('それでも登録しますか？', { code:'PF-3003', title:'期間が重複します', danger:true, ok:'登録する',
             detail:'この代車は選んだ期間、\n\n' + parts.join('\n\n') })
       .then(function(yes){ if (yes) _go(); });
     return;
@@ -1253,19 +1253,19 @@ window.loEmgSrc = function(){ const v = document.getElementById('lem-src').value
 window.loSaveEmergency = function(){
   const g = function(id){ const e = document.getElementById(id); return e ? e.value : ''; };
   const src = g('lem-src'); let model = '', plate = '';
-  if (src === '__manual__'){ model = g('lem-model').trim(); plate = g('lem-plate').trim(); if (!model){ pitAlert('車名を入れてください'); return; } }
+  if (src === '__manual__'){ model = g('lem-model').trim(); plate = g('lem-plate').trim(); if (!model){ pitAlert('車名を入れてください', { code:'PF-3010' }); return; } }
   else if (src){ const c = (state.companyCars || []).find(function(x){ return x.id === src; }); if (c){ model = c.model || c.name || '社用車'; plate = c.plate || ''; } }
-  else { pitAlert('社用車を選ぶか「手入力する」を選んでください'); return; }
+  else { pitAlert('社用車を選ぶか「手入力する」を選んでください', { code:'PF-3011' }); return; }
   const cust = g('lem-cust').trim(), pp = (g('lem-pp').trim() || '緊急'), from = g('lem-from'), to = g('lem-to');
-  if (!from || !to){ pitAlert('期間を入れてください'); return; }
-  if (to < from){ pitAlert('「まで」は「から」以降にしてください'); return; }
+  if (!from || !to){ pitAlert('期間を入れてください', { code:'PF-3012' }); return; }
+  if (to < from){ pitAlert('「まで」は「から」以降にしてください', { code:'PF-3013' }); return; }
   const srcId = (src && src !== '__manual__') ? src : '';
   // 同じ社用車(srcId) or 同じナンバーの車が、その期間すでに緊急で出ていないか衝突チェック
   const dupLo = (state.loaners || []).filter(function(l){ return l.emergency && ((srcId && l.srcId === srcId) || (plate && l.plate && l.plate === plate)); });
   let conf = [];
   dupLo.forEach(function(l){ conf = conf.concat(_loConflictAssigns(l.id, from, to)); });
   if (conf.length){
-    pitAsk('それでも追加しますか？', { title:'すでに緊急で出ています', danger:true, ok:'追加する',
+    pitAsk('それでも追加しますか？', { code:'PF-3014', title:'すでに緊急で出ています', danger:true, ok:'追加する',
             detail:'この車両（'+ _loEsc(model) + (plate ? ' / '+ _loEsc(plate) : '') + '）は選んだ期間、すでに緊急で出ています：\n\n' + _loConflictMsg(conf) })
       .then(function(yes){ if (yes) _go(); });
     return;

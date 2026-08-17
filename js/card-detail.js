@@ -131,7 +131,7 @@ var _pitLastSaveAt = 0;
 function _pitSaveOnce(){
   var now = Date.now();
   if (now - _pitLastSaveAt < 1200){
-    if (window.pitToast) pitToast('いま保存しています。少しお待ちください');
+    if (window.pitToast) pitToast('いま保存しています。少しお待ちください', 'PF-0004');
     return false;
   }
   _pitLastSaveAt = now;
@@ -372,7 +372,7 @@ function _pitSaveInWorkGo(alsoPrint){
   if (!c.boardId){
     const msg = '先に「国産車」か「輸入車」を選んでください。';
     const detail = 'タスクボードは 1課（国産）と 2課（輸入）に分かれているので、どちらに置くかが決まりません。';
-    pitAlert('どちらの課か決まっていません', { detail: msg + '\n' + detail, ok: '入力に戻る' });
+    pitAlert('どちらの課か決まっていません', { code:'PF-1001', detail: msg + '\n' + detail, ok: '入力に戻る' });
     return;
   }
 
@@ -1432,14 +1432,14 @@ function _pitCardGuard(actionLabel, next){
 
   if (r.red.length){
     _pitLastSaveAt = 0;                /* 直してすぐ押し直せるように戻す */
-    pitAlert('保存できません。足りない項目があります', {
+    pitAlert('保存できません。足りない項目があります', { code:'PF-1002',
       detail: '赤い枠のところを入れてから、もう一度保存してください。\n\n・' + r.red.join('\n・'),
       ok: '入力に戻る'
     }).then(function(){ goTo('.cf-miss'); });
     return;
   }
   if (r.yellow.length){
-    pitAsk('このまま' + (actionLabel || '保存') + 'しますか？', {
+    pitAsk('このまま' + (actionLabel || '保存') + 'しますか？', { code:'PF-1003',
       detail: '次の項目が空です（あとから入れられます）。\n\n・' + r.yellow.join('\n・'),
       ok: 'このまま' + (actionLabel || '保存') + 'する', cancel: '入力に戻る'
     }).then(function (yes) {
@@ -1925,7 +1925,7 @@ window.cfAddVehicle = function(kind){
     if (!okd) return;
     if (kind === 'trade'){
       if (!oldPlate){
-        if (window.pitToast) pitToast('ナンバーが入っていないので、前の車はアーカイブできません（増車として登録します）');
+        if (window.pitToast) pitToast('ナンバーが入っていないので、前の車はアーカイブできません（増車として登録します）', 'PF-6003');
       } else {
         const done = window.PitArchive ? PitArchive.archiveVehByPlate(c.customerId, oldPlate, '乗換') : false;
         if (window.pitToast) pitToast(done ? (oldName + ' をアーカイブしました。新しい車を登録してください')
@@ -2392,7 +2392,7 @@ function bindCardFormEvents(root){
         } else {
           const hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
           if (!hasWork){
-            if (window.pitToast) pitToast('保証・保険は作業タイプとセットで選んでください');
+            if (window.pitToast) pitToast('保証・保険は作業タイプとセットで選んでください', 'PF-1004');
             return;   // 単体では付けない
           }
           c[key].push(v);

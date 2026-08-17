@@ -26,8 +26,8 @@
       var r = new FileReader();
       r.onload = function () {
         var arr;
-        try { arr = JSON.parse(r.result); } catch (e) { pitAlert('JSONの読み込みに失敗しました：' + e.message); return; }
-        if (!Array.isArray(arr)) { pitAlert('JSONの形式が配列ではありません。'); return; }
+        try { arr = JSON.parse(r.result); } catch (e) { pitAlert('JSONの読み込みに失敗しました：' + e.message, { code:'PF-9010' }); return; }
+        if (!Array.isArray(arr)) { pitAlert('JSONの形式が配列ではありません。', { code:'PF-9011' }); return; }
         /* 🔵 v1.75.0 聞くのはアプリ内ダイアログ（pitAsk）＝答えは後から返る。
            ⚠ 取り込みの本体は **_go に切り出して** そこから呼ぶ（.then の中に本文を写さない）。 */
         pitAsk('顧客 ' + arr.length + ' 件を取り込みます。よろしいですか？',

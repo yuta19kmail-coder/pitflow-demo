@@ -102,7 +102,7 @@
       var bd = el('mg-backdrop'); if (bd) bd.classList.remove('show');
       var p = pending; pending = null;
       if (!p) return;
-      if (!ok){ if (window.pitToast) pitToast('移動をやめました'); return; }
+      if (!ok){ if (window.pitToast) pitToast('移動をやめました', 'PF-2002'); return; }
       try { p.go(); } catch(e){ if (window.console) console.error(e); }
     }
   };

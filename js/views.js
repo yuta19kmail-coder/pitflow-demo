@@ -353,9 +353,9 @@ function goToday(){
   state.reserveDate = new Date();
   if (state.currentView === 'reserve') renderReserve();
 }
-function addBoard(){    pitAlert('看板の追加は次フェーズで実装予定です'); }
-function editBays(){    pitAlert('PIT枠の編集は次フェーズで実装予定です'); }
-function editLoaners(){ pitAlert('代車の編集は次フェーズで実装予定です'); }
+function addBoard(){    pitAlert('看板の追加は次フェーズで実装予定です', { code:'PF-0030' }); }
+function editBays(){    pitAlert('PIT枠の編集は次フェーズで実装予定です', { code:'PF-0031' }); }
+function editLoaners(){ pitAlert('代車の編集は次フェーズで実装予定です', { code:'PF-0032' }); }
 function prevMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()-1); renderResult(); }
 function nextMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()+1); renderResult(); }
-function closeMonth(){  pitAlert('月次集計締めは次フェーズで実装予定です'); }
+function closeMonth(){  pitAlert('月次集計締めは次フェーズで実装予定です', { code:'PF-0033' }); }

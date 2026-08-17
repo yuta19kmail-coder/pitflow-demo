@@ -220,7 +220,7 @@
     /* 1枚目の答え：0＝通常／1＝実績化／null＝やめる */
     kind: function(v){
       khide();
-      if (v == null){ pending = null; if (window.pitToast) pitToast('やめました'); return; }
+      if (v == null){ pending = null; if (window.pitToast) pitToast('やめました', 'PF-4001'); return; }
       if (!pending) return;
       pending.toResult = (v === 1 || v === '1' || v === true);
       openModal(pending.card, pending.mode, pending.toResult);
@@ -237,7 +237,7 @@
       var p = pending;
       if (!ok){
         hide(); pending = null;
-        if (p && window.pitToast) pitToast('やめました');
+        if (p && window.pitToast) pitToast('やめました', 'PF-4002');
         return;
       }
       if (!p){ hide(); return; }

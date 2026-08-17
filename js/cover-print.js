@@ -418,11 +418,11 @@
 
   window.pitPrintCover = function(cardId){
     var c = ((window.state&&state.cards)||[]).find(function(x){ return x.id === cardId; });
-    if (!c){ if(window.pitToast) pitToast('カードが見つかりません'); return; }
+    if (!c){ if(window.pitToast) pitToast('カードが見つかりません', 'PF-8001'); return; }
     ensureAssets().then(function(a){
       openAndPrint(buildDoc(c, { formSvg:a.formSvg, stampUri:a.stampUri }));
     }).catch(function(err){
-      if (window.pitToast) pitToast('表紙テンプレートを読み込めませんでした');
+      if (window.pitToast) pitToast('表紙テンプレートを読み込めませんでした', 'PF-8002');
       try{ console.error('[cover-print]', err); }catch(e){}
     });
   };

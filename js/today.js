@@ -348,7 +348,7 @@ window.pitTodayReturn = function(id){
   /* 🔴 v1.97.0 完TELを通っていない車は、ここでも固めない（ボタンを消しただけにしない）。
      ⚠ 判断はアクションシートと同じ1つ＝returnStage が付いているか。 */
   if (window.pitReturnCanDone ? !pitReturnCanDone(c) : !c.returnStage){
-    if (window.pitToast) pitToast(window.PIT_RETURN_WHY || '');
+    if (window.pitToast) pitToast(window.PIT_RETURN_WHY || '', 'PF-4010');
     return;
   }
   const t = ymd(new Date());

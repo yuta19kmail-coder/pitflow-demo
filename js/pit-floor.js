@@ -542,7 +542,7 @@
           var sc = document.getElementById('pf-scale'); if (sc) sc.value = fp().cols;
           var lb = document.getElementById('pf-scale-lb'); if (lb) lb.textContent = '横' + fp().cols + 'マス';
           render(); paintProps();
-        } catch (e) { pitAlert('読み込みに失敗しました: ' + e.message); }
+        } catch (e) { pitAlert('読み込みに失敗しました: ' + e.message, { code:'PF-9030' }); }
       };
       rd.readAsText(fl);
       });

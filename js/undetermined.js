@@ -268,10 +268,10 @@ window.pitUndRestoreGo = function(id, forced){
   if (!c) return;
   const el = document.getElementById('und-rs-date');
   const d = String(forced || (el ? el.value : '') || '').trim();
-  if (!d){ if (window.pitToast) pitToast('入庫日を選んでください'); return; }
+  if (!d){ if (window.pitToast) pitToast('入庫日を選んでください', 'PF-1020'); return; }
   /* 🔴 過ぎた日は入れない。入れるとまた未入庫へ落ちて、戻したことにならない。 */
   if (d < ymd(new Date())){
-    if (window.pitToast) pitToast('過ぎた日は選べません（また未入庫に戻ってしまいます）');
+    if (window.pitToast) pitToast('過ぎた日は選べません（また未入庫に戻ってしまいます）', 'PF-1021');
     return;
   }
   c.status = 'reserved';

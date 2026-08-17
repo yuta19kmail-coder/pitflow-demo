@@ -81,15 +81,15 @@
   // ===== ラスターPDF（フォールバック：html2canvasでA4 1枚に収める） =====
   function rasterPdf(){
     ensureJsPDF().then(ensureH2C).then(function(){
-      var body=document.getElementById('view-sales-body'); if(!body){ pitAlert('データがありません'); return; }
+      var body=document.getElementById('view-sales-body'); if(!body){ pitAlert('データがありません', { code:'PF-5001' }); return; }
       var clone=body.cloneNode(true); clone.querySelectorAll('.sv-tabbar,.sv-head,.sv-viewsw').forEach(function(el){ if(el.parentNode) el.parentNode.removeChild(el); });
       var wrap=document.createElement('div'); wrap.style.cssText='position:fixed;left:-9999px;top:0;width:760px;background:#fff;color:#111;padding:12px;';
       wrap.setAttribute('data-theme','light'); wrap.appendChild(clone); document.body.appendChild(wrap);
       window.html2canvas(wrap,{scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false}).then(function(canvas){
         var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF('p','mm','a4'); var pw=210-16, ph=297-16; var ratio=Math.min(pw/canvas.width, ph/canvas.height);
         pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',8,8,canvas.width*ratio,canvas.height*ratio); pdf.save(fileBase()+'.pdf'); document.body.removeChild(wrap);
-      }).catch(function(){ document.body.removeChild(wrap); pitAlert('PDF出力に失敗しました。'); });
-    }).catch(function(){ pitAlert('PDFライブラリの読込に失敗しました（オフライン等）。'); });
+      }).catch(function(){ document.body.removeChild(wrap); pitAlert('PDF出力に失敗しました。', { code:'PF-5002' }); });
+    }).catch(function(){ pitAlert('PDFライブラリの読込に失敗しました（オフライン等）。', { code:'PF-5003' }); });
   }
 
   window.svExportPdf=function(){

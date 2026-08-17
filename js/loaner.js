@@ -109,13 +109,13 @@ function _loName(id){
   return model ? (model + (num?'（'+num+'）':'')) : (l.name||id);
 }
 /* 🚗 v1.56.0（ゆうた指定）**予約詳細に出す代車の呼び名＝車種名だけ**（「代車5」ではなく「タント」）。
-   ⚠ 車種が未登録の代車だけ、今までどおり元の名前（「代車5」）で埋める＝**空にしない**。
-   🔴 代車カレンダーの「タント（5）」は上の `_loName`。**呼び名を各画面で組み立てず、必ずどちらかを通すこと。** */
-window.pitLoanerModel = function (id) {
-  const l = ((window.state && state.loaners) || []).find(function (x) { return x.id === id; });
-  if (!l) return '';
-  return String(l.model || '').trim() || String(l.name || '').trim() || '';
-};
+   🔴🔴 v1.111.0（2026-08-17）**`pitLoanerModel` の本家は `js/pit-share.js` に移した。**
+        当日ビューの1行メモに代車名を出すことになり、**MHS も同じ呼び名を使う**ため。
+        ここに書き戻さないこと（書くと写しが2枚になって、片方だけ古くなる）。
+        ⚠ 中身は同じ。呼び方も `pitLoanerModel(id)` のまま変わっていない。
+        ⚠ pit-share.js は state.js より前に読み込まれるので、このファイルより必ず先にいる。
+   🔴 代車カレンダーの「タント（5）」は上の `_loName`（番号つき）。当日メモ・予約詳細は番号なし。
+      **呼び名を各画面で組み立てず、必ずどちらかを通すこと。** */
 function _loAbbr(s, n){ s = String(s == null ? '' : s); return s.length > n ? (s.slice(0, n) + '…') : s; }
 /* 当日かぶり（後発）：この割当の開始日に、同じ代車で別予約の返却(toDate)が重なるか＝後発は初日が「耳」・実質翌日開始 */
 function _loHandoffLater(a){

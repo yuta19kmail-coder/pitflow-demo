@@ -95,6 +95,40 @@
   window.pitApproveCard = approve;
 
   /* ===================================================================
+     ↩ 承認に回すのをやめる＝印を下ろして、ふつうの本予約に戻す（v1.134.0）
+     🗣 ゆうた「承認取り消しも含めて」
+
+     🔴 **入口（承認予約にする）に、出口をそろえる。** 立てられる印は、下ろせるようにする。
+     🔴 **下ろすのは `approvalPending` だけ。仮予約にはしない。**
+        仮おさえに落としたいなら、戻ってから改めて ⋮ の「仮予約にする」を押す＝**2手にする**。
+        （1手でまとめると「承認をやめる」と「仮に落とす」の区別が現場で消える）
+     ⚠ **`approve()` と取り違えないこと。** どちらも `approvalPending` を false にするが、
+        **フローと操作ログに残す言葉が違う**ので、後から「承認したのか／回すのをやめたのか」を見分けられる。
+        ここを同じ言葉にしたら、記録から区別が消える。テストが見張っている。
+     ⚠ **聞くのは呼ぶ側**（card-view.js の `cvUnapproval`）。ここは実行だけ。
+     =================================================================== */
+  function unapprove(id){
+    var c = (window.state && state.cards) ? state.cards.find(function(x){ return x.id === id; }) : null;
+    if (!c) return;
+    if (!pending(c)) return;                       /* もう承認待ちではない＝何もしない（二度押し） */
+
+    c.approvalPending = false;
+
+    var who = _me();
+    try { if (window.logFlow) logFlow(c, '承認に回すのをやめた（本予約に戻した）' + (who ? '／' + who : '')); } catch(e){}
+    try {
+      if (window.pitLog) pitLog('承認に回すのをやめた', { cardId: c.id, kind: 'approval',
+        label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') });
+    } catch(e){}
+
+    try { if (window.PitDB) PitDB.save(true); } catch(e){}
+    try { if (window.state && state.currentView && window.showView) showView(state.currentView); } catch(e){}
+    try { if (window.renderCardView && document.getElementById('md-body-modal')) renderCardView(c, 'md-body-modal'); } catch(e){}
+    try { if (window.pitToast) pitToast('承認待ちから外しました（ふつうの本予約に戻りました）'); } catch(e){}
+  }
+  window.pitUnapproveCard = unapprove;
+
+  /* ===================================================================
      🚪 承認待ちのまま入庫させようとした時＝**1回だけ聞いて通す**（ゆうた指定）
      ⚠ 止めない。承認者が不在の日に現場が動けなくなるほうが困る。
      ⚠ 通しても印は残る（あとから承認できる）。

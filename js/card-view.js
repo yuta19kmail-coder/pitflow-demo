@@ -937,17 +937,34 @@
     const gone   = (c && (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled'));
     let h = '';
     if (isResv){
-      /* 🔴 v1.101.0（ゆうた指定）**まだ入庫していない車のメニュー**＝
-         仮予約にする／承認予約にする／入庫中にする／予約キャンセルにする／消去する
-         ⚠ 仮予約と承認待ちは**同時に立てない**（v1.74.0 の決めごと）ので、
-            片方を立てるともう片方は下りる。だから並べて出しても矛盾しない。
-         ⚠ すでに承認待ちの車には「承認予約にする」を出さない
-            （承認する入口は、カード詳細のいちばん上の承認バー1か所だけ）。 */
-      h += (c.tentative
-        ? '<button class="cv-opti cv-kariopt" onclick="cvToggleTentative()">✓ 本予約に確定する</button>'
-        : '<button class="cv-opti cv-kariopt" onclick="cvToggleTentative()"><i data-ic=pencil data-ics=16></i> 仮予約にする</button>');
-      if (!(window.pitApprovalPending && pitApprovalPending(c))){
+      /* 🔴 v1.101.0（ゆうた指定）→ v1.134.0 で整理 **まだ入庫していない車のメニュー**
+         ・承認待ちでない … 仮予約にする（or ✓本予約に確定する）／承認予約にする／
+                            入庫中にする／予約キャンセルにする／消去する
+         ・承認待ち　　　 … ↩承認に回すのをやめる／入庫中にする／予約キャンセルにする／消去する
+         ⚠ 仮予約と承認待ちは**同時に立てない**（v1.74.0 の決めごと）。
+            v1.133.0 まではこれが**片側だけ**しか守られていなかった（下の 🔴 を読むこと）。
+         ⚠ **承認する**入口は、いまも昔もカード詳細のいちばん上の承認バー1か所だけ。
+            ここに出す「承認に回すのをやめる」は**承認ではない**（印を下ろすだけ）。 */
+      /* 🔴🔴 v1.134.0（ゆうた確定・2026-08-18）**承認待ちの車には「仮予約にする」を出さない。**
+         ◎なにが起きていた
+           `cvToggleTentative` は `tentative` を裏返すだけで `approvalPending` を触っていない。
+           逆向き（承認予約にする）は `tentative=false` にしてあるので、**片方だけ対策されていた**。
+           ＝承認待ちの車で「仮予約にする」を押すと、**「承認待」と「仮予約」の札が2つ並ぶ**。
+           v1.74.0 の決めごと「承認に回した予約は本予約扱い。仮とは同時に立てない」に反する。
+         🔴 直し方＝**承認待ちの間は「仮予約にする／本予約に確定する」を出さない。**
+            （「承認予約にする」を出していないのと同じ理屈でそろえる）
+         🔴 代わりに **「↩ 承認に回すのをやめる」** を出す＝**入口に出口をそろえる**。
+            押すと `approvalPending` だけ下りて**ふつうの本予約**に戻る。
+            仮おさえに落としたいなら、戻ってから改めて「仮予約にする」＝**2手**にする。
+         ⚠ 中身は `approval-pit.js` の `pitUnapproveCard` 1本。**ここに書き写さない。** */
+      var _appr = !!(window.pitApprovalPending && pitApprovalPending(c));
+      if (!_appr){
+        h += (c.tentative
+          ? '<button class="cv-opti cv-kariopt" onclick="cvToggleTentative()">✓ 本予約に確定する</button>'
+          : '<button class="cv-opti cv-kariopt" onclick="cvToggleTentative()"><i data-ic=pencil data-ics=16></i> 仮予約にする</button>');
         h += '<button class="cv-opti cv-apopt" onclick="cvToApproval()"><i data-ic=shield data-ics=16></i> 承認予約にする</button>';
+      } else {
+        h += '<button class="cv-opti cv-apopt" onclick="cvUnapproval()"><i data-ic=undo data-ics=16></i> 承認に回すのをやめる…</button>';
       }
       h += '<button class="cv-opti" onclick="cvCheckIn()"><i data-ic=download data-ics=16></i> 入庫中にする</button>'
         +  '<button class="cv-opti" onclick="cvAskCancelResv()"><i data-ic=ban data-ics=16></i> 予約キャンセルにする…</button>'
@@ -1468,6 +1485,25 @@
         save(); cvRefreshBg();
         if (window.pitToast) pitToast('承認待ちにしました');
         renderCardView(c, 'md-body-modal');
+      });
+  };
+
+  /* ---- ⓪-1b 承認に回すのをやめる（v1.134.0・ゆうた「承認取り消しも含めて」）----
+     🔴 **入口（承認予約にする）に、出口をそろえた。**
+     🔴 中身は `approval-pit.js` の `pitUnapproveCard` 1本。**ここは聞くだけ。**
+        ＝「承認する」（`pitApproveCard`）と並べて置いてあるので、片方だけ直る事故が起きない。
+     ⚠ 仮予約にはしない。ふつうの本予約に戻すだけ。 */
+  window.cvUnapproval = function(){
+    if (!_c) return; closeAllPop();
+    const c = _c;
+    _cvAsk('承認に回すのをやめる', 'この予約を承認待ちから外して、ふつうの本予約に戻しますか？\n' + _cvLabel(c),
+           ['・予約ビューの「未定 → 承認待ち」BOXから消えます',
+            '・入庫カレンダーと代車の枠は、埋まったまま変わりません',
+            '・🔴 承認したことにはなりません（回すのをやめた、と記録に残ります）',
+            '・仮予約にはなりません。仮おさえに戻すなら、このあと ⋮ →「仮予約にする」'].join('\n'), '承認待ちから外す')
+      .then(function(yes){
+        if (!yes) return;
+        if (window.pitUnapproveCard) pitUnapproveCard(c.id);
       });
   };
 

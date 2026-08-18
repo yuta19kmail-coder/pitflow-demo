@@ -45,6 +45,41 @@
     return '';
   }
 
+  /* ---------- 予約カードのアーカイブ（v1.136.0・ゆうた確定 2026-08-18）----------
+     🗣「アーカイブまで行った車は基本マスターとか管理者以外は触れない。
+        ＝詳細を見たりは出来るが、金額をいじったり、消去したり、入庫中に戻したり などは出来ない」
+     🗣「アーカイブに統一しよう」
+
+     🔴 **顧客・車両とまったく同じ形にそろえる。**
+        ・アーカイブする … 誰でもできる
+        ・**アーカイブから戻す … 管理者だけ**（`canRestore()` を共用）
+        ・言葉も「アーカイブ／アーカイブから戻す」で統一（「片付ける」は使わない）
+     🔴 **「この車はアーカイブ済みか」の物差しはここ1本。** 画面側に条件を書き写さない。
+
+     ⚠ いまここに入っているのは **売上なしアーカイブだけ**（ステージ②で決めたぶん）。
+        実績（返車済み）・予約キャンセル・未入庫・廃車は、**それぞれのステージを決めた時にここへ足す**。
+        足す場所を増やさないこと＝1行足せば ⋮ も帯も権限も全部そろって効く。 */
+  function cardArchived(c){
+    if (!c) return false;
+    if (w.pitCardNoSale && w.pitCardNoSale(c)) return true;   /* 売上なしアーカイブ */
+    return false;
+  }
+  /* アーカイブ済みのカードを「戻す」時のラベル（画面ごとに書き分けない） */
+  function cardArchiveNote(c){
+    if (!cardArchived(c)) return '';
+    var s = 'アーカイブ済み（売上なし）';
+    if (c.noSaleAt) s += '　' + c.noSaleAt + (c.noSaleBy ? ' ' + c.noSaleBy : '');
+    return s;
+  }
+  /* 戻せない人が押した時の断り方。**顧客・車両と同じ文言**（customers.js の _deny と一字一句そろえる） */
+  function denyRestore(){
+    if (w.UI && w.UI.alert){
+      w.UI.alert('戻せるのは管理者だけです', { detail: 'アーカイブから戻す操作は、PitFlow の役割が「管理」の人だけができます。' });
+    } else if (w.pitAlert){
+      w.pitAlert('戻せるのは管理者だけです。', { code: 'PF-0020' });
+    }
+  }
+
   /* ---------- 判定 ---------- */
   function custArchived(cust){ return !!(cust && cust.archived); }
   /* 🔴 車は「自分が片付いている」か「持ち主が片付いている」かのどちらかでアーカイブ扱い。 */
@@ -168,7 +203,9 @@
     cardVisible: cardVisible, custVisible: custVisible,
     archiveCust: archiveCust, restoreCust: restoreCust,
     archiveVeh: archiveVeh, restoreVeh: restoreVeh, archiveVehByPlate: archiveVehByPlate,
-    noteOf: noteOf, whenText: whenText
+    noteOf: noteOf, whenText: whenText,
+    /* 予約カードのアーカイブ（v1.136.0）＝顧客・車両と同じ物差し・同じ断り方 */
+    cardArchived: cardArchived, cardArchiveNote: cardArchiveNote, denyRestore: denyRestore
   };
-  console.log('[archive-pit] ready（顧客・車両のアーカイブ）');
+  console.log('[archive-pit] ready（顧客・車両・予約カードのアーカイブ）');
 })(window, document);

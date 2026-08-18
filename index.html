@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.134.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.136.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="css/work-content.css?v=7">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=c679db13">
-<link rel="stylesheet" href="css/card-view.css?v=35">
+<link rel="stylesheet" href="css/card-view.css?v=36">
 <link rel="stylesheet" href="css/card-hover.css?v=24">
 <link rel="stylesheet" href="css/sales.css?v=8">
 <link rel="stylesheet" href="css/shaken.css?v=21">
@@ -120,7 +120,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.134.0</div>
+    <div class="login-ver">v1.136.0</div>
   </div>
 </div>
 
@@ -134,7 +134,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.134.0</span>
+    <span class="ver">v1.136.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -824,7 +824,7 @@
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
 <script src="js/pit-share.js?v=12"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=f85dcc35"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
-<script src="js/errcode-pit.js?v=2"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
+<script src="js/errcode-pit.js?v=4"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
 <script src="js/state.js?v=71"></script>
 <script src="js/loaner-free.js?v=3"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
@@ -849,12 +849,12 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-detail.js?v=133"></script>
 <script src="js/flow-pit.js?v=4"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=1"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=67"></script>
+<script src="js/card-view.js?v=69"></script>
 <script src="js/cover-print.js?v=15"></script>
 <script src="js/avail.js?v=7"></script>
 <script src="js/card-tabs.js?v=14"></script>
-<script src="js/archive-pit.js?v=2"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
-<script src="js/customers.js?v=48"></script>
+<script src="js/archive-pit.js?v=3"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
+<script src="js/customers.js?v=49"></script>
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=31"></script>
@@ -910,7 +910,7 @@ window.PIT_DEMO = true;</script>
 
 <script src="js/ui-dialog.js?v=29a016f1"></script><!-- アプリ内ダイアログ（全アプリ共通・_shared から配布）。配られていたのに読み込みが抜けていた -->
 <script src="js/ask-pit.js?v=3"></script><!-- 🔵 v1.75.0 「聞く・知らせる」の入口1本（pitAlert / pitAsk / pitAskText）。ブラウザ純正の alert・confirm・prompt はここ以外で使わない -->
-<script src="js/blank-cards.js?v=5"></script><!-- 空の予約カードを残さない（settings.js / views.js / card-detail.js より後ろ） -->
+<script src="js/blank-cards.js?v=7"></script><!-- 空の予約カードを残さない（settings.js / views.js / card-detail.js より後ろ） -->
 <script src="js/reset-pit.js?v=3"></script><!-- 本番データの初期化／デモ版の「まっさらにする」（settings.js より後ろ） -->
 <script src="js/import-cloud.js?v=3"></script><!-- 顧客データの取込（本番・分割送信／settings.js より後ろ） -->
 <script src="js/coreflow-sync.js?v=2e2dc585"></script><!-- 同期ランプ共通部品（PitFlowではふきだしだけ借りる。sync-pit.js より後ろ） -->

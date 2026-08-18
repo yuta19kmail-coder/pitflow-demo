@@ -237,7 +237,10 @@
           その車に時間だけ入れても（＝日付欄は変えていないので change が飛ばない）
           returnStage が callWait のまま残り、日も時間もそろっているのに
           **ずっと完TEL待ちの箱から出られなかった**。
-       ⚠ 空にした時（取り消し）は上げない。上げると「返車済みの取り消し」で完TEL待ちに戻せなくなる。 */
+       ⚠ 空にした時（取り消し）は上げない。上げると完TEL待ちへ戻す道が塞がる。
+       ⚠ v1.137.0 訂正＝ここに書いてあった「返車済みの取り消し」という機能は**存在しない**。
+          完TELを取り消してタスクボードへ戻すのは `card-view.js` の `cvBackToBoard`（⋮ の1つ）。
+          当日ビューの「返車キャンセル」は返車**予定**を外すだけで、返車済みの取り消しではない。 */
     var _wroteDate = (date !== undefined && String(date == null ? '' : date).trim() !== '');
     var _wroteTime = (time !== undefined && String(time == null ? '' : time).trim() !== '');
     if (c.returnStage === 'callWait' && (_wroteDate || _wroteTime)) c.returnStage = 'returnWait';

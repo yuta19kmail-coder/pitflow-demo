@@ -622,35 +622,9 @@
 .today-col-body{ display:flex; flex-direction:column; }
 .today-empty{ padding:30px 16px; text-align:center; color:var(--text3); font-size:12px; }
 
-/* ══ 車検の枠（v1.130.0・当日ビュー）＝入庫／返車の下に横1本 ══
-   🔴 ゆうた指定「車検・客名・車種・ナンバー下4桁・車検担当者・陸運局・R を当日ビューにも」。
-   🔴 頭の「車検」は**1行ごとの種類**（ゆくゆく名変なども入る）。枠の名前ではない。
-   ⚠ MHS の当日と**同じ順・同じ中身**にすること（あちらも同じ物差しを借りている）。 */
-.today-shk{ margin-top:12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
-.today-col-head.shk{ color:#e6c34d; }
-.today-col-head .sub{ font-size:11px; font-weight:600; color:var(--text3); margin-left:8px; }
-.today-shk-body{ display:flex; flex-direction:column; }
-.tshk-row{ display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:8px 14px;
-           border-bottom:1px solid var(--border2,#232c34); cursor:pointer; font-size:13px; }
-.tshk-row:last-child{ border-bottom:0; }
-.tshk-row:hover{ background:var(--bg3); }
-.tshk-row.done{ opacity:.72; }
-.tshk-kind{ font-size:11px; font-weight:800; color:#1c1300; background:#e6c34d; border-radius:5px; padding:1px 7px; }
-.tshk-ap{ font-size:11px; font-weight:800; border-radius:5px; padding:1px 7px; }
-.tshk-ap.am{ color:#e6c34d; background:rgba(230,195,77,.16); }
-.tshk-ap.pm{ color:#8bb4f7; background:rgba(59,130,246,.16); }
-.tshk-mk{ font-size:10px; font-weight:900; border-radius:4px; padding:1px 5px; }
-.tshk-mk.done{ color:#fff; background:#ef4444; }
-.tshk-mk.re{ color:#1c1300; background:#f97316; }
-.tshk-nm{ font-weight:800; color:var(--text); }
-.tshk-nm small{ font-size:11px; font-weight:600; color:var(--text2); margin-left:1px; }
-.tshk-car{ color:var(--text2); font-weight:700; }
-.tshk-pl{ font-size:11.5px; font-weight:700; color:var(--text2); background:var(--bg3);
-          border:1px solid var(--border2); border-radius:5px; padding:1px 7px; font-variant-numeric:tabular-nums; }
-.tshk-st{ font-size:11.5px; font-weight:700; color:#7fdcb4; background:rgba(38,162,105,.18); border-radius:5px; padding:1px 7px; }
-.tshk-of{ font-size:11.5px; font-weight:700; color:#9dc0f8; background:rgba(59,130,246,.16); border-radius:5px; padding:1px 7px; }
-.tshk-rd{ font-size:11.5px; font-weight:800; color:#e6c34d; background:rgba(230,195,77,.16); border-radius:5px; padding:1px 7px; }
-.tshk-tbd{ font-size:11px; color:var(--text3); border:1px dashed var(--border); border-radius:5px; padding:0 6px; }
+/* 車検の枠は**当日ビューには出さない**（v1.131.0・ゆうた「ピットの当日は車検はないか」）。
+   v1.130.0 で一度入れた `.today-shk` / `.tshk-*` は**丸ごと取り消した**。
+   車検は「車検予定」の画面と、工場の MHS で見る。ここに足さないこと。 */
 
 /* 行：［チーム色］時間｜担当縦バッジ｜本体｜右タグ（固定幅で全幅揃え） */
 .today-row{

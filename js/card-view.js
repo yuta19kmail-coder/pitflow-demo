@@ -597,7 +597,8 @@
       const _ofOf = function(o){ return o ? ((window.pitLocName?pitLocName(o.office||''):'') || o.officeName || '') : ''; };
       const _rdOf = function(o){ var n = o ? Number(o.round) : 0; return (n>=1&&n<=4) ? n+'R' : ''; };
       const _rcTxt = _rcH.map(function(r){
-        var ex = [ r.staff||'', _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
+        /* 🔴 v1.127.0 カード詳細は**フルネーム**（ゆうた指定）。狭い枠だけ通称＆苗字。 */
+      var ex = [ (r.staff ? (window.pitStaffFull?pitStaffFull(r.staff):r.staff) : ''), _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
         return (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'');
       }).join('　');
       if (_si.result==='done'){
@@ -605,7 +606,7 @@
         const _of = window.pitShakenOffice ? pitShakenOffice(c) : _ofOf(_si);
         const _rd = window.pitShakenRound  ? pitShakenRound(c)  : 0;
         h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=search data-ics=16></i> 車検</div>'
-          + '<div class="cv-shdone"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> 車検済　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc(_si.resultStaff||'—') +'</span></div>'
+          + '<div class="cv-shdone"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> 車検済　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc((window.pitShakenStaffFull?pitShakenStaffFull(c):(_si.resultStaff||''))||'—') +'</span></div>'
           + '<div class="cv-shwhere"><span class="cv-shw"><i data-ic=location data-ics=15></i> 陸運局：'+ esc(_of||'—') +'</span>'
           + '<span class="cv-shw"><i data-ic=clock data-ics=15></i> ラウンド：'+ (_rd? _rd+'R' : '—') +'</span></div>'
           + (_rcH.length? '<div class="cv-shrc">再検 '+_rcH.length+'回：'+_rcTxt+'</div>':'')

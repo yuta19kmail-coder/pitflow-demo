@@ -148,7 +148,8 @@
      🔴 R＝ラウンド 1〜4。空でも決定できる（ゆうた確定）が、**空なら「未定」の印を出す**。
      ⚠ 中身の読み出しは pit-share.js の物差し（pitShakenStaff / pitShakenOffice / pitShakenRound）。
         ここで条件を書き直さないこと。 */
-  function shStaff(c){ return window.pitShakenStaff ? pitShakenStaff(c) : ((c.inspSchedule||{}).resultStaff||''); }
+  /* 🔴 v1.127.0 この画面は枠が狭いので**通称＆苗字**（ゆうた指定）。フルネームはカード詳細だけ。 */
+  function shStaff(c){ return window.pitShakenStaffCall ? pitShakenStaffCall(c) : ((c.inspSchedule||{}).resultStaff||''); }
   function shOffice(c){ return window.pitShakenOffice ? pitShakenOffice(c) : ((c.inspSchedule||{}).officeName||''); }
   function shRound(c){ return window.pitShakenRound ? pitShakenRound(c) : 0; }
   function rikuunList(){ return window.pitRikuunList ? pitRikuunList() : []; }

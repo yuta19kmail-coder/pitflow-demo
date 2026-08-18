@@ -183,7 +183,47 @@ function renderToday(){
   html += '</div>';
   html += '</div>';
 
+  /* 🔴🔴 v1.130.0（ゆうた指定 2026-08-18）**当日ビューにも車検の枠を出す。**
+     🗣「車検予定の 車検・客名・車種・ナンバーの下4桁・車検担当者・陸運局・R を
+        当日ビューや MHS の当日に表示できるように。頭に車検を付けてほしい（ゆくゆく名変とかも入るため）」
+     🔴 **どの車を出すか・並び・中身は pit-share.js の物差し1本**（`pitShakenOnDate`）。ここで絞らない。
+     🔴 頭の「車検」は**1行ごとの種類**。名変などが増えたら物差し側に種類を足す。
+     ⚠ MHS の当日と**同じ順・同じ中身**にすること（あちらも同じ物差しを借りている）。 */
+  html += _todShakenHtml(dayStr);
+
   wrap.innerHTML = html;
+}
+
+/* 当日ビューの車検枠。0台の日も**枠は出す**（黙って消えると「壊れて出ていない」と区別が付かない） */
+function _todShakenHtml(dayStr){
+  var rows = window.pitShakenOnDate ? (pitShakenOnDate(state.cards || [], dayStr) || []) : [];
+  var am = rows.filter(function(r){ return r.slot === 'am'; }).length;
+  var body;
+  if (!rows.length){
+    body = '<div class="today-empty">車検予定なし</div>';
+  } else {
+    body = rows.map(function(r){
+      var bits = '';
+      /* 頭の種類（いまは「車検」だけ。ゆくゆく名変など） */
+      bits += '<span class="tshk-kind">' + _todEsc(r.kind || '車検') + '</span>';
+      bits += '<span class="tshk-ap ' + r.slot + '">' + (r.slot === 'am' ? 'AM' : 'PM') + '</span>';
+      if (r.mark) bits += '<span class="tshk-mk ' + (r.done ? 'done' : 're') + '">' + _todEsc(r.mark) + '</span>';
+      bits += '<span class="tshk-nm">' + _todEsc(r.name || '（未入力）') + '<small>様</small></span>';
+      if (r.car)    bits += '<span class="tshk-car">' + _todEsc(r.car) + '</span>';
+      if (r.plate4) bits += '<span class="tshk-pl">' + _todEsc(r.plate4) + '</span>';
+      /* 担当・陸運局・R は入っているものだけ。決まっていなければ「未定」を1つにまとめる */
+      var miss = [];
+      if (r.staff)  bits += '<span class="tshk-st">' + _todEsc(r.staff) + '</span>'; else miss.push('回送');
+      if (r.office) bits += '<span class="tshk-of">' + _todEsc(r.office) + '</span>'; else miss.push('陸運局');
+      if (r.round)  bits += '<span class="tshk-rd">' + r.round + 'R</span>'; else miss.push('R');
+      if (miss.length && !r.done) bits += '<span class="tshk-tbd">未定 ' + miss.join('・') + '</span>';
+      return '<div class="tshk-row' + (r.done ? ' done' : '') + '" onclick="openDetail(\'' + r.id + '\')">' + bits + '</div>';
+    }).join('');
+  }
+  return '<div class="today-shk"><div class="today-col-head shk"><span class="ic"><i data-ic=search data-ics=16></i></span>'
+       + '車検 <span class="cnt">' + rows.length + '</span>'
+       + (rows.length ? '<span class="sub">AM ' + am + '・PM ' + (rows.length - am) + '</span>' : '')
+       + '</div><div class="today-shk-body">' + body + '</div></div>';
 }
 
 window.todayToggleFull = function(){ window._todayFull = !window._todayFull; renderToday(); };

@@ -62,6 +62,11 @@
     if (!c) return false;
     if (w.pitCardNoSale && w.pitCardNoSale(c)) return true;   /* 売上なしアーカイブ（v1.136.0） */
     if (c.status === 'returned') return true;                 /* 返車済み＝実績（v1.138.0） */
+    /* 🔴 v1.139.0 未入庫・予約キャンセルで**アーカイブまで行ったもの**（v1.139.0）
+       ⚠ 未入庫は30日たつまで `archived` が立たない＝その間は今までどおり
+          予約▸未定の「未入庫」BOXから**誰でも**戻せる。ここでは拾わない。 */
+    if (c.status === 'cancelled' && c.archived) return true;
+    /* ⚠ 廃車・乗替（scrap）は**入れない。** タスクボードの側列にいる＝まだ手元にある車。 */
     return false;
   }
   /* アーカイブ済みか（返車済み＝実績のほう）。売上なしと戻し先が違うので見分ける。 */
@@ -75,6 +80,14 @@
       var s = 'アーカイブ済み（売上なし）';
       if (c.noSaleAt) s += '　' + c.noSaleAt + (c.noSaleBy ? ' ' + c.noSaleBy : '');
       return s;
+    }
+    if (c.status === 'cancelled'){
+      /* 🔴 v1.139.0 同じ `cancelled` でも中身が違うので、帯で言い分ける。
+         ・`cancelled === true` … 人が「やめます」と決めた＝予約キャンセル
+         ・それ以外（`noShow`）  … 来なかった＝未入庫（自動でも当日ビューからでも） */
+      var k = c.cancelled ? 'アーカイブ済み（予約キャンセル）' : 'アーカイブ済み（未入庫）';
+      if (c.cancelledAt) k += '　' + c.cancelledAt;
+      return k;
     }
     var t = 'アーカイブ済み（実績）';
     if (c.completedAt) t += '　' + c.completedAt;

@@ -984,7 +984,10 @@
     const isResv = (c && c.status === 'reserved');
     /* アーカイブ済みか（物差しは archive-pit.js の1本）。ここで条件を書かない。 */
     const archived = !!(window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c));
-    const gone   = (c && (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled')) && !archived;
+    /* 🔴 v1.139.0（ゆうた確定）**廃車・乗替（scrap）は `gone` から外した。**
+       タスクボードの**側列**にいる＝まだ手元にある車なので、⋮ もタスクボードの車と同じ3択にする。
+       ⚠ 前は「終わった車」扱いで ⋮ が『消去する』だけ＝片付け方が消去しか無かった。 */
+    const gone   = (c && (c.status === 'returned' || c.status === 'cancelled')) && !archived;
     let h = '';
     if (isResv){
       /* 🔴 v1.101.0（ゆうた指定）→ v1.134.0 で整理 **まだ入庫していない車のメニュー**
@@ -1677,8 +1680,12 @@
   window.cvAskCancelResv = function(){
     if (!_c) return; closeAllPop();
     const c = _c;
+    /* 🔴 v1.139.0（ゆうた指定）**重さを先に言う。**
+       押した瞬間にアーカイブされ、そこから戻せるのは管理者だけになる。
+       ⚠ 顧客・車両のアーカイブの窓と同じ、最後の1行をそろえる。 */
     const ask = (window.pitAskText)
-      ? pitAskText('キャンセルの理由（任意・1行）', '', { ok: '予約をキャンセルする', title: '予約キャンセル', placeholder: '例）日程変更／よそでやることになった' })
+      ? pitAskText('キャンセルの理由（任意・1行）\n※ アーカイブされます。戻せるのは管理者だけです', '',
+                   { ok: '予約をキャンセルする', title: '予約キャンセル', placeholder: '例）日程変更／よそでやることになった' })
       : Promise.resolve('');
     ask.then(function(reason){
       if (reason === null || reason === undefined) return;   /* ✕ で閉じた＝やめる */
@@ -1716,12 +1723,66 @@
   window.cvAskUnarchive = function(){
     if (!_c) return;
     const c = _c;
-    const isResult = !!(window.PitArchive && PitArchive.cardIsResult && PitArchive.cardIsResult(c));
-    if (isResult) return cvAskBackToDelivery();
-    return cvAskBackToReserve();
+    if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
+    /* 🔴 v1.139.0 戻し先はアーカイブの種類で3つ。**入口の言葉は「アーカイブから戻す」1つ。**
+       ・実績（返車済み）　… 返車前（完TEL済）へ　… `cvUnarchiveToDelivery`
+       ・売上なし　　　　　… **タスクボードへ**（ゆうた指定「ほとんどないけど、あるとしたら
+                             入れ間違えただけだと思う」）… `cvUnarchiveToBoard`
+       ・未入庫／予約キャンセル … 予約へ（入庫日を選ぶ）… `pitUndRestore`（未入庫BOXと同じ処理を呼ぶだけ） */
+    if (window.PitArchive && PitArchive.cardIsResult && PitArchive.cardIsResult(c)) return cvUnarchiveToDelivery();
+    if (c.status === 'cancelled'){
+      closeAllPop();
+      if (window.closeDetail) closeDetail();
+      if (window.pitUndRestore) pitUndRestore(c.id);
+      return;
+    }
+    return cvUnarchiveToBoard();
   };
 
-  /* ---- ⓪-b 実績 → 完TEL済（返車前）に戻す v1.138.0 -------------------
+  /* ---- ⓪-a 売上なし → タスクボードに戻す（v1.139.0）------------------
+     🗣 ゆうた「売上なしは予約じゃなくタスクボードに戻して。ほとんどないけど、
+        逆にあるとしたら入れ間違えただけだと思う」
+     ◎やること＝**売上なしの印を外して、作業完了済でタスクボードへ。**
+       ・`noSale` の印を外す＝また実績に乗れる状態に戻る
+       ・`status` を「作業完了済」に＝タスクボードの終わりの列に出る（③と同じ着地点）
+       ・返車の予定日・金額は残す（入れ間違いを直すだけなので、消す理由がない）
+     ⚠ `returnStage` は付けない＝アーカイブした時も通っていない（v1.99.0 の決めごと）。 */
+  window.cvUnarchiveToBoard = function(){
+    if (!_c) return; closeAllPop();
+    const c = _c;
+    if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
+    const det = ['・「売上なし」の印を外して、タスクボードの「作業完了済」に戻します',
+                 '・作業内容・フロー（進捗ログ）・担当者・金額はそのまま残します',
+                 '・お客様の来店履歴からは、いったん外れます',
+                 '・誰がいつ戻したかは記録に残ります'].join('\n');
+    _cvAsk('アーカイブから戻す', 'アーカイブから戻して、タスクボードに戻しますか？\n' + _cvLabel(c),
+           det, 'タスクボードに戻す')
+      .then(function(yes){ if (yes) cvUnarchiveToBoardGo(); });
+  };
+  window.cvUnarchiveToBoardGo = function(){
+    const c = _c; if (!c) return;
+    if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
+    if (!(window.pitCardNoSale && pitCardNoSale(c))) return;
+    c.noSale = false; delete c.noSaleAt; delete c.noSaleBy;
+    c.status = 'workDone';
+    c.completedAt = '';
+    if (window.logFlow) logFlow(c, 'アーカイブから戻した（売上なし → タスクボード・作業完了済）');
+    if (window.pitLog) pitLog('売上なしをアーカイブから戻した（タスクボードへ）', { cardId: c.id, kind: 'phase', label: _cvLabel(c) });
+    save(); cvRefreshBg();
+    if (window.pitToast) pitToast('タスクボードに戻しました');
+    if (window.closeDetail) closeDetail();
+  };
+
+  /* ---- ⓪-c 実績 → 完TEL済（返車前）に戻す v1.138.0 -------------------
      ◎消すのは **実績カウント日（completedAt）だけ。**
        ・`status` を「作業完了済」＋`returnStage='returnWait'` に戻す＝**返車カレンダーのその日に戻る**
        ・**確定売上・返車日・入金日はそのまま残す**（ゆうた指定「入金日はそのままで移動できるように」）
@@ -1730,7 +1791,7 @@
         止めはしない＝決算前に直したい時に詰むため。
      ⚠ 代車の自動返却は戻さない（`loUnreturn` は代車カレンダー側の操作）。窓に書いてある。
      ⚠ これで「戻す」は3本＝予約へ／タスクボードへ／返車前へ。**必ずこの並びに置くこと。** */
-  window.cvAskBackToDelivery = function(){
+  window.cvUnarchiveToDelivery = function(){
     if (!_c) return; closeAllPop();
     const c = _c;
     if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
@@ -1750,9 +1811,9 @@
     _cvAsk('アーカイブから戻す',
            'アーカイブから戻して、返車前（完TEL済）にしますか？\n' + _cvLabel(c) + '　　確定売上 ' + amt,
            det, '返車前に戻す')
-      .then(function(yes){ if (yes) cvBackToDelivery(); });
+      .then(function(yes){ if (yes) cvUnarchiveToDeliveryGo(); });
   };
-  window.cvBackToDelivery = function(){
+  window.cvUnarchiveToDeliveryGo = function(){
     const c = _c; if (!c) return;
     if (c.status !== 'returned') return;
     if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
@@ -1825,20 +1886,13 @@
   window.cvAskBackToReserve = function(){
     if (!_c) return; closeAllPop();
     const c = _c;
-    /* 🔴 v1.136.0 アーカイブ済みかどうかで、窓の言い方を変える（メニューの言葉とそろえる）。 */
-    const arch = !!(window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c));
-    if (arch && window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
-      if (PitArchive.denyRestore) PitArchive.denyRestore();
-      return;
-    }
+    /* ⚠ v1.139.0 ここは**アーカイブ前の車だけ**が通る（アーカイブ済みは `cvAskUnarchive` が受ける）。 */
     const det = ['・入庫してから付いた記録を取り消します（工程・完TEL・返車の予定・確定売上）',
                  '・作業内容・フロー（進捗ログ）・担当者はそのまま残ります',
                  (c.needLoaner ? '・代車の貸出はそのまま残ります（取り消すなら代車カレンダーから）' : '')]
                 .filter(Boolean).join('\n');
-    const ttl = arch ? 'アーカイブから戻す' : '入庫を取り消して予約に戻す';
-    const msg = (arch ? 'アーカイブから戻して、予約の状態にしますか？\n'
-                      : 'この入庫を取り消して、予約に戻しますか？\n') + _cvLabel(c);
-    _cvAsk(ttl, msg, det, arch ? 'アーカイブから戻す' : '予約に戻す')
+    _cvAsk('入庫を取り消して予約に戻す', 'この入庫を取り消して、予約に戻しますか？\n' + _cvLabel(c),
+           det, '予約に戻す')
       .then(function(yes){ if (yes) cvBackToReserve(); });
   };
   window.cvBackToReserve = function(){

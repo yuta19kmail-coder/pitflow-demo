@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.121.0
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.123.0
    ======================================== */
 #shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
   --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
@@ -91,10 +91,13 @@
 /* ══ 決定チップの下に付く拡張（v1.119.0）＝回送の担当／陸運局／R ══
    🔴 ゆうた指定「決定した車両カードの下などに拡張で付けたい」。
    ⚠ 「未定」はこれから行く車だけに出す（済・再検には出さない）。 */
-.shk-meta{ display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
-.shk-mt{ font-size:8.5px; line-height:1.6; padding:0 4px; border-radius:4px; max-width:100%;
+/* 🔴 v1.123.0 **必ず1行**。折り返すとチップが縦に伸びて、下のガントの行が画面外へ押し出され、
+   掴めなくなる（2026-08-18「2台目が動かせない」の原因）。折り返さず、長いものだけ「…」で縮める。 */
+.shk-meta{ display:flex; flex-wrap:nowrap; gap:3px; margin-top:3px; overflow:hidden; }
+.shk-mt{ flex:0 0 auto; font-size:8.5px; line-height:1.6; padding:0 4px; border-radius:4px; max-width:100%;
          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
          background:rgba(255,255,255,.07); color:var(--text2); }
+.shk-mt.of, .shk-mt.tbd{ flex:0 1 auto; min-width:0; }   /* 長い陸運局名・未定だけが縮む */
 .shk-mt.st{ background:rgba(38,162,105,.20); color:#7fdcb4; font-weight:700; }   /* 回送の担当 */
 .shk-mt.of{ background:rgba(59,130,246,.18); color:#9dc0f8; }                    /* 陸運局 */
 .shk-mt.rd{ background:rgba(230,195,77,.18); color:#e6c34d; font-weight:700; }   /* R（ラウンド） */

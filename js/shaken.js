@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.121.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.123.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
@@ -155,16 +155,24 @@
 
   /* チップの下に付ける拡張（ゆうた指定「決定した車両カードの下などに拡張で付けたい」）。
      ⚠ 「未定」の印を出すのは**これから行く車（決定）だけ**。済・再検は終わった話なので、
-        入っているものだけ静かに出す（終わった車に「未定」と出しても直しようがない）。 */
+        入っているものだけ静かに出す（終わった車に「未定」と出しても直しようがない）。
+
+     🔴🔴 v1.123.0 **必ず1行に収める**（2026-08-18 ゆうた「ドラッグが効かない・2台目が動かせない」）。
+        ⚠ v1.119.0 で「回送 未定／陸運局 未定／R未定」を3枚並べたら、枠が118pxしかないので
+           **折り返して1枚のチップが約95px**になった。決定枠に2〜3台入るとバンドが一気に伸び、
+           **下のガントの行が画面の外へ押し出されて掴めなくなっていた**（実際に6台目で再現した）。
+        🔴 だから **並べる順は R → 担当 → 陸運局**。前の2つは短くて必ず出る。
+           長い陸運局の名前だけが縮んで「…」になる（全文は吹き出しで出す）。
+        🔴 未定は **1枚にまとめる**（例「未定 回送・R」）。3枚並べない。 */
   function chipMeta(c, kind){
-    var st=shStaff(c), of=shOffice(c), rd=shRound(c), todo=(kind==='decided'), h='';
-    /* ⚠ チップは幅が狭い（1枠118px）ので名前は切れる。切れても分かるように吹き出しに全部入れる。 */
-    if(st)      h+='<span class="shk-mt st" title="回送の担当：'+esc(st)+'">'+esc(st)+'</span>';
-    else if(todo) h+='<span class="shk-mt tbd" title="回送の担当がまだ決まっていません">回送 未定</span>';
-    if(of)      h+='<span class="shk-mt of" title="陸運局：'+esc(of)+'">'+esc(of)+'</span>';
-    else if(todo) h+='<span class="shk-mt tbd" title="どこの陸運局へ行くかがまだ決まっていません">陸運局 未定</span>';
-    if(rd)      h+='<span class="shk-mt rd" title="'+rd+'ラウンド">'+rd+'R</span>';
-    else if(todo) h+='<span class="shk-mt tbd" title="何ラウンドで行くかがまだ決まっていません">R未定</span>';
+    var st=shStaff(c), of=shOffice(c), rd=shRound(c), todo=(kind==='decided'), h='', miss=[];
+    if(rd)        h+='<span class="shk-mt rd" title="'+rd+'ラウンド">'+rd+'R</span>';
+    else if(todo) miss.push('R');
+    if(st)        h+='<span class="shk-mt st" title="回送の担当：'+esc(st)+'">'+esc(st)+'</span>';
+    else if(todo) miss.push('回送');
+    if(of)        h+='<span class="shk-mt of" title="陸運局：'+esc(of)+'">'+esc(of)+'</span>';
+    else if(todo) miss.push('陸運局');
+    if(miss.length) h+='<span class="shk-mt tbd" title="まだ決まっていません：'+miss.join('・')+'">未定 '+miss.join('・')+'</span>';
     return h ? '<div class="shk-meta">'+h+'</div>' : '';
   }
 
@@ -307,6 +315,54 @@
   function _clearZone(){ if(_lastZone){ _lastZone.classList.remove('drop'); _lastZone=null; } }
   function _detachGhost(){ if(_ghostEl && _ghostEl.parentNode) _ghostEl.parentNode.removeChild(_ghostEl); }
   function _hideHover(){ var hv=document.getElementById('pit-hovercard'); if(hv) hv.classList.remove('show'); }
+
+  /* 🔴🔴 v1.123.0 **ドラッグ中に画面の端まで来たら自分でスクロールする**
+     （2026-08-18 ゆうた「ドラッグが効かないところがある。2台目が動かせないのかな？」）
+     ⚠ 掴んでいる間は指を離せないので、**画面の外にある行や日には届かなかった**。
+        台数が増えるほど下の行が押し出されるので、6台目・7台目が掴めない＝「動かない」に見えていた。
+     ⚠ 縦＝車検予定の画面そのもの（`.view` が overflow:auto）。窓（body）は動かない作り。
+        横＝表の横スクロール（`.shk-scroll`）。**先の日付へも持って行けるようにする。**
+     ⚠ 端で止まっている間もドロップ先を見直す（動かさないと枠が光らない、を防ぐ）。 */
+  var _scV=null, _scH=null, _scTimer=null, _lastPt=null;
+  function _findScrollerY(){
+    var el=document.getElementById('shakencal-body');
+    while(el && el!==document.body){
+      var cs=getComputedStyle(el);
+      if((cs.overflowY==='auto'||cs.overflowY==='scroll') && el.scrollHeight>el.clientHeight+2) return el;
+      el=el.parentElement;
+    }
+    return null;
+  }
+  function _edge(pos, lo, hi, M){ return pos < lo+M ? -1 : pos > hi-M ? 1 : 0; }
+  function _autoScrollStart(){
+    _scV=_findScrollerY();
+    _scH=document.querySelector('#shakencal-body .shk-scroll');
+    if(_scTimer) clearInterval(_scTimer);
+    _scTimer=setInterval(function(){
+      if(!_pdrag || !_lastPt) return;
+      /* ⚠ 端の帯は**狭く**（48px）。広いと「見えた枠の上に指を置いているのに、まだスクロールし続ける」
+         ことになって、狙った枠が通り過ぎてしまう。 */
+      var M=48, moved=false;
+      if(_scV){ var rv=_scV.getBoundingClientRect(); var dy=_edge(_lastPt.y, rv.top, rv.bottom, M);
+        if(dy){ var b4=_scV.scrollTop; _scV.scrollTop+=dy*16; moved = moved || (_scV.scrollTop!==b4); } }
+      if(_scH){ var rh=_scH.getBoundingClientRect(); var dx=_edge(_lastPt.x, rh.left, rh.right, M);
+        if(dx){ var b4h=_scH.scrollLeft; _scH.scrollLeft+=dx*20; moved = moved || (_scH.scrollLeft!==b4h); } }
+      if(moved) _updateZone(_lastPt.x, _lastPt.y);
+    }, 16);
+  }
+  function _autoScrollStop(){ if(_scTimer) clearInterval(_scTimer); _scTimer=null; _scV=null; _scH=null; _lastPt=null; }
+
+  /* ドロップ先の枠を光らせる／ゴーストを置く（ドラッグ中と自動スクロール中の両方から呼ぶ） */
+  function _updateZone(x,y){
+    var t=document.elementFromPoint(x,y);
+    var decell = t && t.closest && t.closest('.shk-decell:not(.off)');
+    var gantt  = decell ? null : (t && t.closest && t.closest('.shk-gantt-drop'));
+    var zone = decell || gantt;
+    if(zone!==_lastZone){ _clearZone(); if(zone){ zone.classList.add('drop'); _lastZone=zone; } }
+    /* ゴースト＝決定枠に入れた時だけ、その枠に「ここに入る」プレビューを出す */
+    if(decell && _ghostEl){ if(_ghostEl.parentNode!==decell) decell.appendChild(_ghostEl); }
+    else { _detachGhost(); }
+  }
   document.addEventListener('pointerdown', function(e){
     if(e.pointerType==='mouse' && e.button!==0) return;
     var host=document.getElementById('shakencal-body'); if(!host||!host.contains(e.target)) return;
@@ -324,20 +380,16 @@
       _pdrag.moved=true; window.pitDragging=true; _hideHover();   // ドラッグ中フラグ＝card-hoverが他カードのホバーを抑制 v0.124.3
       if(_srcEl && _srcEl.classList) _srcEl.classList.add('shk-dragsrc');   // 元チップを薄く
       _ghostEl=document.createElement('div'); _ghostEl.className='shk-chip shk-ghostchip'; _ghostEl.textContent=_pdrag.label;
+      _autoScrollStart();   /* 🔴 v1.123.0 端まで来たら自分でスクロールする */
     }
     e.preventDefault();
-    var t=document.elementFromPoint(e.clientX,e.clientY);
-    var decell = t && t.closest && t.closest('.shk-decell:not(.off)');
-    var gantt  = decell ? null : (t && t.closest && t.closest('.shk-gantt-drop'));
-    var zone = decell || gantt;
-    if(zone!==_lastZone){ _clearZone(); if(zone){ zone.classList.add('drop'); _lastZone=zone; } }
-    // ゴースト＝決定枠に入れた時だけ、その枠に「ここに入る」プレビューを出す
-    if(decell){ if(_ghostEl.parentNode!==decell) decell.appendChild(_ghostEl); }
-    else { _detachGhost(); }
+    _lastPt={x:e.clientX, y:e.clientY};
+    _updateZone(e.clientX, e.clientY);
   }, {passive:false});
   document.addEventListener('pointerup', function(e){
     if(!_pdrag) return;
     var p=_pdrag, zone=_lastZone; _pdrag=null; window.pitDragging=false;   // ドラッグ終了＝ホバー抑制を解除 v0.124.3
+    _autoScrollStop();   /* 🔴 v1.123.0 自動スクロールを必ず止める（止め忘れると裏で走り続ける） */
     _detachGhost(); _ghostEl=null; _clearZone();
     if(_srcEl && _srcEl.classList) _srcEl.classList.remove('shk-dragsrc'); _srcEl=null;
     if(!p.moved) return;   // タップ＝onclick（メニュー/その枠で決定）に任せる

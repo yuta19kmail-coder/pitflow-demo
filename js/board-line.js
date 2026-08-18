@@ -328,9 +328,36 @@
   w.addEventListener('resize', helpClose);
   d.addEventListener('keydown', function(e){ if (e.key === 'Escape') helpClose(); });
 
-  /* ---------- 右クリックメニュー用（ctxmenu-pit.js から呼ぶ） ---------- */
+  /* ---------- 右クリックメニュー用（ctxmenu-pit.js から呼ぶ） ----------
+     🔴 v1.133.0（ゆうた指摘）**出す条件はこの1本にまとめた。**
+     🗣「右クリメニューも『ラインを引く』とかタスクビューでしか使えないのとかでてるよ」
+
+     ◎なにが起きていた
+       区切りラインは**タスク看板の列の中にしか無い**のに、条件が「カードの状態」だけだったので、
+       **当日ビュー・返車・PIT配置図・駐車場・代車カレンダー・検索結果・マイダッシュ**でも
+       右クリックに「この下にラインを入れる」が出ていた。
+       押しても線は**その画面には出ない**（看板を開いた時だけ出る）＝ 何も起きていないように見える。
+
+     ◎出す条件（2つとも満たした時だけ）
+       ① いま見ているのが**タスク看板**（`task` ＝統合／`course1` ＝1課／`course2` ＝2課）
+       ② そのカードが**盤面に乗っている**（予約・返車済み・キャンセル・廃車・**完TEL通過**は乗っていない）
+     ⚠ ②の「完TELを通ったら盤面から外れる」は task.js の `!c.returnStage` と同じ物差し。
+        別の式を書かないこと（片方だけ直すとズレる）。 */
+  var BOARD_VIEWS = { task:1, course1:1, course2:1 };
+  function onBoardView(){
+    try { return !!BOARD_VIEWS[(w.state && state.currentView) || '']; } catch(e){ return false; }
+  }
+  function onBoardCard(c){
+    if (!c) return false;
+    var st = c.status || '';
+    if (st === 'reserved' || st === 'returned' || st === 'cancelled' || st === 'scrap') return false;
+    if (c.returnStage) return false;      /* 完TELを通った車は返車ビューへ移っていて、盤面に無い */
+    return true;
+  }
   function ctxItem(c){
     if (!c || !c.id) return null;
+    if (!onBoardView()) return null;
+    if (!onBoardCard(c)) return null;
     return { ic: 'minus', label: 'この下にラインを入れる', sub: '区切り（今日はここまで 等）',
       run: function(){
         put(c.boardId || 'default', c.status || '', c.id, '');
@@ -341,6 +368,8 @@
 
   w.PitBoardLine = {
     renderColumn: renderColumn, ctxItem: ctxItem,
+    /* テスト用（出す条件をここ1本から確かめる） */
+    _onBoardView: onBoardView, _onBoardCard: onBoardCard,
     put: put, moveTo: moveTo, remove: remove, all: lines, TOP: TOP
   };
   console.log('[board-line] ready（タスクボードの区切りライン）');

@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.125.0
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.126.0
    ======================================== */
 #shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
   --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
@@ -80,6 +80,14 @@
       ⚠ `.shk-sc` は AM/PM の見出し行でも使うので、**この行の中だけ**に効かせること。 */
 .shk-decrow .shk-sc{ display:flex; flex-direction:column; }
 .shk-decrow .shk-decell{ flex:1 1 auto; }
+/* 🔴 v1.126.0 決定の行だけ **はみ出しを切らない**（ゆうた「済みマークが決定のラベルの下に来ちゃってる」）。
+   ⚠ 「済」の赤いスタンプはチップの角から 7px 外へ出る作り。**1枚目のカードだけ**上に何も無いので、
+      マスの `overflow:hidden` に当たって**上が切れ、決定の帯の下に潜って見えていた**。
+   ⚠ 横に漏れる心配は無い＝名前・車名・拡張はそれぞれ中で「…」に切っている。
+   ⚠ この行を上に重ねる（`position:relative; z-index:1`）のはセットで必要。切らないだけだと
+      上の「決定」の帯の背景に隠れる。 */
+.shk-decrow{ position:relative; z-index:1; }
+.shk-decrow .shk-sc{ overflow:visible; }
 .shk-decell{ position:relative; padding:4px 5px 5px; min-height:42px; }
 .shk-decell.off{ min-height:0; height:100%; background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
 .shk-decell.drop{ outline:2px dashed var(--brand,#1f7a4d); outline-offset:-3px; background:rgba(31,122,77,.14); }

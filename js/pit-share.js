@@ -482,6 +482,28 @@ w.pitDivisionColor = pitDivisionColor;
     var live = w.pitLocName ? pitLocName(s.office) : '';
     return live || String(s.officeName || '');
   }
+  /* 🔴🔴 v1.129.0（ゆうた指定 2026-08-18）**陸運局も担当者と同じ2つの出し方。**
+     🗣「さっきのフルネームと同じで、省略表示は **野田** とか **習志野** とか**地名だけ**でいいよ」
+
+     ・広い画面（カード詳細・ホバー情報カード）… **正式名のまま**（`pitShakenOffice`）
+     ・狭い枠（車検予定のチップ・MHS・前日LINE）… **地名だけ**（`pitLocShort`）
+       例）野田自動車検査登録事務所 → **野田** ／ 習志野自動車検査登録事務所 → **習志野**
+           千葉運輸支局 → **千葉**
+
+     ⚠ やり方は「**後ろのお決まりの言葉を落とすだけ**」。CoreMembers の名前を書き換えたりはしない。
+     ⚠ 落とすものが1つも無ければ**そのまま**出す（知らない書き方でも空にしない）。
+     ⚠ うしろの（かっこ書き）も落とす。例）野田自動車検査登録事務所（千葉）→ 野田 */
+  var _PIT_LOC_TAIL = /(自動車検査登録事務所|自動車検査場|検査登録事務所|自動車検査協会|運輸監理部|運輸支局|陸運支局|陸運局|運輸局|支局|事務所|検査場)$/;
+  function pitLocShort(name){
+    var n = String(name == null ? '' : name).trim();
+    if (!n) return '';
+    var t = n.replace(/[（(][^）)]*[）)]\s*$/, '').trim();
+    var s2 = t.replace(_PIT_LOC_TAIL, '').trim();
+    return s2 || t || n;
+  }
+  function pitShakenOfficeShort(c){ return pitLocShort(pitShakenOffice(c)); }
+  w.pitLocShort           = pitLocShort;
+  w.pitShakenOfficeShort  = pitShakenOfficeShort;
   function pitShakenRound(c){
     var s = c && c.inspSchedule, n = s ? Number(s.round) : 0;
     return (n >= 1 && n <= 4) ? n : 0;
@@ -510,7 +532,7 @@ w.pitDivisionColor = pitDivisionColor;
 
   /* 🔴🔴 その日の車検予定を返す。**絞り込み・並び・中身までここで決める。**
        戻り＝[{ id, state:'decided'|'done'|'recheck', mark, slot:'am'|'pm',
-                name, car, staff, office, round, div, divColor, done, card }]
+                name, car, staff, office（地名だけ）, round, div, divColor, done, card }]
        ⚠ v1.119.0 で `office`（どこの陸運局）と `round`（何R・0＝未定）を**足した**。
           いま使っているのは PitFlow の車検予定だけ。MHS・LINEの画像は使っていないが、
           使いたくなった時に**条件をあちらに書き写さないで済む**ように、ここから配る。
@@ -527,7 +549,8 @@ w.pitDivisionColor = pitDivisionColor;
         /* 🔴 v1.127.0 ここに乗るのは**通称＆苗字**（狭い枠に出るものだから）。
            ⚠ MHS・前日LINEの画像もこれを使う。フルネームが要るのはカード詳細だけ。 */
         staff: pitShakenStaffCall(c),
-        office: pitShakenOffice(c), round: pitShakenRound(c),
+        /* 🔴 v1.129.0 陸運局も**地名だけ**（狭い枠に出るものだから）。正式名はカード詳細・ホバーで出す。 */
+        office: pitShakenOfficeShort(c), round: pitShakenRound(c),
         div: pitDivisionLabel(c), divColor: pitDivisionColor(c)
       };
     }

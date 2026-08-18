@@ -134,6 +134,14 @@
 .pp-check input{ width:17px; height:17px; accent-color:var(--brand); }
 .pp-salesmemo{ width:100%; box-sizing:border-box; font-size:13px; padding:8px 10px; border:1px solid var(--border2); border-radius:8px; background:var(--bg2); color:var(--text); font-family:inherit; }
 .pp-salesmemo:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 2px rgba(29,185,122,.25); }
+/* 🔴 v1.128.0 車検の詳細（車検予定の画面のホバーだけ・基本情報の下）
+   ⚠ ラベルの幅をそろえて3行を縦に並べる＝ぱっと読めるように。 */
+.ph-sec-shk .ph-sec-body{ display:flex; flex-direction:column; gap:3px; }
+.ph-shk{ display:flex; align-items:baseline; gap:8px; font-size:12.5px; }
+.ph-shk-lb{ flex:0 0 88px; font-size:11px; font-weight:700; color:var(--text3); }
+.ph-shk-v{ flex:1 1 auto; min-width:0; font-weight:700; color:var(--text); word-break:break-all; }
+.ph-shk-v.tbd{ font-weight:600; color:var(--text3); }
+
 /* 🔴 v1.122.0 洗車の枠（車販依頼の上）＝見た目は車販依頼と同じ箱。
    ⚠ 要／不要のボタンは完TELの窓と同じ部品（polish.css の `.rp-chips` / `.rp-chip`）を使い回す。
       押されていない時は**どちらも光らない**＝「まだ決まっていない」がひと目で分かる。 */

@@ -346,6 +346,33 @@
     }
     h += '</div>'; // .ph-stats
 
+    /* 🔴🔴 v1.128.0（ゆうた指定 2026-08-18）**車検予定の画面のホバーだけ**、基本情報のすぐ下に
+       「車検の詳細（担当・陸運局・R）」を出す。
+       🗣「車検予定のカードのホバーだけ　基本情報の下に車検の詳細　車検担当者　陸運局　R　の表記を入れられない？」
+       ⚠ **ほかの画面のホバーには出さない。** 車検予定の段取りを見ている時だけ要る情報なので、
+          全部の画面に足すと、いつものホバーが縦に伸びるだけになる。
+       ⚠ 中身の読み方は pit-share.js の物差し（`pitShakenStaffFull` / `pitShakenOffice` / `pitShakenRound`）。
+          ここで組み立て直さない。
+       ⚠ 名前は**フルネーム**。ホバー情報カードは 2026-08-16 の決めごとで
+          「幅のある画面＝フルのまま」の側（予約詳細と同じ扱い）。 */
+    var _onShaken = !!(window.state && state.currentView === 'shakencal');
+    var _isShakenCar = window.pitIsShaken ? pitIsShaken(c) : false;
+    if (_onShaken && _isShakenCar){
+      var _sst = window.pitShakenStaffFull ? pitShakenStaffFull(c) : '';
+      var _sof = window.pitShakenOffice ? pitShakenOffice(c) : '';
+      var _srd = window.pitShakenRound ? pitShakenRound(c) : 0;
+      var _row = function(lb, v){
+        return '<div class="ph-shk"><span class="ph-shk-lb">' + lb + '</span>'
+             + '<span class="ph-shk-v' + (v ? '' : ' tbd') + '">' + (v ? esc(v) : '未定') + '</span></div>';
+      };
+      h += '<div class="ph-sec ph-sec-shk"><div class="ph-sec-lb"><i data-ic=search data-ics=16></i> 車検の詳細</div>'
+         + '<div class="ph-sec-body ph-shk-body">'
+         + _row('担当（回送）', _sst)
+         + _row('陸運局', _sof)
+         + _row('R（ラウンド）', _srd ? (_srd + 'R') : '')
+         + '</div></div>';
+    }
+
     // ===== 注意（外注先） ※車両注意は上部バッジ行に集約（.ph-b-cau） =====
     if (c.status === 'outsource'){
       h += '<div class="ph-note"><i data-ic=external data-ics=16></i> 外注先：'+esc(c.outsourceTo||'未定')+(c.outsourceNote?'（'+esc(c.outsourceNote)+'）':'')+'</div>';

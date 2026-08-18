@@ -504,6 +504,26 @@ w.pitDivisionColor = pitDivisionColor;
   function pitShakenOfficeShort(c){ return pitLocShort(pitShakenOffice(c)); }
   w.pitLocShort           = pitLocShort;
   w.pitShakenOfficeShort  = pitShakenOfficeShort;
+
+  /* 🔴🔴 v1.130.0（ゆうた指定 2026-08-18）**当日ビュー／MHS の当日に出す車検の1行。**
+     🗣「車検予定の **車検・客名・車種・ナンバーの下4桁・車検担当者・陸運局・R** の情報を
+        当日ビューや MHS の当日に表示できるように。
+        現状車検枠で『車検』だけだが、**ゆくゆくは名変とかも入るようにしたい**ため頭に車検を付けてほしい」
+
+     🔴 **頭の「車検」は“種類”**。名変・抹消などが増えたら、ここに種類を足していく。
+        ⚠ 枠の名前（車検枠）ではなく**1行ごとの種類**として出すこと。混ぜると増やせなくなる。
+     🔴 **並びと中身はこの1本。** PitFlow の当日ビューと MHS の当日で**同じ順・同じ中身**にする。
+        片方に書き足さない。 */
+  w.PIT_SHAKEN_KIND = '車検';
+  /* ナンバーの下4桁。⚠「野田 500 あ 12-34」「…1234」どちらでも数字だけ拾って後ろ4つ。 */
+  function pitPlate4(c){
+    var p = String((c && c.plate) || '').trim();
+    if (!p) return '';
+    var d = p.replace(/[０-９]/g, function (x) { return String.fromCharCode(x.charCodeAt(0) - 0xFEE0); })
+             .replace(/[^0-9]/g, '');
+    return d ? d.slice(-4) : '';
+  }
+  w.pitPlate4 = pitPlate4;
   function pitShakenRound(c){
     var s = c && c.inspSchedule, n = s ? Number(s.round) : 0;
     return (n >= 1 && n <= 4) ? n : 0;
@@ -532,7 +552,7 @@ w.pitDivisionColor = pitDivisionColor;
 
   /* 🔴🔴 その日の車検予定を返す。**絞り込み・並び・中身までここで決める。**
        戻り＝[{ id, state:'decided'|'done'|'recheck', mark, slot:'am'|'pm',
-                name, car, staff, office（地名だけ）, round, div, divColor, done, card }]
+                kind:'車検', name, car, plate4, staff, office（地名だけ）, round, div, divColor, done, card }]
        ⚠ v1.119.0 で `office`（どこの陸運局）と `round`（何R・0＝未定）を**足した**。
           いま使っているのは PitFlow の車検予定だけ。MHS・LINEの画像は使っていないが、
           使いたくなった時に**条件をあちらに書き写さないで済む**ように、ここから配る。
@@ -546,6 +566,8 @@ w.pitDivisionColor = pitDivisionColor;
         id: c.id, card: c, state: state, mark: w.PIT_SHAKEN_MARK[state] || '',
         done: (state === 'done'), slot: pitShakenSlot(slotRaw),
         name: pitCustSurname(c), car: pitCarLabel(c),
+        /* 🔴 v1.130.0 当日ビュー／MHS の当日で出すもの（種類・ナンバー下4桁）も一緒に配る */
+        kind: w.PIT_SHAKEN_KIND, plate4: pitPlate4(c),
         /* 🔴 v1.127.0 ここに乗るのは**通称＆苗字**（狭い枠に出るものだから）。
            ⚠ MHS・前日LINEの画像もこれを使う。フルネームが要るのはカード詳細だけ。 */
         staff: pitShakenStaffCall(c),

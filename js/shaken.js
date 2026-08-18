@@ -1,8 +1,10 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.117.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.118.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
-   ・帯 or 決定チップをドラッグ→決定枠へドロップで確定/移動。決定チップのタップで完了/再検/取消。
+   ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
+   ・🔴 v1.118.0 決定への移動＝**ドラッグだけ**。帯を押しても決定しない（押し間違いで陸運局の日が変わらないように）。
+   ・決定チップのタップで完了/再検/取消。決定チップを「予定」へドロップで候補に戻す。
    ・配車（誰が運ぶ）は扱わない＝MHSの領分。ここは整備が段取りを目で見る場所。
    フィールド：inspSchedule.slots{iso:['am','pm']}（候補）/ decided+decidedSlot / result 'done'+resultSlot / history[{date,slot,result:'recheck'}]
    ======================================== */
@@ -173,7 +175,6 @@
   function renderShaken(){
     var host=document.getElementById('shakencal-body'); if(!host) return;
     var days=rangeDays(), tIso=todayIso();
-    var subs=[]; days.forEach(function(d){ subs.push({iso:d.iso,slot:'am',off:d.off}); subs.push({iso:d.iso,slot:'pm',off:d.off}); });
     var data=collect(days), decCell=data.decCell, cnt=data.cnt;
     var h='';
     // ヘッダ操作
@@ -201,7 +202,6 @@
     }).join('')+'</div>';
     // 可能性ガント
     h+='<div class="shk-row shk-bandrow shk-gantt-drop" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-band"><i data-ic=clock data-ics=16></i> 予定</div><div class="shk-bandfill"><span class="shk-drophint">↩ 決定チップをこの「予定」エリアにドロップ＝候補（行ける日）に戻す</span></div></div>';
-    window._shkSubs = subs;
     var ganttCars = data.cands.concat(data.empties);
     ganttCars.forEach(function(c){ var s=ins(c); var isEmpty=data.empties.indexOf(c)>=0;
       function son(di,slot){ var day=days[di]; if(!day||day.off) return false; return (s.slots[day.iso]||[]).indexOf(slot)>=0; }
@@ -211,11 +211,16 @@
       h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+attr.map(function(x){return '<span class="shk-ca'+(x==='未設定'?' unset':'')+'">'+x+'</span>';}).join('')+'</div></div>'
         + days.map(function(x,di){ if(x.off) return '<div class="shk-off2"></div>';
             return ['am','pm'].map(function(slot){
-              var idx=di*2+(slot==='am'?0:1), on=son(di,slot);
-              if(!on) return '<div class="shk-gsc paintable'+(slot==='pm'?' pm':'')+'" data-car="'+c.id+'" data-idx="'+idx+'" onmousedown="shkPaintStart(event,\''+c.id+'\','+idx+')" onmouseenter="shkPaintMove(\''+c.id+'\','+idx+')" title="ドラッグで行ける枠を選択"></div>';
+              var on=son(di,slot);
+              /* 🔴 v1.118.0 予定（候補）の付け外しは**押すだけ**（ゆうた指定）。
+                 ⚠ ドラッグで塗る作りはやめた＝表の中で掴むのは「決定へ動かす」時だけにする。 */
+              var ap=(slot==='am'?'午前':'午後');
+              if(!on) return '<div class="shk-gsc slotcell'+(slot==='pm'?' pm':'')+'" onclick="shkSlot(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="押すと '+fmtMDW(x.iso)+' '+ap+' を「行ける枠」に入れる"></div>';
               var pOn = slot==='am'? son(di-1,'pm') : son(di,'am');
               var nOn = slot==='am'? son(di,'pm') : son(di+1,'am');
-              return '<div class="shk-gsc'+(slot==='pm'?' pm':'')+'"><div class="shk-bar'+(c.boardId==='import'?' imp':'')+(pOn?'':' l')+(nOn?'':' r')+'" draggable="false" data-card-id="'+c.id+'" data-iso="'+x.iso+'" data-slot="'+slot+'" onclick="shkFix(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="'+fmtMD(x.iso)+' '+(slot==='am'?'午前':'午後')+'で決定・ドラッグで別の枠へ"></div></div>';
+              /* 🔴 v1.118.0 帯を押しても**決定しない**（ゆうた指定「予定部分をクリックで飛ばないように」）。
+                 押す＝その枠を外すだけ。決定は**決定バンドへドラッグ**したときだけ。 */
+              return '<div class="shk-gsc'+(slot==='pm'?' pm':'')+'"><div class="shk-bar'+(c.boardId==='import'?' imp':'')+(pOn?'':' l')+(nOn?'':' r')+'" draggable="false" data-card-id="'+c.id+'" data-iso="'+x.iso+'" data-slot="'+slot+'" onclick="shkSlot(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="押すと '+fmtMDW(x.iso)+' '+ap+' の枠を外す／上の「決定」へドラッグで決定"></div></div>';
             }).join('');
           }).join('')+'</div>';
     });
@@ -232,7 +237,9 @@
   window.shkOver=function(e){ e.preventDefault(); e.currentTarget.classList.add('drop'); };
   window.shkLeave=function(e){ e.currentTarget.classList.remove('drop'); };
   window.shkDrop=function(e,iso,slot){ e.preventDefault(); e.currentTarget.classList.remove('drop'); var id=(e.dataTransfer&&e.dataTransfer.getData('text'))||_drag; _drag=null; assign(id,iso,slot); };
-  window.shkFix=function(id,iso,slot){ assign(id,iso,slot); };
+  /* 🔴 v1.118.0 `shkFix`（帯を押したら決定）は**廃止**。
+     ゆうた指定「決定車両への移動はドラッグのみ、予定部分をクリックで飛ばないように」。
+     ⚠ 押し間違いで陸運局の日が勝手に決まってしまうのを防ぐのが目的。復活させないこと。 */
   function assign(id,iso,slot){ var c=card(id); if(!c) return; var s=ins(c); s.decided=iso; s.decidedSlot=(slot==='pm'?'pm':'am'); s.result=''; s.resultDate=''; s.resultSlot=''; save(); renderShaken(); }
 
   // 決定チップを「予定」エリアにドロップ＝決定を解除して候補（行ける日）表示に戻す（候補slotsは残す）v0.124.0
@@ -296,19 +303,21 @@
     if(host&&host.contains(e.target)){ e.stopPropagation(); e.preventDefault(); }
   }, true);
 
-  // ===== 範囲ドラッグで「行ける枠」を塗る（空セル→予定） =====
-  var _paint=null;
-  window.shkPaintStart=function(e,carId,idx){ if(e.button!==0) return; e.preventDefault(); _paint={car:carId,a:idx,b:idx}; paintHi(); };
-  window.shkPaintMove=function(carId,idx){ if(!_paint||_paint.car!==carId) return; _paint.b=idx; paintHi(); };
-  function paintHi(){ if(!_paint) return; var lo=Math.min(_paint.a,_paint.b),hi=Math.max(_paint.a,_paint.b);
-    var els=document.querySelectorAll('.shk-gsc.paintable[data-car="'+_paint.car+'"]');
-    Array.prototype.forEach.call(els,function(el){ var i=+el.getAttribute('data-idx'); el.classList.toggle('paintsel', i>=lo&&i<=hi); }); }
-  document.addEventListener('mouseup', function(){ if(!_paint) return; var p=_paint; _paint=null; paintCommit(p); });
-  function paintCommit(p){ var c=card(p.car); if(!c) return; var s=ins(c); var subs=window._shkSubs||[];
-    var lo=Math.min(p.a,p.b),hi=Math.max(p.a,p.b), any=false;
-    for(var i=lo;i<=hi;i++){ var sub=subs[i]; if(!sub||sub.off) continue; if(!s.slots[sub.iso]) s.slots[sub.iso]=[]; if(s.slots[sub.iso].indexOf(sub.slot)<0){ s.slots[sub.iso].push(sub.slot); any=true; } }
-    if(any) save(); renderShaken();
-  }
+  /* ===== 「行ける枠」の付け外し＝**押すだけ**（v1.118.0・ゆうた指定） =====
+     🗣「ドラッグの挙動は候補日を増やすのはなし。あくまで**予定側の枠をクリックするのみ**」
+     🔴 空いているマスを押す → その枠を入れる／すでに帯があるマスを押す → その枠を外す。
+     ⚠ **範囲ドラッグで塗る作りは廃止した。** 表の中で掴む操作は「決定へ動かす」1つだけにする、
+        というのが今回の決めごと。塗りを戻すと、掴んだつもりが塗りになって事故る。
+     ⚠ 帯を押した時に決定へ飛ばないこと（`shkFix` を廃止した理由と同じ）。
+     ⚠ ドラッグして離した直後の空クリックは `_suppressClick` が止める＝ここには来ない。 */
+  window.shkSlot=function(id,iso,slot){
+    var c=card(id); if(!c) return; var s=ins(c);
+    if(!s.slots[iso]) s.slots[iso]=[];
+    var i=s.slots[iso].indexOf(slot);
+    if(i>=0){ s.slots[iso].splice(i,1); if(!s.slots[iso].length) delete s.slots[iso]; }
+    else s.slots[iso].push(slot);
+    save(); renderShaken();
+  };
 
   // 決定チップのメニュー
   window.shkChipMenu=function(id){

@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.116.0
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.118.0
    ======================================== */
 #shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
   --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
@@ -125,11 +125,13 @@
 .shk-off2 .shk-ap.off{ border-bottom:0; color:var(--text3); font-weight:700; padding:3px 2px; }
 .shk-nocar{ color:var(--text3); opacity:.55; }
 
-/* 未設定行＋範囲塗り */
+/* 「行ける枠」のマス（v1.118.0＝押して入れる／押して外す。範囲塗りは廃止）
+   🔴 カーソルは **指さし（pointer）1本**。2026-08-16 の全アプリ共通の決めごと
+      ＝`cursor:grab`／`grabbing` は二度と使わない。`cell` のような特殊カーソルも使わない
+      （Windows に標準の絵が無いものは、環境によって黒フチが落ちて見えなくなる）。 */
 .shk-gsc{ -webkit-user-select:none; user-select:none; }
-.shk-gsc.paintable{ cursor:cell; }
-.shk-gsc.paintable:hover{ background:rgba(31,122,77,.10); }
-.shk-gsc.paintsel{ background:rgba(31,122,77,.32); box-shadow:inset 0 0 0 1px #1f7a4d88; }
+.shk-gsc.slotcell{ cursor:pointer; }
+.shk-gsc.slotcell:hover{ background:rgba(31,122,77,.10); }
 .shk-gcar.unset .shk-gcar-nm{ color:var(--text2); }
 .shk-ca.unset{ background:rgba(249,115,22,.20); color:#f8a866; }
 /* v1.116.0 入庫日は**チップの先頭**（並びが入庫日順なので、日が左端に揃うと読みやすい）＋曜日つき */

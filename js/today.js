@@ -326,6 +326,14 @@ window.pitTodayCancel = function(id, isReturn){
     if (window.logFlow) logFlow(c, '返車予定キャンセル（未定へ）');
   } else {
     c.status = 'cancelled';
+    /* 🔴 v1.139.0（ゆうた確定）**自動の未入庫と同じ印を立てる。**
+       ◎なにが起きていた
+         自動（入庫日を過ぎた）は `noShow=true` を立てるのに、**ここだけ立てていなかった**。
+         同じ「未入庫」BOXに並ぶのに印が違う＝**手で押したのか自動なのか、あとから見分けられない**。
+       🔴 意味はどちらも「**来なかった**」で同じ（窓にも「未入庫リストに残る」と書いてある）。
+          人が決めた「予約キャンセル」（`cancelled=true`）とは**別物**なので、そちらとは混ぜない。 */
+    c.noShow = true;
+    c.noShowAt = c.noShowAt || ymd(new Date());
     c.cancelledAt = ymd(new Date());
     if (window.logFlow) logFlow(c, 'キャンセル（来店なし）');
   }

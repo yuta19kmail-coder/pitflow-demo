@@ -82,7 +82,13 @@ function renderReserveTbd(){
   h += col('<i data-ic=ban data-ics=16></i> 未入庫 <small>（来店なし）</small>', noShow.length,
     noShow.length ? noShow.map(c => item(c, '<button class="rtbd-act" onclick="event.stopPropagation();pitUndRestore(\'' + c.id + '\')">↩ 予約に戻す</button>')).join('') : empty,
     '<b>入庫日を過ぎても入庫済みにならなかった予約は、ここへ自動で入ります</b>（仮予約と承認待ちは動きません）。'
-    + '連絡が来たら「↩ 予約に戻す」。※ 1ヶ月（' + UNDET_ARCHIVE_DAYS + '日）たつと自動でアーカイブされます。');
+    /* 🔴 v1.139.0 アーカイブされたあと**どうなるか**まで書く。
+       ⚠ v1.138.0 までは「自動でアーカイブされます」だけで、
+          そのあと**このボタンが消える**ことが誰にも見えていなかった。
+       ⚠ v1.139.0 からは「戻せなくなる」ではなく「**管理者だけになる**」＝カードの ⋮ から戻せる。 */
+    + '連絡が来たら「↩ 予約に戻す」。<br>'
+    + '※ ' + UNDET_ARCHIVE_DAYS + '日たつと自動でアーカイブされ、'
+    + '<b>そのあと戻せるのは管理者だけ</b>になります（カードを開いて ⋮ から）。');
 
   h += '</div>';
   wrap.innerHTML = h;
@@ -266,6 +272,14 @@ window.pitUndRestoreClose = function(){
 window.pitUndRestoreGo = function(id, forced){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  /* 🔴 v1.139.0 **アーカイブまで行ったものを戻せるのは管理者だけ。**
+     ⚠ 30日たつ前（未入庫BOXに並んでいる間）は `archived` が立っていないので、今までどおり誰でも戻せる。
+     ⚠ ボタンを消しただけにしない＝ここでも止める（⋮ からも未入庫BOXからも同じ道を通る）。 */
+  if (window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c)
+      && PitArchive.canRestore && !PitArchive.canRestore()){
+    if (PitArchive.denyRestore) PitArchive.denyRestore();
+    return;
+  }
   const el = document.getElementById('und-rs-date');
   const d = String(forced || (el ? el.value : '') || '').trim();
   if (!d){ if (window.pitToast) pitToast('入庫日を選んでください', 'PF-1020'); return; }

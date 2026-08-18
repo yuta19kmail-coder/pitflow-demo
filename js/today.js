@@ -365,16 +365,50 @@ function _pitTodayCheckInGo(c){
   if (window.pitLog) pitLog('入庫済みにした', { cardId: c.id, kind: 'in', label: ((window.pitCustName?pitCustName(c):c.customer)? (window.pitCustName?pitCustName(c):c.customer)+' 様':'') + (c.car? ' / '+c.car:'') });
   if (window.pitToast) pitToast('入庫済み → タスク「点検待ち」へ移動しました');
 }
-/* 返車済み：実績へ。completedAtを今日に・売上を確定値で固める */
+/* 返車済み：実績へ。completedAtを今日に・売上を確定値で固める
+   🔴🔴 v1.137.0（ゆうた確定・2026-08-18）**押す前に1枚聞く。**
+     ◎なぜ
+       押した瞬間に実績カウント日と確定売上が固まって**アーカイブに入る**。
+       そこから先は（R8 の決めごとで）**管理者しか戻せない**。
+       それなのに確認が1枚も無く、小さい字で「この日の実績に固めます」と書いてあるだけだった。
+     🔴 **いくらで固まるかを窓に出す。** 数字を見てから押せるのが要点。
+     ⚠ 聞くのはここ（入口）だけ。**固める処理は `_pitTodayReturnGo` の1本**に分けてある
+        （`pitTodayCheckIn` / `_pitTodayCheckInGo` と同じ形）。
+     ⚠ 関門（完TELを通ったか）は**聞く前にも、固める所でも**見る。窓を出しただけにしない。 */
 window.pitTodayReturn = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
-  /* 🔴 v1.97.0 完TELを通っていない車は、ここでも固めない（ボタンを消しただけにしない）。
-     ⚠ 判断はアクションシートと同じ1つ＝returnStage が付いているか。 */
-  if (window.pitReturnCanDone ? !pitReturnCanDone(c) : !c.returnStage){
-    if (window.pitToast) pitToast(window.PIT_RETURN_WHY || '', 'PF-4010');
-    return;
-  }
+  if (!_todReturnGate(c)) return;
+  const _amt = (c.amountFinal != null && c.amountFinal !== '')
+      ? c.amountFinal
+      : (window.pitFinalAmountOf ? pitFinalAmountOf(c) : 0);
+  const _yen = '¥' + Number(_amt || 0).toLocaleString();
+  const _nm  = ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様'
+             + (c.car ? ' / ' + c.car : '');
+  const _md  = (function(){ const d = new Date(); return (d.getMonth()+1) + '/' + d.getDate(); })();
+  const ask = (window.UI && UI.confirm)
+    ? UI.confirm('返車済みにして、実績（確定売上）に固めますか？', {
+        title: '返車済みにする',
+        detail: _nm + '　　確定売上 ' + _yen + '\n\n'
+              + '・' + _md + ' の実績として数えます（実績カレンダー・月次の売上・メカの配分）\n'
+              + '・お客様の来店履歴に残ります\n'
+              + '🔴 ここから先はアーカイブです。戻せるのは管理者だけです',
+        ok: '返車済みにする', cancel: 'やめる' })
+    : Promise.resolve(true);
+  ask.then(function(yes){ if (yes) _pitTodayReturnGo(c); });
+};
+/* 🔴 v1.97.0 の関門＝完TELを通っていない車は固めない。
+   🔴 v1.137.0 **聞く前と、固める直前の2回**ここを通る。
+      ⚠ 通る場所は2つでも、**判断と言い方（エラー番号 PF-4010 も）はこの1本だけ**にする。
+         2か所に書くと、片方だけ直った時に「押せるのに固まらない」が起きる。 */
+function _todReturnGate(c){
+  if (window.pitReturnCanDone ? pitReturnCanDone(c) : !!(c && c.returnStage)) return true;
+  if (window.pitToast) pitToast(window.PIT_RETURN_WHY || '', 'PF-4010');
+  return false;
+}
+function _pitTodayReturnGo(c){
+  if (!c) return;
+  if (!_todReturnGate(c)) return;   /* ボタンを消しただけにしない＝固める所でも見る */
   const t = ymd(new Date());
   c.status = 'returned';
   c.returnDate = c.returnDate || t;
@@ -392,7 +426,8 @@ window.pitTodayReturn = function(id){
   renderToday();
   if (window.pitLog) pitLog('返車済みにした（実績へ）', { cardId: c.id, kind: 'out', label: ((window.pitCustName?pitCustName(c):c.customer)? (window.pitCustName?pitCustName(c):c.customer)+' 様':'') + (c.car? ' / '+c.car:'') + (c.amountFinal? ' / ¥'+Number(c.amountFinal).toLocaleString():'') });
   if (window.pitToast) pitToast('返車済み → 実績（確定売上）に固めました');
-};
+}
+window._pitTodayReturnGo = _pitTodayReturnGo;   /* テスト用（窓を通さずに固める道） */
 
 /* カードと休憩を時間順にブロック分け：[{break?, cards:[...]}] の配列を返す */
 function _todBuildRows(cards, isReturn){

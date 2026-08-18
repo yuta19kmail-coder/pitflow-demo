@@ -1007,9 +1007,22 @@
       /* ⚠ v1.136.0 「予約に戻す」→「入庫を取り消して予約に戻す」。
          アーカイブ済みで出る「アーカイブから戻す」と**別物だと分かるように**言葉を離した。
          ・入庫を取り消して予約に戻す … まだ手元にある車（アーカイブ前）。誰でも
-         ・アーカイブから戻す　　　　 … 終わった車を掘り起こす。管理者だけ */
-      h += '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> 入庫を取り消して予約に戻す…</button>'
-        +  '<button class="cv-opti" onclick="cvAskNoSale()"><i data-ic=box data-ics=16></i> 売上なしでアーカイブする…</button>'
+         ・アーカイブから戻す　　　　 … 終わった車を掘り起こす。管理者だけ
+
+         🔴🔴 v1.137.0（ゆうた確定・2026-08-18）**完TELを通った車は3択にする。**
+         🗣「予約に戻すはなしで。盤面もタスクボードの名称で。
+            なのでタスクボードに戻す と売上なしアーカイブ、消去 の3択で」
+         ◎なぜ
+           完TELに**入る道はドラッグ1つ**なのに、出る道が「予約まで全部戻す」しかなかった。
+           押すと工程・完TEL・返車の予定・**確定売上**・実績日・PIT枠がまとめて消える＝重すぎる。
+         🔴 完TELを通った車（`returnStage` あり）＝**タスクボードに戻す／売上なしでアーカイブする／消去する**
+            「入庫を取り消して予約に戻す」は**出さない**（ゆうた指定）。
+         ⚠ まだタスクボードに乗っている車（`returnStage` なし）は今までどおり
+            「入庫を取り消して予約に戻す」。 */
+      h += (c.returnStage
+        ? '<button class="cv-opti" onclick="cvAskBackToBoard()"><i data-ic=undo data-ics=16></i> タスクボードに戻す…</button>'
+        : '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> 入庫を取り消して予約に戻す…</button>');
+      h += '<button class="cv-opti" onclick="cvAskNoSale()"><i data-ic=box data-ics=16></i> 売上なしでアーカイブする…</button>'
         +  '<div class="cv-optdiv"></div>';
     }
     h += '<button class="cv-opti cv-danger" onclick="cvAskDelete()"><i data-ic=trash data-ics=16></i> 消去する…</button>';
@@ -1639,6 +1652,41 @@
       label: _cvLabel(c) + (c.cancelReason ? ' / ' + c.cancelReason : '') });
     save(); cvRefreshBg();
     if (window.pitToast) pitToast('予約をキャンセルしました（来店履歴に残ります）');
+    if (window.closeDetail) closeDetail();
+  };
+
+  /* ---- ①-0 タスクボードに戻す（完TELを取り消す）v1.137.0 -----------
+     🗣 ゆうた「予約に戻すはなしで。盤面もタスクボードの名称で。
+        なのでタスクボードに戻す と売上なしアーカイブ、消去 の3択で」
+
+     ◎なにをするか＝**`returnStage` を消すだけ。**
+       ・工程（`status`）は触らない … 完TELに入る時に「作業完了済」になっているので、そのまま戻る
+       ・**返車の予定日・時間・確定金額は残す** … 入れ直しにさせない（間違えて落としただけなので）
+       ・売上の見込みは**1円も動かない** … `pitSalesTier` は「完TEL中」も「作業完了済」も同じ『確定』
+     🔴 **これが `returnStage` を消す2つ目の道。**（1つ目＝`cvBackToReserve`）
+        ⚠ どちらも消し方は同じ1行。増やす時はここを見ること。
+     ⚠ アーカイブ前なので**誰でも押せる**（ゆうた指定）。 */
+  window.cvAskBackToBoard = function(){
+    if (!_c) return; closeAllPop();
+    const c = _c;
+    if (!c.returnStage){ if (window.pitToast) pitToast('この車は完TELを通っていません'); return; }
+    const det = ['・完TELの印だけを外します。工程は「作業完了済」のままタスクボードへ戻ります',
+                 '・返車の予定日・時間・確定金額は、入れたまま残します（入れ直しになりません）',
+                 '・売上の見込みは変わりません（どちらも「確定」の扱いです）',
+                 '・返車の一覧（完TEL待ち・返車カレンダー）からは外れます'].join('\n');
+    _cvAsk('タスクボードに戻す', '完TELを取り消して、タスクボードに戻しますか？\n' + _cvLabel(c),
+           det, 'タスクボードに戻す')
+      .then(function(yes){ if (yes) cvBackToBoard(); });
+  };
+  window.cvBackToBoard = function(){
+    const c = _c; if (!c) return;
+    if (!c.returnStage) return;
+    const from = (c.returnStage === 'callWait') ? '完TEL待ち' : '完TEL済';
+    c.returnStage = null;                    /* 🔴 消すのはこれだけ */
+    if (window.logFlow) logFlow(c, '完TELを取り消してタスクボードに戻した（' + from + ' から）');
+    if (window.pitLog) pitLog('完TELを取り消した（タスクボードへ）', { cardId: c.id, kind: 'phase', label: _cvLabel(c) });
+    save(); cvRefreshBg();
+    if (window.pitToast) pitToast('タスクボードに戻しました');
     if (window.closeDetail) closeDetail();
   };
 

@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.124.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.125.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
@@ -238,16 +238,21 @@
     h+='<div class="shk-row"><div class="shk-gut hgut bb"></div>'+days.map(function(x){ if(x.off) return '<div class="shk-off2 apoff"><span class="shk-ap off">'+offLabel(x.iso)+'</span></div>'; return '<div class="shk-sc"><div class="shk-ap am"><i data-ic=sunrise data-ics=16></i>午前</div></div><div class="shk-sc pm"><div class="shk-ap pm"><i data-ic=sunrise data-ics=16></i>午後</div></div>'; }).join('')+'</div>';
     // 決定バンド
     h+='<div class="shk-row shk-bandrow"><div class="shk-band"><i data-ic=pin data-ics=16></i> 決定</div><div class="shk-bandfill"></div></div>';
-    h+='<div class="shk-row"><div class="shk-gut glabel">行く車</div>'+days.map(function(x){
+    /* 🔴🔴 v1.125.0 **落とす枠は、その日の午前／午後の箱いっぱい**（2026-08-18・ゆうた指定
+       「決定の行く車のカードに乗せないとだめだった。ドラッグ先の枠をその日のAM/PMの枠いっぱいにとってほしい」）。
+       ⚠ 前は枠が**中身の高さしか無かった**ので、他の日に何台も入って行が背高になると、
+          空いている日の枠は上のほうの42pxだけ＝**カードの上に正確に乗せないと落ちなかった**。
+       ⚠ 高さを持たせるのは CSS（`.shk-decrow`）。ここでは行に印を付けるだけ。 */
+    h+='<div class="shk-row shk-decrow"><div class="shk-gut glabel">行く車</div>'+days.map(function(x){
       if(x.off) return '<div class="shk-off2"></div>';
       return ['am','pm'].map(function(slot){
         var arr=decCell[x.iso+'|'+slot]||[];
         var inner=arr.length?arr.map(function(o){ return decChip(o.c,o.kind); }).join(''):'<span class="shk-empty">－</span>';
-        return '<div class="shk-sc'+(slot==='pm'?' pm':'')+'"><div class="shk-decell" data-iso="'+x.iso+'" data-slot="'+slot+'" ondragover="shkOver(event)" ondragleave="shkLeave(event)" ondrop="shkDrop(event,\''+x.iso+'\',\''+slot+'\')">'+inner+'</div></div>';
+        return '<div class="shk-sc'+(slot==='pm'?' pm':'')+'"><div class="shk-decell" data-iso="'+x.iso+'" data-slot="'+slot+'">'+inner+'</div></div>';
       }).join('');
     }).join('')+'</div>';
     // 可能性ガント
-    h+='<div class="shk-row shk-bandrow shk-gantt-drop" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-band"><i data-ic=clock data-ics=16></i> 予定</div><div class="shk-bandfill"><span class="shk-drophint">↩ 決定チップをこの「予定」エリアにドロップ＝候補（行ける日）に戻す</span></div></div>';
+    h+='<div class="shk-row shk-bandrow shk-gantt-drop"><div class="shk-band"><i data-ic=clock data-ics=16></i> 予定</div><div class="shk-bandfill"><span class="shk-drophint">↩ 決定チップをこの「予定」エリアへ運ぶ＝候補（行ける日）に戻す</span></div></div>';
     var ganttCars = data.cands.concat(data.empties);
     ganttCars.forEach(function(c){ var s=ins(c); var isEmpty=data.empties.indexOf(c)>=0;
       function son(di,slot){ var day=days[di]; if(!day||day.off) return false; return (s.slots[day.iso]||[]).indexOf(slot)>=0; }
@@ -257,7 +262,7 @@
       var subH = pre.map(function(x){return '<span class="shk-ca unset">'+x+'</span>';}).join('')
                + attrChips(c)
                + post.map(function(x){return '<span class="shk-ca">'+x+'</span>';}).join('');
-      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+subH+'</div></div>'
+      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+subH+'</div></div>'
         + days.map(function(x,di){ if(x.off) return '<div class="shk-off2"></div>';
             return ['am','pm'].map(function(slot){
               var on=son(di,slot);
@@ -279,13 +284,14 @@
     host.innerHTML=h;
   }
 
-  // ===== ドラッグ =====
-  var _drag=null;
-  window.shkDragStart=function(e,id){ _drag=id; try{ e.dataTransfer.setData('text',id); e.dataTransfer.effectAllowed='move'; }catch(_){}; if(e.target&&e.target.classList) e.target.classList.add('dragging'); };
-  window.shkDragEnd=function(e){ if(e.target&&e.target.classList) e.target.classList.remove('dragging'); };
-  window.shkOver=function(e){ e.preventDefault(); e.currentTarget.classList.add('drop'); };
-  window.shkLeave=function(e){ e.currentTarget.classList.remove('drop'); };
-  window.shkDrop=function(e,iso,slot){ e.preventDefault(); e.currentTarget.classList.remove('drop'); var id=(e.dataTransfer&&e.dataTransfer.getData('text'))||_drag; _drag=null; assign(id,iso,slot); };
+  /* ═══════════════════════════════════════════════════════════════════
+     🔴🔴 v1.125.0 **この画面のドラッグは「ポインタ方式」の1本だけ。**
+     ⚠ ブラウザ標準のドラッグ（`draggable` / `ondragover` / `ondrop`）は
+        **v0.124.1 で使うのをやめている**（タッチで動かせないため）。
+        なのに受け口だけが残っていて、読む人に「2通りある」と勘違いさせていた。**全部消した。**
+     ⚠ 復活させないこと。標準のドラッグに戻すと、タブレットで帯が動かせなくなる。
+     ═══════════════════════════════════════════════════════════════════ */
+
   /* 🔴 v1.118.0 `shkFix`（帯を押したら決定）は**廃止**。
      ゆうた指定「決定車両への移動はドラッグのみ、予定部分をクリックで飛ばないように」。
      ⚠ 押し間違いで陸運局の日が勝手に決まってしまうのを防ぐのが目的。復活させないこと。 */
@@ -299,18 +305,17 @@
     if(isNew) setTimeout(function(){ shkDecidePop(id); }, 60);
   }
 
-  // 決定チップを「予定」エリアにドロップ＝決定を解除して候補（行ける日）表示に戻す（候補slotsは残す）v0.124.0
-  window.shkGanttOver=function(e){ e.preventDefault(); try{ e.dataTransfer.dropEffect='move'; }catch(_){}; var t=e.currentTarget; if(t&&t.classList) t.classList.add('drop'); };
-  window.shkGanttLeave=function(e){ var t=e.currentTarget; if(t&&t.classList) t.classList.remove('drop'); };
-  window.shkGanttDrop=function(e){ e.preventDefault(); e.stopPropagation(); var t=e.currentTarget; if(t&&t.classList) t.classList.remove('drop'); var id=(e.dataTransfer&&e.dataTransfer.getData('text'))||_drag; _drag=null; unassign(id); };
+  /* 決定チップを「予定」エリアへ運ぶ＝決定を解除して候補（行ける日）に戻す（候補の枠は残す）v0.124.0 */
   function unassign(id){ var c=card(id); if(!c) return; var s=ins(c); if(!s.decided) return;   // 決定中の車だけ候補へ戻す
     s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; save(); renderShaken();
     if(window.pitToast) pitToast('↩ 候補（行ける日）に戻しました'); }
 
-  // ===== ポインタ方式のドラッグ（マウス＋タッチ両対応。ネイティブHTML5 DnDが効かない環境の確実版）v0.124.1 =====
-  //   決定チップ／候補バーを長押し移動→「📌決定」枠にドロップで決定/別日移動、「🕘予定」エリアにドロップで候補へ戻す。
-  //   動かさず離した時（タップ）は従来の onclick（メニュー/その枠で決定）に任せる。
-  //   ゴーストは「ドロップ先の枠」に反映する＝決定枠に入れると、その枠にプレビュー用チップが出る。元チップは薄くする。
+  /* ═══ ドラッグ（マウス＋タッチ・ポインタ方式）v0.124.1 ═══
+     ・掴めるもの＝**決定チップ**と**候補の帯**の2つだけ。
+     ・落とせる場所＝**その日の午前／午後の箱**（決定になる）と、**「予定」の側**（候補に戻る）。
+     ・動かさずに離した時＝タップ扱い。今までどおり onclick（メニュー／枠の付け外し）に任せる。
+     ・掴んでいる間＝元は薄く／落ちる先には薄いチップ（ゴースト）を出す。
+     🔴 落ちる先の当たり判定は **箱いっぱい**（v1.125.0）。カードの上に乗せる必要はない。 */
   var _pdrag=null, _ghostEl=null, _lastZone=null, _srcEl=null, _suppressClick=false;
   function _clearZone(){ if(_lastZone){ _lastZone.classList.remove('drop'); _lastZone=null; } }
   function _detachGhost(){ if(_ghostEl && _ghostEl.parentNode) _ghostEl.parentNode.removeChild(_ghostEl); }

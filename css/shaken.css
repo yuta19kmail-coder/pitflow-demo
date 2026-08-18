@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.123.0
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.125.0
    ======================================== */
 #shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
   --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
@@ -64,12 +64,23 @@
 .shk-chip.shk-drag, .shk-bar{ touch-action:none; }
 /* v0.124.2 ドラッグ中：元チップは薄く／ドロップ先の決定枠にプレビュー用ゴーストチップを表示 */
 .shk-chip.shk-dragsrc{ opacity:.3; }
-.shk-chip.shk-ghostchip{ pointer-events:none; opacity:.7; border-style:dashed; border-left-color:var(--brand); background:var(--brand-soft,rgba(38,162,105,.15)); }
+/* 🔴 v1.125.0 ゴーストは**浮かせる**（`position:absolute`）。
+   ⚠ 中に入れて高さを押し広げると、掴んでいる最中に表が伸び縮みして、狙った枠が動いてしまう。 */
+.shk-chip.shk-ghostchip{ position:absolute; left:5px; right:5px; bottom:4px; margin:0;
+  pointer-events:none; opacity:.75; border-style:dashed; border-left-color:var(--brand);
+  background:var(--brand-soft,rgba(38,162,105,.15)); }
 
 .shk-glabel, .shk-gut.glabel{ display:flex; align-items:center; padding:8px 12px; font-size:12px; font-weight:800; color:var(--text2); }
 
-/* 決定セル */
-.shk-decell{ padding:4px 5px 5px; min-height:42px; }
+/* ══ 決定セル ══
+   🔴🔴 v1.125.0 **落とす枠は、その日の午前／午後の箱いっぱい**（ゆうた指定）。
+   ⚠ 前は枠が中身の高さしか無かったので、他の日に何台も入って行が背高になると、
+      空いている日の枠は上のほうの42pxだけ＝**カードの上に正確に乗せないと落ちなかった**。
+   ⚠ そのために `.shk-decrow` の中だけ「マス（.shk-sc）を縦のflexにして、枠を伸ばす」。
+      ⚠ `.shk-sc` は AM/PM の見出し行でも使うので、**この行の中だけ**に効かせること。 */
+.shk-decrow .shk-sc{ display:flex; flex-direction:column; }
+.shk-decrow .shk-decell{ flex:1 1 auto; }
+.shk-decell{ position:relative; padding:4px 5px 5px; min-height:42px; }
 .shk-decell.off{ min-height:0; height:100%; background:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.02) 5px,rgba(255,255,255,.02) 10px); }
 .shk-decell.drop{ outline:2px dashed var(--brand,#1f7a4d); outline-offset:-3px; background:rgba(31,122,77,.14); }
 .shk-chip{ position:relative; overflow:visible; display:block; max-width:100%; border:1px solid var(--border); border-left:3px solid var(--green); border-radius:6px; padding:3px 8px; background:var(--bg3); cursor:pointer; margin-bottom:4px; line-height:1.28; }

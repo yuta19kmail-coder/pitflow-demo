@@ -399,6 +399,24 @@ w.pitDivisionColor = pitDivisionColor;
   function pitCarLabel(c){ return String((c && (c.car || c.maker || c.plate)) || ''); }
   w.pitCarLabel = pitCarLabel;
 
+  /* 🔴🔴 v1.121.0 **車両注意（左・M/T・車高・土禁）の言い方はここが本家**（2026-08-18・ゆうた指定
+       「MT等の車両注意は他のカードと同じ黄色ベースの物で出してほしい」）。
+     ・**左とM/Tが両方なら「左M/T」に合体**（2つ並べない）／多くても**3つまで**
+     ・色は**塗りアンバー `#f59e0b`＋濃い字 `#1c1300`**。CSS 側でこの色に揃える
+     ⚠ 予約カードの耳の注意タブ（`.pcm-caut`）が元の形。**ここに合わせる。**
+     ⚠ ホバー詳細（card-hover.js）だけは**わざと長い言い方**（左ハンドル／M/T）なので別物。混ぜない。 */
+  function pitCarCautions(c){
+    var dr = (c && Array.isArray(c.drive)) ? c.drive : [], out = [];
+    if (dr.indexOf('leftHand') >= 0 && dr.indexOf('mt') >= 0) out.push('左M/T');
+    else { if (dr.indexOf('leftHand') >= 0) out.push('左'); if (dr.indexOf('mt') >= 0) out.push('M/T'); }
+    if (dr.indexOf('lowCar')  >= 0) out.push('車高');
+    if (dr.indexOf('noShoes') >= 0) out.push('土禁');
+    return out.slice(0, 3);
+  }
+  w.pitCarCautions = pitCarCautions;
+  w.PIT_CAUTION_BG = '#f59e0b';   /* 注意の塗り（耳のタブと同じ）。CSS に写す時はこの色 */
+  w.PIT_CAUTION_FG = '#1c1300';
+
   /* 🔴 車検の担当＝**陸運局へ車を持って行く（行った）人＝回送の担当**
      （ゆうた確定 2026-08-16／2026-08-18「担当者というのは実際に車検に行く、回送の担当者ね」）。
      受付したフロント担当は**別物なので混ぜない**。決まっていなければ空欄。

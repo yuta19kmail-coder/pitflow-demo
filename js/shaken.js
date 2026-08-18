@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.119.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.121.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
@@ -39,15 +39,23 @@
   function fmtMDW(iso){ var d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate()+'('+DOW[d.getDay()]+')'; }
   function addDays(iso,n){ var d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return ymdL(d); }
 
-  /* 🔴 v1.116.0 車の注意（左・MT・12点）＝**ガントの行と入庫待ちの箱で同じ言葉**を使う（ゆうた指定）。
-     ⚠ 陸運局へ誰が持って行けるかに効くので、入庫前から見えている必要がある。 */
-  function carAttrs(c){
-    var out=[], dr=Array.isArray(c.drive)?c.drive:[];
-    if(dr.indexOf('leftHand')>=0) out.push('左');
-    if(dr.indexOf('mt')>=0)       out.push('MT');
-    var ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:[];
-    if(ids.indexOf('12pt')>=0)    out.push('12点');
+  /* 🔴 v1.116.0 車の注意＝**ガントの行と入庫待ちの箱で同じ言葉**を使う（ゆうた指定）。
+     ⚠ 陸運局へ誰が持って行けるかに効くので、入庫前から見えている必要がある。
+     🔴 v1.121.0（ゆうた指定「MT等の車両注意は他のカードと同じ黄色ベースの物で」）
+        ・**言い方は pit-share.js の `pitCarCautions` 1本**＝予約カードの耳の注意タブとまったく同じ
+          （左とM/Tが両方なら「左M/T」に合体・車高・土禁も出る・多くても3つ）。ここで書き直さない。
+        ・色も**塗りアンバー**に揃える（CSS の `.shk-ca.cau`）。
+     ⚠ **12点は車両注意ではない**（やる作業の種類）ので、今までどおり地味な灰色のまま分けて出す。 */
+  function carCautions(c){ return window.pitCarCautions ? pitCarCautions(c) : []; }
+  function carOthers(c){
+    var out=[], ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:[];
+    if(ids.indexOf('12pt')>=0) out.push('12点');
     return out;
+  }
+  /* チップ用の小さいバッジ。注意はアンバー、それ以外は灰色。 */
+  function attrChips(c){
+    return carCautions(c).map(function(x){ return '<span class="shk-ca cau">'+esc(x)+'</span>'; }).join('')
+         + carOthers(c).map(function(x){ return '<span class="shk-ca">'+esc(x)+'</span>'; }).join('');
   }
 
   function rangeDays(){
@@ -193,7 +201,7 @@
               + '<span class="shk-ures">'+(c.reserveDate?fmtMDW(c.reserveDate):'入庫日未定')+'</span>'
               + '<span class="shk-unm">'+esc(surname(c))+'様</span>'
               + '<span class="shk-ucar">'+esc(carLabel(c)||'')+'</span>'
-              + carAttrs(c).map(function(x){ return '<span class="shk-ca">'+x+'</span>'; }).join('')
+              + attrChips(c)
               + '</span>';
           }).join('')
         : '<span class="shk-empty">なし</span>';
@@ -235,10 +243,13 @@
     var ganttCars = data.cands.concat(data.empties);
     ganttCars.forEach(function(c){ var s=ins(c); var isEmpty=data.empties.indexOf(c)>=0;
       function son(di,slot){ var day=days[di]; if(!day||day.off) return false; return (s.slots[day.iso]||[]).indexOf(slot)>=0; }
-      /* 🔴 v1.116.0 左・MT・12点は carAttrs 1本（入庫待ちの箱と同じ言葉になる） */
-      var attr=[]; if(isEmpty)attr.push('未設定'); attr=attr.concat(carAttrs(c));
-      var rc=(s.history||[]).filter(function(x){return x.result==='recheck';}).length; if(rc)attr.push('再'+rc);
-      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+attr.map(function(x){return '<span class="shk-ca'+(x==='未設定'?' unset':'')+'">'+x+'</span>';}).join('')+'</div></div>'
+      /* 🔴 v1.121.0 車両注意（アンバー）は attrChips 1本。未設定・再検回数はこの画面だけの印なので別に足す。 */
+      var pre=[]; if(isEmpty)pre.push('未設定');
+      var rc=(s.history||[]).filter(function(x){return x.result==='recheck';}).length; var post=rc?['再'+rc]:[];
+      var subH = pre.map(function(x){return '<span class="shk-ca unset">'+x+'</span>';}).join('')
+               + attrChips(c)
+               + post.map(function(x){return '<span class="shk-ca">'+x+'</span>';}).join('');
+      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+subH+'</div></div>'
         + days.map(function(x,di){ if(x.off) return '<div class="shk-off2"></div>';
             return ['am','pm'].map(function(slot){
               var on=son(di,slot);

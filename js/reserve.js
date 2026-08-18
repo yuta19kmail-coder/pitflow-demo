@@ -513,13 +513,11 @@ function cardHtml(c, opts){
     const _clickC = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");
     let h = '<div class="pit-card pcm' + (c.codeRed ? ' pcm-claim' : '') + (c.resNo ? ' pcm-tab' : '') + (placed ? ' pcm-placed' : '') + (c.tentative ? ' is-tentative' : '') + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="true" data-card-id="' + c.id + '"' + _reorderAttr + ' onclick="' + _clickC + '" style="border-left-color:' + teamColor + ';">';
     h += (c.resNo ? '<div class="pcm-ear" style="border-left-color:' + (c.codeRed ? '#ef4444' : teamColor) + (c.codeRed ? ';border-top-color:#ef4444' : '') + '">' + at(c.resNo) + '</div><i class="pcm-ear-slide"></i>' : '');
-    // 車両注意タブ（左/M/T/車高/土禁・左M/T合体・最大3・該当時のみ・耳の右の上辺）
-    var _dr = Array.isArray(c.drive) ? c.drive : [], _ct = [];
-    if (_dr.indexOf('leftHand') >= 0 && _dr.indexOf('mt') >= 0) _ct.push('左M/T');
-    else { if (_dr.indexOf('leftHand') >= 0) _ct.push('左'); if (_dr.indexOf('mt') >= 0) _ct.push('M/T'); }
-    if (_dr.indexOf('lowCar') >= 0) _ct.push('車高');
-    if (_dr.indexOf('noShoes') >= 0) _ct.push('土禁');
-    if (_ct.length) h += '<div class="pcm-cau">' + _ct.slice(0, 3).map(function(x){ return '<span class="pcm-caut">' + x + '</span>'; }).join('') + '</div>';
+    /* 車両注意タブ（左/M/T/車高/土禁・左M/T合体・最大3・該当時のみ・耳の右の上辺）
+       🔴 v1.121.0 言い方は **pit-share.js の `pitCarCautions` 1本**にした（車検予定と同じ言葉になる）。
+       ⚠ ここに条件を書き戻さないこと。出るものは今までと1文字も変わっていない。 */
+    var _ct = (window.pitCarCautions ? pitCarCautions(c) : []);
+    if (_ct.length) h += '<div class="pcm-cau">' + _ct.map(function(x){ return '<span class="pcm-caut">' + x + '</span>'; }).join('') + '</div>';
     /* 名前・車種・担当の title は撤去（ホバー情報カード card-hover.js で全文表示するため二重ツールチップを防ぐ） */
     var _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
     /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */

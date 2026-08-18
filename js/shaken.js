@@ -150,7 +150,9 @@
         ここで条件を書き直さないこと。 */
   /* 🔴 v1.127.0 この画面は枠が狭いので**通称＆苗字**（ゆうた指定）。フルネームはカード詳細だけ。 */
   function shStaff(c){ return window.pitShakenStaffCall ? pitShakenStaffCall(c) : ((c.inspSchedule||{}).resultStaff||''); }
-  function shOffice(c){ return window.pitShakenOffice ? pitShakenOffice(c) : ((c.inspSchedule||{}).officeName||''); }
+  /* 🔴 v1.129.0 この画面は枠が狭いので**地名だけ**（ゆうた指定「野田 とか 習志野 とか」）。
+     正式名はカード詳細とホバー情報カードで出す。 */
+  function shOffice(c){ return window.pitShakenOfficeShort ? pitShakenOfficeShort(c) : ((c.inspSchedule||{}).officeName||''); }
   function shRound(c){ return window.pitShakenRound ? pitShakenRound(c) : 0; }
   function rikuunList(){ return window.pitRikuunList ? pitRikuunList() : []; }
 
@@ -171,7 +173,8 @@
     else if(todo) miss.push('R');
     if(st)        h+='<span class="shk-mt st" title="回送の担当：'+esc(st)+'">'+esc(st)+'</span>';
     else if(todo) miss.push('回送');
-    if(of)        h+='<span class="shk-mt of" title="陸運局：'+esc(of)+'">'+esc(of)+'</span>';
+    /* ⚠ 吹き出しには**正式名**を出す（地名だけだとどこか分からない時があるので） */
+    if(of)        h+='<span class="shk-mt of" title="陸運局：'+esc((window.pitShakenOffice?pitShakenOffice(c):of)||of)+'">'+esc(of)+'</span>';
     else if(todo) miss.push('陸運局');
     if(miss.length) h+='<span class="shk-mt tbd" title="まだ決まっていません：'+miss.join('・')+'">未定 '+miss.join('・')+'</span>';
     return h ? '<div class="shk-meta">'+h+'</div>' : '';

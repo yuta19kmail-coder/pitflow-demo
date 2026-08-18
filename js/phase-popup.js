@@ -18,6 +18,11 @@
 
   var pending = null;   // { card, from, to, commit, mode }
   var built = false;
+  /* 🔴 v1.122.0 洗車の「要／不要」を**この窓で押したかどうか**。
+     ⚠ null＝押していない＝**カードの洗車は書き換えない**。
+        まだ決まっていないものを「不要」と決めつけないため（2026-08-13 の決めごと
+        「覚えていないものを本物と思い込まない」と同じ考え方）。 */
+  var _washPick = null;
 
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
@@ -50,6 +55,9 @@
       + '    <label class="pp-lb">返車予定日</label>'
       + '    <input class="pp-date" id="pp-ret" type="date">'
       + '  </div>'
+      /* 🔴 v1.122.0（ゆうた指定）受注のときに**洗車を先に決める**枠。車販依頼の枠の**上**に置く。
+         ⚠ 見た目は車販依頼の枠と同じ（同じ「依頼」の話なので並べて見せる＝`pp-sales` を共用）。 */
+      + '  <div class="pp-field pp-sales pp-wash" id="pp-wash-field" style="display:none"></div>'
       + '  <div class="pp-field pp-sales" id="pp-sales-field" style="display:none"></div>'
       + '  <div class="pp-field" id="pp-partner-field" style="display:none">'
       + '    <label class="pp-lb">外注先</label>'
@@ -97,6 +105,8 @@
 
     // 車販依頼フィールドは既定で隠す（order時のみ出す）
     var _sf = el('pp-sales-field'); if (_sf){ _sf.style.display = 'none'; _sf.innerHTML = ''; }
+    var _wf = el('pp-wash-field');  if (_wf){ _wf.style.display = 'none'; _wf.innerHTML = ''; }
+    _washPick = null;   /* 🔴 v1.122.0 押されていない＝どちらでもない（下の「押すまで書き換えない」の鍵） */
 
     // フィールドの出し分け
     var isOut = (mode === 'outsource');
@@ -156,6 +166,25 @@
       var _ids = (Array.isArray(card.workTypes) && card.workTypes.length) ? card.workTypes : (card.workType ? [card.workType] : []);
       var _isShaken = (card.workType === 'shaken' || _ids.indexOf('shaken') >= 0);
       var _hasCoat = (_ids.indexOf('coat1y') >= 0 || _ids.indexOf('coat3m') >= 0);
+      /* 🔴🔴 v1.122.0（ゆうた指定）**洗車をここで先に決める**。車販部門への依頼の**上**。
+         🗣「早い段階で洗車を確定させて、車販のスケジュールを楽にするイメージ」
+         🔴 スイッチの中身は**カード詳細のスイッチとまったく同じ**（`needWash` / `washNote`）。
+            完TELの窓と同じで、**どこから触っても同じ1つのスイッチ**を動かしているだけ。
+         ⚠ **押されていなければ書き換えない。** 既定で「不要」を光らせると、
+            まだ決まっていない車が全部「洗車しない」で確定してしまう。
+         ⚠ すでに決まっている車（完TELを通った・要になっている・備考が入っている）は、
+            その状態を光らせて開く＝**入れ直させない**。 */
+      var _wDecided = !!(card.returnStage || card.needWash === true || (card.washNote || '').trim());
+      _washPick = _wDecided ? (card.needWash ? '1' : '0') : null;
+      var _wh = '<div class="pp-saleshd"><i data-ic=sparkle data-ics=16></i> 洗車</div>'
+        + '<div class="rp-chips">'
+        + '<button type="button" class="rp-chip' + (_washPick === '1' ? ' on' : '') + '" id="pp-wash-1" onclick="PitPhasePopup.onWash(\'1\')">要</button>'
+        + '<button type="button" class="rp-chip' + (_washPick === '0' ? ' on' : '') + '" id="pp-wash-0" onclick="PitPhasePopup.onWash(\'0\')">不要</button>'
+        + '</div>'
+        + '<input class="pp-salesmemo" id="pp-washnote" type="text" placeholder="洗車の備考（1行・任意）" value="' + esc(card.washNote || '') + '">'
+        + '<div class="pp-washhint">既に決まっていれば入力してください。洗車依頼枠に表示されます。後から変更もできます。</div>';
+      if (_wf){ _wf.innerHTML = _wh; _wf.style.display = ''; }
+
       var _sh = '<div class="pp-saleshd"><i data-ic=cart data-ics=16></i> 車販部門への依頼</div>';
       if (_isShaken) _sh += '<label class="pp-check"><input type="checkbox" id="pp-headlight"' + (card.headlight ? ' checked' : '') + '> <i data-ic=search data-ics=16></i> 車検ヘッドライト磨き</label>';
       if (_hasCoat)  _sh += '<label class="pp-check"><input type="checkbox" id="pp-coatingok"' + (card.coatingOK ? ' checked' : '') + '> <i data-ic=sparkle data-ics=16></i> コーティング受注OK</label>';
@@ -218,6 +247,13 @@
       input.value = c;
       if (window.pitTaxHintSync) pitTaxHintSync(input, el('pp-tax'));   /* 🧾 税込の確認表示をライブで */
     },
+    /* 🔴 v1.122.0 洗車の要／不要。押した時だけ光る＝**押すまでは書き換えない**（上の `_washPick`）。 */
+    onWash: function(v){
+      _washPick = (v === '1') ? '1' : '0';
+      var a = el('pp-wash-1'), b = el('pp-wash-0');
+      if (a) a.classList.toggle('on', _washPick === '1');
+      if (b) b.classList.toggle('on', _washPick === '0');
+    },
     onPartner: function(){
       var sel = el('pp-partner'); if (!sel) return;
       var need = (sel.value === '各ディーラー' || sel.value === 'その他');
@@ -274,6 +310,10 @@
           var _co = el('pp-coatingok'); if (_co) card.coatingOK = _co.checked;
           var _sr = el('pp-salesreq');  if (_sr) card.salesReq  = _sr.checked;
           var _sm = el('pp-salesmemo'); if (_sm) card.salesReqMemo = _sm.value.trim();
+          /* 🔴 v1.122.0 洗車＝**押された時だけ**書き換える（押していなければ今までのまま）。
+             ⚠ 備考はいまの値を入れて開いているので、そのまま保存してよい（消したい時も消せる）。 */
+          if (_washPick !== null) card.needWash = (_washPick === '1');
+          var _wn = el('pp-washnote'); if (_wn) card.washNote = _wn.value.trim();
         }
       }
       try { p.commit(); } catch(e){ if (window.console) console.error(e); }

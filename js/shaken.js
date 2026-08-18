@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.116.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.117.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・帯 or 決定チップをドラッグ→決定枠へドロップで確定/移動。決定チップのタップで完了/再検/取消。
@@ -156,7 +156,9 @@
         + '<div class="shk-wgb">';
       h+= g.cars.length ? g.cars.map(function(c){
             return '<span class="shk-uchip" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" style="border-left-color:'+team(c)+'">'
-              + '<span class="shk-ures">'+(c.reserveDate?fmtMDW(c.reserveDate)+'入':'入庫日未定')+'</span>'
+              /* 🔴 v1.117.0 日付だけ（ゆうた指定「（金）だけで 入 は外しちゃってOK」）。
+                 ⚠ 箱の見出しが「今週入庫分」なので、1つずつに「入」を付けると同じ字が並ぶだけ。 */
+              + '<span class="shk-ures">'+(c.reserveDate?fmtMDW(c.reserveDate):'入庫日未定')+'</span>'
               + '<span class="shk-unm">'+esc(surname(c))+'様</span>'
               + '<span class="shk-ucar">'+esc(carLabel(c)||'')+'</span>'
               + carAttrs(c).map(function(x){ return '<span class="shk-ca">'+x+'</span>'; }).join('')

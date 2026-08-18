@@ -43,6 +43,8 @@
      捨てずにここへ寄せておく＝付箋やカードに残った名前がちゃんと出せる。MHS と同じ考え方。 */
   var _former = {};       // { id: {id,name,realName,aliases,left:true,leftAt,photo} }
   var _unsubCM = null, _unsubCD = null;
+  var _coreLocs = [];     /* CoreMembers の場所マスター（陸運局・部品商など）。v1.119.0 */
+  var _unsubLoc = null;
   var _coreLeft = [];     // CoreMembers の退職者（退職日つき）
   var _portalAll = [];    // CoreFlow の名簿（在籍中ぜんぶ）
   var SELF_ID = 'pit_self', SELF_NAME = '小林モータース';   /* 自社そのものを担当にする時の受け皿 */
@@ -382,7 +384,70 @@
         rebuildStaff();
       }, function (e) { console.warn('[members] 社員(coreMembers)の購読に失敗（部署なしで続けます）', e); });
     }
+    /* 🔴 v1.119.0 **場所マスター（CoreMembers の「場所」）**も購読する（2026-08-18・ゆうた指定）。
+       車検予定で「どこの陸運局へ行くか」を選ぶための一覧。
+       ⚠ **PitFlow では作れない・直せない。CoreMembers が正。** ここは読むだけ。 */
+    if (!_unsubLoc) {
+      _unsubLoc = base.collection('coreLocations').onSnapshot(function (snap) {
+        var a = []; snap.forEach(function (d) { var x = d.data() || {}; x.id = d.id; a.push(x); });
+        _coreLocs = a;
+        console.log('[members] CoreMembers の場所', a.length, '件（うち陸運局', pitRikuunList().length, '件）');
+        if (window.renderShaken && window.state && state.currentView === 'shakencal') renderShaken();
+      }, function (e) { console.warn('[members] 場所(coreLocations)の購読に失敗（陸運局は選べません）', e); });
+    }
   }
+
+  /* ══════════════════════════════════════════════════════════════════
+     📍 場所マスター（CoreMembers）＝ここが PitFlow 側の窓口。**物差しは1本**
+     ------------------------------------------------------------------
+     🔴 「陸運支局のバッジが付いているもの」＝場所のカテゴリ。
+        鍵は `rikuun` 固定だが、CoreMembers の設定でカテゴリ名を作り直せるので、
+        **鍵が `rikuun` か、名札に「陸運」が入っていれば陸運局**として拾う（取りこぼさない側）。
+     ⚠ 「有効」のチェックが外れている場所は出さない。
+     ⚠ 並びは CoreMembers と同じ考え方＝**よく使う → 並び順 → 名前**。
+     ══════════════════════════════════════════════════════════════════ */
+  function _locCatLabel(key) {
+    var cats = (window.state && state.settings && state.settings.locCats) || null;
+    if (Array.isArray(cats)) {
+      var h = cats.find(function (c) { return c && c.key === key; });
+      if (h) return String(h.label || '');
+    }
+    return key === 'rikuun' ? '陸運局' : '';
+  }
+  function pitIsRikuunLoc(l) {
+    if (!l || l.active === false) return false;
+    if (l.category === 'rikuun') return true;
+    return /陸運/.test(_locCatLabel(l.category) || '');
+  }
+  /* サンプル・デモ版は CoreMembers を読まない（名簿と同じ扱い）。
+     ⚠ ここが空だと車検予定で陸運局が1つも選べず「壊れている」ように見えるので、見本を置く。
+     ⚠ **本番では絶対に使われない**（`PIT_CLOUD` が立つと購読した中身で上書きされる）。 */
+  var SAMPLE_RIKUUN = [
+    { id: 'sample_rik_noda',  name: '野田自動車検査登録事務所', category: 'rikuun', frequent: true,  order: 0, active: true },
+    { id: 'sample_rik_chiba', name: '千葉運輸支局',             category: 'rikuun', frequent: false, order: 1, active: true },
+    { id: 'sample_rik_narsh', name: '習志野自動車検査登録事務所', category: 'rikuun', frequent: false, order: 2, active: true }
+  ];
+  /* 陸運局の一覧（車検予定の「どこへ行くか」の選択肢） */
+  function pitRikuunList() {
+    var src = (!window.PIT_CLOUD && !_coreLocs.length) ? SAMPLE_RIKUUN : _coreLocs;
+    return src.filter(pitIsRikuunLoc).sort(function (a, b) {
+      return (b.frequent ? 1 : 0) - (a.frequent ? 1 : 0)
+          || (a.order || 0) - (b.order || 0)
+          || String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+    }).map(function (l) {
+      return { id: l.id, name: String(l.name || ''), aliases: l.aliases || [], frequent: !!l.frequent, address: l.address || '' };
+    });
+  }
+  /* 場所の名前を引く。⚠ 消された・名前が変わった時に備えて、呼ぶ側は写しを後ろ盾に持つこと。 */
+  function pitLocName(id) {
+    if (!id) return '';
+    var src = (!window.PIT_CLOUD && !_coreLocs.length) ? SAMPLE_RIKUUN : _coreLocs;
+    var h = src.find(function (l) { return l.id === id; });
+    return h ? String(h.name || '') : '';
+  }
+  window.pitIsRikuunLoc = pitIsRikuunLoc;
+  window.pitRikuunList  = pitRikuunList;
+  window.pitLocName     = pitLocName;
 
   function watchMembers() {
     if (_unsub) { try { _unsub(); } catch (e) {} _unsub = null; }

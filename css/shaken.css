@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.118.0
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.119.0
    ======================================== */
 #shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
   --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
@@ -87,6 +87,20 @@
 .shk-chip.shk-done{ background:rgba(29,185,122,.14); }
 .shk-chip.shk-recheck{ background:rgba(249,115,22,.14); }
 .shk-empty{ font-size:10px; color:var(--text3); opacity:.35; }
+
+/* ══ 決定チップの下に付く拡張（v1.119.0）＝回送の担当／陸運局／R ══
+   🔴 ゆうた指定「決定した車両カードの下などに拡張で付けたい」。
+   ⚠ 「未定」はこれから行く車だけに出す（済・再検には出さない）。 */
+.shk-meta{ display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; }
+.shk-mt{ font-size:8.5px; line-height:1.6; padding:0 4px; border-radius:4px; max-width:100%;
+         white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+         background:rgba(255,255,255,.07); color:var(--text2); }
+.shk-mt.st{ background:rgba(38,162,105,.20); color:#7fdcb4; font-weight:700; }   /* 回送の担当 */
+.shk-mt.of{ background:rgba(59,130,246,.18); color:#9dc0f8; }                    /* 陸運局 */
+.shk-mt.rd{ background:rgba(230,195,77,.18); color:#e6c34d; font-weight:700; }   /* R（ラウンド） */
+.shk-mt.tbd{ background:transparent; color:var(--text3); border:1px dashed var(--border); opacity:.75; }
+.shk-phint{ font-size:11px; color:var(--text3); line-height:1.5; margin:-4px 0 10px; }
+.shk-pbtn.ok2{ border-color:var(--brand,#1f7a4d); color:var(--text); }
 
 /* 可能性ガント */
 .shk-gcar{ border-bottom:1px solid var(--border2,#232c34); }

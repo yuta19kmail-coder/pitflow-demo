@@ -486,18 +486,14 @@ window.pitGenResNo = pitGenResNo;
    ⚠ 自社「小林モータース」は姓を持たないので ③ を通り、法人としてそのまま出る。
    ⚠ 画面側の表示は今までどおり（ここは印刷専用）。 */
 function pitStaffPrintName(name){
+  /* 🔴 v1.127.0 中身は pit-share.js の `pitStaffCall`（通称＆苗字）1本にした。
+     ⚠ 紙と画面で名前が食い違わないように、**ここに条件を書き戻さないこと**。
+     ⚠ 自社「小林モータース」だけは、紙では**フルのまま**にしたいので pitStaffCall を通さない
+        （画面の狭い枠は「コバモ」でよいが、紙はフル＝2026-08-16 の決めごと）。 */
   var n = String(name == null ? '' : name).trim();
   if (!n) return '';
-  var m = null;
-  try { if (window.pitStaffAny) m = pitStaffAny(n); } catch (e) {}
-  if (m){
-    var dn = String(m.dispName || '').trim();
-    if (dn) return dn;
-    var ln = String(m.lastName || '').trim();
-    if (ln) return ln;
-    return pitSurname(m.name || n);
-  }
-  return pitSurname(n);
+  if (window.pitIsSelfName && pitIsSelfName(n)) return pitSurname(n);
+  return window.pitStaffCall ? pitStaffCall(n) : pitSurname(n);
 }
 window.pitStaffPrintName = pitStaffPrintName;
 

@@ -127,6 +127,46 @@ w.PIT_SELF_SHORT = PIT_SELF_SHORT;
 w.pitIsSelfName  = pitIsSelfName;
 w.pitStaffShort  = pitStaffShort;
 
+/* 🔴🔴 v1.127.0（ゆうた指定 2026-08-18）**担当者の名前の出し方は2つだけ。**
+   🗣「車検の担当者は**カード詳細はフルネーム**で、**それ以外は通称＆苗字**にして」
+
+   ・`pitStaffFull(name)` … **フルネーム**（CoreMembers の本名）。広い画面＝カード詳細で使う
+   ・`pitStaffCall(name)` … **通称＆苗字**＝ ① 呼び名（CoreMembers の dispName。例「チーフ」「山田（太）」）
+                              → ② 姓（lastName） → ③ どちらも無ければ名前の先頭のかたまり（＝苗字）
+     ＝ 呼び名があればそれ、無ければ苗字。**狭い枠はぜんぶこっち。**
+
+   ⚠ **これは 2026-08-16 の「表紙印刷の担当名」（`pitStaffPrintName`）とまったく同じ考え方。**
+      別々に書くとズレるので、あちらは**この1本を呼ぶだけ**にしてある。ここを直せば紙も揃う。
+   ⚠ 名簿に居ない人（退職者・整備ソフト由来）でも**必ず何か出す**＝空欄にしない。
+   ⚠ 自社「小林モータース」は姓を持たないので、狭い枠では今までどおり「コバモ」。
+   ⚠ MHS は名簿（CoreMembers）を持たないので、**苗字まで**しか出せない。それでよい（狭い枠だから）。 */
+function _pitStaffRec(name){
+  var n = String(name == null ? '' : name).trim();
+  if (!n) return null;
+  try { return (w.pitStaffAny ? pitStaffAny(n) : null); } catch (e) { return null; }
+}
+function pitStaffFull(name){
+  var n = String(name == null ? '' : name).trim();
+  if (!n) return '';
+  var m = _pitStaffRec(n);
+  if (!m) return n;
+  return String(m.realName || m.name || n).trim() || n;
+}
+function pitStaffCall(name){
+  var n = String(name == null ? '' : name).trim();
+  if (!n) return '';
+  if (pitIsSelfName(n)) return PIT_SELF_SHORT;         /* 自社はコバモ（人ではない） */
+  var m = _pitStaffRec(n);
+  if (m){
+    var dn = String(m.dispName || '').trim();  if (dn) return dn;      /* ① 呼び名 */
+    var ln = String(m.lastName || '').trim();  if (ln) return ln;      /* ② 姓 */
+    return pitSurname(m.name || n);                                    /* ③ 苗字 */
+  }
+  return pitSurname(n);
+}
+w.pitStaffFull = pitStaffFull;
+w.pitStaffCall = pitStaffCall;
+
 
 /* ===== 🕐 v1.33.0（ゆうた指定）入庫時間のショートカット =====
    🔴 **並び順はこの配列のとおり**（画面のボタンの並び）。
@@ -424,6 +464,12 @@ w.pitDivisionColor = pitDivisionColor;
         入れ物は同じ `resultStaff` 1つ＝MHS の当日ビューと前日LINEの画像に、**前もって名前が出る**。 */
   function pitShakenStaff(c){ var s = c && c.inspSchedule; return (s && s.resultStaff) || ''; }
   w.pitShakenStaff = pitShakenStaff;
+  /* 🔴 v1.127.0（ゆうた指定）**カード詳細はフルネーム／それ以外は通称＆苗字。**
+     ⚠ 入っている中身（`resultStaff`）は今までどおり触らない。**出す時だけ**変える。 */
+  function pitShakenStaffFull(c){ return w.pitStaffFull ? pitStaffFull(pitShakenStaff(c)) : pitShakenStaff(c); }
+  function pitShakenStaffCall(c){ return w.pitStaffCall ? pitStaffCall(pitShakenStaff(c)) : pitShakenStaff(c); }
+  w.pitShakenStaffFull = pitShakenStaffFull;
+  w.pitShakenStaffCall = pitShakenStaffCall;
 
   /* 🔴 v1.119.0 どこの陸運局へ行くか／何ラウンドか（2026-08-18・ゆうた指定）
      ・`inspSchedule.office`     … CoreMembers の場所マスターの id（**陸運支局のバッジが付いた場所**）
@@ -478,7 +524,9 @@ w.pitDivisionColor = pitDivisionColor;
         id: c.id, card: c, state: state, mark: w.PIT_SHAKEN_MARK[state] || '',
         done: (state === 'done'), slot: pitShakenSlot(slotRaw),
         name: pitCustSurname(c), car: pitCarLabel(c),
-        staff: pitShakenStaff(c),
+        /* 🔴 v1.127.0 ここに乗るのは**通称＆苗字**（狭い枠に出るものだから）。
+           ⚠ MHS・前日LINEの画像もこれを使う。フルネームが要るのはカード詳細だけ。 */
+        staff: pitShakenStaffCall(c),
         office: pitShakenOffice(c), round: pitShakenRound(c),
         div: pitDivisionLabel(c), divColor: pitDivisionColor(c)
       };

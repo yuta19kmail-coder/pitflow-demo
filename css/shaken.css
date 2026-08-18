@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v0.110.0
+   shaken.css  -  車検予定（決定カレンダー＋可能性ガント）/ PitFlow v1.116.0
    ======================================== */
 #shakencal-body{ padding:2px 2px 40px; --GUT:168px; --SUB:118px; --OFF:60px;
   --dc:#3b82f6; --dn:#1db97a; --re:#f97316; --daybd:#39434d; }
@@ -14,9 +14,22 @@
 .shk-lg.dc{ color:#7fa8f5; } .shk-lg.dn{ color:#5fd3a6; } .shk-lg.re{ color:#f8a866; } .shk-lg.cd{ color:#5fd3a6; }
 .shk-sum{ margin-left:auto; font-size:12px; color:var(--text3); font-weight:600; }
 
-.shk-un{ font-size:11.5px; color:var(--text2); margin:0 2px 10px; line-height:2; }
-.shk-uchip{ display:inline-block; border:1px solid var(--border); border-left:3px solid var(--green); background:var(--bg3); border-radius:6px; padding:2px 8px; margin:0 5px 4px 0; cursor:pointer; font-size:11px; }
+/* ══ 入庫待ちの予約（v1.116.0）＝**表の下**に「今週／来週／再来週」の3つ ══
+   🔴 ゆうた指定「上からメインの表、今週、来週、と下に続くように」。
+   ⚠ 空の週も見出しだけは出す（黙って消すと壊れて見える）。 */
+.shk-wait{ margin:14px 2px 0; display:flex; flex-direction:column; gap:10px; }
+.shk-wg{ border:1px solid var(--border); border-radius:12px; background:var(--bg2); overflow:hidden; }
+.shk-wgh{ display:flex; align-items:center; gap:8px; padding:7px 12px; background:var(--bg3);
+          border-bottom:1px solid var(--border); font-size:12px; color:var(--text2); }
+.shk-wgh b{ font-size:12.5px; color:var(--text); }
+.shk-wgr{ font-size:11px; color:var(--text3); }
+.shk-wgn{ margin-left:auto; font-size:11px; color:var(--text3); font-weight:700; }
+.shk-wgb{ padding:8px 10px 6px; line-height:2.1; }
+.shk-uchip{ display:inline-flex; align-items:center; gap:5px; border:1px solid var(--border); border-left:3px solid var(--green);
+            background:var(--bg3); border-radius:6px; padding:2px 8px; margin:0 5px 5px 0; cursor:pointer; font-size:11px; }
 .shk-uchip:hover{ border-color:var(--brand,#1f7a4d); }
+.shk-unm{ font-weight:700; color:var(--text); white-space:nowrap; }
+.shk-ucar{ color:var(--text2); white-space:nowrap; }
 
 .shk-scroll{ overflow-x:auto; border:1px solid var(--border); border-radius:12px; background:var(--bg2); }
 .shk-tbl{ min-width:max-content; }
@@ -119,7 +132,10 @@
 .shk-gsc.paintsel{ background:rgba(31,122,77,.32); box-shadow:inset 0 0 0 1px #1f7a4d88; }
 .shk-gcar.unset .shk-gcar-nm{ color:var(--text2); }
 .shk-ca.unset{ background:rgba(249,115,22,.20); color:#f8a866; }
-.shk-ures{ margin-left:6px; font-size:9.5px; color:var(--text3); background:rgba(255,255,255,.06); border-radius:4px; padding:0 4px; }
+/* v1.116.0 入庫日は**チップの先頭**（並びが入庫日順なので、日が左端に揃うと読みやすい）＋曜日つき */
+.shk-ures{ font-size:9.5px; color:var(--text2); background:rgba(255,255,255,.08); border-radius:4px; padding:0 5px;
+           font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.shk-uchip .shk-ca{ font-size:9px; }
 .shk-plabel{ display:block; font-size:11px; color:var(--text3); font-weight:600; margin:2px 0 4px; }
 .shk-psel{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:10px; }
 .shk-chip.locked{ cursor:pointer; }

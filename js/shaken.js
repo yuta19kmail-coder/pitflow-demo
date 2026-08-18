@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v0.110.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.115.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・帯 or 決定チップをドラッグ→決定枠へドロップで確定/移動。決定チップのタップで完了/再検/取消。
@@ -40,7 +40,20 @@
     return out;
   }
 
-  function isArrived(c){ return c.status!=='reserved' && c.status!=='returned' && c.status!=='scrap'; }
+  /* 🔴 v1.115.0 いまこの車がどこにいるか＝**3つに分ける**（2026-08-18 ゆうた「未入庫の予定が動いてない」）
+       'waiting' … まだ来ていない（予約中）→ 上の「入庫待ちの予約」の帯に出す
+       'here'    … いま店にいる（入庫中〜完TEL待ち）→ 予定が無ければ「未設定」の空行
+       'gone'    … もう帰った・廃車 → **この盤には出さない**（終わった車だから）
+     ⚠ 前は「入庫済みか」の1本しか見ておらず、**返車済みが「まだ来ていない側」に落ちていた**。
+        帰った車は入庫日が必ず過去なので、下の「〜◯/◯まで」の網に必ず引っかかる。
+        結果、**何ヶ月も前に終わった車が帯に並びっぱなし**になっていた（本番相当の中身で75台中51台）。
+        ＝いつ見ても同じ顔ぶれ＝「動いていない」ように見えていた正体。
+     ⚠ 済・再検は下の「決定」バンドが別に拾う（pitShakenOnDate）ので、帰った車の実績は消えない。 */
+  function whereIs(c){
+    if(c.status==='reserved') return 'waiting';
+    if(c.status==='returned' || c.status==='scrap') return 'gone';
+    return 'here';
+  }
   /* 🔴 v1.108.0 **その日にどの車が並ぶか（決定バンド）は pitShakenOnDate 1本**で決める。
      ＝ MHS の当日ビューと前日LINEの画像と、台数も並びも中身も**必ず同じ**になる。
      ⚠ ここで条件を書き直さないこと。候補（まだ決めていない枠）と未設定・未入庫だけ、この画面固有。 */
@@ -55,10 +68,14 @@
       (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date){ cnt.recheck++; } });
       if(s.result==='done'){ cnt.done++; return; }
       if(s.decided){ cnt.decided++; return; }
+      var pos=whereIs(c);
+      /* 🔴 v1.115.0 もう帰った車は「これからやること」の3つ（候補・未設定・入庫待ち）に入れない。
+         ⚠ 上の 完了・再検・決定 の数は**帰った車も数える**（起きた事実だから）。ここだけ外す。 */
+      if(pos==='gone') return;
       var slotDays=Object.keys(s.slots||{}).filter(function(k){ return (s.slots[k]||[]).length; });
       if(slotDays.length){ cnt.cand++; cands.push(c); return; }
-      if(isArrived(c)){ cnt.unset++; empties.push(c); return; }   // 入庫済みで予定なし＝未設定→予定欄に空行
-      unsched.push(c);                                            // 未入庫（予約中）で予定なし→ストリップ
+      if(pos==='here'){ cnt.unset++; empties.push(c); return; }   // 店にいて予定なし＝未設定→予定欄に空行
+      unsched.push(c);                                            // まだ来ていない予約で予定なし→上の帯
     });
     return {decCell:decCell, cands:cands, empties:empties, unsched:unsched, cnt:cnt};
   }
@@ -87,11 +104,14 @@
     h+='<div class="shk-head"><div class="shk-nav"><button onclick="shkShift(-7)"><i data-ic=chevLeft data-ics=16></i> 前週</button><b>'+fmtMD(days[0].iso)+' 〜</b><button onclick="shkShift(7)">次週 <i data-ic=chevRight data-ics=16></i></button><button class="shk-now" onclick="shkShift(0)">今週</button></div>';
     h+='<div class="shk-legend"><span class="shk-lg dc">決定</span><span class="shk-lg dn">完了</span><span class="shk-lg re">再検</span><span class="shk-lg cd">予定枠</span></div>';
     h+='<div class="shk-sum">決定'+cnt.decided+'／完了'+cnt.done+'／再検'+cnt.recheck+'／候補'+cnt.cand+'／未設定'+cnt.unset+'</div></div>';
-    // 未入庫の予約（翌週末＝表示範囲＋週末ぶんまで。それ以降の先の予約は出さない）
+    /* 入庫待ちの予約（翌週末＝表示範囲＋週末ぶんまで。それ以降の先の予約は出さない）
+       🔴 v1.115.0 呼び名を「未入庫の予約」→「**入庫待ちの予約**」に変えた（2026-08-18）。
+       ⚠ v1.101.0 から「未入庫」は**来なかった車**（予約→未定の未入庫の箱）を指す言葉になっている。
+          ここは**これから来る予約**なので、同じ言葉だと別物と混ざる。 */
     var _lim=new Date(window._shakenBase); _lim.setDate(_lim.getDate()+13); var _limIso=ymdL(_lim);
     var _uns=data.unsched.filter(function(c){ return !c.reserveDate || c.reserveDate<=_limIso; });
     if(_uns.length){
-      h+='<div class="shk-un"><i data-ic=clock data-ics=16></i> 未入庫の予約（〜'+fmtMD(_limIso)+'・入庫後に予定）：'+_uns.map(function(c){ return '<span class="shk-uchip" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" style="border-left-color:'+team(c)+'">'+esc(surname(c))+'様 '+esc(carLabel(c)||'')+(c.reserveDate?'<span class="shk-ures">'+fmtMD(c.reserveDate)+'入</span>':'')+'</span>'; }).join('')+'</div>';
+      h+='<div class="shk-un"><i data-ic=clock data-ics=16></i> 入庫待ちの予約（〜'+fmtMD(_limIso)+'・入庫後に予定）：'+_uns.map(function(c){ return '<span class="shk-uchip" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" style="border-left-color:'+team(c)+'">'+esc(surname(c))+'様 '+esc(carLabel(c)||'')+(c.reserveDate?'<span class="shk-ures">'+fmtMD(c.reserveDate)+'入</span>':'')+'</span>'; }).join('')+'</div>';
     }
     // スクロール表
     h+='<div class="shk-scroll"><div class="shk-tbl">';

@@ -56,20 +56,29 @@
         ・言葉も「アーカイブ／アーカイブから戻す」で統一（「片付ける」は使わない）
      🔴 **「この車はアーカイブ済みか」の物差しはここ1本。** 画面側に条件を書き写さない。
 
-     ⚠ いまここに入っているのは **売上なしアーカイブだけ**（ステージ②で決めたぶん）。
-        実績（返車済み）・予約キャンセル・未入庫・廃車は、**それぞれのステージを決めた時にここへ足す**。
+     ⚠ 予約キャンセル・未入庫・廃車は、**それぞれのステージを決めた時にここへ足す**。
         足す場所を増やさないこと＝1行足せば ⋮ も帯も権限も全部そろって効く。 */
   function cardArchived(c){
     if (!c) return false;
-    if (w.pitCardNoSale && w.pitCardNoSale(c)) return true;   /* 売上なしアーカイブ */
+    if (w.pitCardNoSale && w.pitCardNoSale(c)) return true;   /* 売上なしアーカイブ（v1.136.0） */
+    if (c.status === 'returned') return true;                 /* 返車済み＝実績（v1.138.0） */
     return false;
   }
-  /* アーカイブ済みのカードを「戻す」時のラベル（画面ごとに書き分けない） */
+  /* アーカイブ済みか（返車済み＝実績のほう）。売上なしと戻し先が違うので見分ける。 */
+  function cardIsResult(c){
+    return !!(c && c.status === 'returned' && !(w.pitCardNoSale && w.pitCardNoSale(c)));
+  }
+  /* 帯に出す文字（画面ごとに書き分けない） */
   function cardArchiveNote(c){
     if (!cardArchived(c)) return '';
-    var s = 'アーカイブ済み（売上なし）';
-    if (c.noSaleAt) s += '　' + c.noSaleAt + (c.noSaleBy ? ' ' + c.noSaleBy : '');
-    return s;
+    if (w.pitCardNoSale && w.pitCardNoSale(c)){
+      var s = 'アーカイブ済み（売上なし）';
+      if (c.noSaleAt) s += '　' + c.noSaleAt + (c.noSaleBy ? ' ' + c.noSaleBy : '');
+      return s;
+    }
+    var t = 'アーカイブ済み（実績）';
+    if (c.completedAt) t += '　' + c.completedAt;
+    return t;
   }
   /* 戻せない人が押した時の断り方。**顧客・車両と同じ文言**（customers.js の _deny と一字一句そろえる） */
   function denyRestore(){
@@ -205,7 +214,8 @@
     archiveVeh: archiveVeh, restoreVeh: restoreVeh, archiveVehByPlate: archiveVehByPlate,
     noteOf: noteOf, whenText: whenText,
     /* 予約カードのアーカイブ（v1.136.0）＝顧客・車両と同じ物差し・同じ断り方 */
-    cardArchived: cardArchived, cardArchiveNote: cardArchiveNote, denyRestore: denyRestore
+    cardArchived: cardArchived, cardIsResult: cardIsResult,
+    cardArchiveNote: cardArchiveNote, denyRestore: denyRestore
   };
   console.log('[archive-pit] ready（顧客・車両・予約カードのアーカイブ）');
 })(window, document);

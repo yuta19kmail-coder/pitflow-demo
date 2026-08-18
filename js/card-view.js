@@ -401,7 +401,27 @@
   }
 
   /* 並びの右端に置く ✏編集 */
+  /* 🔴🔴 v1.138.0（ゆうた確定・2026-08-18）**実績カードの金額・日付は管理だけ。**
+     🗣「金額をいじったり、消去したり、入庫中に戻したり などは出来ないイメージ」
+
+     ◎なにが起きていた
+       実績カウント日と確定返車日には `canEditResultDate()` の確認が入っていたのに、
+       **確定売上金額と、表紙の ✏編集（概算・見積・受注・予定返車日）だけ抜けていた。**
+       ＝「🔒 確定」の札を出しておきながら、**隣の「✏️ 編集」は誰でも押せた。**
+     🔴 物差しは `canEditResultDate()` と**同じ1本**（＝`pitIsAdmin()`）。新しい物差しを作らない。
+     🔴 **実績になる前は今までどおり全員**（ふだんの入力を止めない）。
+     ⚠ 練習用（`!PIT_CLOUD`）は今までどおり全部さわれる（`canEditResultDate` の中で見ている）。 */
+  function canEditMoney(c){
+    var t = c || _c;
+    if (!t || t.status !== 'returned') return true;   /* 実績でなければ今までどおり */
+    return canEditResultDate();
+  }
+  function adminOnlyTag(){
+    return '<span class="cv-adminonly"><i data-ic=lock data-ics=14></i> 管理のみ</span>';
+  }
   function chainEditBtn(which, on){
+    /* 実績カードでは、管理でない人に「編集」を出さない（押せない札にする） */
+    if (!canEditMoney()) return adminOnlyTag();
     return '<button type="button" class="cv-chedit'+(on?' on':'')+'" id="cv-chedit-'+which+'" onclick="cvChainEdit(\''+which+'\')" title="あとから直す">'
          + '<i data-ic=pencil data-ics=13></i> 編集</button>';
   }
@@ -521,13 +541,24 @@
         h += '<div class="cv-nosalenote">来店履歴には残りますが、<b>実績・売上・台数には数えていません</b>。'
           + '下の金額は途中まで入れていた額で、どこにも数えていません。</div>';
       }
-      h += '<div class="cv-fixrow cv-fixlocked"><div class="cv-frt">確定売上金額（請求額） <span class="cv-locktag"><i data-ic=lock data-ics=16></i> 確定</span> <button type="button" class="cv-unlockbtn" onclick="cvUnlockFinal()"><i data-ic=pencil data-ics=16></i> 編集</button></div><div class="cv-frb">'
+      /* 🔴 v1.138.0 **確定売上金額は管理だけが直せる。**（実績カウント日・確定返車日と同じ形）
+         ⚠ 「🔒 確定」の札を出しておきながら、隣の「✏️ 編集」が誰でも押せていた。
+            見た目を変えるだけでなく、保存する所（`cvAmtOK`）でも同じ条件で止めている。 */
+      const _canMoney = canEditMoney(c);
+      h += '<div class="cv-fixrow cv-fixlocked"><div class="cv-frt">確定売上金額（請求額） <span class="cv-locktag"><i data-ic=lock data-ics=16></i> 確定</span> '
+        + (_canMoney
+            ? '<button type="button" class="cv-unlockbtn" onclick="cvUnlockFinal()"><i data-ic=pencil data-ics=16></i> 編集</button>'
+            : adminOnlyTag())
+        + '</div><div class="cv-frb">'
         + '<span class="cv-fixval" id="cv-finlock">'+(faStr?('¥'+faStr):'—')+'</span>'
-        + '<span class="cv-unlockwrap" id="cv-finedit" style="display:none">'
-          + '<span class="cv-yenmark">¥</span><input class="cv-fixinput cv-money" id="cv-amt-final" type="text" inputmode="numeric" value="'+esc(faStr)+'" data-prev="'+esc(faStr)+'" oninput="cvAmtChange(\'final\')">'
-          + '<div class="pt-tax" id="cv-tax-final">'+(window.pitTaxHint?pitTaxHint(faStr):'')+'</div>'
-          + '<div class="cv-fixconfirm" id="cv-amtconfirm-final">金額を <b id="cv-amtnew-final"></b> に変更しますか？ <button class="cv-ok" onclick="cvAmtOK(\'final\')">OK</button><button class="cv-ng" onclick="cvAmtNG(\'final\')">取消</button></div>'
-        + '</span></div></div>';
+        + (_canMoney
+          ? ('<span class="cv-unlockwrap" id="cv-finedit" style="display:none">'
+            + '<span class="cv-yenmark">¥</span><input class="cv-fixinput cv-money" id="cv-amt-final" type="text" inputmode="numeric" value="'+esc(faStr)+'" data-prev="'+esc(faStr)+'" oninput="cvAmtChange(\'final\')">'
+            + '<div class="pt-tax" id="cv-tax-final">'+(window.pitTaxHint?pitTaxHint(faStr):'')+'</div>'
+            + '<div class="cv-fixconfirm" id="cv-amtconfirm-final">金額を <b id="cv-amtnew-final"></b> に変更しますか？ <button class="cv-ok" onclick="cvAmtOK(\'final\')">OK</button><button class="cv-ng" onclick="cvAmtNG(\'final\')">取消</button></div>'
+            + '</span>')
+          : '')
+        + '</div></div>';
     }
     const finRet = c.returnDateFinal || '';
     if (c.status === 'returned'){
@@ -997,9 +1028,12 @@
            ・**消去する…** … 誰でも押せる。ただし**2枚聞く**（`cvAskDelete`）
          ⚠ 「売上なしでアーカイブする」はもう出さない（すでにアーカイブ済み）。
          ⚠ ボタンを消すだけにしない＝`cvBackToReserve` の中でも同じ条件で止めている。 */
+      /* 🔴 v1.138.0 戻し先はアーカイブの種類で変わる（入口の言葉は「アーカイブから戻す」で1つ）。
+         ・実績（返車済み）… **完TEL済（返車カレンダー）へ**＝階段を1段だけ下りる
+         ・売上なし　　　　… 予約へ（v1.136.0 のまま） */
       const canR = !(window.PitArchive && PitArchive.canRestore) || PitArchive.canRestore();
       h += canR
-        ? '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> アーカイブから戻す…</button>'
+        ? '<button class="cv-opti" onclick="cvAskUnarchive()"><i data-ic=undo data-ics=16></i> アーカイブから戻す…</button>'
         : '<button class="cv-opti cv-optlocked" onclick="cvDenyRestore()"><i data-ic=undo data-ics=16></i> アーカイブから戻す…'
           + '<span class="cv-adminonly"><i data-ic=lock data-ics=14></i> 管理のみ</span></button>';
       h += '<div class="cv-optdiv"></div>';
@@ -1238,7 +1272,13 @@
     cf.classList.add('show');
   };
   window.cvAmtOK = function(kind){
-    const el=document.getElementById('cv-amt-'+kind); const v=el.value.replace(/[^0-9]/g,'').slice(0,9);
+    /* 🔴 v1.138.0 **ボタンを消しただけにしない。** 実績カードの金額は管理だけ。
+       ⚠ 外から呼ばれても（古い画面・別タブ・コンソール）ここで止まる。 */
+    if (!canEditMoney()){
+      if (window.UI && UI.alert) UI.alert('実績になったカードの金額を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+      return;
+    }
+    const el=document.getElementById('cv-amt-'+kind); if(!el) return; const v=el.value.replace(/[^0-9]/g,'').slice(0,9);
     const _bef = _c[AMT_FIELD[kind]];
     _c[AMT_FIELD[kind]] = v ? +v : null; el.dataset.prev=el.value;
     document.getElementById('cv-amtconfirm-'+kind).classList.remove('show');
@@ -1269,6 +1309,10 @@
      =================================================================== */
   window.cvChainEdit = function(which){
     if (!_c) return;
+    if (!canEditMoney()){   /* 🔴 v1.138.0 実績カードの「表紙の✏編集」も管理だけ */
+      if (window.UI && UI.alert) UI.alert('実績になったカードの金額・日付を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+      return;
+    }
     if (which === 'money') _chainEditMoney = !_chainEditMoney;
     else                   _chainEditDate  = !_chainEditDate;
     _chainEditFor = _c.id;
@@ -1335,7 +1379,13 @@
   };
   // 実績移行後のロック表示を、✏️編集で入力欄に切り替える（DOM切替のみ・保存は各入力のonchange/OKで）v0.118.0
   window.cvUnlockReturn = function(){ var v=document.getElementById('cv-retlock'), e=document.getElementById('cv-retedit'); if(v)v.style.display='none'; if(e)e.style.display=''; };
-  window.cvUnlockFinal = function(){ var v=document.getElementById('cv-finlock'), e=document.getElementById('cv-finedit'); if(v)v.style.display='none'; if(e)e.style.display=''; };
+  window.cvUnlockFinal = function(){
+    if (!canEditMoney()){
+      if (window.UI && UI.alert) UI.alert('実績になったカードの金額を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+      return;
+    }
+    var v=document.getElementById('cv-finlock'), e=document.getElementById('cv-finedit'); if(v)v.style.display='none'; if(e)e.style.display='';
+  };
   window.cvUnlockPay = function(){ var e=document.getElementById('cv-payedit'); if(e) e.style.display=(e.style.display==='none'?'':'none'); };
   // 💳 入金日を分ける（売掛）ON/OFF。OFFで入金日クリア。表示切替のため再描画 v0.121.0
   window.cvTogglePaySeparate = function(on){
@@ -1652,6 +1702,74 @@
       label: _cvLabel(c) + (c.cancelReason ? ' / ' + c.cancelReason : '') });
     save(); cvRefreshBg();
     if (window.pitToast) pitToast('予約をキャンセルしました（来店履歴に残ります）');
+    if (window.closeDetail) closeDetail();
+  };
+
+  /* ---- ⓪ アーカイブから戻す（v1.138.0）--------------------------------
+     🗣 ゆうた「アーカイブから戻すは管理者ならOK」／戻し先は「B案＝完TEL済に戻す」
+
+     🔴 **入口の言葉は「アーカイブから戻す」1つ。戻し先は種類で変える。**
+        ・実績（返車済み）… **完TEL済（返車カレンダー）へ**＝③の「タスクボードに戻す」と同じ考え方で
+                            **階段を1段だけ下りる**。予約まで飛ばさない
+        ・売上なし　　　　… 予約へ（v1.136.0 のまま。そもそも完TELを通っていない車なので）
+     🔴 戻せるのは**管理者だけ**。ボタンを消すだけにせず、実行の中でも止める。 */
+  window.cvAskUnarchive = function(){
+    if (!_c) return;
+    const c = _c;
+    const isResult = !!(window.PitArchive && PitArchive.cardIsResult && PitArchive.cardIsResult(c));
+    if (isResult) return cvAskBackToDelivery();
+    return cvAskBackToReserve();
+  };
+
+  /* ---- ⓪-b 実績 → 完TEL済（返車前）に戻す v1.138.0 -------------------
+     ◎消すのは **実績カウント日（completedAt）だけ。**
+       ・`status` を「作業完了済」＋`returnStage='returnWait'` に戻す＝**返車カレンダーのその日に戻る**
+       ・**確定売上・返車日・入金日はそのまま残す**（ゆうた指定「入金日はそのままで移動できるように」）
+       ・返車済みにし直せば、また実績に入る
+     🔴 **月の売上が動く操作。** 窓で**どの月が変わるかを名指しする**（ゆうた指定・案イ）。
+        止めはしない＝決算前に直したい時に詰むため。
+     ⚠ 代車の自動返却は戻さない（`loUnreturn` は代車カレンダー側の操作）。窓に書いてある。
+     ⚠ これで「戻す」は3本＝予約へ／タスクボードへ／返車前へ。**必ずこの並びに置くこと。** */
+  window.cvAskBackToDelivery = function(){
+    if (!_c) return; closeAllPop();
+    const c = _c;
+    if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
+    const cd = String(c.completedAt || '');
+    const mLbl = (cd.length >= 7) ? (+cd.slice(5, 7)) + '月' : 'その月';
+    const amt = (c.amountFinal != null && c.amountFinal !== '')
+      ? '¥' + Number(c.amountFinal).toLocaleString() : '未入力';
+    const det = ['🔴 ' + (cd || '') + ' の実績から外れます。**' + mLbl + 'の売上・台数・メカの配分が変わります**',
+                 '・確定売上と返車日はそのまま残します（入れ直しになりません）',
+                 '・入金日・支払方法もそのまま残します',
+                 '・返車カレンダーの ' + (cd || '返車予定日') + ' に戻ります。返車済みにし直せば、また実績に入ります',
+                 '・代車を自動で返却済みにしたぶんは戻りません（必要なら代車カレンダーで取り消してください）',
+                 '・誰がいつ戻したかは記録に残ります'].join('\n').replace(/\*\*/g, '');
+    _cvAsk('アーカイブから戻す',
+           'アーカイブから戻して、返車前（完TEL済）にしますか？\n' + _cvLabel(c) + '　　確定売上 ' + amt,
+           det, '返車前に戻す')
+      .then(function(yes){ if (yes) cvBackToDelivery(); });
+  };
+  window.cvBackToDelivery = function(){
+    const c = _c; if (!c) return;
+    if (c.status !== 'returned') return;
+    if (window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
+    const was = c.completedAt || '';
+    c.status      = 'workDone';        /* 作業完了済＋完TEL済＝返車カレンダーへ戻る */
+    c.returnStage = 'returnWait';
+    c.completedAt = '';                /* 🔴 実績から外れるのはこれ1つ */
+    if (!c.returnDate) c.returnDate = c.returnDateFinal || was;
+    /* ⚠ amountFinal / returnDateFinal / paymentDate / paymentSeparate は**触らない**（ゆうた指定） */
+    if (window.logFlow) logFlow(c, 'アーカイブから戻した（実績 ' + (was || '—') + ' → 返車前・完TEL済）');
+    if (window.pitLog) pitLog('実績をアーカイブから戻した（返車前へ）', { cardId: c.id, kind: 'result',
+      label: _cvLabel(c) + '　実績 ' + (was || '—') + ' を取り消し' });
+    save(); cvRefreshBg();
+    if (window.pitToast) pitToast('返車前（完TEL済）に戻しました');
     if (window.closeDetail) closeDetail();
   };
 

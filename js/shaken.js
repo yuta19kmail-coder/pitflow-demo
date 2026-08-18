@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.118.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.119.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
@@ -131,6 +131,35 @@
     return g;
   }
 
+  /* ══ 回送の担当・陸運局・R（v1.119.0・2026-08-18 ゆうた指定） ══
+     🔴 担当者＝**実際に車検へ行く＝回送する人**（ゆうた「担当者というのは実際に車検に行く、回送の担当者ね」）。
+        入れ物は今までの「陸運局へ行った人」と**同じ1つ**（ゆうた確定）。
+        ＝決めた時点で入れると、**MHS の当日ビューと前日LINEの画像にも前もって名前が出る**。
+     🔴 陸運局は **CoreMembers の場所マスターで「陸運局」のバッジが付いたもの**から選ぶ。
+        PitFlow では作れない・直せない（読むだけ）。窓口は members-pit.js の1本。
+     🔴 R＝ラウンド 1〜4。空でも決定できる（ゆうた確定）が、**空なら「未定」の印を出す**。
+     ⚠ 中身の読み出しは pit-share.js の物差し（pitShakenStaff / pitShakenOffice / pitShakenRound）。
+        ここで条件を書き直さないこと。 */
+  function shStaff(c){ return window.pitShakenStaff ? pitShakenStaff(c) : ((c.inspSchedule||{}).resultStaff||''); }
+  function shOffice(c){ return window.pitShakenOffice ? pitShakenOffice(c) : ((c.inspSchedule||{}).officeName||''); }
+  function shRound(c){ return window.pitShakenRound ? pitShakenRound(c) : 0; }
+  function rikuunList(){ return window.pitRikuunList ? pitRikuunList() : []; }
+
+  /* チップの下に付ける拡張（ゆうた指定「決定した車両カードの下などに拡張で付けたい」）。
+     ⚠ 「未定」の印を出すのは**これから行く車（決定）だけ**。済・再検は終わった話なので、
+        入っているものだけ静かに出す（終わった車に「未定」と出しても直しようがない）。 */
+  function chipMeta(c, kind){
+    var st=shStaff(c), of=shOffice(c), rd=shRound(c), todo=(kind==='decided'), h='';
+    /* ⚠ チップは幅が狭い（1枠118px）ので名前は切れる。切れても分かるように吹き出しに全部入れる。 */
+    if(st)      h+='<span class="shk-mt st" title="回送の担当：'+esc(st)+'">'+esc(st)+'</span>';
+    else if(todo) h+='<span class="shk-mt tbd" title="回送の担当がまだ決まっていません">回送 未定</span>';
+    if(of)      h+='<span class="shk-mt of" title="陸運局：'+esc(of)+'">'+esc(of)+'</span>';
+    else if(todo) h+='<span class="shk-mt tbd" title="どこの陸運局へ行くかがまだ決まっていません">陸運局 未定</span>';
+    if(rd)      h+='<span class="shk-mt rd" title="'+rd+'ラウンド">'+rd+'R</span>';
+    else if(todo) h+='<span class="shk-mt tbd" title="何ラウンドで行くかがまだ決まっていません">R未定</span>';
+    return h ? '<div class="shk-meta">'+h+'</div>' : '';
+  }
+
   /* 🔴 v1.108.0 印（済／再検）を必ず出す。ゆうた確定＝**両方出すが、印を付けて区別する**。 */
   function decChip(c, kind){ var car=carLabel(c);
     var mark = (window.PIT_SHAKEN_MARK && PIT_SHAKEN_MARK[kind]) || '';
@@ -142,7 +171,8 @@
     return '<div class="'+cls+'" draggable="false" data-card-id="'+c.id+'"'
       + ' onclick="'+onclick+'" style="border-left-color:'+team(c)+'">'
       + '<div class="shk-nm">'+(mark?'<span class="shk-mk shk-mk-'+kind+'">'+mark+'</span>':'')+esc(surname(c))+'様</div>'
-      + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div></div>';
+      + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div>'
+      + chipMeta(c, kind) + '</div>';
   }
 
   /* 🔴 v1.116.0 入庫待ちの予約＝表の下に「今週／来週／再来週」の3つの箱で出す（ゆうた指定）。
@@ -240,7 +270,15 @@
   /* 🔴 v1.118.0 `shkFix`（帯を押したら決定）は**廃止**。
      ゆうた指定「決定車両への移動はドラッグのみ、予定部分をクリックで飛ばないように」。
      ⚠ 押し間違いで陸運局の日が勝手に決まってしまうのを防ぐのが目的。復活させないこと。 */
-  function assign(id,iso,slot){ var c=card(id); if(!c) return; var s=ins(c); s.decided=iso; s.decidedSlot=(slot==='pm'?'pm':'am'); s.result=''; s.resultDate=''; s.resultSlot=''; save(); renderShaken(); }
+  function assign(id,iso,slot){ var c=card(id); if(!c) return; var s=ins(c);
+    /* 🔴 v1.119.0 **はじめて決めた時だけ**、回送の担当・陸運局・R を聞く窓を出す（ゆうた確定）。
+       ⚠ すでに決まっている車を別の日へ動かしただけの時は**出さない**（毎回聞かれると邪魔）。
+       ⚠ 担当・陸運局・R は日を動かしても**消さない**（同じ車検の話なので持ち回る）。 */
+    var isNew = !s.decided;
+    s.decided=iso; s.decidedSlot=(slot==='pm'?'pm':'am'); s.result=''; s.resultDate=''; s.resultSlot='';
+    save(); renderShaken();
+    if(isNew) setTimeout(function(){ shkDecidePop(id); }, 60);
+  }
 
   // 決定チップを「予定」エリアにドロップ＝決定を解除して候補（行ける日）表示に戻す（候補slotsは残す）v0.124.0
   window.shkGanttOver=function(e){ e.preventDefault(); try{ e.dataTransfer.dropEffect='move'; }catch(_){}; var t=e.currentTarget; if(t&&t.classList) t.classList.add('drop'); };
@@ -319,6 +357,60 @@
     save(); renderShaken();
   };
 
+  /* ══ 回送の担当・陸運局・R の入力欄（v1.119.0） ══
+     決めた直後の窓と、決定チップのメニューの**両方で同じ部品**を使う＝食い違わない。
+     ⚠ 担当の既定＝いま入っている人／無ければ**自分**（v1.55.0 の決めごとを引き継ぐ）。
+     ⚠ 「（未定）」を必ず先頭に置く＝**空のまま決定してよい**（ゆうた確定）ので、外す道が要る。 */
+  function fieldsHtml(c){
+    var s=ins(c);
+    var cur=(s.resultStaff||(window.pitFlowMe?pitFlowMe():'')||'');
+    var stOpts='<option value="">（未定）</option>'
+      + (window.state&&Array.isArray(state.staff)?state.staff:[]).map(function(m){
+          return '<option value="'+esc(m.name)+'"'+(cur===m.name?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
+    var offs=rikuunList();
+    var ofOpts='<option value="">（未定）</option>'
+      + offs.map(function(o){ return '<option value="'+esc(o.id)+'"'+(s.office===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('');
+    var rd=shRound(c);
+    var rOpts='<option value="">（未定）</option>'
+      + (window.PIT_SHAKEN_ROUNDS||[1,2,3,4]).map(function(n){ return '<option value="'+n+'"'+(rd===n?' selected':'')+'>'+n+'R</option>'; }).join('');
+    return '<label class="shk-plabel">担当（回送＝実際に車検に行く人）</label>'
+      + '<select id="shk-staff" class="shk-psel">'+stOpts+'</select>'
+      + '<label class="shk-plabel">陸運局</label>'
+      + '<select id="shk-office" class="shk-psel">'+ofOpts+'</select>'
+      + (offs.length ? '' : '<div class="shk-phint">CoreMembers の場所マスターに「陸運局」の場所がありません。CoreMembers で登録すると、ここに出ます。</div>')
+      + '<label class="shk-plabel">R（ラウンド）</label>'
+      + '<select id="shk-round" class="shk-psel">'+rOpts+'</select>';
+  }
+
+  /* 決めた直後に出る窓（ゆうた指定「決定車両になった時点で入力できるように」）。
+     ⚠ ここには 完了・再検 を置かない＝**決めたばかりの車を押し間違いで「済」にしないため**。 */
+  window.shkDecidePop=function(id){
+    var c=card(id); if(!c) return; var s=ins(c);
+    if(!s.decided) return;
+    var slName=s.decidedSlot==='pm'?'午後':'午前';
+    pop('車検の予定を決めました',
+      '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+(c.plate?' / '+esc(c.plate):'')+'</div>'
+      + '<div class="shk-pnote">予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
+      + fieldsHtml(c)
+      + '<button class="shk-pbtn ok" onclick="shkSaveFields(\''+id+'\')">保存する</button>'
+      + '<button class="shk-pbtn ghost" onclick="shkClosePop()">あとで入れる</button>');
+  };
+
+  /* 3つを保存する。⚠ 陸運局は id で持ち、名前は**後ろ盾の写し**として一緒に控える
+     （CoreMembers で場所が消えたり名前が変わっても、過去の記録が空欄にならないように）。 */
+  window.shkSaveFields=function(id){
+    var c=card(id); if(!c) return; var s=ins(c);
+    var stEl=document.getElementById('shk-staff'), ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
+    var staff=stEl?stEl.value:'', off=ofEl?ofEl.value:'', rd=rdEl?Number(rdEl.value||0):0;
+    s.resultStaff=staff;
+    s.office=off||'';
+    s.officeName=off ? ((window.pitLocName?pitLocName(off):'') || s.officeName || '') : '';
+    s.round=(rd>=1&&rd<=4)?rd:0;
+    if(window.logFlow) logFlow(c, '車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（回送:'+(staff||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）');
+    save(); closePop(); renderShaken();
+    if(window.pitToast) pitToast('車検の予定を保存しました');
+  };
+
   // 決定チップのメニュー
   window.shkChipMenu=function(id){
     var c=card(id); if(!c) return; var s=ins(c);
@@ -327,10 +419,9 @@
     if(s.result==='done'){
       body+='<div class="shk-pnote">完了：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
     } else if(s.decided){
-      var _cur=(s.resultStaff||(window.pitFlowMe?pitFlowMe():'')||'');   /* 🔴 v1.55.0 既定＝自分（bnMe はどこにも入れていない死んだ変数だった） */
-      var _opts=(window.state&&Array.isArray(state.staff)?state.staff:[]).map(function(m){ return '<option value="'+esc(m.name)+'"'+(_cur===m.name?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
-      body+='<div class="shk-pnote">予定決定：'+fmtMD(s.decided)+' '+slName+'</div>'
-        + '<label class="shk-plabel">担当（車検に行った人）</label><select id="shk-staff" class="shk-psel">'+_opts+'</select>'
+      body+='<div class="shk-pnote">予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
+        + fieldsHtml(c)
+        + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+id+'\')">この内容で保存</button>'
         + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（受かった）</button>'
         + '<button class="shk-pbtn re" onclick="shkAct(\''+id+'\',\'recheck\')">↺ 再検（落ちた・候補へ戻す）</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'flip\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
@@ -345,10 +436,19 @@
   function _slT(sl){ return sl==='pm'?'PM':'AM'; }
   window.shkAct=function(id,act){ var c=card(id); if(!c) return; var s=ins(c);
     var stEl=document.getElementById('shk-staff'); var staff=stEl?stEl.value:'';
+    /* 🔴 v1.119.0 完了・再検の時も、窓に出ている陸運局とRを一緒に確定する（別々に保存させない）。 */
+    var ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
+    if(ofEl){ s.office=ofEl.value||''; s.officeName=s.office?((window.pitLocName?pitLocName(s.office):'')||s.officeName||''):''; }
+    if(rdEl){ var _r=Number(rdEl.value||0); s.round=(_r>=1&&_r<=4)?_r:0; }
+    var _wh='（回送:'+(staff||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）';
     if(act==='done'){ var d=s.decided||todayIso(), sl=s.decidedSlot||'am'; s.result='done'; s.resultDate=d; s.resultSlot=sl; s.resultStaff=staff;
-      if(window.logFlow) logFlow(c, '車検 済 '+fmtMD(d)+' '+_slT(sl)+'（担当:'+(staff||'—')+'）'); }
-    else if(act==='recheck'){ var d2=s.decided||todayIso(), sl2=s.decidedSlot||'am'; s.history.push({date:d2, slot:sl2, result:'recheck', staff:staff}); s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
-      if(window.logFlow) logFlow(c, '車検 再検 '+fmtMD(d2)+' '+_slT(sl2)+'（担当:'+(staff||'—')+'）'); }
+      if(window.logFlow) logFlow(c, '車検 済 '+fmtMD(d)+' '+_slT(sl)+_wh); }
+    else if(act==='recheck'){ var d2=s.decided||todayIso(), sl2=s.decidedSlot||'am';
+      /* ⚠ 再検の記録にも、その時どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
+      s.history.push({date:d2, slot:sl2, result:'recheck', staff:staff, office:s.office||'', officeName:s.officeName||'', round:s.round||0});
+      s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
+      /* ⚠ 陸運局とRは**残す**＝次に決め直す時、たいてい同じ所へ行くので入れ直させない。直したい時は窓で変えられる。 */
+      if(window.logFlow) logFlow(c, '車検 再検 '+fmtMD(d2)+' '+_slT(sl2)+_wh); }
     else if(act==='tocand'){ closePop(); unassign(id); return; }   // 候補（行ける日）に戻す＝slotsは残す v0.124.1
     else if(act==='cancel'){ s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; }
     else if(act==='reopen'){ s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff=''; }

@@ -399,10 +399,32 @@ w.pitDivisionColor = pitDivisionColor;
   function pitCarLabel(c){ return String((c && (c.car || c.maker || c.plate)) || ''); }
   w.pitCarLabel = pitCarLabel;
 
-  /* 🔴 車検の担当＝**陸運局へ行く（行った）人**（ゆうた確定 2026-08-16）。
-     受付したフロント担当は**別物なので混ぜない**。決まっていなければ空欄。 */
+  /* 🔴 車検の担当＝**陸運局へ車を持って行く（行った）人＝回送の担当**
+     （ゆうた確定 2026-08-16／2026-08-18「担当者というのは実際に車検に行く、回送の担当者ね」）。
+     受付したフロント担当は**別物なので混ぜない**。決まっていなければ空欄。
+     ⚠ v1.119.0 から**決めた時点でも入れられる**（前は「済」を記録する時だけだった）。
+        入れ物は同じ `resultStaff` 1つ＝MHS の当日ビューと前日LINEの画像に、**前もって名前が出る**。 */
   function pitShakenStaff(c){ var s = c && c.inspSchedule; return (s && s.resultStaff) || ''; }
   w.pitShakenStaff = pitShakenStaff;
+
+  /* 🔴 v1.119.0 どこの陸運局へ行くか／何ラウンドか（2026-08-18・ゆうた指定）
+     ・`inspSchedule.office`     … CoreMembers の場所マスターの id（**陸運支局のバッジが付いた場所**）
+     ・`inspSchedule.officeName` … その名前の**写し**。⚠ 出す時は本家（CoreMembers）が優先。
+        写しは「場所が消された・名前が変わった」時に過去の記録が空欄にならないための後ろ盾だけ。
+     ・`inspSchedule.round`      … ラウンド 1〜4（陸運局の受付の回）。数字で持つ。空・0＝未定
+     ⚠ 決まっていなくても決定できる（ゆうた確定）。空の時は画面に「未定」の印を出す。 */
+  function pitShakenOffice(c){
+    var s = c && c.inspSchedule; if (!s || !s.office) return '';
+    var live = w.pitLocName ? pitLocName(s.office) : '';
+    return live || String(s.officeName || '');
+  }
+  function pitShakenRound(c){
+    var s = c && c.inspSchedule, n = s ? Number(s.round) : 0;
+    return (n >= 1 && n <= 4) ? n : 0;
+  }
+  w.pitShakenOffice   = pitShakenOffice;
+  w.pitShakenRound    = pitShakenRound;
+  w.PIT_SHAKEN_ROUNDS = [1, 2, 3, 4];
 
   /* 午前／午後 */
   function pitShakenSlot(v){ return (v === 'pm') ? 'pm' : 'am'; }
@@ -424,7 +446,10 @@ w.pitDivisionColor = pitDivisionColor;
 
   /* 🔴🔴 その日の車検予定を返す。**絞り込み・並び・中身までここで決める。**
        戻り＝[{ id, state:'decided'|'done'|'recheck', mark, slot:'am'|'pm',
-                name, car, staff, div, divColor, done, card }]
+                name, car, staff, office, round, div, divColor, done, card }]
+       ⚠ v1.119.0 で `office`（どこの陸運局）と `round`（何R・0＝未定）を**足した**。
+          いま使っているのは PitFlow の車検予定だけ。MHS・LINEの画像は使っていないが、
+          使いたくなった時に**条件をあちらに書き写さないで済む**ように、ここから配る。
      ・並び＝午前→午後 → まだ行っていないものが先 → お客様名。**どこで見ても同じ順。**
      ・cards は PitFlow なら state.cards、MHS/サーバーなら読んだカードの配列。 */
   function pitShakenOnDate(cards, iso){
@@ -436,6 +461,7 @@ w.pitDivisionColor = pitDivisionColor;
         done: (state === 'done'), slot: pitShakenSlot(slotRaw),
         name: pitCustSurname(c), car: pitCarLabel(c),
         staff: pitShakenStaff(c),
+        office: pitShakenOffice(c), round: pitShakenRound(c),
         div: pitDivisionLabel(c), divColor: pitDivisionColor(c)
       };
     }

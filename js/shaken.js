@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.115.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.116.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・帯 or 決定チップをドラッグ→決定枠へドロップで確定/移動。決定チップのタップで完了/再検/取消。
@@ -32,6 +32,21 @@
   function isOff(iso){ var w=new Date(iso+'T00:00:00').getDay(); if(w===0||w===6) return true; if(window.Holidays&&Holidays.is&&Holidays.is(iso)) return true; if(shopClosed(iso)) return true; return false; }
   function offLabel(iso){ var w=new Date(iso+'T00:00:00').getDay(); if(w!==0&&w!==6&&!(window.Holidays&&Holidays.is&&Holidays.is(iso))&&shopClosed(iso)) return shopNote(iso)||'定休'; return '休'; }
   function fmtMD(iso){ var d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }
+  /* 🔴 v1.116.0 入庫待ちの日付は**曜日つき**で出す（ゆうた指定「8/22入 → 8/22(土)」）。
+     ⚠ 土日が休みなので、曜日が見えないと「土曜に入庫？」の勘違いが起きる。 */
+  function fmtMDW(iso){ var d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate()+'('+DOW[d.getDay()]+')'; }
+  function addDays(iso,n){ var d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return ymdL(d); }
+
+  /* 🔴 v1.116.0 車の注意（左・MT・12点）＝**ガントの行と入庫待ちの箱で同じ言葉**を使う（ゆうた指定）。
+     ⚠ 陸運局へ誰が持って行けるかに効くので、入庫前から見えている必要がある。 */
+  function carAttrs(c){
+    var out=[], dr=Array.isArray(c.drive)?c.drive:[];
+    if(dr.indexOf('leftHand')>=0) out.push('左');
+    if(dr.indexOf('mt')>=0)       out.push('MT');
+    var ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:[];
+    if(ids.indexOf('12pt')>=0)    out.push('12点');
+    return out;
+  }
 
   function rangeDays(){
     if(!window._shakenBase){ var t=new Date(); t.setHours(0,0,0,0); t.setDate(t.getDate()-((t.getDay()+6)%7)); window._shakenBase=t; } // 週の月曜
@@ -80,6 +95,40 @@
     return {decCell:decCell, cands:cands, empties:empties, unsched:unsched, cnt:cnt};
   }
 
+  /* 🔴🔴 v1.116.0 入庫待ちの予約を **3つの箱**に分ける（2026-08-18・ゆうた指定）
+       ① 今週入庫分   … **今週の金曜まで**
+       ② 来週入庫分   … 土曜 〜 翌週の金曜
+       ③ 再来週入庫分 … その次の土曜 〜 金曜
+     🔴 週の区切りは **土曜はじまり・金曜おわり**（ゆうた指定）。土日が休みなので、
+        金曜で締めて土曜から次の週、と数えるほうが現場の感覚と合う。
+     🔴 数える起点は **今日**。カレンダーを前週・次週に送っても、この3つは動かない。
+        ⚠「今週」「来週」は**今日から見た言葉**なので、めくると意味が変わってしまうため。
+     ⚠ 入庫日が**過ぎているもの**（仮予約・承認待ちは自動で未入庫に落ちない）と
+        **入庫日未定**のものは、いちばん手前の「今週入庫分」に入れる＝目に入る場所に置く。
+     ⚠ 再来週より先の予約は**出さない**（今までどおり。先を全部並べると帯が意味を失う）。 */
+  function waitGroups(list){
+    var t=todayIso(), dow=new Date(t+'T00:00:00').getDay();
+    var f1=addDays(t,(5-dow+7)%7), f2=addDays(f1,7), f3=addDays(f1,14);   /* 各週の金曜 */
+    var g=[
+      {key:'w0', title:'今週入庫分',   range:'〜'+fmtMDW(f1),                        cars:[]},
+      {key:'w1', title:'来週入庫分',   range:fmtMDW(addDays(f1,1))+' 〜 '+fmtMDW(f2), cars:[]},
+      {key:'w2', title:'再来週入庫分', range:fmtMDW(addDays(f2,1))+' 〜 '+fmtMDW(f3), cars:[]}
+    ];
+    (list||[]).forEach(function(c){
+      var d=c.reserveDate||'';
+      if(!d || d<=f1) g[0].cars.push(c);
+      else if(d<=f2)  g[1].cars.push(c);
+      else if(d<=f3)  g[2].cars.push(c);
+    });
+    /* それぞれ入庫日順（ゆうた指定）。入庫日未定はいちばん後ろ。同じ日は名前順で毎回同じ並びにする。 */
+    g.forEach(function(x){ x.cars.sort(function(a,b){
+      var da=a.reserveDate||'9999-99-99', db=b.reserveDate||'9999-99-99';
+      if(da!==db) return da<db ? -1 : 1;
+      return String(surname(a)).localeCompare(String(surname(b)),'ja');
+    }); });
+    return g;
+  }
+
   /* 🔴 v1.108.0 印（済／再検）を必ず出す。ゆうた確定＝**両方出すが、印を付けて区別する**。 */
   function decChip(c, kind){ var car=carLabel(c);
     var mark = (window.PIT_SHAKEN_MARK && PIT_SHAKEN_MARK[kind]) || '';
@@ -94,6 +143,31 @@
       + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div></div>';
   }
 
+  /* 🔴 v1.116.0 入庫待ちの予約＝表の下に「今週／来週／再来週」の3つの箱で出す（ゆうた指定）。
+     ⚠ 空の週も**見出しだけは必ず出す**。黙って消えると「壊れて出ていない」のか
+        「本当に無い」のか分からない（8/18 の「動いてない？」がまさにそれ）。 */
+  function buildWait(unsched){
+    var h='<div class="shk-wait">';
+    waitGroups(unsched).forEach(function(g){
+      h+='<div class="shk-wg" data-wg="'+g.key+'">'
+        + '<div class="shk-wgh"><i data-ic=clock data-ics=16></i> <b>'+g.title+'</b>'
+        + '<span class="shk-wgr">'+g.range+'</span>'
+        + '<span class="shk-wgn">'+g.cars.length+'台</span></div>'
+        + '<div class="shk-wgb">';
+      h+= g.cars.length ? g.cars.map(function(c){
+            return '<span class="shk-uchip" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" style="border-left-color:'+team(c)+'">'
+              + '<span class="shk-ures">'+(c.reserveDate?fmtMDW(c.reserveDate)+'入':'入庫日未定')+'</span>'
+              + '<span class="shk-unm">'+esc(surname(c))+'様</span>'
+              + '<span class="shk-ucar">'+esc(carLabel(c)||'')+'</span>'
+              + carAttrs(c).map(function(x){ return '<span class="shk-ca">'+x+'</span>'; }).join('')
+              + '</span>';
+          }).join('')
+        : '<span class="shk-empty">なし</span>';
+      h+='</div></div>';
+    });
+    return h+'</div>';
+  }
+
   function renderShaken(){
     var host=document.getElementById('shakencal-body'); if(!host) return;
     var days=rangeDays(), tIso=todayIso();
@@ -104,15 +178,8 @@
     h+='<div class="shk-head"><div class="shk-nav"><button onclick="shkShift(-7)"><i data-ic=chevLeft data-ics=16></i> 前週</button><b>'+fmtMD(days[0].iso)+' 〜</b><button onclick="shkShift(7)">次週 <i data-ic=chevRight data-ics=16></i></button><button class="shk-now" onclick="shkShift(0)">今週</button></div>';
     h+='<div class="shk-legend"><span class="shk-lg dc">決定</span><span class="shk-lg dn">完了</span><span class="shk-lg re">再検</span><span class="shk-lg cd">予定枠</span></div>';
     h+='<div class="shk-sum">決定'+cnt.decided+'／完了'+cnt.done+'／再検'+cnt.recheck+'／候補'+cnt.cand+'／未設定'+cnt.unset+'</div></div>';
-    /* 入庫待ちの予約（翌週末＝表示範囲＋週末ぶんまで。それ以降の先の予約は出さない）
-       🔴 v1.115.0 呼び名を「未入庫の予約」→「**入庫待ちの予約**」に変えた（2026-08-18）。
-       ⚠ v1.101.0 から「未入庫」は**来なかった車**（予約→未定の未入庫の箱）を指す言葉になっている。
-          ここは**これから来る予約**なので、同じ言葉だと別物と混ざる。 */
-    var _lim=new Date(window._shakenBase); _lim.setDate(_lim.getDate()+13); var _limIso=ymdL(_lim);
-    var _uns=data.unsched.filter(function(c){ return !c.reserveDate || c.reserveDate<=_limIso; });
-    if(_uns.length){
-      h+='<div class="shk-un"><i data-ic=clock data-ics=16></i> 入庫待ちの予約（〜'+fmtMD(_limIso)+'・入庫後に予定）：'+_uns.map(function(c){ return '<span class="shk-uchip" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" style="border-left-color:'+team(c)+'">'+esc(surname(c))+'様 '+esc(carLabel(c)||'')+(c.reserveDate?'<span class="shk-ures">'+fmtMD(c.reserveDate)+'入</span>':'')+'</span>'; }).join('')+'</div>';
-    }
+    /* 🔴 v1.116.0 入庫待ちの帯は**表のいちばん下**へ移した（ゆうた指定
+       「上からメインの表、今週、来週、と下に続くように」）。組み立ては下の buildWait()。 */
     // スクロール表
     h+='<div class="shk-scroll"><div class="shk-tbl">';
     // 日付ヘッダ
@@ -136,8 +203,8 @@
     var ganttCars = data.cands.concat(data.empties);
     ganttCars.forEach(function(c){ var s=ins(c); var isEmpty=data.empties.indexOf(c)>=0;
       function son(di,slot){ var day=days[di]; if(!day||day.off) return false; return (s.slots[day.iso]||[]).indexOf(slot)>=0; }
-      var attr=[]; if(isEmpty)attr.push('未設定'); var dr=Array.isArray(c.drive)?c.drive:[]; if(dr.indexOf('leftHand')>=0)attr.push('左'); if(dr.indexOf('mt')>=0)attr.push('MT');
-      var ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:[]; if(ids.indexOf('12pt')>=0)attr.push('12点');
+      /* 🔴 v1.116.0 左・MT・12点は carAttrs 1本（入庫待ちの箱と同じ言葉になる） */
+      var attr=[]; if(isEmpty)attr.push('未設定'); attr=attr.concat(carAttrs(c));
       var rc=(s.history||[]).filter(function(x){return x.result==='recheck';}).length; if(rc)attr.push('再'+rc);
       h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'" ondragover="shkGanttOver(event)" ondragleave="shkGanttLeave(event)" ondrop="shkGanttDrop(event)"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+attr.map(function(x){return '<span class="shk-ca'+(x==='未設定'?' unset':'')+'">'+x+'</span>';}).join('')+'</div></div>'
         + days.map(function(x,di){ if(x.off) return '<div class="shk-off2"></div>';
@@ -152,6 +219,7 @@
     });
     if(!ganttCars.length) h+='<div class="shk-row"><div class="shk-gut gcar"><span class="shk-empty">対象車なし</span></div>'+days.map(function(x){ return x.off?'<div class="shk-off2"></div>':'<div class="shk-gsc"></div><div class="shk-gsc pm"></div>'; }).join('')+'</div>';
     h+='</div></div>';
+    h+=buildWait(data.unsched);          /* 🔴 v1.116.0 表の下に「今週／来週／再来週」 */
     host.innerHTML=h;
   }
 

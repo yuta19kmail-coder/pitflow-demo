@@ -588,11 +588,26 @@
       const _si = c.inspSchedule || {};
       const _rcH = (Array.isArray(_si.history)?_si.history:[]).filter(function(x){return x&&x.result==='recheck';});
       const _slT = function(sl){ return sl==='pm'?'PM':'AM'; };
-      const _rcTxt = _rcH.map(function(r){ return (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(r.staff?'・'+esc(r.staff):''); }).join('　');
+      /* 🔴 v1.120.0（ゆうた指定）**済にした時点で、陸運局とラウンドも予約詳細に残す。**
+         ⚠ 担当は前から出ていた。足すのは「どこへ行ったか」と「何Rだったか」。
+         ⚠ 読み方は pit-share.js の物差し（`pitShakenOffice` / `pitShakenRound`）。
+            陸運局の名前は **CoreMembers が正**・控えの写しは後ろ盾だけ。ここで組み立て直さない。
+         ⚠ 再検の記録にも、その回の陸運局とRが入っている（v1.119.0〜）。古い記録には入っていないので、
+            **入っているものだけ**出す（無いものを「未定」と書かない＝2026-08-13 の決めごと）。 */
+      const _ofOf = function(o){ return o ? ((window.pitLocName?pitLocName(o.office||''):'') || o.officeName || '') : ''; };
+      const _rdOf = function(o){ var n = o ? Number(o.round) : 0; return (n>=1&&n<=4) ? n+'R' : ''; };
+      const _rcTxt = _rcH.map(function(r){
+        var ex = [ r.staff||'', _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
+        return (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'');
+      }).join('　');
       if (_si.result==='done'){
         // 済＝「いつ行く？」は非表示。実施サマリのみ。
+        const _of = window.pitShakenOffice ? pitShakenOffice(c) : _ofOf(_si);
+        const _rd = window.pitShakenRound  ? pitShakenRound(c)  : 0;
         h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=search data-ics=16></i> 車検</div>'
-          + '<div class="cv-shdone"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> 車検済　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当：'+ esc(_si.resultStaff||'—') +'</span></div>'
+          + '<div class="cv-shdone"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> 車検済　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc(_si.resultStaff||'—') +'</span></div>'
+          + '<div class="cv-shwhere"><span class="cv-shw"><i data-ic=location data-ics=15></i> 陸運局：'+ esc(_of||'—') +'</span>'
+          + '<span class="cv-shw"><i data-ic=clock data-ics=15></i> ラウンド：'+ (_rd? _rd+'R' : '—') +'</span></div>'
           + (_rcH.length? '<div class="cv-shrc">再検 '+_rcH.length+'回：'+_rcTxt+'</div>':'')
           + '<button class="cv-shbtn ghost" onclick="cvShakenReopen()">↩ 済を取り消す</button></div></div>';
       } else {
@@ -1718,7 +1733,19 @@
     const body = '<div class="cv-shpb">'
       + '<label>行った日</label><input type="date" id="cv-shdate" value="'+defDate+'">'
       + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(window._cvShSlot==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(window._cvShSlot==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
-      + '<label>担当（車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      /* 🔴 v1.120.0 ここでも陸運局とラウンドを確定できるようにした（ゆうた指定）。
+         ⚠ 選択肢は **CoreMembers の場所マスターで「陸運局」のバッジが付いた場所**だけ。
+            窓口は members-pit.js の `pitRikuunList()` 1本。ここで条件を書き直さない。
+         ⚠ 車検予定の画面で入れてあれば、そのまま選ばれた状態で開く（入れ直させない）。 */
+      + '<label>陸運局</label><select id="cv-shoffice">'
+        + '<option value="">（未定）</option>'
+        + (window.pitRikuunList?pitRikuunList():[]).map(function(o){ return '<option value="'+esc(o.id)+'"'+(s.office===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')
+        + '</select>'
+      + '<label>R（ラウンド）</label><select id="cv-shround">'
+        + '<option value="">（未定）</option>'
+        + [1,2,3,4].map(function(n){ return '<option value="'+n+'"'+(Number(s.round)===n?' selected':'')+'>'+n+'R</option>'; }).join('')
+        + '</select>'
       + '<div class="cv-shpb-act"><button class="cv-shbtn '+(isDone?'ok':'re')+'" onclick="cvShConfirm(\''+kind+'\')">記録する</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
       + '</div>';
     let back=document.getElementById('cv-shpop');
@@ -1732,14 +1759,22 @@
     if(!_c) return; const s=_c.inspSchedule||(_c.inspSchedule={mode:'manual',slots:{}});
     const dEl=document.getElementById('cv-shdate'); const stEl=document.getElementById('cv-shstaff');
     const iso=(dEl&&dEl.value)||_isoToday(); const slot=(window._cvShSlot==='pm')?'pm':'am'; const staff=(stEl&&stEl.value)||'';
+    /* 🔴 v1.120.0 陸運局とラウンドも一緒に確定する（ゆうた指定「済みにした時点で予約詳細にも埋め込む」）。
+       ⚠ 陸運局は **id で持ち、名前は控えの写し**（CoreMembers で場所が消えても記録が空にならないように）。 */
+    const ofEl=document.getElementById('cv-shoffice'), rdEl=document.getElementById('cv-shround');
+    if(ofEl){ s.office=ofEl.value||''; s.officeName = s.office ? ((window.pitLocName?pitLocName(s.office):'') || s.officeName || '') : ''; }
+    if(rdEl){ const _r=Number(rdEl.value||0); s.round=(_r>=1&&_r<=4)?_r:0; }
+    const _wh='（回送:'+(staff||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）';
     if(!Array.isArray(s.history)) s.history=[];
     if(kind==='done'){
       s.result='done'; s.resultDate=iso; s.resultSlot=slot; s.resultStaff=staff; s.decided=iso; s.decidedSlot=slot;
-      if(window.logFlow) logFlow(_c, '車検 済 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+'（担当:'+(staff||'—')+'）');
+      if(window.logFlow) logFlow(_c, '車検 済 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+_wh);
     } else {
-      s.history.push({date:iso, slot:slot, result:'recheck', staff:staff});
+      /* ⚠ 再検の記録にも、その回どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
+      s.history.push({date:iso, slot:slot, result:'recheck', staff:staff, office:s.office||'', officeName:s.officeName||'', round:s.round||0});
       s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
-      if(window.logFlow) logFlow(_c, '車検 再検 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+'（担当:'+(staff||'—')+'）');
+      /* ⚠ 陸運局とRは残す＝次に決め直す時、たいてい同じ所へ行くので入れ直させない（車検予定の画面と同じ考え方） */
+      if(window.logFlow) logFlow(_c, '車検 再検 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+_wh);
     }
     save(); cvShClose(); renderCardView(_c,'md-body-modal');
     if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();

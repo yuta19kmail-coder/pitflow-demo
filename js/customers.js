@@ -445,9 +445,12 @@
     if(window.UI && UI.confirm) return UI.confirm(title, { detail:detail, ok:okLabel||'OK', cancel:'やめる', danger:!!danger });
     return Promise.resolve(window.confirm(title + '\n\n' + (detail||'')));
   }
+  /* 🔴 v1.136.0 断り方は `archive-pit.js` の1本（`PitArchive.denyRestore`）に寄せた。
+     ⚠ ここに文言を書き写すと、カード側（予約カードのアーカイブ）とズレる。
+        エラー番号 PF-0020 も1か所からしか出さない（テストが見張っている）。 */
   function _deny(){
-    if(window.UI && UI.alert) UI.alert('戻せるのは管理者だけです', { detail:'アーカイブから戻す操作は、PitFlow の役割が「管理」の人だけができます。' });
-    else pitAlert('戻せるのは管理者だけです。', { code:'PF-0020' });
+    if (window.PitArchive && PitArchive.denyRestore) { PitArchive.denyRestore(); return; }
+    if (window.UI && UI.alert) UI.alert('戻せるのは管理者だけです', { detail:'アーカイブから戻す操作は、PitFlow の役割が「管理」の人だけができます。' });
   }
   window.custArchive=function(id){
     const c=list().find(r=>r.id===id); if(!c) return;

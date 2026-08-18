@@ -467,3 +467,20 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-lo.cv-lev-back .cv-lorem{ color:var(--text3); }
 .cv-lo.cv-lev-back .cv-lodays{ color:#aab5c6; }
 .cv-lo.cv-lev-back .cv-lometer i{ background:#8390a6; }
+
+/* 📦 v1.136.0 アーカイブ済みの帯（顧客詳細の .cd-archbar と同じ見た目にそろえた）
+   ⚠ 帯には**状態だけ**。「見るだけです」などの説明は入れない（ゆうた指定）。 */
+.cv-archbar{ display:flex; align-items:center; gap:7px; font-size:12px; font-weight:800; color:#f0c069;
+  background:rgba(224,163,58,.12); border:1px solid rgba(224,163,58,.4); border-radius:9px;
+  padding:8px 11px; margin-bottom:9px; }
+/* 🔒 ⋮ の中で「管理者だけ」の行。押すと理由の窓が出る（黙って消さない） */
+.cv-opti.cv-optlocked{ color:var(--text3); }
+.cv-opti.cv-optlocked:hover{ background:var(--bg3); }
+.cv-adminonly{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700;
+  color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:6px;
+  padding:1px 7px; margin-left:6px; }
+/* 実績（確定売上）を持った車の消去＝ふつうの消去と見た目で分ける */
+.cv-delpop-hard{ width:340px; border-color:#5b2230; }
+.cv-delpop-hard .cv-dpnote{ font-size:11.5px; color:var(--text2); background:rgba(239,68,68,.08);
+  border:1px solid rgba(239,68,68,.25); border-radius:8px; padding:8px 10px; }
+.cv-delpop-hard .cv-dpnote b{ color:#ff9a9a; }

@@ -1,5 +1,5 @@
 /* ========================================
-   blank-cards.js  -  新規予約の「下書き」と、空カードの片付け（PitFlow）
+   blank-cards.js  -  新規予約の「下書き」と、空カードの消去（PitFlow）
    v1.17.0（2026-08-02）
    ----------------------------------------
    ◎ 何を解決したものか
@@ -25,7 +25,11 @@
    ◎ このファイルの持ち場
      ① 書きかけの控え（保存・復元・破棄）
      ② カード画面から出た時に、確定していない下書きを state から外す
-     ③ 設定の「空の予約カードを片付ける」＝**v1.16.0 より前に溜まった分**の後始末
+     ③ 設定の「空の予約カードを消去する」＝**v1.16.0 より前に溜まった分**の後始末
+        🔴 v1.135.0 言葉を「片付ける」から「消去」に変えた（v1.136.0 で「消す」→「消去」に再統一）（ゆうた指定の言葉そろえ）。
+           ⚠ **「アーカイブ」にはしない。** ここは `state.cards` から本当に消していて、
+              アーカイブ（＝印を立てるだけ・データは消さない）とは中身が違う。
+              同じ言葉にすると「戻せるはず」と思わせてしまう。
         （新しく増えることはもう無いので、これは掃除用）
 
    ⚠ 「空」の判定はホワイトリスト方式（pitIsBlankCard）。逆にしないこと。
@@ -209,7 +213,7 @@
   w.addEventListener('beforeunload', function () { try { keepDraft(); } catch (e) {} });
 
   /* =========================================================
-     ② 設定：v1.16.0 より前に溜まった空カードの片付け
+     ② 設定：v1.16.0 より前に溜まった空カードの消去
      ========================================================= */
   function isCloud() { return !!w.PIT_CLOUD; }
   function isAdmin() { return !w.pitIsAdmin || w.pitIsAdmin(); }
@@ -247,16 +251,16 @@
     box.id = 'pit-blank-box';
     box.className = 'pit-blank-box';
     box.innerHTML =
-      '<h4><i data-ic=trash data-ics=16></i> 空の予約カードを片付ける</h4>' +
+      '<h4><i data-ic=trash data-ics=16></i> 空の予約カードを消去する</h4>' +
       '<p>v1.17.0 より前に、「＋ 新規予約」を開いて<b>何も入れずにやめた</b>ぶんのカードです。' +
       'お客様も車も作業内容も入っていないのに、<b>「今日の入庫」「預かり中」に数えられて</b>しまいます。' +
-      '予約ビューには時間が無いので出てこないため、ここから片付けます。<br>' +
+      '予約ビューには時間が無いので出てこないため、ここから消去します。<br>' +
       '<b>いまは保存を押すまでカードができない作りなので、これ以上増えることはありません。</b><br>' +
       '何か1つでも入力があるカードは対象になりません。</p>' +
       '<p>いま <span class="pb-n">' + list.length + '</span> 枚あります。</p>' +
       (rows ? '<div class="pit-blank-list">' + rows + (list.length > 30 ? '<br>ほか ' + (list.length - 30) + ' 枚' : '') + '</div>' : '') +
       '<button class="pb-go" onclick="pitOpenBlankClean()"' + (list.length ? '' : ' disabled') + '>' +
-      (list.length ? 'この ' + list.length + ' 枚を片付ける…' : '片付けるものはありません') + '</button>';
+      (list.length ? 'この ' + list.length + ' 枚を消去する…' : '消去するものはありません') + '</button>';
     host.appendChild(box);
     try { if (w.icoBoot) w.icoBoot(box); } catch (e) {}
   }
@@ -265,19 +269,19 @@
     if (!canShow()) return;
     var list = blanks();
     if (!list.length) return;
-    confirmBox('空の予約カードを ' + list.length + ' 枚 片付けます。', {
-      title: '空の予約カードを片付ける',
-      detail: 'お客様・車・作業内容など、何か1つでも入っているカードは含まれていません。消したものは戻せません。',
-      ok: '片付ける', danger: true
+    confirmBox('空の予約カードを ' + list.length + ' 枚 消去します。', {
+      title: '空の予約カードを消去する',
+      detail: 'お客様・車・作業内容など、何か1つでも入っているカードは含まれていません。消去したものは戻せません。',
+      ok: '消去する', danger: true
     }).then(function (ok) {
       if (!ok) return;
       var ids = {}; list.forEach(function (c) { ids[c.id] = 1; });
       w.state.cards = w.state.cards.filter(function (c) { return !ids[c.id]; });
       try { if (w.PitDB) w.PitDB.save(true); } catch (e) { console.warn('[draft] 保存でエラー', e); }
-      try { if (w.pitLog) w.pitLog('空の予約カードを片付けた', { label: list.length + ' 枚', kind: 'clean' }); } catch (e) {}
-      try { if (w.showToast) w.showToast('空の予約カードを ' + list.length + ' 枚 片付けました'); } catch (e) {}
+      try { if (w.pitLog) w.pitLog('空の予約カードを消去した', { label: list.length + ' 枚', kind: 'clean' }); } catch (e) {}
+      try { if (w.showToast) w.showToast('空の予約カードを ' + list.length + ' 枚 消去しました'); } catch (e) {}
       try { if (w.showView) w.showView('settings'); } catch (e) {}
-      console.log('[draft] 片付け完了：' + list.length + ' 枚');
+      console.log('[draft] 消去完了：' + list.length + ' 枚');
     });
   };
 

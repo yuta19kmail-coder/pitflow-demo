@@ -324,11 +324,22 @@
     return h;
   }
 
+  /* 📦 アーカイブ済みの帯（v1.136.0・ゆうた確定）
+     🔴 **顧客・車両と同じで、いちばん上に帯**。開いた瞬間に「終わった車だ」と分かる。
+     🔴 判定は `PitArchive.cardArchived` の1本（ここに条件を書かない）。
+     ⚠ 帯には**状態だけ**を書く。「見るだけです」などの説明は入れない（ゆうた指定）。
+        できる／できないは、押した時の窓で分かる。 */
+  function archBarHtml(c){
+    if (!(window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c))) return '';
+    return '<div class="cv-archbar"><i data-ic=box data-ics=16></i> '
+         + esc(PitArchive.cardArchiveNote ? PitArchive.cardArchiveNote(c) : 'アーカイブ済み') + '</div>';
+  }
+
   // ===== 右カラム＝タブ本体 =====
   function rightHtml(c){
     /* 🔵 v1.74.0 承認待ちなら、いちばん上に承認バー（承認する入口はここ1つだけ）。
        ⚠ 予約段階でも、入庫してしまったあとでも同じ場所に出る＝取り残さない。 */
-    let h = (window.pitApprovalBarHtml ? pitApprovalBarHtml(c) : '') + pbarHtml(c);
+    let h = (window.pitApprovalBarHtml ? pitApprovalBarHtml(c) : '') + archBarHtml(c) + pbarHtml(c);
     /* 🔴 v1.56.0 予約の段階は「予約詳細」だけ。表紙・整備・バックオフィスはまだ出す意味がない。 */
     if (isReserveStage(c)){
       h += '<div class="cv-tabs cv-tabs-one">'
@@ -504,10 +515,10 @@
       const fa = c.amountFinal;
       const faStr = (fa!=null&&fa!=='') ? Number(fa).toLocaleString() : '';
       /* 🔴 v1.99.0 売上なしでアーカイブした車＝金額の欄より先に、数えていないことを言い切る */
+      /* ⚠ v1.136.0 「売上なしでアーカイブ済み（日付・人）」はいちばん上の帯（`archBarHtml`）へ移した。
+         同じことを2か所に書かない。ここは**金額の読み方**だけを言う。 */
       if (window.pitCardNoSale && pitCardNoSale(c)){
-        h += '<div class="cv-nosalenote"><b>売上なしでアーカイブ済み</b>'
-          + (c.noSaleAt ? '（' + esc(c.noSaleAt) + (c.noSaleBy ? ' ' + esc(c.noSaleBy) : '') + '）' : '')
-          + '<br>来店履歴には残りますが、<b>実績・売上・台数には数えていません</b>。'
+        h += '<div class="cv-nosalenote">来店履歴には残りますが、<b>実績・売上・台数には数えていません</b>。'
           + '下の金額は途中まで入れていた額で、どこにも数えていません。</div>';
       }
       h += '<div class="cv-fixrow cv-fixlocked"><div class="cv-frt">確定売上金額（請求額） <span class="cv-locktag"><i data-ic=lock data-ics=16></i> 確定</span> <button type="button" class="cv-unlockbtn" onclick="cvUnlockFinal()"><i data-ic=pencil data-ics=16></i> 編集</button></div><div class="cv-frb">'
@@ -925,7 +936,13 @@
        ・**入庫済み以降**（＝タスクボードに乗っている車）＝
           **予約に戻す ／ 売上なしでアーカイブする ／ 消去する** の3つだけ
        ・**まだ入庫していない予約**＝今までどおり「仮予約にする／本予約に確定する」＋消去する
-       ・**もう片付いた車**（実績・売上なし・廃車）＝消去するだけ
+       ・**もう終わった車**（実績・売上なし・廃車）＝消去するだけ
+
+     🔴🔴 v1.136.0（ゆうた確定・2026-08-18）**アーカイブ済みの車は分けて扱う。**
+        判定は `PitArchive.cardArchived(c)` の1本（＝顧客・車両と同じ置き場所）。
+        アーカイブ済み ＝ **アーカイブから戻す（管理者だけ）／消去する（誰でも・2枚聞く）**
+        ⚠ いま `cardArchived` が拾うのは**売上なしアーカイブだけ**。
+           実績・キャンセル・未入庫・廃車は、そのステージを決めた時に `archive-pit.js` へ足す。
 
      🔴 **フェーズ移動は廃止した。** 工程はドラッグか ◀▶ で動かす。
         ここから直接飛ばすと、**金額を聞く画面（v1.62.0）と担当者の注意（v1.97.0）を素通り**してしまい、
@@ -934,7 +951,9 @@
      🔴 **入庫済みの車に「仮予約にする」は出さない**（ゆうた指定）。もう来ている車を仮に戻す意味がない。 */
   function optMenuHtml(c){
     const isResv = (c && c.status === 'reserved');
-    const gone   = (c && (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled'));
+    /* アーカイブ済みか（物差しは archive-pit.js の1本）。ここで条件を書かない。 */
+    const archived = !!(window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c));
+    const gone   = (c && (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled')) && !archived;
     let h = '';
     if (isResv){
       /* 🔴 v1.101.0（ゆうた指定）→ v1.134.0 で整理 **まだ入庫していない車のメニュー**
@@ -969,8 +988,27 @@
       h += '<button class="cv-opti" onclick="cvCheckIn()"><i data-ic=download data-ics=16></i> 入庫中にする</button>'
         +  '<button class="cv-opti" onclick="cvAskCancelResv()"><i data-ic=ban data-ics=16></i> 予約キャンセルにする…</button>'
         +  '<div class="cv-optdiv"></div>';
+    } else if (archived){
+      /* 🔴🔴 v1.136.0（ゆうた確定）**アーカイブ済みの車。**
+         🗣「アーカイブまで行った車は基本マスターとか管理者以外は触れない」
+         🗣「アーカイブから戻すは管理者ならOK」／「消すは誰でもでいい」
+         ◎出るもの
+           ・**アーカイブから戻す…** … 管理者は押せる／それ以外は 🔒 管理のみ（押すと顧客と同じ断りの窓）
+           ・**消去する…** … 誰でも押せる。ただし**2枚聞く**（`cvAskDelete`）
+         ⚠ 「売上なしでアーカイブする」はもう出さない（すでにアーカイブ済み）。
+         ⚠ ボタンを消すだけにしない＝`cvBackToReserve` の中でも同じ条件で止めている。 */
+      const canR = !(window.PitArchive && PitArchive.canRestore) || PitArchive.canRestore();
+      h += canR
+        ? '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> アーカイブから戻す…</button>'
+        : '<button class="cv-opti cv-optlocked" onclick="cvDenyRestore()"><i data-ic=undo data-ics=16></i> アーカイブから戻す…'
+          + '<span class="cv-adminonly"><i data-ic=lock data-ics=14></i> 管理のみ</span></button>';
+      h += '<div class="cv-optdiv"></div>';
     } else if (!gone){
-      h += '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> 予約に戻す…</button>'
+      /* ⚠ v1.136.0 「予約に戻す」→「入庫を取り消して予約に戻す」。
+         アーカイブ済みで出る「アーカイブから戻す」と**別物だと分かるように**言葉を離した。
+         ・入庫を取り消して予約に戻す … まだ手元にある車（アーカイブ前）。誰でも
+         ・アーカイブから戻す　　　　 … 終わった車を掘り起こす。管理者だけ */
+      h += '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> 入庫を取り消して予約に戻す…</button>'
         +  '<button class="cv-opti" onclick="cvAskNoSale()"><i data-ic=box data-ics=16></i> 売上なしでアーカイブする…</button>'
         +  '<div class="cv-optdiv"></div>';
     }
@@ -1014,10 +1052,25 @@
       + '<textarea class="cv-fpbody" id="cv-fpbody" placeholder="付箋の内容（例：部品が入荷したら連絡）"></textarea>'
       + '<div class="cv-fpcolors"><span class="cv-fpc on" data-col="yellow" style="background:#fde68a" onclick="cvFpColor(this)"></span><span class="cv-fpc" data-col="red" style="background:#fca5a5" onclick="cvFpColor(this)"></span><span class="cv-fpc" data-col="green" style="background:#a7f3d0" onclick="cvFpColor(this)"></span><span class="cv-fpc" data-col="blue" style="background:#bfdbfe" onclick="cvFpColor(this)"></span></div>'
       + '<div class="cv-fpacts"><button class="cv-ng" onclick="cvCloseFusen()">取消</button><button class="cv-ok" onclick="cvFusenIssue()">付箋を発行</button></div></div>'
-      + '<div class="cv-delpop" id="cv-delpop"><div class="cv-dpt">この予約を削除しますか？</div>'
-      + '<div class="cv-dpsub">'+esc(link)+'</div>'
-      + '<div class="cv-dpnote">予約番号は欠番として残ります（再利用しません）。</div>'
-      + '<div class="cv-fpacts"><button class="cv-ng" onclick="cvCloseDel()">取消</button><button class="cv-dpdel" onclick="cvDeleteCard()">削除する</button></div></div>';
+      + delPopHtml(c, link);
+  }
+
+  /* 🗑 消去の**2枚目**（v1.136.0）＝その車を名指しして見せる最終確認。
+     ⚠ 1枚目（`cvAskDelete`）を通らないと出ない。
+     🔴 言葉は「消去」でそろえる（「削除」は使わない）。
+     ⚠ 実績カウント日か確定売上を持っている車は、**何が消えるかを名指しで言う**。 */
+  function delPopHtml(c, link){
+    const hasResult = !!(c && (c.completedAt || (c.amountFinal != null && c.amountFinal !== '')));
+    const note = (hasResult
+        ? '🔴 <b>実績・確定売上・お客様の来店履歴</b>からも、この1台ぶんが消えます。<br>'
+        : '')
+      + '<b>元に戻せません。</b>予約番号は欠番として残ります（再利用しません）。';
+    return '<div class="cv-delpop' + (hasResult ? ' cv-delpop-hard' : '') + '" id="cv-delpop">'
+      + '<div class="cv-dpt">本当に消去しますか？</div>'
+      + '<div class="cv-dpsub">' + esc(link) + '</div>'
+      + '<div class="cv-dpnote">' + note + '</div>'
+      + '<div class="cv-fpacts"><button class="cv-ng" onclick="cvCloseDel()">やめる</button>'
+      + '<button class="cv-dpdel" onclick="cvDeleteCard()">消去する</button></div></div>';
   }
 
   // ===== メイン描画 =====
@@ -1417,7 +1470,33 @@
   window.cvToggleFusen = function(e){ e.stopPropagation(); const f=document.getElementById('cv-fusenpop'); const sh=f.classList.contains('show'); closeAllPop(); if(!sh)f.classList.add('show'); };
   window.cvCloseFusen = function(){ const f=document.getElementById('cv-fusenpop'); if(f)f.classList.remove('show'); };
   window.cvFpColor = function(el){ el.parentNode.querySelectorAll('.cv-fpc').forEach(function(x){x.classList.remove('on');}); el.classList.add('on'); };
-  window.cvAskDelete = function(){ const m=document.getElementById('cv-optmenu'); if(m)m.classList.remove('show'); const d=document.getElementById('cv-delpop'); if(d)d.classList.add('show'); };
+  /* 🗑🗑 v1.136.0（ゆうた確定・2026-08-18）**消去は2枚聞く。**
+     🗣「消すは誰でもでいいが、ポップアップを2重で出す。戻らない旨、通常は何かしらのアーカイブに
+        落ち着く旨を伝えて」
+
+     ◎1枚目＝**考え直させる紙**（アプリ内ダイアログ）
+        「戻せない」ことと、「ふつうはアーカイブで残す」ことを言う。
+        ここで“やめる”を選びやすくするのが目的なので、既定は「やめる」。
+     ◎2枚目＝**その車の名前を出した最終確認**（カードの上の窓・今までのもの）
+        何の車を消すのかを名指しで見せてから消す。
+     🔴 **誰でも押せる**（ゆうた指定）。管理者だけにはしない。
+        代わりに**2枚にして、言葉で止める。**
+     ⚠ 消す処理そのもの（`cvDeleteCard`）は1文字も変えていない。入口の聞き方だけ。 */
+  window.cvAskDelete = function(){
+    const m = document.getElementById('cv-optmenu'); if (m) m.classList.remove('show');
+    const c = _c; if (!c) return;
+    _cvAsk('消去する前に',
+           'このカードを消去すると、データごと無くなります。\n元に戻せません。',
+           ['・ふつうは消去ではなく、いずれかの<アーカイブ>に落ち着きます。',
+            '　アーカイブなら記録も金額も残り、お客様の来店履歴にも出ます。',
+            '・消去は「間違えて作ったカード」など、そもそも無かったことにしてよいものだけに使ってください。',
+            '・フロー（進捗ログ）・作業内容・担当者も、まとめて無くなります。'].join('\n'),
+           'それでも消去する')
+      .then(function(yes){
+        if (!yes) return;
+        const d = document.getElementById('cv-delpop'); if (d) d.classList.add('show');
+      });
+  };
   window.cvCloseDel = function(){ const d=document.getElementById('cv-delpop'); if(d)d.classList.remove('show'); };
 
   window.cvFusenIssue = function(){
@@ -1460,6 +1539,11 @@
          + (((window.pitCustName ? pitCustName(c) : c.customer) || '') ? (((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様') : '')
          + (c.car ? ' / ' + c.car : '');
   }
+  /* ⚠ v1.136.0 気づいたこと＝**`title` は画面に出ていない。**
+     `UI.confirm(title, opt)` は**第1引数が見出し**なので、ここで渡している `opt.title` は上書きされる。
+     ＝ 窓の見出しに出るのは `msg` のほう。`title` は**呼ぶ側の覚え書きにしかなっていない**。
+     ⚠ 直すと既存の窓（承認・売上なし・予約に戻す）の見出しが全部変わるので、
+        **ここでは触らない**。見出しに出したい言葉は `msg` の1行目に書くこと。 */
   function _cvAsk(title, msg, det, okTxt){
     if (window.UI && UI.confirm) return UI.confirm(msg, { title: title, detail: det, ok: okTxt, cancel: 'やめる' });
     return Promise.resolve(false);   /* ⚠ ブラウザ純正の confirm は使わない（v1.75.0 の決めごと） */
@@ -1566,18 +1650,40 @@
      🔴 **残すもの**＝作業内容・フロー（進捗ログ）・担当者・お客様と車の情報。**本当にあったことだから消さない。**
      🔴 **代車の貸出はそのまま残す**（ゆうた指定）。先に代車だけ出しているケースがあるので勝手に取り消さない。
      ⚠ 実績になった車（返車済み）にはこのボタンを出していない＝**実績を後から予約へ戻す道は作らない。** */
+  /* 🔒 v1.136.0 アーカイブから戻せない人が押した時。**顧客・車両と同じ断り方**（archive-pit.js の1本）。 */
+  window.cvDenyRestore = function(){
+    closeAllPop();
+    if (window.PitArchive && PitArchive.denyRestore) PitArchive.denyRestore();
+  };
+
   window.cvAskBackToReserve = function(){
     if (!_c) return; closeAllPop();
     const c = _c;
+    /* 🔴 v1.136.0 アーカイブ済みかどうかで、窓の言い方を変える（メニューの言葉とそろえる）。 */
+    const arch = !!(window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c));
+    if (arch && window.PitArchive && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
     const det = ['・入庫してから付いた記録を取り消します（工程・完TEL・返車の予定・確定売上）',
                  '・作業内容・フロー（進捗ログ）・担当者はそのまま残ります',
                  (c.needLoaner ? '・代車の貸出はそのまま残ります（取り消すなら代車カレンダーから）' : '')]
                 .filter(Boolean).join('\n');
-    _cvAsk('予約に戻す', 'この入庫を取り消して、予約に戻しますか？\n' + _cvLabel(c), det, '予約に戻す')
+    const ttl = arch ? 'アーカイブから戻す' : '入庫を取り消して予約に戻す';
+    const msg = (arch ? 'アーカイブから戻して、予約の状態にしますか？\n'
+                      : 'この入庫を取り消して、予約に戻しますか？\n') + _cvLabel(c);
+    _cvAsk(ttl, msg, det, arch ? 'アーカイブから戻す' : '予約に戻す')
       .then(function(yes){ if (yes) cvBackToReserve(); });
   };
   window.cvBackToReserve = function(){
     const c = _c; if (!c) return;
+    /* 🔴 v1.136.0 **ボタンを消しただけにしない。** アーカイブ済みを戻せるのは管理者だけ。
+       ⚠ 外から呼ばれても（古い画面・別タブ・コンソール）ここで止まる。 */
+    if (window.PitArchive && PitArchive.cardArchived && PitArchive.cardArchived(c)
+        && PitArchive.canRestore && !PitArchive.canRestore()){
+      if (PitArchive.denyRestore) PitArchive.denyRestore();
+      return;
+    }
     c.status = 'reserved';
     c.returnStage    = null;
     c.returnDate     = '';   c.returnTime = '';
@@ -1615,7 +1721,7 @@
                  '・お客様の来店履歴には「売上なし」で残ります',
                  '🔴 実績カレンダー・売上・台数には一切入りません',
                  '・戻したい時は、この画面の ⋮ →「予約に戻す」で入庫の状態に戻せます'].join('\n');
-    _cvAsk('売上なしでアーカイブする', '売上なしで片付けますか？\n' + _cvLabel(c), det, '売上なしでアーカイブ')
+    _cvAsk('売上なしでアーカイブする', '売上なしでアーカイブしますか？\n' + _cvLabel(c), det, '売上なしでアーカイブ')
       .then(function(yes){ if (yes) cvNoSaleArchive(); });
   };
   window.cvNoSaleArchive = function(){
@@ -1649,7 +1755,7 @@
 
   window.cvDeleteCard = function(){
     if(!_c) return; const idx = state.cards.findIndex(c=>c.id===_c.id);
-    if(window.pitLog) pitLog('予約カードを削除', { kind:'delete', label: (_c.resNo? '['+_c.resNo+'] ':'') + ((window.pitCustName?pitCustName(_c):_c.customer)? (window.pitCustName?pitCustName(_c):_c.customer)+' 様':'') + (_c.car? ' / '+_c.car:'') });
+    if(window.pitLog) pitLog('予約カードを消去', { kind:'delete', label: (_c.resNo? '['+_c.resNo+'] ':'') + ((window.pitCustName?pitCustName(_c):_c.customer)? (window.pitCustName?pitCustName(_c):_c.customer)+' 様':'') + (_c.car? ' / '+_c.car:'') });
     if(idx>=0) state.cards.splice(idx,1);
     cvCloseDel();
     if(window.closeDetail) closeDetail(); else save();

@@ -1,5 +1,5 @@
 /* ========================================
-   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.123.0
+   shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.124.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
    ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
@@ -324,6 +324,7 @@
         横＝表の横スクロール（`.shk-scroll`）。**先の日付へも持って行けるようにする。**
      ⚠ 端で止まっている間もドロップ先を見直す（動かさないと枠が光らない、を防ぐ）。 */
   var _scV=null, _scH=null, _scTimer=null, _lastPt=null;
+  var _armU=false, _armD=false, _armL=false, _armR=false;   /* その向きへ流してよいか（下の説明を読む） */
   function _findScrollerY(){
     var el=document.getElementById('shakencal-body');
     while(el && el!==document.body){
@@ -334,19 +335,54 @@
     return null;
   }
   function _edge(pos, lo, hi, M){ return pos < lo+M ? -1 : pos > hi-M ? 1 : 0; }
+
+  /* 🔴🔴 v1.124.0 **掴んだ瞬間に「決定」の行を見えるところへ出す**
+     （2026-08-18 ゆうた「つまめるけど 決定の所がアクティブにならない感じ」）
+     ⚠ 車が増えると決定の行が**画面の上に隠れる**。そこから下のガントの帯を掴んで上へ運んでも、
+        通り道はぜんぶ別のガントの行なので**どこも光らないまま**＝落とす場所が無い。
+        実際に再現した（決定の行が y=-2 ＝ 画面の外。上へ運んでも最後まで光らなかった）。
+     🔴 だから **帯を掴んだ時点で、決定の行を画面の中に入れてしまう。**
+        ＝いつでも「上にある決定の枠へ持っていく」だけで済む。
+     ⚠ 決定チップを掴んだ時は動かさない（もともとその行にいるので、動かすと画面が跳ねる）。 */
+  function _ensureDecideVisible(){
+    var sc=_findScrollerY(); if(!sc) return;
+    var cell=document.querySelector('#shakencal-body .shk-decell'); if(!cell) return;
+    var r=cell.getBoundingClientRect(), s=sc.getBoundingClientRect();
+    /* ⚠ 置く高さは **端の帯（自動スクロールが走る40px）より下**。
+       すぐ上に置くと、決定の枠に近づいた瞬間に自動スクロールが走って**枠が逃げていく**。
+       実際にそれで「決定の所がアクティブにならない」が残っていた（2026-08-18）。 */
+    var PAD=76;
+    if(r.top < s.top+PAD || r.top > s.bottom-60){ sc.scrollTop += (r.top - s.top) - PAD; }
+  }
+
   function _autoScrollStart(){
     _scV=_findScrollerY();
     _scH=document.querySelector('#shakencal-body .shk-scroll');
+    /* ⚠ 掴んだ場所がすでに端の中だと、動かしていないのに走り出してしまう。
+       **一度その端から離れるまで、その向きへは流さない**（下端の帯を掴んだ時の暴走よけ）。 */
+    _armU=_armD=_armL=_armR=false;
     if(_scTimer) clearInterval(_scTimer);
     _scTimer=setInterval(function(){
       if(!_pdrag || !_lastPt) return;
-      /* ⚠ 端の帯は**狭く**（48px）。広いと「見えた枠の上に指を置いているのに、まだスクロールし続ける」
+      /* ⚠ 端の帯は**狭く**（40px）。広いと「見えた枠の上に指を置いているのに、まだスクロールし続ける」
          ことになって、狙った枠が通り過ぎてしまう。 */
-      var M=48, moved=false;
-      if(_scV){ var rv=_scV.getBoundingClientRect(); var dy=_edge(_lastPt.y, rv.top, rv.bottom, M);
-        if(dy){ var b4=_scV.scrollTop; _scV.scrollTop+=dy*16; moved = moved || (_scV.scrollTop!==b4); } }
-      if(_scH){ var rh=_scH.getBoundingClientRect(); var dx=_edge(_lastPt.x, rh.left, rh.right, M);
-        if(dx){ var b4h=_scH.scrollLeft; _scH.scrollLeft+=dx*20; moved = moved || (_scH.scrollLeft!==b4h); } }
+      var M=40, moved=false;
+      if(_scV){
+        var rv=_scV.getBoundingClientRect(), dy=_edge(_lastPt.y, rv.top, rv.bottom, M);
+        if(dy!==-1) _armU=true;
+        if(dy!==1)  _armD=true;
+        if((dy===-1&&_armU)||(dy===1&&_armD)){
+          var b4=_scV.scrollTop; _scV.scrollTop+=dy*10; moved = moved || (_scV.scrollTop!==b4);
+        }
+      }
+      if(_scH){
+        var rh=_scH.getBoundingClientRect(), dx=_edge(_lastPt.x, rh.left, rh.right, M);
+        if(dx!==-1) _armL=true;
+        if(dx!==1)  _armR=true;
+        if((dx===-1&&_armL)||(dx===1&&_armR)){
+          var b4h=_scH.scrollLeft; _scH.scrollLeft+=dx*14; moved = moved || (_scH.scrollLeft!==b4h);
+        }
+      }
       if(moved) _updateZone(_lastPt.x, _lastPt.y);
     }, 16);
   }
@@ -381,6 +417,9 @@
       if(_srcEl && _srcEl.classList) _srcEl.classList.add('shk-dragsrc');   // 元チップを薄く
       _ghostEl=document.createElement('div'); _ghostEl.className='shk-chip shk-ghostchip'; _ghostEl.textContent=_pdrag.label;
       _autoScrollStart();   /* 🔴 v1.123.0 端まで来たら自分でスクロールする */
+      /* 🔴 v1.124.0 帯（候補）を掴んだ時は、決定の行を先に見えるところへ出す。
+         ⚠ 決定チップを掴んだ時はやらない（もともとその行にいる＝画面が跳ねるだけ）。 */
+      if(_srcEl && _srcEl.classList && _srcEl.classList.contains('shk-bar')) _ensureDecideVisible();
     }
     e.preventDefault();
     _lastPt={x:e.clientX, y:e.clientY};

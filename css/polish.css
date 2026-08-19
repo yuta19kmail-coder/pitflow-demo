@@ -2151,3 +2151,50 @@ th.cfs-lg-d{ z-index:3; }
 .kb-line.kb-line-tmp{ cursor:default; opacity:.42; }
 .kb-line.kb-line-tmp .kb-line-bar{ border-top-style:dotted; }
 .kanban.pf-sorting .kanban-col-head .count{ color:#8dc2f5; border:1px solid rgba(55,138,221,.45); }
+
+/* ==========================================================================
+   🚙 v1.145.0 貸出履歴（代車管理のいちばん下・fleet.js の _flHistoryHtml）
+   ゆうた指定 2026-08-19「代車管理の下部に履歴一覧。テキストベースでいいから
+   過去を含めて がーーーっと全履歴が残るイメージ」／「新しい順＋代車で絞れる」
+   ⚠ **見るだけの一覧**なので、押せるのは上の絞り込みボタンだけ。行は押せない見た目にする。
+   ========================================================================== */
+.fl-hist-fil{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.fl-hist-chip{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 10px; border:1px solid var(--border); border-radius:20px;
+  background:var(--bg3); color:var(--text2);
+  font-size:11.5px; font-weight:700; white-space:nowrap; cursor:pointer;
+}
+.fl-hist-chip:hover{ border-color:var(--brand); color:var(--brand); }
+.fl-hist-chip.on{ border-color:var(--brand); background:var(--brand); color:#fff; }
+.fl-hist-chip .fl-hist-n{ font-size:10px; font-weight:800; opacity:.75; }
+.fl-hist-chip .fl-hist-ret{ font-size:9.5px; font-weight:800; background:var(--bg4); color:var(--text3);
+  border-radius:4px; padding:0 4px; }
+.fl-hist-chip.on .fl-hist-ret{ background:rgba(255,255,255,.25); color:#fff; }
+
+/* 1行1貸出。狭い画面では折り返す */
+.fl-hist-rows{ display:flex; flex-direction:column; }
+.fl-hist-row{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:6px 4px; border-bottom:1px solid var(--border);
+  font-size:12.5px; color:var(--text2);
+}
+.fl-hist-row:last-child{ border-bottom:none; }
+.fl-hist-row:hover{ background:var(--bg3); }
+.fl-hist-lo{ flex:0 0 auto; min-width:118px; display:inline-flex; align-items:center; gap:5px;
+  font-weight:800; color:var(--text); }
+.fl-hist-lo .fl-hist-ret{ font-size:9.5px; font-weight:800; background:var(--bg4); color:var(--text3);
+  border-radius:4px; padding:0 4px; }
+.fl-hist-dt{ flex:0 0 auto; min-width:150px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; }
+.fl-hist-day{ flex:0 0 auto; min-width:44px; text-align:right; color:var(--text3); font-size:11.5px; }
+.fl-hist-st{ flex:0 0 auto; font-size:10.5px; font-weight:800; border-radius:5px; padding:1px 7px; }
+.fl-hist-st.done{ background:var(--bg4); color:var(--text3); }
+.fl-hist-st.now{ background:rgba(38,162,105,.18); color:var(--brand); border:1px solid rgba(38,162,105,.45); }
+.fl-hist-who{ flex:1 1 auto; min-width:0; color:var(--text); font-weight:700;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fl-hist-who small{ font-weight:600; color:var(--text2); margin-left:5px; }
+.fl-hist-tag{ flex:0 0 auto; font-size:10px; font-weight:800; border-radius:5px; padding:1px 6px;
+  background:var(--bg4); color:var(--text2); }
+.fl-hist-tag.emg{ background:rgba(239,68,68,.16); color:#ff8b8b; border:1px solid rgba(239,68,68,.4); }
+.fl-hist-memo{ flex:0 0 auto; max-width:34%; font-size:11.5px; color:var(--text3);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

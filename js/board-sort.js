@@ -130,7 +130,10 @@
     if (!isOn()) return '';
     return '<div class="kb-tmpbar">⇅ <b>' + esc(labelOf(_mode)) + '</b> で並べて見ています'
          + ' ─ <b>表示だけ</b>です。マスター並びは変わっていません／カードは動かせません'
-         + '<button type="button" class="kb-tmpbar-x" onclick="pitBoardSortSet(\'master\')">マスター並びに戻す</button></div>';
+         /* 🔴 v1.140.2（ゆうた指定）**帯の戻すボタンは全部「キャンセル」で統一。**
+            ⚠ 青（並び替え）と緑（絞り込み）で言葉が違うと、押す前に読まないといけない。
+               役割は同じ「いま掛けているものを外す」なので、**言葉も1つ**にする。 */
+         + '<button type="button" class="kb-tmpbar-x" onclick="pitBoardSortSet(\'master\')">キャンセル</button></div>';
   }
 
   /* ---------- ボタンとメニュー ---------- */

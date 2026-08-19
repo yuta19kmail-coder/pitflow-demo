@@ -186,7 +186,8 @@
     return '<div class="kb-filtbar">' + (_on ? '<b>' + esc(nm) + '</b> さん（自分）の担当だけ出しています'
                                              : '<b>' + esc(nm) + '</b> さんの担当だけ出しています')
          + ' ─ 1課・2課をまたいで集めています'
-         + '<button type="button" class="kb-filtbar-x" onclick="pitMemberFilterClear()">全部出す</button></div>';
+         /* 🔴 v1.140.2（ゆうた指定）帯の戻すボタンは**全部「キャンセル」で統一**（board-sort.js の青い帯と同じ言葉）。 */
+         + '<button type="button" class="kb-filtbar-x" onclick="pitMemberFilterClear()">キャンセル</button></div>';
   }
 
   /* ---------- スイッチ ---------- */

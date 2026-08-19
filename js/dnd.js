@@ -214,7 +214,7 @@
        ⚠ 止めるのは**看板の中だけ**＝当日・返車・PIT配置図などのドラッグには一切かからない。 */
     if (window.PitBoardSort && PitBoardSort.isOn() && card.closest('.kanban.pf-sorting')){
       e.preventDefault();
-      if (window.pitToast) pitToast('並び替えて見ている間は動かせません。「マスター並びに戻す」を押してください');
+      if (window.pitToast) pitToast('並び替えて見ている間は動かせません。帯の「キャンセル」を押してください');
       return;
     }
     draggingId = card.dataset.cardId;

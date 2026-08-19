@@ -34,8 +34,28 @@
   // ヘルパー
   // -----------------------------------------
   function _toast(msg) { if (window.pitToast) pitToast(msg); }
-  function _save() { if (window.PitDB && PitDB.save) PitDB.save(); }
+  /* 🔴 v1.142.0 保存先は付箋の出どころで変わる（まとめて表示・coreflow-note-all.js）。
+     ⚠ **よその付箋を PitDB に保存しない。** PitFlow のデータではないので、書くと二重に増える。 */
+  function _save(note) {
+    if (note && window.CFNoteAll && CFNoteAll.isForeign(note)) { CFNoteAll.save(note, function () { renderBoardNotes(); }); return; }
+    if (window.PitDB && PitDB.save) PitDB.save();
+  }
+  /* 🔴 **書く用**＝PitFlow 自身の付箋の配列。ここに よその付箋を混ぜないこと（push/splice の相手） */
   function _notes() { if (!Array.isArray(state.boardNotes)) state.boardNotes = []; return state.boardNotes; }
+  /* 🔴 **読む用**＝画面に出す全部（まとめて表示がONなら よそのアプリの付箋も混ざる） */
+  function _all() {
+    var mine = _notes();
+    if (!window.CFNoteAll || !CFNoteAll.isOn()) return mine;
+    return mine.concat(CFNoteAll.foreign());
+  }
+  function _find(id) { return _all().find(function (x) { return x && x.id === id; }) || null; }
+  function _foreign(n) { return !!(window.CFNoteAll && CFNoteAll.isForeign(n)); }
+  /* よその付箋にできるのは「返信」と「チェック」だけ（ゆうた指定）。編集・消去・並び替えは止める。 */
+  function _denyForeign(n) {
+    if (!_foreign(n)) return false;
+    _toast('まとめて表示中です。' + (window.CFNoteAll ? CFNoteAll.labelOf(n) : 'よそのアプリ') + 'の付箋は、そのアプリで直してください');
+    return true;
+  }
   function _esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -207,9 +227,15 @@
       `<option value="${_esc(s.id)}" ${s.id === meId ? 'selected' : ''}>${_esc(s.name)}</option>`).join('');
 
     // シークレット付箋は作成者本人以外には出さない
-    const cards = _notes()
+    /* 🔴 v1.142.0 出すのは _all()＝自分の付箋＋（まとめて表示ONなら）よそのアプリの付箋。
+       ⚠ 並びは今までどおり order 順。**よその付箋は後ろにまとめる**＝自分の盤の順番が崩れない。 */
+    const cards = _all()
       .filter(n => !(_isSecretNote(n) && n.authorUid !== meId))
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+      .sort((a, b) => {
+        const fa = _foreign(a) ? 1 : 0, fb2 = _foreign(b) ? 1 : 0;
+        if (fa !== fb2) return fa - fb2;
+        return (a.order || 0) - (b.order || 0);
+      });
 
     const cardsHtml = cards.length === 0
       ? '<div class="bn-empty">付箋はまだありません。「＋ 付箋を追加」から最初の1枚を作りましょう。</div>'
@@ -229,6 +255,7 @@
           <div class="bn-label-chips">${labelChipsHtml}</div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          ${_allBtnHtml()}
           <button class="bn-add-btn" onclick="openBoardNoteModal(null)">＋ 付箋を追加</button>
         </div>
       </div>
@@ -236,6 +263,22 @@
     `;
   }
   window.renderBoardNotes = renderBoardNotes;
+
+  /* 🔴 v1.142.0（ゆうた指定 2026-08-19）「まとめて表示」のボタン。
+     🗣「新規付箋の横にボタン。押すと MHS・PitFlow・CarFlow 全アプリの付箋が集合して一斉表示。
+     　　もう一度押すか、ビューを切り替えたらデフォルトに戻る。**ボタンは新規より目立たない形がいい**」
+     ⚠ 出すのは**本番モードだけ**（練習用にはよそのアプリのデータが無いので押しても何も起きない）。
+     ⚠ 中身は coreflow-note-all.js。ここは呼ぶだけ。 */
+  function _allBtnHtml() {
+    if (!window.CFNoteAll || !CFNoteAll.available()) return '';
+    const on = CFNoteAll.isOn();
+    const n = on ? CFNoteAll.count() : 0;
+    return `<button type="button" class="cfa-btn${on ? ' on' : ''}" onclick="pitNoteAllToggle()"
+      title="${on ? 'CarFlow・MHS の付箋も一緒に出しています。もう一度押すと PitFlow だけに戻ります'
+                  : 'CarFlow・MHS の付箋も一緒に出す（別の画面へ移ると戻ります）'}"
+      >まとめて表示${on && n ? `<span class="cfa-n">+${n}</span>` : ''}</button>`;
+  }
+  window.pitNoteAllToggle = function () { if (window.CFNoteAll) CFNoteAll.toggle(); };
 
   function _renderNoteCard(note) {
     const color = NOTE_COLORS.includes(note.color) ? note.color : 'yellow';
@@ -257,7 +300,8 @@
     const deadlineHtml = note.deadline
       ? `<div class="bn-deadline ${overdue ? 'is-overdue' : ''}">${overdue ? '<i data-ic=warn data-ics=16></i> ' : '<i data-ic=clock data-ics=16></i> '}${_esc(_formatDeadline(note.deadline))}</div>` : '';
 
-    const dragAttrs = (!_isTouchDevice())
+    /* 🔴 v1.142.0 よその付箋は**並び替えできない**（順番はそのアプリのものだから） */
+    const dragAttrs = (!_isTouchDevice() && !_foreign(note))
       ? `draggable="true"
            ondragstart="boardNoteOnDragStart(event, '${_esc(note.id)}')"
            ondragover="boardNoteOnDragOver(event)"
@@ -297,14 +341,14 @@
     }
 
     return `
-      <div class="bn-card bn-color-${color} ${done ? 'is-done' : ''} ${overdue ? 'is-overdue' : ''}"
+      <div class="bn-card bn-color-${color} ${done ? 'is-done' : ''} ${overdue ? 'is-overdue' : ''} ${_foreign(note) ? 'cfa-foreign' : ''}"
            data-note-id="${_esc(note.id)}"
            ${done ? 'onclick="bnToggleDonePeek(event)"' : ''}
            ${dragAttrs}>
         ${done ? '<div class="bn-done-stamp">済</div>' : ''}
         ${labelText ? `<div class="bn-card-label">${_esc(labelText)}</div>` : ''}
         <button class="bn-menu-btn" onclick="event.stopPropagation();openBoardNoteActions('${_esc(note.id)}')" title="メニュー">⋮</button>
-        <div class="bn-title">${secretBadge}${titleHtml}</div>
+        <div class="bn-title">${(window.CFNoteAll ? CFNoteAll.badgeHtml(note) : '')}${secretBadge}${titleHtml}</div>
         ${imgHtml}
         ${bodyHtml ? `<div class="bn-body">${bodyHtml}</div>` : ''}
         ${deadlineHtml}
@@ -323,7 +367,7 @@
   // -----------------------------------------
   function openBoardNoteActions(noteId) {
     _activeMenuNoteId = noteId;
-    const note = _notes().find(x => x.id === noteId);
+    const note = _find(noteId);
     const t = document.getElementById('bn-actionsheet-title');
     if (t) t.textContent = note && note.title ? note.title : '付箋メニュー';
     const isDone = !!(note && note.status === 'done');
@@ -331,6 +375,13 @@
     const uEl = document.getElementById('bn-action-undone');
     if (dEl) dEl.style.display = isDone ? 'none' : '';
     if (uEl) uEl.style.display = isDone ? '' : 'none';
+    /* 🔴 v1.142.0 よその付箋にできるのは「返信」と「チェック（済・回覧の確認）」だけ（ゆうた指定）。
+       ⚠ ボタンを消すだけにしない＝実行する関数の中でも _denyForeign で止めている。 */
+    const isFgn = _foreign(note);
+    const eEl = document.getElementById('bn-action-edit');
+    const xEl = document.getElementById('bn-action-delete');
+    if (eEl) eEl.style.display = isFgn ? 'none' : '';
+    if (xEl) xEl.style.display = isFgn ? 'none' : '';
     /* 🔴 v1.141.0 **回覧でも返信できる**（ゆうた指定）。以前はここで隠していた。
        ⚠ 「済にする／戻す」は回覧では出さないまま＝回覧の完了は各自の「✓ 自分が確認」で決まる。 */
     const rEl = document.getElementById('bn-action-reply');
@@ -422,30 +473,30 @@
   // 済 / 未済 / 回覧 / 消去
   // -----------------------------------------
   function markBoardNoteDone(noteId) {
-    const n = _notes().find(x => x.id === noteId);
+    const n = _find(noteId);
     if (!n) return;
     n.status = 'done';
     n.doneAt = Date.now();
     n.doneByUid = _meId() || null;
-    _save();
+    _save(n);
     renderBoardNotes();
   }
   window.markBoardNoteDone = markBoardNoteDone;
 
   function markBoardNoteUndone(noteId) {
-    const n = _notes().find(x => x.id === noteId);
+    const n = _find(noteId);
     if (!n) return;
     n.status = 'open';
     n.doneAt = null;
     n.doneByUid = null;
     if (n.noteType === 'circulate') n.doneByUids = [];
-    _save();
+    _save(n);
     renderBoardNotes();
   }
   window.markBoardNoteUndone = markBoardNoteUndone;
 
   function markCirculationSelf(noteId) {
-    const n = _notes().find(x => x.id === noteId);
+    const n = _find(noteId);
     if (!n) return;
     const uid = _meId();
     if (!uid) { _toast('「自分」を選んでください'); return; }
@@ -456,14 +507,15 @@
     const allDone = uids.length > 0 && uids.every(u => n.doneByUids.includes(u));
     if (allDone) { n.status = 'done'; n.doneAt = Date.now(); n.doneByUid = uid; }
     else { n.status = 'open'; n.doneAt = null; }
-    _save();
+    _save(n);
     renderBoardNotes();
   }
   window.markCirculationSelf = markCirculationSelf;
 
   function deleteBoardNoteFromCard(noteId) {
-    const n = _notes().find(x => x.id === noteId);
+    const n = _find(noteId);
     if (!n) return;
+    if (_denyForeign(n)) return;
     pitAsk(`付箋「${n.title || '(無題)'}」を消去しますか？`, { danger: true, ok: '消去する' }).then(function (yes) {
       if (!yes) return;
       const i = _notes().findIndex(x => x.id === noteId);
@@ -483,7 +535,8 @@
     _editor.photoChanged = false;
     _editor.members = [];
 
-    const note = noteId ? _notes().find(x => x.id === noteId) : null;
+    const note = noteId ? _find(noteId) : null;
+    if (note && _denyForeign(note)) return;
     const isNew = !note;
 
     document.getElementById('bn-modal-title').textContent = isNew ? '付箋を追加' : '付箋を編集';
@@ -738,10 +791,14 @@
      ========================================= */
   if (window.CFNoteReply) {
     CFNoteReply.setup({
-      getNote:    function (id) { return _notes().find(function (x) { return x && x.id === id; }) || null; },
+      getNote:    function (id) { return _find(id); },
       getMe:      function () { return _meId(); },
       avatarHtml: function (uid, px) { return _renderAvatar(uid, px); },
-      save:       function (note, done) { _save(); if (done) done(); },
+      /* 🔴 v1.142.0 まとめて表示中は、よその付箋への返信を**そのアプリの入れ物**へ書く。 */
+      save:       function (note, done) {
+        if (_foreign(note) && window.CFNoteAll) { CFNoteAll.save(note, function () { if (done) done(); }); return; }
+        _save(); if (done) done();
+      },
       rerender:   function () { renderBoardNotes(); },
       toast:      function (msg, code) { _toast(msg, code); },
       ask:        function (msg, cb) {
@@ -749,6 +806,30 @@
         else cb(true);
       }
     });
+  }
+
+  /* =========================================
+     🔴 v1.142.0 「まとめて表示」＝全アプリ共通の部品（_shared/coreflow-note-all.js）につなぐ。
+     ⚠ 出すのは**本番モード（クラウド）だけ**。練習用（サンプル・デモ）ではボタンを出さない。
+     ⚠ 別のビューへ移ったら解除（下の showView の包み）。**持ち越さない。**
+     ========================================= */
+  if (window.CFNoteAll) {
+    CFNoteAll.setup({
+      self:     'pitflow',
+      db:       function () { return window.fb && window.fb.db; },
+      company:  function () { return window.fb && window.fb.company && window.fb.company(); },
+      ready:    function () { return !!(window.PitDB && PitDB.mode === 'cloud' && PitDB._loaded); },
+      onChange: function () { renderBoardNotes(); },
+      toast:    function (msg) { _toast(msg); }
+    });
+    /* 別のビューへ移ったら解除（myonly-pit.js と同じ包み方＝views.js は触らない） */
+    var _origShow = window.showView;
+    if (typeof _origShow === 'function') {
+      window.showView = function (v) {
+        if (CFNoteAll.isOn()) CFNoteAll.off(true);   /* ここでは描き直さない＝これから描く画面に任せる */
+        return _origShow.apply(this, arguments);
+      };
+    }
   }
 
   console.log('[board-notes] ready (PitFlow)');

@@ -47,6 +47,9 @@
       var _commitStatus = function(){
         c.status = val;
         c.testDrive = false;   // メイン領域に置く＝試運転フラグOFF（試運転ゾーンから戻した時も解除）
+        /* 🔴 v1.140.0 工程を移したカードは、移った先の列の**いちばん下**（board-order.js）。
+           ⚠ 黙って途中に割り込ませない＝マスター並びを勝手に動かさない、という決めごと。 */
+        if (_changed && window.PitBoardOrder) PitBoardOrder.moveToEnd(c);
         if (_changed){
           if (window.logPhaseMove) logPhaseMove(c, _fromStatus, val);
           else if (window.logFlow && typeof statusLabel === 'function') logFlow(c, statusLabel(val) + 'へ');
@@ -65,6 +68,7 @@
       var _changedTd = (c.status !== val);
       var _commitTd = function(){
         c.status = val; c.testDrive = true;
+        if (_changedTd && window.PitBoardOrder) PitBoardOrder.moveToEnd(c);   /* v1.140.0 */
         if (_changedTd && window.logPhaseMove) logPhaseMove(c, _fromTd, val);
         if (window.PitDB) PitDB.save();
         if (state.currentView) showView(state.currentView);
@@ -86,6 +90,11 @@
         var ci = state.cards.indexOf(c); if (ci >= 0) state.cards.splice(ci, 1);
         var ti = state.cards.indexOf(t); if (ti < 0) ti = state.cards.length;
         state.cards.splice(ti, 0, c);
+        /* 🔴 v1.140.0 **ここが「人が動かした順」＝マスター並び**。
+           ⚠ 上の splice は配列の中を入れ替えるだけで、**どこにも保存されない**（v1.139.0 までの穴）。
+              並び番号（boardOrder）を振り直して初めて、開き直しても・他の人の画面でも同じ順になる。
+           ⚠ 番号を書くのは board-order.js だけ。ここで boardOrder を直接いじらない。 */
+        if (window.PitBoardOrder) PitBoardOrder.moveBefore(c, t);
         if (_changedR && window.logPhaseMove) logPhaseMove(c, _fromR, c.status);
         if (window.PitDB) PitDB.save();
         if (state.currentView) showView(state.currentView);
@@ -179,6 +188,14 @@
   document.addEventListener('dragstart', function (e) {
     const card = e.target.closest('[data-card-id][draggable="true"]');
     if (!card) return;
+    /* 🔴 v1.140.0 **一時並び替え中は看板のカードを動かせない**（ゆうた 2026-08-18 で確定）。
+       ⚠ 仮の並びのまま掴むと「隣のカードの手前」がマスター並びの意味とズレて、並びが壊れる。
+       ⚠ 止めるのは**看板の中だけ**＝当日・返車・PIT配置図などのドラッグには一切かからない。 */
+    if (window.PitBoardSort && PitBoardSort.isOn() && card.closest('.kanban.pf-sorting')){
+      e.preventDefault();
+      if (window.pitToast) pitToast('並び替えて見ている間は動かせません。「マスター並びに戻す」を押してください');
+      return;
+    }
     draggingId = card.dataset.cardId;
     draggingFromPip = !!card.closest('#pitpip');
     card.classList.add('dnd-dragging');

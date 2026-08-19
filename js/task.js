@@ -23,9 +23,29 @@ function renderCourse(boardId, colsElId){
   _renderKanban(board, document.getElementById(colsElId));
 }
 
+/* 🔴 v1.140.0 盤面の上の帯（一時並び替え＝青／絞り込み＝緑）。
+   ⚠ 帯は `.kanban`（列を横に並べる箱）の**外**に置く＝列の並びを崩さない。
+   ⚠ 中身は board-sort.js / myonly-pit.js が作る。ここでは並べるだけ。 */
+function _paintBoardBars(cols){
+  const host = cols && cols.parentNode; if (!host) return;
+  const id = cols.id + '-bars';
+  let bar = document.getElementById(id);
+  const html = (window.PitBoardSort ? PitBoardSort.bannerHtml() : '')
+             + (window.PitMyOnly && PitMyOnly.bannerHtml ? PitMyOnly.bannerHtml() : '');
+  if (!html){ if (bar && bar.parentNode) bar.parentNode.removeChild(bar); return; }
+  if (!bar){ bar = document.createElement('div'); bar.id = id; bar.className = 'kb-bars'; host.insertBefore(bar, cols); }
+  bar.innerHTML = html;
+}
+
 /* 看板の列＋カードを描画（renderTask／renderCourse 共通） */
 function _renderKanban(board, cols){
   if (!board || !cols) return;
+  /* 🔴 v1.140.0 マスター並び（board-order.js）。番号を持っていないカードに、いまの並びのまま振る。
+     ⚠ 変わった時だけ保存する。ふだんは何もしない。 */
+  if (window.PitBoardOrder) PitBoardOrder.ensure();
+  /* 一時並び替え中は盤面に印を付ける（カードのバッジ・線の薄さ・掴めなさは CSS 側） */
+  cols.classList.toggle('pf-sorting', !!(window.PitBoardSort && PitBoardSort.isOn()));
+  _paintBoardBars(cols);
 
   function renderCol(col){
     // returnStage（完TEL待ち/返車待ち）が付いたカードは盤面から外れ、返車ビューへ移る
@@ -34,15 +54,28 @@ function _renderKanban(board, cols){
        ・ON ＝**1課・2課をまたいで自分の担当を集めて**、同じ工程の列に並べる。
        ⚠ どの列に入れるかの判断は myonly-pit.js の colCards に任せる（ここは呼ぶだけ）。
        ⚠ 絞ってから数えるので、列の見出しの件数も**出ている数**と合う。 */
-    const inCol = (window.PitMyOnly && PitMyOnly.colCards)
+    const _picked = (window.PitMyOnly && PitMyOnly.colCards)
       ? PitMyOnly.colCards(board, col)
       : state.cards.filter(c => c.status === col.id && c.boardId === board.id && !c.returnStage);
-    /* よその課から来たカードに印を付ける（見た目だけ・ONの時だけ付く） */
-    const _card = (c, o) => (window.PitMyOnly && PitMyOnly.decorate)
-      ? PitMyOnly.decorate(c, board, cardHtml(c, o)) : cardHtml(c, o);
+    /* 🔴 v1.140.0 並びの物差しは2段。
+       ① マスター並び（board-order.js）＝人が動かした順。**いつでもこれが土台**
+       ② 一時並び替え（board-sort.js）＝見るためだけの並べ替え。データは触らない
+       ⚠ ここで日付や金額を直接くらべない。物差しは board-sort.js の1本に置いてある。 */
+    const inColMaster = window.PitBoardOrder ? PitBoardOrder.sort(_picked) : _picked;
+    const inCol = window.PitBoardSort ? PitBoardSort.apply(inColMaster) : inColMaster;
+    /* よその課から来たカードに印を付ける（見た目だけ・ONの時だけ付く）＋
+       一時並び替え中は「何順で並んでいるか」の数字バッジを付ける（board-sort.js） */
+    const _card = (c, o) => {
+      let h = cardHtml(c, o);
+      if (window.PitMyOnly && PitMyOnly.decorate) h = PitMyOnly.decorate(c, board, h);
+      if (window.PitBoardSort && PitBoardSort.decorate) h = PitBoardSort.decorate(c, h);
+      return h;
+    };
     /* 🔴 v1.69.0 この列の「絞り込む前」の並び（この盤ぶんだけ）。
-       区切りラインの位置を**担当車両のON/OFFで動かさない**ために渡す。 */
-    const ownAll = state.cards.filter(c => c && c.status === col.id && c.boardId === board.id && !c.returnStage);
+       区切りラインの位置を**担当車両のON/OFFで動かさない**ために渡す。
+       🔴 v1.140.0 ここもマスター並びで渡す（配列の順を見ない）。 */
+    const _ownRaw = state.cards.filter(c => c && c.status === col.id && c.boardId === board.id && !c.returnStage);
+    const ownAll = window.PitBoardOrder ? PitBoardOrder.sort(_ownRaw) : _ownRaw;
     /* 列の中身＝自分の課（区切りライン付き）＋よその課のまとまり（「◯課分」のバー）。
        ⚠ 組み立ては myonly-pit.js / board-line.js に任せる。ここは呼ぶだけ。 */
     const _body = (list, allOwn, opt) => {
@@ -120,6 +153,7 @@ function advanceCard(cardId, dir){
   let i = flow.indexOf(c.status);
   if (i < 0){
     if (dir > 0){ const _from = c.status; c.status = flow[0];
+      if (window.PitBoardOrder) PitBoardOrder.moveToEnd(c);   /* v1.140.0 工程を移したカードは列のいちばん下 */
       if (window.logPhaseMove) logPhaseMove(c, _from, flow[0]);
       else if (window.logFlow) logFlow(c, statusLabel(flow[0]) + 'へ');
       if (window.PitDB) PitDB.save(); _rerenderActiveBoard(); }
@@ -131,6 +165,7 @@ function advanceCard(cardId, dir){
   const _to = flow[ni];
   const _commit = function(){
     c.status = _to;
+    if (window.PitBoardOrder) PitBoardOrder.moveToEnd(c);   /* v1.140.0 工程を移したカードは列のいちばん下 */
     if (window.logPhaseMove) logPhaseMove(c, _from, _to);
     else if (window.logFlow) logFlow(c, statusLabel(_to) + 'へ');
     if (window.PitDB) PitDB.save();

@@ -2079,3 +2079,71 @@ th.cfs-lg-d{ z-index:3; }
 .cf-recall-more{ padding:8px 12px; font-size:11.5px; line-height:1.6; color:var(--text3);
   border-bottom:1px solid var(--border); background:var(--bg1);
   position:sticky; top:0; z-index:1; }
+
+/* ==========================================================================
+   🔴 v1.140.0 タスクボードの並び順（board-order.js / board-sort.js / myonly-pit.js）
+   ゆうた指定 2026-08-18
+     ・マスター並び＝人が動かした順。勝手に変わらない
+     ・一時並び替え＝見るためだけ。**青**（データを変えていない印）
+     ・絞り込み（担当車両／メンバー）＝**緑**（誰かで絞っている印）
+   ⚠ 色を分けているのは「いま並びが変なのは並び替えのせい／絞り込みのせい」を
+      一目で切り分けるため。片方だけ色を変えないこと。
+   ========================================================================== */
+
+/* --- ボタン（担当車両・区切りラインと同じ寸法にそろえる） --- */
+.kb-memfilt, .kb-sortbtn{
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:5px 11px; border:1px solid var(--border); border-radius:var(--r, 8px);
+  background:var(--bg3); color:var(--text2);
+  font-size:12px; font-weight:700; line-height:1.5; white-space:nowrap; cursor:pointer; }
+.kb-memfilt:hover{ border-color:var(--brand); color:var(--brand); }
+.kb-memfilt.on{ border-color:var(--brand); background:var(--brand); color:#fff; }
+.kb-sortbtn:hover{ border-color:var(--blue); color:var(--blue); }
+.kb-sortbtn.on{ border-color:var(--blue); background:var(--blue); color:#fff; }
+
+/* --- プルダウン（並び替え／メンバー 共通。body 直下に出す＝列に隠れない） --- */
+.kb-dd{ position:fixed; z-index:9000; min-width:238px;
+  background:var(--bg2); border:1px solid var(--border2); border-radius:10px; padding:6px;
+  box-shadow:0 10px 30px rgba(0,0,0,.55); max-height:70vh; overflow:auto; }
+.kb-dd-h{ font-size:10.5px; font-weight:800; color:var(--text3); letter-spacing:.05em; padding:5px 9px 4px; }
+.kb-dd-i{ display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:7px; cursor:pointer;
+  font-size:12.5px; font-weight:700; color:var(--text); }
+.kb-dd-i:hover{ background:var(--bg3); }
+.kb-dd-i.sel{ background:var(--brand-soft); color:var(--brand); }
+.kb-dd-ck{ width:13px; flex:0 0 13px; font-size:11px; color:var(--brand); }
+.kb-dd-sm{ margin-left:auto; font-size:10.5px; font-weight:700; color:var(--text3); }
+.kb-dd-sep{ height:1px; background:var(--border); margin:5px 4px; }
+.kb-dd-empty{ padding:9px; font-size:11.5px; color:var(--text3); }
+
+/* --- 盤面の上の帯 --- */
+.kb-bars{ flex:0 0 auto; display:flex; flex-direction:column; gap:6px; margin:0 0 8px; }
+.kb-tmpbar, .kb-filtbar{ display:flex; align-items:center; gap:10px; padding:7px 13px;
+  font-size:12px; font-weight:700; border-radius:9px; }
+.kb-tmpbar{ background:rgba(55,138,221,.13); border:1px solid rgba(55,138,221,.42); color:#a9d1f7; }
+.kb-filtbar{ background:rgba(38,162,105,.12); border:1px solid rgba(38,162,105,.42); color:#8ee3ba; }
+.kb-tmpbar b, .kb-filtbar b{ color:#fff; }
+.kb-tmpbar-x, .kb-filtbar-x{ margin-left:auto; border-radius:7px; padding:3px 10px;
+  font-size:11.5px; font-weight:800; cursor:pointer; }
+.kb-tmpbar-x{ border:1px solid rgba(55,138,221,.6); background:rgba(55,138,221,.18); color:#cfe6fb; }
+.kb-tmpbar-x:hover{ background:rgba(55,138,221,.34); }
+.kb-filtbar-x{ border:1px solid rgba(38,162,105,.6); background:rgba(38,162,105,.18); color:#d3f3e3; }
+.kb-filtbar-x:hover{ background:rgba(38,162,105,.34); }
+[data-theme^="light"] .kb-tmpbar{ color:#1d4f86; }
+[data-theme^="light"] .kb-filtbar{ color:#12603f; }
+[data-theme^="light"] .kb-tmpbar b, [data-theme^="light"] .kb-filtbar b{ color:var(--text); }
+
+/* --- 一時並び替え中のカード（何順で並んでいるかを数字で出す） --- */
+.pit-card.pcm.kb-sortkey{ position:relative; margin-top:9px; }
+.pit-card.pcm.kb-sortkey::before{
+  content:attr(data-sortkey); position:absolute; top:-9px; right:7px; z-index:3;
+  font:900 9.5px/1.6 -apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; letter-spacing:.02em;
+  color:#fff; background:var(--blue); border-radius:4px; padding:0 5px;
+  box-shadow:0 1px 4px rgba(0,0,0,.5); pointer-events:none; white-space:nowrap; }
+/* ⚠ 「国産／輸入」の印（担当車両）と場所がぶつかるので、並び替え中は数字を優先する。
+      課は**左の色帯**（緑＝国産／桃＝輸入）で分かるので、情報は落ちない。 */
+.kanban.pf-sorting .pit-card.pcm.kb-xboard::after{ display:none; }
+.kanban.pf-sorting .pit-card.pcm{ cursor:default; }
+/* 区切りラインは薄く出したまま・掴めない（黙って消さない） */
+.kb-line.kb-line-tmp{ cursor:default; opacity:.42; }
+.kb-line.kb-line-tmp .kb-line-bar{ border-top-style:dotted; }
+.kanban.pf-sorting .kanban-col-head .count{ color:#8dc2f5; border:1px solid rgba(55,138,221,.45); }

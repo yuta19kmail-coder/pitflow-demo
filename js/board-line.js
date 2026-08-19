@@ -66,10 +66,17 @@
   /* 🔴 v1.37.0（ゆうた指定）
      ・**×は付けない**＝消すのは「枠の外へドラッグ」だけ。
      ・**名前は最初は付いていない**＝ただの線。**ダブルクリックで入れて、初めて文字が出る。** */
+  /* 🔴 v1.140.0 一時並び替え中は **薄く出したまま・掴めない**（ゆうた 2026-08-18 で確定）。
+     ⚠ 黙って消さない＝「線がどこかへ行った」と思わせない。位置はマスター並びの
+        「上から何枚目」を守る（下の renderColumn を見ること）。 */
+  function tmpOn(){ return !!(w.PitBoardSort && PitBoardSort.isOn()); }
   function lineHtml(l){
     var t = String(l.label || '').trim();
-    return '<div class="kb-line" draggable="true" data-lineid="' + esc(l.id) + '"'
-         + ' title="ドラッグで移動（枠の外へ出すと消えます）／ダブルクリックで名前を入れる">'
+    var tmp = tmpOn();
+    return '<div class="kb-line' + (tmp ? ' kb-line-tmp' : '') + '"'
+         + (tmp ? '' : ' draggable="true"') + ' data-lineid="' + esc(l.id) + '"'
+         + ' title="' + (tmp ? '並び替えて見ている間は動かせません（マスター並びでの位置に出しています）'
+                             : 'ドラッグで移動（枠の外へ出すと消えます）／ダブルクリックで名前を入れる') + '">'
          + '<span class="kb-line-bar"></span>'
          + (t ? '<span class="kb-line-t">' + esc(t) + '</span><span class="kb-line-bar"></span>' : '')
          + '</div>';
@@ -103,6 +110,25 @@
     var sorted = mine.slice().sort(function(a, b){ return at(a) - at(b); });
 
     var out = '', li = 0;
+
+    /* 🔴 v1.140.0 一時並び替え中（board-sort.js）は、カードの並びが**マスター並びとは別物**になる。
+       「どのカードの下か」で置くと、線が意味のない所へ飛ぶ。
+       ⚠ そこで **「上から何枚目か」だけを守って**置く＝マスター並びで3枚目の下にあった線は、
+          並び替えて見ている間も3枚目の下に出る。位置の意味は薄れるので**薄く**出す（lineHtml）。 */
+    if (tmpOn()){
+      var slot = sorted.map(function(l){
+        var a = at(l);
+        var n = (a < 0) ? 0 : (a + 1);
+        return Math.min(n, cards.length);
+      });
+      cards.forEach(function(c, i){
+        while (li < sorted.length && slot[li] <= i){ out += lineHtml(sorted[li]); li++; }
+        out += cardHtmlFn(c);
+      });
+      while (li < sorted.length){ out += lineHtml(sorted[li]); li++; }
+      return out;
+    }
+
     cards.forEach(function(c){
       var ci = (pos[c.id] != null) ? pos[c.id] : END;
       /* このカードより前に来るラインを先に出す（同じ位置＝そのカードの「下」なので出さない） */
@@ -171,6 +197,12 @@
   }
 
   d.addEventListener('dragstart', function (e) {
+    /* 🔴 v1.140.0 一時並び替え中は線を入れる・動かすのも止める（位置がマスター並びと合わないため） */
+    if (tmpOn() && e.target.closest && (e.target.closest('[data-linenew]') || e.target.closest('[data-lineid]'))){
+      e.preventDefault();
+      if (w.pitToast) pitToast('並び替えて見ている間は区切りラインを動かせません');
+      return;
+    }
     var add = e.target.closest && e.target.closest('[data-linenew]');
     if (add){
       draggingNew = true; dragging = null;
@@ -358,6 +390,7 @@
     if (!c || !c.id) return null;
     if (!onBoardView()) return null;
     if (!onBoardCard(c)) return null;
+    if (tmpOn()) return null;   /* 🔴 v1.140.0 一時並び替え中は入れられない（位置がマスター並びと合わないため） */
     return { ic: 'minus', label: 'この下にラインを入れる', sub: '区切り（今日はここまで 等）',
       run: function(){
         put(c.boardId || 'default', c.status || '', c.id, '');

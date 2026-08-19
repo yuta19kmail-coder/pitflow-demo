@@ -628,10 +628,17 @@ function _fleetSubmitInner(){
      ⚠ **見るだけ。**ここから消したり直したりはできない（v1.143.0「返却済みは不可侵」の続き）。
      ⚠ 数える所（何日間・返却済みか）は**貸出の札に書いてある内容だけ**を使う。ここで計算し直さない。
    ===================================================================== */
-let _flHistLo = '';   /* 絞り込み中の代車（空＝全部）。画面の中だけ・保存しない */
+let _flHistLo = '';        /* 絞り込み中の代車（空＝全部）。画面の中だけ・保存しない */
+let _flHistOpen = false;  /* 🔴 v1.146.0（ゆうた指定）**最初はたたんでおく。**開いたかどうかも画面の中だけ */
 
+window.flHistToggle = function(){
+  _flHistOpen = !_flHistOpen;
+  renderFleet();
+};
+/* 🔴 v1.146.0（ゆうた指定）「代車検索はチップじゃなくてプルダウンで。
+   　 今後も含めるとかなりの台数になっていくと思う」＝台数が増えても縦に伸びない形にした。 */
 window.flHistFilter = function(id){
-  _flHistLo = (_flHistLo === id) ? '' : (id || '');
+  _flHistLo = id || '';
   renderFleet();
 };
 
@@ -672,12 +679,16 @@ function _flHistoryHtml(){
   });
   const list = _flHistLo ? all.filter(function(a){ return a.loanerId === _flHistLo; }) : all;
 
-  let h = '<div class="fl-card fl-hist">';
-  h += '<div class="fl-h"><i data-ic=clock data-ics=16></i> 貸出履歴（' + list.length + '件'
-     + (_flHistLo ? ' ／ ' + _fleetEsc(_flHistLoName(_flHistLo)) + ' で絞り込み中' : '') + '）'
+  /* 🔴 v1.146.0 最初はたたんでおく（見出しをクリックで開く）。
+     ⚠ 台数と件数が増えていく一覧なので、開いたままだと車両リストが遠くなる。 */
+  let h = '<div class="fl-card fl-hist' + (_flHistOpen ? ' open' : '') + '">';
+  h += '<div class="fl-h fl-hist-h" onclick="flHistToggle()" title="クリックで開く・閉じる">'
+     + '<span class="fl-hist-caret">' + (_flHistOpen ? '▼' : '▶') + '</span>'
+     + '<i data-ic=clock data-ics=16></i> 貸出履歴（' + all.length + '件）'
      + '<span class="fl-note">引退した代車のぶんも、予約以外で貸したぶんも全部。見るだけです</span></div>';
+  if (!_flHistOpen) return h + '</div>';
 
-  /* 絞り込みボタン（貸出がある代車だけ・引退も出す） */
+  /* 絞り込み＝プルダウン（貸出がある代車だけ・引退も出す） */
   const used = {};
   all.forEach(function(a){ if (a && a.loanerId) used[a.loanerId] = (used[a.loanerId] || 0) + 1; });
   const ids = Object.keys(used).sort(function(x, y){
@@ -686,13 +697,16 @@ function _flHistoryHtml(){
     return ((lx && lx.number) || 9999) - ((ly && ly.number) || 9999);
   });
   h += '<div class="fl-hist-fil">';
-  h += '<button class="fl-hist-chip' + (_flHistLo ? '' : ' on') + '" onclick="flHistFilter(\'\')">全部（' + all.length + '）</button>';
+  h += '<label class="fl-hist-lb">代車で絞る</label>';
+  h += '<select class="fl-hist-sel" onchange="flHistFilter(this.value)">';
+  h += '<option value=""' + (_flHistLo ? '' : ' selected') + '>全部（' + all.length + '件）</option>';
   ids.forEach(function(id){
     const l = (state.loaners || []).find(function(x){ return x.id === id; });
-    h += '<button class="fl-hist-chip' + (_flHistLo === id ? ' on' : '') + '" onclick="flHistFilter(\'' + _fleetEsc(id) + '\')">'
-       + _fleetEsc(_flHistLoName(id)) + (l && l.retired ? '<span class="fl-hist-ret">引退</span>' : '')
-       + '<span class="fl-hist-n">' + used[id] + '</span></button>';
+    h += '<option value="' + _fleetEsc(id) + '"' + (_flHistLo === id ? ' selected' : '') + '>'
+       + _fleetEsc(_flHistLoName(id)) + (l && l.retired ? '（引退）' : '') + '　' + used[id] + '件</option>';
   });
+  h += '</select>';
+  if (_flHistLo) h += '<span class="fl-hist-now">' + list.length + '件を出しています</span>';
   h += '</div>';
 
   if (!list.length){

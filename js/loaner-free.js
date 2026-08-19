@@ -168,22 +168,35 @@
     return Math.round((_pd(toStr) - _pd(fromStr)) / 86400000);
   }
 
-  /* 返ってきているか（＋返した日）。貸出が正・カードの印は予備。 */
+  /* 🔴 v1.146.0（ゆうた指定 2026-08-19）返ってきたか・何色か の中身は
+     **全アプリ共通の部品（_shared/coreflow-loaner-remain.js）に移した。**
+     🗣「（CarFlow は）あくまで **PitFlow の出張画面**だから、**PitFlow に完全に準拠**してほしい」
+     ⚠ CarFlow が同じ計算を**写しで持っていて、返したかどうかを見ていなかった**（返却済みでも赤い「超過」）。
+     　 写しを直すのではなく、**判定を1本にして両方がそれを使う**形にした。
+     ⚠ ここは**昔の名前で呼んでいる所のための入口**。中身は部品に渡すだけ。
+     ⚠ 部品が読み込めていない時のための保険だけ残してある（下の _backFallback / _levelFallback）。
+     ⚠ 部品に渡すもの（貸した札・色の境目）は、このファイルの下のほうで setup している。 */
   function backOf(c) {
+    if (w.CFLoanerRemain) return CFLoanerRemain.backOf(c);
+    return _backFallback(c);
+  }
+  function _backFallback(c) {
     if (!c) return { back: false, at: '' };
     var a = arr(w.state && w.state.loanerAssigns).find(function (x) { return x.cardId === c.id; });
     if (a && a.returned) return { back: true, at: a.returnedAt || a.toDate || '' };
     if (c.loanerReturned === true) return { back: true, at: c.loanerTo || '' };
     return { back: false, at: '' };
   }
-
-  /* 色の段階。閾値は設定（settings.loanerColors）から。 */
   function levelOf(rem) {
+    if (w.CFLoanerRemain) return CFLoanerRemain.levelOf(rem);
+    return _levelFallback(rem);
+  }
+  function _levelFallback(rem) {
     if (rem == null) return 'none';
     var s = (w.state && w.state.settings && w.state.settings.loanerColors) || {};
     var g = (s.greenMin != null) ? s.greenMin : 4;
     var a = (s.amberMin != null) ? s.amberMin : 2;
-    if (rem < 0)  return 'dead';    /* 期限を過ぎている＝まだ戻っていない */
+    if (rem < 0)  return 'dead';
     if (rem >= g) return 'green';
     if (rem >= a) return 'amber';
     return 'red';
@@ -198,6 +211,10 @@
        rem   … あと何日（マイナス＝超過／null＝期限未設定）
        level … 'back' | 'green' | 'amber' | 'red' | 'dead' | 'none' */
   function remainOf(c) {
+    if (w.CFLoanerRemain) return CFLoanerRemain.of(c);
+    return _remainFallback(c);
+  }
+  function _remainFallback(c) {
     if (!c || !c.needLoaner) return { has: false, back: false, at: '', due: '', rem: null, level: 'none' };
     var due = c.loanerTo || c.returnDateFinal || c.returnDate || '';
     var bk = backOf(c);
@@ -234,6 +251,15 @@
   w.pitLoanerPeriodOf    = periodOf;
   w.pitLoanerMD          = _md;
   w.pitLoanerBackOf      = backOf;
+  /* 🔴 v1.146.0 共通部品に「PitFlow のデータ」を差し込む。**判定の中身は部品が持つ。**
+     ⚠ 渡すのは 貸した札 と 色の境目 の2つだけ。ここに条件を書き足さない。 */
+  if (w.CFLoanerRemain) {
+    CFLoanerRemain.setup({
+      assigns: function () { return (w.state && w.state.loanerAssigns) || []; },
+      colors:  function () { return (w.state && w.state.settings && w.state.settings.loanerColors) || null; }
+    });
+  }
+
   w.pitLoanerRemainOf    = remainOf;
   w.pitLoanerLevelOf     = levelOf;
   w.pitLoanerUsable      = usable;

@@ -61,12 +61,23 @@
 
   /* このボタンを出してよいか＝クラウドに繋がっていて、名簿も読める本番モードの時だけ。
      ⚠ 練習用（サンプル・デモ）では出さない。よそのアプリのデータが無いので押しても何も起きない。 */
-  function available() {
-    if (!cfg.self || !COLS[cfg.self]) return false;
-    if (cfg.ready && !call(function () { return !!cfg.ready(); }, false)) return false;
+  /* ⚠ 2026-08-19：ボタンが出ない、が最初の版で起きた。**なぜ出ないのかを必ず残す。**
+     　 黙って false を返すと、画面に何も出ないだけで原因が分からない。 */
+  var _whyLogged = '';
+  function why() {
+    if (!cfg.self || !COLS[cfg.self]) return '自分のアプリが設定されていません（setup の self）';
     var db = cfg.db && call(function () { return cfg.db(); }, null);
+    if (!db) return 'Firestore に繋がっていません（練習用モードでは出ません）';
     var co = cfg.company && call(function () { return cfg.company(); }, null);
-    return !!(db && co);
+    if (!co) return '会社のデータの入口が取れませんでした';
+    if (cfg.ready && !call(function () { return !!cfg.ready(); }, false)) return 'まだ読み込み中です';
+    return '';
+  }
+  function available() {
+    var w2 = why();
+    if (w2 && w2 !== _whyLogged) { _whyLogged = w2; console.log('[note-all] まとめて表示は出しません＝' + w2); }
+    if (!w2) _whyLogged = '';
+    return !w2;
   }
 
   function isOn() { return _on; }
@@ -176,7 +187,7 @@
 
   w.CFNoteAll = {
     setup: setup, toggle: toggle, on: on, off: off,
-    isOn: isOn, available: available, foreign: foreign, count: count,
+    isOn: isOn, available: available, why: why, foreign: foreign, count: count,
     isForeign: isForeign, labelOf: labelOf, appOf: appOf, badgeHtml: badgeHtml, save: save,
     COLS: COLS, LABEL: LABEL
   };

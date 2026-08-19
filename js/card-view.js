@@ -248,7 +248,14 @@
     const pct = back ? 100 : waiting ? 0 : (rem==null) ? 50 : Math.max(8, Math.min(95, 100 - rem*8));
     let extras = '';
     if (c.loanerFixed) extras += '<span class="cv-loxchip cv-fix">車種固定</span>';
-    const lmemo = (c.loanerMemo||'');
+    /* 🔴 v1.147.0（ゆうた指定 2026-08-19）**代車の条件メモが予約詳細だけ永久に出ていなかった。**
+       ⚠ 入力欄が書いているのは `loanerOther`（card-detail.js）。ここだけ `loanerMemo` を読んでいた
+          ＝**どこからも書かれていないキー**なので、何を入れても空だった。
+       ⚠ ほかの画面（ホバー情報カード・表紙印刷・代車カレンダー）は最初から `loanerOther` を見ていて、
+          **予約詳細だけが仲間はずれ**だった。
+       ⚠ 昔のデータに `loanerMemo` が入っている可能性は無い（一度も書いていないため）が、
+          念のため両方見る＝これで取りこぼさない。 */
+    const lmemo = (c.loanerOther || c.loanerMemo || '');
     if (lmemo) extras += '<span class="cv-loxmemo">'+esc(lmemo)+'</span>';
     /* ⚠ **車は返したのに代車が戻っていない**時は、ちゃんと赤く「超過」と出す＝知らせるべき事故。 */
     const lead = back ? '代車' : waiting ? '代車 貸出予定' : '代車 返却まで';

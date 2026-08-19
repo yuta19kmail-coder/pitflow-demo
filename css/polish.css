@@ -2158,19 +2158,22 @@ th.cfs-lg-d{ z-index:3; }
    過去を含めて がーーーっと全履歴が残るイメージ」／「新しい順＋代車で絞れる」
    ⚠ **見るだけの一覧**なので、押せるのは上の絞り込みボタンだけ。行は押せない見た目にする。
    ========================================================================== */
-.fl-hist-fil{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-.fl-hist-chip{
-  display:inline-flex; align-items:center; gap:5px;
-  padding:4px 10px; border:1px solid var(--border); border-radius:20px;
-  background:var(--bg3); color:var(--text2);
-  font-size:11.5px; font-weight:700; white-space:nowrap; cursor:pointer;
+/* 🔴 v1.146.0 見出し＝クリックで開く・閉じる（最初はたたんである） */
+.fl-hist-h{ cursor:pointer; user-select:none; margin-bottom:0; }
+.fl-hist.open .fl-hist-h{ margin-bottom:12px; }
+.fl-hist-h:hover{ color:var(--brand); }
+.fl-hist-caret{ flex:0 0 auto; font-size:10px; color:var(--text3); width:12px; }
+
+/* 🔴 v1.146.0 絞り込みはプルダウン（ゆうた指定「今後かなりの台数になっていく」＝縦に伸びない形） */
+.fl-hist-fil{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+.fl-hist-lb{ font-size:11.5px; font-weight:700; color:var(--text3); }
+.fl-hist-sel{
+  padding:5px 10px; border:1px solid var(--border2); border-radius:8px;
+  background:var(--bg3); color:var(--text); font-size:12.5px; font-weight:700;
+  min-width:200px; max-width:100%; cursor:pointer;
 }
-.fl-hist-chip:hover{ border-color:var(--brand); color:var(--brand); }
-.fl-hist-chip.on{ border-color:var(--brand); background:var(--brand); color:#fff; }
-.fl-hist-chip .fl-hist-n{ font-size:10px; font-weight:800; opacity:.75; }
-.fl-hist-chip .fl-hist-ret{ font-size:9.5px; font-weight:800; background:var(--bg4); color:var(--text3);
-  border-radius:4px; padding:0 4px; }
-.fl-hist-chip.on .fl-hist-ret{ background:rgba(255,255,255,.25); color:#fff; }
+.fl-hist-sel:focus{ outline:none; border-color:var(--brand); }
+.fl-hist-now{ font-size:11.5px; font-weight:700; color:var(--brand); }
 
 /* 1行1貸出。狭い画面では折り返す */
 .fl-hist-rows{ display:flex; flex-direction:column; }

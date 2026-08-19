@@ -886,15 +886,23 @@ function loResizeAssign(aid, destDate){
   _loRefresh();
 }
 
+/* 🔴 v1.143.0 直前の「代車キャンセル」の控え（画面の中だけ・持ち越さない）。下のバーと loCancelLoaner が使う */
+let _loCancelSnap = null;
+
 /* ===== 下書きバー（変更件数＋変更チップ＋破棄/やり直し/一括実行） ===== */
 function _loRenderDraftBar(){
   const host = document.getElementById('lo-draft-bar');
   if (!host) return;
   const changed = _loChangedList();
   if (!_loDraftOrig || !changed.length){
-    // 下書きなし＝バー非表示（やり直しボタンだけ applySnap があれば残す）
-    host.innerHTML = _loApplySnap ? '<div class="lod-inner"><span class="lod-lbl">直前の一括実行：</span><button class="lod-btn warn" onclick="loDraftUndoApply()">↩ やり直す</button></div>' : '';
-    host.style.display = (_loApplySnap) ? 'block' : 'none';
+    /* 下書きなし＝バー非表示（やり直しボタンだけ applySnap があれば残す）
+       🔴 v1.143.0 直前の「代車キャンセル」も同じ場所に「↩ 元に戻す」を出す。
+       ⚠ **入口を作ったら出口も作る**＝消しっぱなしにしない。1回だけ・画面を離れたら消える。 */
+    let bar = '';
+    if (_loApplySnap) bar += '<div class="lod-inner"><span class="lod-lbl">直前の一括実行：</span><button class="lod-btn warn" onclick="loDraftUndoApply()">↩ やり直す</button></div>';
+    if (_loCancelSnap) bar += '<div class="lod-inner"><span class="lod-lbl">直前の代車キャンセル：</span><button class="lod-btn warn" onclick="loCancelUndo()">↩ 元に戻す</button></div>';
+    host.innerHTML = bar;
+    host.style.display = bar ? 'block' : 'none';
     return;
   }
   const bad = _loNewBad();
@@ -1054,7 +1062,12 @@ window.loBadgeMenu = function(ev, aid){
   if (card) h += '<button class="lo-bpop-b" onclick="loBadgeDetail(\'' + aid + '\')"><i data-ic=clipboard data-ics=16></i> 予約詳細を見る</button>';
   if (!ret) h += '<button class="lo-bpop-b" onclick="loReturnStart(\'' + aid + '\')"><i data-ic=check data-ics=16></i> 返却を確定する</button>';
   else h += '<button class="lo-bpop-b" onclick="loUnreturn(\'' + aid + '\')">↩ 返却を取り消す</button>';
-  h += '<button class="lo-bpop-b danger" onclick="loCancelLoaner(\'' + aid + '\')"><i data-ic=ban data-ics=16></i> この予約の代車をキャンセル</button>';
+  /* 🔴 v1.143.0（ゆうた指定 2026-08-19）**返却済み（グレー）の貸出には出さない。**
+     🗣「アーカイブと同じで、返却済みの代車は何がなんでも不可侵的に残すイメージ」
+     ⚠ v1.142.0 まではここが `ret` の分岐の**外**にあり、返却済みの札からも押せた。
+        押すと**いつ誰にどの代車を貸したかの記録が丸ごと消えていた。**
+     ⚠ ボタンを消すだけにしない＝`loCancelLoaner` の中でも同じ条件で止めている。 */
+  if (!ret) h += '<button class="lo-bpop-b danger" onclick="loCancelLoaner(\'' + aid + '\')"><i data-ic=ban data-ics=16></i> この予約の代車をキャンセル</button>';
   _loBadgePopOpen(h);
 };
 /* 省スペース表示のホバー＝代車カレンダーのフルサイズ札（3行カード）をそのまま上に重ねて表示 */
@@ -1135,19 +1148,74 @@ window.loReturnConfirm = function(aid){
     _loBadgePopClose(); renderLoaner();
   });
 };
+/* 🔴 v1.143.0（ゆうた指定 2026-08-19）代車のキャンセルを作り直した。
+
+   🗣「アーカイブと同じで、**返却済みの代車（グレーになってる奴）は何がなんでも不可侵的に残す**イメージ。
+   　　だからキャンセルは、**その予約に関する代車の貸し出しスケジュールだけを無くす**イメージでいい」
+   🗣（「代車 必要」のチェックは？）「**チェックも外す**」
+
+   ◎やること … ①カレンダーの予定を消す ②予約カードの代車の設定を空にする（必要のチェックも外す）
+   ◎やらないこと … **返却済みの貸出には触らない。**そもそもメニューに出さない（`loBadgeMenu`）。
+
+   ⚠ v1.142.0 までの問題（3つとも直した）
+     1. 窓の説明が **「カレンダーから外します。」** だけ＝**カードの代車設定も消える**ことを言っていなかった
+     2. **返却済みでも押せた**＝貸した記録が消えた（v1.80.0 の「返却済みは消さない」は自動の掃除にしか効いていなかった）
+     3. **戻す道が無かった**（下書きの「1件戻す」はここを通らない）
+   🔴 **入口を作ったら出口も作る**（カードの一生で決めた R3）＝直後1回だけ「↩ 元に戻す」で戻せるようにした。 */
 window.loCancelLoaner = function(aid){
   const a = (state.loanerAssigns || []).find(function(x){ return x.id === aid; });
   if (!a) { _loBadgePopClose(); return; }
+  /* 🔴 返却済みは不可侵。ボタンを消すだけにせず、ここでも止める（外から呼ばれても通らない） */
+  if (a.returned){
+    _loBadgePopClose();
+    pitAlert('返却済みの貸出は消せません。実際に貸した記録として残します。\n直したい時は「↩ 返却を取り消す」で戻してから操作してください。');
+    return;
+  }
   const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
   const nm = card ? ((window.pitCustSurname ? pitCustSurname(card) : (card.customer || '')) || 'この予約') : (a.customer || 'この貸出');
-  pitAsk(nm + ' の代車をキャンセルしますか？', { danger:true, ok:'キャンセルする', detail:'カレンダーから外します。' }).then(function(yes){
+  /* ⚠ 何が消えるかを**全部書く**。「外します」で済ませない。 */
+  const detail = card
+    ? 'カレンダーの予定と、予約カードの代車の設定（代車 必要のチェック・使用代車・貸出日・返却日）が消えます。\n直後なら「↩ 元に戻す」で戻せます。'
+    : 'カレンダーからこの貸出を消します。\n直後なら「↩ 元に戻す」で戻せます。';
+  pitAsk(nm + ' の代車をキャンセルしますか？', { danger:true, ok:'キャンセルする', detail:detail }).then(function(yes){
     if (!yes) return;
+    /* 控えを取る（貸出1枚とカードの代車まわりだけ） */
+    _loCancelSnap = {
+      assign: JSON.parse(JSON.stringify(a)),
+      cardId: card ? card.id : null,
+      card: card ? { needLoaner: card.needLoaner, loanerId: card.loanerId, loanerFrom: card.loanerFrom,
+                     loanerTo: card.loanerTo, loanerFixed: card.loanerFixed } : null
+    };
     state.loanerAssigns = (state.loanerAssigns || []).filter(function(x){ return x.id !== aid; });
     if (card){ card.needLoaner = false; card.loanerId = ''; card.loanerFrom = ''; card.loanerTo = ''; card.loanerFixed = false; }
     if (window.PitDB) PitDB.save();
     _loBadgePopClose(); renderLoaner();
+    _loRenderDraftBar();   /* ⚠ renderLoaner だけでは下のバーが描き直されない＝「↩ 元に戻す」が出ない */
+    if (window.pitToast) pitToast(nm + ' の代車をキャンセルしました。直後なら「↩ 元に戻す」で戻せます');
   });
 };
+
+/* 直前のキャンセルを取り消す。⚠ 1回だけ・画面を離れたら消える（下書きの「やり直す」と同じ考え方）。 */
+window.loCancelUndo = function(){
+  if (!_loCancelSnap) return;
+  const sn = _loCancelSnap;
+  pitAsk('直前のキャンセルを取り消して、代車を元に戻します。よろしいですか？', { ok:'元に戻す' }).then(function(yes){
+    if (!yes) return;
+    if (!Array.isArray(state.loanerAssigns)) state.loanerAssigns = [];
+    if (!state.loanerAssigns.some(function(x){ return x && x.id === sn.assign.id; })) state.loanerAssigns.push(sn.assign);
+    if (sn.cardId && sn.card){
+      const c = (state.cards || []).find(function(x){ return x.id === sn.cardId; });
+      if (c){ c.needLoaner = sn.card.needLoaner; c.loanerId = sn.card.loanerId; c.loanerFrom = sn.card.loanerFrom;
+              c.loanerTo = sn.card.loanerTo; c.loanerFixed = sn.card.loanerFixed; }
+    }
+    _loCancelSnap = null;
+    if (window.PitDB) PitDB.save();
+    renderLoaner();
+    _loRenderDraftBar();
+    if (window.pitToast) pitToast('代車を元に戻しました');
+  });
+};
+window.loCancelCanUndo = function(){ return !!_loCancelSnap; };
 
 /* ===== v0.98.0 予約以外の貸出ブロック／緊急車両追加（軽量モーダル） ===== */
 function _loModalOpen(html){

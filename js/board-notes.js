@@ -818,7 +818,10 @@
       self:     'pitflow',
       db:       function () { return window.fb && window.fb.db; },
       company:  function () { return window.fb && window.fb.company && window.fb.company(); },
-      ready:    function () { return !!(window.PitDB && PitDB.mode === 'cloud' && PitDB._loaded); },
+      /* ⚠ 2026-08-19：最初 `PitDB.mode === 'cloud' && PitDB._loaded` で見ていたが、
+         　 それだと**読み込みの途中や、繋ぎ直しの最中にボタンが消える**。
+         　 出す・出さないは「クラウドに繋がっているか」だけで決める（本番モード＝PIT_CLOUD）。 */
+      ready:    function () { return !!(window.PIT_CLOUD && window.fb && window.fb.db); },
       onChange: function () { renderBoardNotes(); },
       toast:    function (msg) { _toast(msg); }
     });

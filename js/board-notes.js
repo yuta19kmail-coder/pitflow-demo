@@ -158,23 +158,28 @@
     return `<span class="bn-av${photo ? ' has-photo' : ''}" title="${_esc(name)}" style="${style}">${inner}</span>`;
   }
 
+  /* 🔴 v1.141.0（ゆうた指定 2026-08-18）返信は **全アプリ共通の部品**（_shared/coreflow-note-reply.js）に寄せた。
+     　 「通常の付箋で返信が入れられるように。**回覧でも返信を入れられるように**したい。
+     　　 またこれは**ピット、MHS、CarFlow 全部の付箋に実装**して」
+     ⚠ **回覧かどうかで出し分けない。** 以前はここで `circulate` を弾いて、回覧には返信を出していなかった。
+     ⚠ 返信の一覧も「返信を書く…」の欄も、部品が1つのHTMLで返す。**ここで組み立て直さない。**
+     ⚠ 部品が読み込めていない時のための保険だけ残してある（下の _repliesFallback）。 */
   function _renderReplies(note) {
-    if (!note || note.noteType === 'circulate') return '';
-    const replies = Array.isArray(note.replies) ? note.replies : [];
+    if (window.CFNoteReply) return CFNoteReply.html(note);
+    return _repliesFallback(note);
+  }
+  function _repliesFallback(note) {
+    const replies = (note && Array.isArray(note.replies)) ? note.replies : [];
     if (replies.length === 0) return '';
     const rows = replies.map(r => {
       const av = _renderAvatar(r.uid, 22);
       const time = _formatReplyTime(r.at);
-      const delBtn = _canDeleteReply(r)
-        ? `<button class="bn-reply-del" title="この返信を消す" onclick="event.stopPropagation();deleteBoardNoteReply('${_esc(note.id)}','${_esc(r.id)}')">×</button>`
-        : '';
       return `<div class="bn-reply">
         <span class="bn-reply-av">${av}</span>
         <div class="bn-reply-bubble">
           <div class="bn-reply-text">${_esc(r.text || '')}</div>
           ${time ? `<span class="bn-reply-time">${_esc(time)}</span>` : ''}
         </div>
-        ${delBtn}
       </div>`;
     }).join('');
     return `<div class="bn-replies">${rows}</div>`;
@@ -302,9 +307,10 @@
         <div class="bn-title">${secretBadge}${titleHtml}</div>
         ${imgHtml}
         ${bodyHtml ? `<div class="bn-body">${bodyHtml}</div>` : ''}
-        ${_renderReplies(note)}
         ${deadlineHtml}
         ${circRow}
+        ${/* 🔴 返信は「回覧の確認」の下。確認ボタンより上に置くと、回覧の車が押す所を見失う */''}
+        ${_renderReplies(note)}
         <div class="bn-footer">
           <div class="bn-members">${membersHtml}</div>
           <div class="bn-author">${authorAv}<span class="bn-author-name">${_esc(authorName)}</span></div>
@@ -325,9 +331,10 @@
     const uEl = document.getElementById('bn-action-undone');
     if (dEl) dEl.style.display = isDone ? 'none' : '';
     if (uEl) uEl.style.display = isDone ? '' : 'none';
-    const isCirc = !!(note && note.noteType === 'circulate');
+    /* 🔴 v1.141.0 **回覧でも返信できる**（ゆうた指定）。以前はここで隠していた。
+       ⚠ 「済にする／戻す」は回覧では出さないまま＝回覧の完了は各自の「✓ 自分が確認」で決まる。 */
     const rEl = document.getElementById('bn-action-reply');
-    if (rEl) rEl.style.display = isCirc ? 'none' : '';
+    if (rEl) rEl.style.display = '';
     const m = document.getElementById('modal-bn-actions');
     if (m) m.classList.add('show');
   }
@@ -721,6 +728,28 @@
     const m = document.getElementById('modal-bn-image');
     if (m) m.classList.remove('show');
   };
+
+  /* =========================================
+     🔴 v1.141.0 付箋の返信＝全アプリ共通の部品（_shared/coreflow-note-reply.js）につなぐ。
+     ⚠ **アプリごとに違うところだけを関数で渡す。** 部品の中に PitFlow の事情を書かない。
+        ・「自分」    … PitFlow は認証ではなく localStorage の選択（_meId）
+        ・保存        … PitDB.save()（クラウドは pitBoardNotes へ差分保存）
+        ・確認ダイアログ … 標準の confirm ではなく pitAsk（v1.75.0 の決めごと）
+     ========================================= */
+  if (window.CFNoteReply) {
+    CFNoteReply.setup({
+      getNote:    function (id) { return _notes().find(function (x) { return x && x.id === id; }) || null; },
+      getMe:      function () { return _meId(); },
+      avatarHtml: function (uid, px) { return _renderAvatar(uid, px); },
+      save:       function (note, done) { _save(); if (done) done(); },
+      rerender:   function () { renderBoardNotes(); },
+      toast:      function (msg, code) { _toast(msg, code); },
+      ask:        function (msg, cb) {
+        if (window.pitAsk) pitAsk(msg, { danger: true, ok: '消す' }).then(function (yes) { cb(!!yes); });
+        else cb(true);
+      }
+    });
+  }
 
   console.log('[board-notes] ready (PitFlow)');
 })();

@@ -124,6 +124,9 @@ function renderFleet(){
     h += '</div></div>';
   });
 
+  /* ===== ③ 貸出履歴（v1.145.0） ===== */
+  h += _flHistoryHtml();
+
   wrap.innerHTML = h;
 
   // 月モード：右端付近までスクロールしたら列を増やす（未来永劫）
@@ -605,6 +608,122 @@ function _fleetSubmitInner(){
   if (window.PitDB) PitDB.save();
   return _fleetEditId;   /* 閉じる・描き直しは呼び出し元（fleetSubmit）でやる */
 }
+/* =====================================================================
+   🚙 貸出履歴（v1.145.0・ゆうた指定 2026-08-19）
+   ---------------------------------------------------------------------
+   🗣「代車管理の下部に**履歴一覧という専用ページ**を作成。そこに**テキストベースでいいから、
+   　　過去を含めて がーーーーーーっと全履歴が残る**イメージがいいかな」
+   🗣（並びは？）「**新しい順＋代車で絞れる**」
+
+   ◎なぜ要るか
+     🔴 **引退させた代車は代車カレンダーから列ごと消える**（`_loFiltered`）。
+     　 ＝ 引退にした瞬間、その代車の過去の貸出も**画面からは追えなくなっていた**（データは残っている）。
+     カレンダーは「いま貸せる車」だけを見る所のままにして、**過去はここで全部追える**ようにする。
+
+   ◎出すもの
+     ・**全部**（引退した代車のぶんも／予約以外で貸したぶんも／緊急車両のぶんも）
+     ・貸した日の**新しい順**
+     ・上のボタンで**代車ごとに絞れる**（引退した代車もボタンに出す）
+   ◎作りの決めごと
+     ⚠ **見るだけ。**ここから消したり直したりはできない（v1.143.0「返却済みは不可侵」の続き）。
+     ⚠ 数える所（何日間・返却済みか）は**貸出の札に書いてある内容だけ**を使う。ここで計算し直さない。
+   ===================================================================== */
+let _flHistLo = '';   /* 絞り込み中の代車（空＝全部）。画面の中だけ・保存しない */
+
+window.flHistFilter = function(id){
+  _flHistLo = (_flHistLo === id) ? '' : (id || '');
+  renderFleet();
+};
+
+function _flHistDays(a){
+  if (!a || !a.fromDate || !a.toDate) return null;
+  const f = new Date(a.fromDate), t = new Date(a.toDate);
+  if (isNaN(f.getTime()) || isNaN(t.getTime())) return null;
+  return Math.round((t - f) / 86400000) + 1;   /* 両端を含む */
+}
+function _flHistMD(ds){
+  if (!ds) return '—';
+  const p = String(ds).split('-');
+  return p.length === 3 ? (p[0].slice(2) + '/' + (+p[1]) + '/' + (+p[2])) : String(ds);
+}
+/* その貸出は誰のものか。予約から作った札はカードのお客様名、手動・緊急は札に入れた名前。 */
+function _flHistWho(a){
+  const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
+  if (card) return (window.pitCustName ? pitCustName(card) : (card.customer || '')) || '（未入力）';
+  return a.customer || (a.emergency ? '（緊急）' : '（予約以外）');
+}
+function _flHistCar(a){
+  const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
+  return (card && card.car) || a.car || '';
+}
+function _flHistLoName(id){
+  const l = (state.loaners || []).find(function(x){ return x.id === id; });
+  if (!l) return '（消えた代車）';
+  return (window.pitVehLabel ? pitVehLabel(l) : (l.model || l.name || id));
+}
+
+function _flHistoryHtml(){
+  const all = (state.loanerAssigns || []).slice();
+  /* 新しい順（貸した日）。同じ日なら返却日の新しい順 */
+  all.sort(function(a, b){
+    const x = String(b.fromDate || ''), y = String(a.fromDate || '');
+    if (x !== y) return x < y ? -1 : 1;
+    return String(b.toDate || '') < String(a.toDate || '') ? -1 : 1;
+  });
+  const list = _flHistLo ? all.filter(function(a){ return a.loanerId === _flHistLo; }) : all;
+
+  let h = '<div class="fl-card fl-hist">';
+  h += '<div class="fl-h"><i data-ic=clock data-ics=16></i> 貸出履歴（' + list.length + '件'
+     + (_flHistLo ? ' ／ ' + _fleetEsc(_flHistLoName(_flHistLo)) + ' で絞り込み中' : '') + '）'
+     + '<span class="fl-note">引退した代車のぶんも、予約以外で貸したぶんも全部。見るだけです</span></div>';
+
+  /* 絞り込みボタン（貸出がある代車だけ・引退も出す） */
+  const used = {};
+  all.forEach(function(a){ if (a && a.loanerId) used[a.loanerId] = (used[a.loanerId] || 0) + 1; });
+  const ids = Object.keys(used).sort(function(x, y){
+    const lx = (state.loaners || []).find(function(l){ return l.id === x; });
+    const ly = (state.loaners || []).find(function(l){ return l.id === y; });
+    return ((lx && lx.number) || 9999) - ((ly && ly.number) || 9999);
+  });
+  h += '<div class="fl-hist-fil">';
+  h += '<button class="fl-hist-chip' + (_flHistLo ? '' : ' on') + '" onclick="flHistFilter(\'\')">全部（' + all.length + '）</button>';
+  ids.forEach(function(id){
+    const l = (state.loaners || []).find(function(x){ return x.id === id; });
+    h += '<button class="fl-hist-chip' + (_flHistLo === id ? ' on' : '') + '" onclick="flHistFilter(\'' + _fleetEsc(id) + '\')">'
+       + _fleetEsc(_flHistLoName(id)) + (l && l.retired ? '<span class="fl-hist-ret">引退</span>' : '')
+       + '<span class="fl-hist-n">' + used[id] + '</span></button>';
+  });
+  h += '</div>';
+
+  if (!list.length){
+    h += '<div class="fl-empty">貸出の記録はまだありません</div></div>';
+    return h;
+  }
+
+  h += '<div class="fl-hist-rows">';
+  list.forEach(function(a){
+    const d = _flHistDays(a);
+    const who = _flHistWho(a);
+    const car = _flHistCar(a);
+    const lo = (state.loaners || []).find(function(x){ return x.id === a.loanerId; });
+    const st = a.returned
+      ? '<span class="fl-hist-st done">返却済</span>'
+      : '<span class="fl-hist-st now">貸出中</span>';
+    h += '<div class="fl-hist-row">'
+       + '<span class="fl-hist-lo">' + _fleetEsc(_flHistLoName(a.loanerId))
+       +   (lo && lo.retired ? '<span class="fl-hist-ret">引退</span>' : '') + '</span>'
+       + '<span class="fl-hist-dt">' + _flHistMD(a.fromDate) + ' 〜 ' + _flHistMD(a.toDate) + '</span>'
+       + '<span class="fl-hist-day">' + (d != null ? d + '日' : '') + '</span>'
+       + st
+       + '<span class="fl-hist-who">' + _fleetEsc(who) + (car ? ' <small>' + _fleetEsc(car) + '</small>' : '') + '</span>'
+       + (a.emergency ? '<span class="fl-hist-tag emg">緊急</span>' : (a.manual ? '<span class="fl-hist-tag">予約以外</span>' : ''))
+       + (a.purpose ? '<span class="fl-hist-memo">' + _fleetEsc(a.purpose) + '</span>' : '')
+       + '</div>';
+  });
+  h += '</div></div>';
+  return h;
+}
+
 /* 🔴 v1.144.0 その車の**貸出実績**の件数（返却済みも数える＝「1回でも貸したか」を見る） */
 function _flUsedCount(id){
   return (state.loanerAssigns || []).filter(function(a){ return a && a.loanerId === id; }).length;

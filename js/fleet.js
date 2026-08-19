@@ -462,8 +462,32 @@ function fleetOpenModal(id){
   const f = id ? _fleetFind(id) : null;
   const v = f ? f.v : {};
   document.getElementById('fl-modal-title').textContent = f ? '車両を編集': '＋ 車両を追加';
+  /* 🔴 v1.144.0（ゆうた指定 2026-08-19）
+     🗣「**1回でも貸出実績がある代車には「消去」という概念が当たらないようにして。引退のみにしよう**」
+     ＝ 貸したことがある代車は**消せない**。列から外したい時は**引退**にする（履歴はそのまま残る）。
+     ⚠ 顧客・車両・予約カードの**アーカイブと同じ考え方**。「消す」ではなく「もう使わない状態にする」。
+     ⚠ 一度も貸していない代車（間違えて登録した等）は、今までどおり削除できる。 */
   var _db = document.getElementById('fl-del-btn');
-  if (_db) { _db.style.display = f ? '' : 'none'; _db.onclick = function(){ fleetDelete(id); }; }
+  if (_db) {
+    _db.style.display = f ? '' : 'none';
+    if (f) {
+      var _used = _flUsedCount(id);
+      if (f.v.retired) {
+        _db.className = 'vh-btn';
+        _db.innerHTML = '<i data-ic=undo data-ics=16></i> 引退を取り消す';
+        _db.onclick = function(){ fleetUnretire(id); };
+      } else if (_used > 0) {
+        _db.className = 'vh-btn';
+        _db.innerHTML = '<i data-ic=box data-ics=16></i> この車両を引退させる';
+        _db.onclick = function(){ fleetRetire(id); };
+      } else {
+        _db.className = 'vh-btn del';
+        _db.innerHTML = '<i data-ic=trash data-ics=16></i> この車両を削除';
+        _db.onclick = function(){ fleetDelete(id); };
+      }
+      if (window.icHydrate) { try { icHydrate(_db); } catch(e){} }   /* 線画アイコンを描く（全アプリ共通の部品） */
+    }
+  }
   document.getElementById('fl-kind').value  = f ? f.kind : 'loaner';
   document.getElementById('fl-number').value = f ? _flLoanerNum(v) : _flNextNum((document.getElementById('fl-kind')||{}).value || 'loaner');   // 自動末番
   document.getElementById('fl-model').value = v.model || '';                          // 車種名
@@ -581,13 +605,66 @@ function _fleetSubmitInner(){
   if (window.PitDB) PitDB.save();
   return _fleetEditId;   /* 閉じる・描き直しは呼び出し元（fleetSubmit）でやる */
 }
+/* 🔴 v1.144.0 その車の**貸出実績**の件数（返却済みも数える＝「1回でも貸したか」を見る） */
+function _flUsedCount(id){
+  return (state.loanerAssigns || []).filter(function(a){ return a && a.loanerId === id; }).length;
+}
+window._flUsedCount = _flUsedCount;
+
+/* 🔴 v1.144.0 引退させる＝列から外すだけ。**貸出の記録も、その車の登録も消さない。**
+   ⚠ 空き判定は引退を除くようになっているので（v1.80.0）、引退にした時点で新しくは貸せない。
+   ⚠ 入口を作ったら出口も作る（R3）＝「引退を取り消す」も同じボタンの場所に出す。 */
+function fleetRetire(id){
+  const f = _fleetFind(id);
+  if (!f) return;
+  const used = _flUsedCount(id);
+  pitAsk('「' + f.v.name + '」を引退させますか？', {
+    ok: '引退させる',
+    detail: 'これから新しく貸せなくなります。\n'
+          + '⚠ **今までの貸出（' + used + '件）はそのまま残ります。**代車カレンダーの履歴も消えません。\n'
+          + 'あとから「引退を取り消す」で戻せます。'
+  }).then(function(yes){
+    if (!yes) return;
+    f.v.retired = true;
+    f.v.retiredAt = (window.ymd ? ymd(new Date()) : '');
+    if (window.PitDB) PitDB.save();
+    renderFleet();
+    if (window.pitToast) pitToast('「' + f.v.name + '」を引退にしました（記録は残っています）');
+  });
+}
+window.fleetRetire = fleetRetire;
+
+function fleetUnretire(id){
+  const f = _fleetFind(id);
+  if (!f) return;
+  pitAsk('「' + f.v.name + '」の引退を取り消しますか？', { ok:'取り消す', detail:'また貸せるようになります。' }).then(function(yes){
+    if (!yes) return;
+    f.v.retired = false;
+    delete f.v.retiredAt;
+    if (window.PitDB) PitDB.save();
+    renderFleet();
+    if (window.pitToast) pitToast('「' + f.v.name + '」を戻しました');
+  });
+}
+window.fleetUnretire = fleetUnretire;
+
 function fleetDelete(id){
   const f = _fleetFind(id);
   if (!f) return;
   const isLoaner = (f.kind === 'loaner');
-  const cnt = isLoaner ? (state.loanerAssigns || []).filter(function(a){ return a.loanerId === id; }).length : 0;
+  const cnt = isLoaner ? _flUsedCount(id) : 0;
+  /* 🔴 v1.144.0 **1回でも貸したことがある代車は消せない**（ゆうた指定）。
+     ⚠ ボタンを出し分けるだけにしない＝ここでも止める。外から呼ばれても通らない。
+     ⚠ v1.143.0 まではここで貸出を全件 filter で消しており、**返却済みの履歴も一緒に消えていた。**
+        「返却済みの貸出は不可侵」という決めごと（v1.143.0）に真っ向から反していた。 */
+  if (isLoaner && cnt > 0) {
+    pitAlert('「' + f.v.name + '」は ' + cnt + ' 件の貸出があるので消せません。\n'
+           + '実際に貸した記録として残します。\n\n'
+           + '列から外したい時は「この車両を引退させる」を使ってください。');
+    return;
+  }
   pitAsk('「' + f.v.name + '」を削除しますか？',
-         { danger:true, ok:'削除する', detail:(cnt ? 'この代車の予約 ' + cnt + ' 件も一緒に消えます。' : '') }).then(function(yes){
+         { danger:true, ok:'削除する', detail:'一度も貸していない車両なので、消しても記録は残りません。' }).then(function(yes){
     if (!yes) return;
     const arr = isLoaner ? state.loaners : state.companyCars;
     arr.splice(arr.indexOf(f.v), 1);

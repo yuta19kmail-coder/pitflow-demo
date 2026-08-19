@@ -93,16 +93,22 @@
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
     });
   }
+  /* 🔴 v1.140.1（ゆうた指定）**バッジに時間は出さない。**
+     　 「日数で時間が出るのと出ないのがあるが、時間は全部要らない。内部処理につかっても表示はしない」
+     ⚠ 並べる時（inKey）は今までどおり**時刻も見て**同じ日の中の順番を決める。**出さないだけ。**
+     🔴 **値が無いものはタブ自体を付けない。**
+     　 「代車が出てないのは代車なしのタブ自体をつけない」
+     ⚠ 同じ考え方で、入庫日が入っていない車にも付けない（空の札を並べない）。順番は今までどおりいちばん下。 */
   function keyText(c){
     if (_mode === 'in'){
       var s = String((c && c.reserveDate) || '');
-      if (!s) return '入庫日なし';
+      if (!s) return '';                         /* 入庫日なし＝札を付けない */
       var p = s.split('-');
-      return (+p[1]) + '/' + (+p[2]) + (c.reserveTime ? ' ' + c.reserveTime : '');
+      return (+p[1]) + '/' + (+p[2]);            /* 時間は出さない */
     }
     if (_mode === 'loaner'){
       var r = remOf(c);
-      if (r == null) return '代車なし';
+      if (r == null) return '';                  /* 代車なし＝札を付けない */
       return r < 0 ? ('超過' + Math.abs(r) + '日') : ('残' + r + '日');
     }
     if (_mode === 'amt'){
@@ -113,8 +119,10 @@
   }
   function decorate(c, html){
     if (!isOn() || !c) return html;
+    var t = keyText(c);
+    if (!t) return html;                         /* 出す値が無い＝何も足さない */
     return String(html).replace('<div class="pit-card pcm',
-      '<div data-sortkey="' + esc(keyText(c)) + '" class="pit-card pcm kb-sortkey');
+      '<div data-sortkey="' + esc(t) + '" class="pit-card pcm kb-sortkey');
   }
 
   /* ---------- 盤面の上の帯 ---------- */

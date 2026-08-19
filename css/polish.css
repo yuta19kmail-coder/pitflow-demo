@@ -2139,9 +2139,13 @@ th.cfs-lg-d{ z-index:3; }
   font:900 9.5px/1.6 -apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; letter-spacing:.02em;
   color:#fff; background:var(--blue); border-radius:4px; padding:0 5px;
   box-shadow:0 1px 4px rgba(0,0,0,.5); pointer-events:none; white-space:nowrap; }
-/* ⚠ 「国産／輸入」の印（担当車両）と場所がぶつかるので、並び替え中は数字を優先する。
-      課は**左の色帯**（緑＝国産／桃＝輸入）で分かるので、情報は落ちない。 */
+/* ⚠ カードの上辺は**耳（予約No）・車両注意タブ・国産/輸入の印**が並ぶ狭い場所。
+      数字の札を足すと重なって読めない（ゆうた報告「金額など耳が出ると MT などと被って見えない」）。
+   🔴 v1.140.1 **並び替えて見ている間だけ、車両注意タブ（左/M/T/車高/土禁）と国産/輸入の印を隠す。**
+      ⚠ 隠すのは**見ているあいだだけ**。マスター並びに戻せばすぐ出る。
+      ⚠ 課は**左の色帯**（緑＝国産／桃＝輸入）で分かるので、情報は落ちない。 */
 .kanban.pf-sorting .pit-card.pcm.kb-xboard::after{ display:none; }
+.kanban.pf-sorting .pcm-cau{ display:none; }
 .kanban.pf-sorting .pit-card.pcm{ cursor:default; }
 /* 区切りラインは薄く出したまま・掴めない（黙って消さない） */
 .kb-line.kb-line-tmp{ cursor:default; opacity:.42; }

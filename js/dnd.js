@@ -30,6 +30,24 @@
     if (window.PitPip && PitPip.isOpen && PitPip.isOpen()) PitPip.refresh();
   }
 
+  /* 🔴 v1.140.1（ゆうた指定）**落とした場所に入れる。**
+     　 列の本体（カードの無い余白）に落とした時、v1.140.0 は必ず「いちばん下」に入れていた。
+     ⚠ カードの上に落とした時は今までどおり `reorder`（そのカードの手前）＝ここは通らない。
+     ⚠ 覚えるのは**その1回のドロップのあいだだけ**。使ったらすぐ捨てる（次のドロップに持ち越さない）。 */
+  var _dropBefore = null;   /* 「このカードの手前に入れる」カードID。null＝いちばん下 */
+  function anchorFromPoint(body, y, dragId) {
+    var kids = Array.prototype.filter.call(body.children, function (el) {
+      return el.hasAttribute && el.hasAttribute('data-card-id');
+    });
+    for (var i = 0; i < kids.length; i++) {
+      var id = kids[i].getAttribute('data-card-id');
+      if (id === dragId) continue;                    /* 自分は数えない */
+      var r = kids[i].getBoundingClientRect();
+      if (y < r.top + r.height / 2) return id;        /* まん中より上＝このカードの手前 */
+    }
+    return null;                                      /* どのカードより下＝いちばん下 */
+  }
+
   function applyCardDrop(cardId, kind, val) {
     const c = state.cards.find(x => x.id === cardId);
     if (!c) return;
@@ -47,9 +65,12 @@
       var _commitStatus = function(){
         c.status = val;
         c.testDrive = false;   // メイン領域に置く＝試運転フラグOFF（試運転ゾーンから戻した時も解除）
-        /* 🔴 v1.140.0 工程を移したカードは、移った先の列の**いちばん下**（board-order.js）。
-           ⚠ 黙って途中に割り込ませない＝マスター並びを勝手に動かさない、という決めごと。 */
-        if (_changed && window.PitBoardOrder) PitBoardOrder.moveToEnd(c);
+        /* 🔴 v1.140.1 **落とした場所に入れる**（board-order.js）。余白の下の方に落とせば今までどおり末尾。
+           ⚠ 番号を書くのは board-order.js だけ。ここで boardOrder を直接いじらない。 */
+        if (window.PitBoardOrder){
+          var _bf = _dropBefore ? state.cards.find(function (x) { return x.id === _dropBefore; }) : null;
+          PitBoardOrder.insertAt(c, (_bf && _bf.status === val && _bf.boardId === c.boardId) ? _bf : null);
+        }
         if (_changed){
           if (window.logPhaseMove) logPhaseMove(c, _fromStatus, val);
           else if (window.logFlow && typeof statusLabel === 'function') logFlow(c, statusLabel(val) + 'へ');
@@ -249,7 +270,12 @@
     if (!zone) return;
     e.preventDefault();
     zone.classList.remove('dnd-over');
+    /* 🔴 v1.140.1 看板の列の余白に落とした時は「どのカードの手前か」を先に読む（applyCardDrop が使う） */
+    _dropBefore = null;
+    const body = zone.closest('.kanban-col-body[data-drop="status"]');
+    if (body && zone.dataset.drop === 'status') _dropBefore = anchorFromPoint(body, e.clientY, id);
     if (id) applyCardDrop(id, zone.dataset.drop, zone.dataset.dropVal || '');
+    _dropBefore = null;   /* 次のドロップに持ち越さない */
   });
 
 })();

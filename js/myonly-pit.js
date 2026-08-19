@@ -183,8 +183,8 @@
     if (!active()) return '';
     var m = target();
     var nm = (m && m.name) || '';
-    return '<div class="kb-filtbar">' + (_on ? '🙋 <b>' + esc(nm) + '</b> さん（自分）の担当だけ出しています'
-                                             : '👤 <b>' + esc(nm) + '</b> さんの担当だけ出しています')
+    return '<div class="kb-filtbar">' + (_on ? '<b>' + esc(nm) + '</b> さん（自分）の担当だけ出しています'
+                                             : '<b>' + esc(nm) + '</b> さんの担当だけ出しています')
          + ' ─ 1課・2課をまたいで集めています'
          + '<button type="button" class="kb-filtbar-x" onclick="pitMemberFilterClear()">全部出す</button></div>';
   }
@@ -209,7 +209,8 @@
     var mm = _memId ? byId(_memId) : null;
     Array.prototype.forEach.call(d.querySelectorAll('.kb-memfilt'), function(el){
       el.classList.toggle('on', !!_memId);
-      el.textContent = mm ? ('👤 ' + (mm.name || '')) : '👤 メンバー';
+      /* 🔴 v1.140.1（ゆうた指定）**絵文字は付けない。**ほかのボタン（担当車両・区切りライン）と同じ見た目にそろえる */
+      el.textContent = mm ? (mm.name || '') : 'メンバー';
       el.title = mm
         ? (mm.name + 'さんの担当だけ出しています。もう一度選ぶか「全員」で解除します')
         : '選んだ1人の担当のカードだけを出す（担当車両とは別。別のビューへ移ると解除されます）';
@@ -248,19 +249,29 @@
   /* ---------- 🔴 v1.140.0 メンバーを選ぶメニュー ----------
      ⚠ 出すのは**フロントの人**（＝フロント担当になりうる人）。辞めた人は出さない。
      ⚠ 盤面に何台あるかを右に出す＝0台の人を選んで「空だ」と驚かないように。 */
-  function candidates(){
-    var cnt = {};
-    ((w.state && state.cards) || []).forEach(function(c){
-      if (!c || c.returnStage) return;
-      if (w.PitBoardOrder && !PitBoardOrder.onBoard(c)) return;
-      var k = c.frontStaffId || String(c.frontStaff || c.staff || '').trim();
-      if (k) cnt[k] = (cnt[k] || 0) + 1;
+  /* 🔴 v1.140.1（ゆうた報告「メンバーの中の数字がちゃんと拾えてない・数字が全然合わない」）
+     ⚠ v1.140.0 は **ID をキーにした数と、名前をキーにした数を別々に数えていた**。
+        カードによって `frontStaffId` が入っていたり名前だけだったりするので、
+        同じ人が2つに割れて**どちらか片方しか数えていなかった**（別名・本名も同じ）。
+     🔴 直し＝**絞り込みに使っているのと同じ物差し（`passFor`）でそのまま数える。**
+        ＝ここに出る台数は、その人を選んだ時に**実際に盤面に残る枚数と必ず一致する**。
+     ⚠ 数える範囲も、押した時に集まる範囲（1課・2課ぜんぶ／盤面に乗っているカードだけ）にそろえてある。 */
+  function boardCards(){
+    var ids = courseBoardIds();
+    return ((w.state && state.cards) || []).filter(function(c){
+      if (!c || c.returnStage) return false;
+      if (ids.indexOf(c.boardId) < 0) return false;
+      if (w.PitBoardOrder && !PitBoardOrder.onBoard(c)) return false;
+      return true;
     });
+  }
+  function candidates(){
+    var cards = boardCards();
     var mid = (me() || {}).id;
     return staffList().filter(function(s){ return s && s.front && !s.left; })
       .map(function(s){
-        var n = cnt[s.id] || 0;
-        if (!n){ (s.aliases || []).concat([s.name, s.realName]).forEach(function(a){ if (a && cnt[a]) n += cnt[a]; }); }
+        var n = 0;
+        cards.forEach(function(c){ if (passFor(c, s)) n++; });
         return { s: s, n: n, isMe: (s.id === mid) };
       });
   }

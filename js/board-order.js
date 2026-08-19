@@ -104,7 +104,17 @@
     var n = renumber(list);
     return n > 0;
   }
-  /* 列のいちばん下へ。新しく来たカード・工程を移したカードはこれ。 */
+  /* 🔴 v1.140.1（ゆうた指定）**ドラッグで持ってきた時は「落とした場所」に入れる。**
+     　 「ドラッグで並び変える時は一番下ではなくてドラッグしたところに初期にいれてほしい」
+     before … その手前に入れたいカード。**null なら列のいちばん下**（＝下の余白に落とした時）。
+     ⚠ 予約から入ってくる新しいカード（点検待ち）は今までどおり**いちばん下**。
+        ここを通らない（`ensure` が末尾に振る）＝ゆうた「点検待ちは一番下に並ぶ形でOK」。 */
+  function insertAt(c, before){
+    if (!c) return false;
+    if (!before || before === c) return moveToEnd(c);
+    return moveBefore(c, before);
+  }
+  /* 列のいちばん下へ。新しく来たカード・◀▶で工程を送ったカードはこれ。 */
   function moveToEnd(c){
     if (!c || !onBoard(c)) return false;
     var v = maxOf(c) + STEP;
@@ -150,7 +160,7 @@
 
   w.PitBoardOrder = {
     KEY: KEY, sort: sort, orderOf: orderOf, ensure: ensure,
-    moveBefore: moveBefore, moveToEnd: moveToEnd, onBoard: onBoard
+    moveBefore: moveBefore, moveToEnd: moveToEnd, insertAt: insertAt, onBoard: onBoard
   };
   console.log('[board-order] ready（タスクボードのマスター並び）');
 })(window);

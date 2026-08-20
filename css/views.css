@@ -1046,7 +1046,7 @@ select.cf-input{
 .today-row.is-retpend{
   background:rgba(131,144,166,.10);
   border-color:rgba(131,144,166,.45);
-  border-left-color:#8390a6 !important;   /* 左の色（国産緑／輸入ピンク）もグレーへ */
+  border-left-color:var(--pit-div-none,var(--text3)) !important;   /* 左の色（国産緑／輸入ピンク）もグレーへ */
   border-left-style:dashed;               /* 点線＝「まだ途中」を形でも出す */
 }
 .pit-card.is-retpend:hover,
@@ -1071,8 +1071,10 @@ select.cf-input{
 .is-retpend .tag-side:not(.ret-pend){ filter:grayscale(.9); opacity:.72; }
 
 /* 当日ビュー：担当者（課）の縦バッジもグレーへ。左の色帯もグレー */
-.today-row.is-retpend{ --team:#8390a6; }
-.today-row.is-retpend .tr-front{ background:#8390a6 !important; }
+/* 🔴 v1.160.0 グレーは pit-share.js の PIT_DIV_NONE_COLOR 1本（JSが --pit-div-none に配る）。
+   ⚠ ここに色を書き写さないこと（v1.150.0 で写して、MHS の見張りに捕まった）。 */
+.today-row.is-retpend{ --team:var(--pit-div-none,var(--text3)); }
+.today-row.is-retpend .tr-front{ background:var(--pit-div-none,var(--text3)) !important; }
 
 /* アクションシート（当日ビューのカードをタップ）の説明文 */
 .ta-note{

@@ -545,25 +545,28 @@
     pop('車検の予定', body);
   };
   function _slT(sl){ return sl==='pm'?'PM':'AM'; }
+  /* 🔴🔴 v1.160.0（ゆうた指定 2026-08-20）**どう変わるかは pit-share.js の `pitShakenApply` 1本。**
+     🗣「MHSに出てる当日の車検車両、入庫返車と同じように…クリックできるように」
+     ＝ MHS の当日ボードからも同じ操作ができるようになった。
+        ⚠ **ここに手を入れる時は、MHS も同じ答えになるか**を必ず考えること
+           （写しを作った瞬間、片方だけ古くなる。2026-08-15 の食い違い4件と同じ筋）。
+     ⚠ 'tocand'（候補＝行ける日に戻す）だけは**ガントの枠を触る操作**なので、ここに残す。
+        🔴 ゆうた「候補に戻すは MHS 上だと分からないので要らない」＝MHS には出さない。 */
   window.shkAct=function(id,act){ var c=card(id); if(!c) return; var s=ins(c);
+    if(act==='tocand'){ closePop(); unassign(id); return; }   // 候補（行ける日）に戻す＝slotsは残す v0.124.1
     var stEl=document.getElementById('shk-staff'); var staff=stEl?stEl.value:'';
-    /* 🔴 v1.119.0 完了・再検の時も、窓に出ている陸運局とRを一緒に確定する（別々に保存させない）。 */
     var ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
-    if(ofEl){ s.office=ofEl.value||''; s.officeName=s.office?((window.pitLocName?pitLocName(s.office):'')||s.officeName||''):''; }
-    if(rdEl){ var _r=Number(rdEl.value||0); s.round=(_r>=1&&_r<=4)?_r:0; }
-    var _wh='（回送:'+(staff||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）';
-    if(act==='done'){ var d=s.decided||todayIso(), sl=s.decidedSlot||'am'; s.result='done'; s.resultDate=d; s.resultSlot=sl; s.resultStaff=staff;
-      if(window.logFlow) logFlow(c, '車検 済 '+fmtMD(d)+' '+_slT(sl)+_wh); }
-    else if(act==='recheck'){ var d2=s.decided||todayIso(), sl2=s.decidedSlot||'am';
-      /* ⚠ 再検の記録にも、その時どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
-      s.history.push({date:d2, slot:sl2, result:'recheck', staff:staff, office:s.office||'', officeName:s.officeName||'', round:s.round||0});
-      s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
-      /* ⚠ 陸運局とRは**残す**＝次に決め直す時、たいてい同じ所へ行くので入れ直させない。直したい時は窓で変えられる。 */
-      if(window.logFlow) logFlow(c, '車検 再検 '+fmtMD(d2)+' '+_slT(sl2)+_wh); }
-    else if(act==='tocand'){ closePop(); unassign(id); return; }   // 候補（行ける日）に戻す＝slotsは残す v0.124.1
-    else if(act==='cancel'){ s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; }
-    else if(act==='reopen'){ s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff=''; }
-    else if(act==='flip'){ s.decidedSlot=(s.decidedSlot==='pm'?'am':'pm'); }
+    var off=ofEl?(ofEl.value||''):null;
+    var r=window.pitShakenApply ? pitShakenApply(s, act, {
+      staff: stEl?staff:null,
+      office: off,
+      officeName: off ? ((window.pitLocName?pitLocName(off):'')||s.officeName||'') : '',
+      round: rdEl?Number(rdEl.value||0):null,
+      today: todayIso()
+    }) : null;
+    if(!r) return;
+    c.inspSchedule=r.insp;
+    if(r.log && window.logFlow) logFlow(c, r.log);
     save(); closePop(); renderShaken();
   };
 

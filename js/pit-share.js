@@ -358,6 +358,14 @@ function pitDivisionColor(c){
 var PIT_DIV_NONE_COLOR = '#8390a6';
 function pitDivisionColorOr(c){ return pitDivisionColor(c) || PIT_DIV_NONE_COLOR; }
 w.PIT_DIV_NONE_COLOR = PIT_DIV_NONE_COLOR;
+/* 🔴 v1.160.0 CSS からも**同じ1本**を見られるようにする（`var(--pit-div-none)`）。
+   ⚠ CSS に色を書き写すと、ここを直しても片方だけ古くなる。
+      実際 v1.150.0 の「未完のグレー」で写してしまい、MHS の見張り
+      （test_pit_sync「CSSに写していない」）に捕まった。**写さない・変数を使う。** */
+try {
+  if (typeof document !== 'undefined' && document.documentElement)
+    document.documentElement.style.setProperty('--pit-div-none', PIT_DIV_NONE_COLOR);
+} catch (e) {}
 w.pitDivisionColorOr = pitDivisionColorOr;
 w.pitDivisionId = pitDivisionId;
 w.pitDivisionLabel = pitDivisionLabel;
@@ -602,6 +610,133 @@ w.pitDivisionColor = pitDivisionColor;
     return out;
   }
   w.pitShakenOnDate = pitShakenOnDate;
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     🔧 車検の予定を「動かす」ときの物差し（v1.160.0・2026-08-20 ゆうた指定）
+     --------------------------------------------------------------------------
+     🗣 ゆうた「**MHSに出てる当日の車検車両、入庫返車と同じように、
+     　　PitFlow上でクリックしたときに出る、担当から陸運局から午後に変更、
+     　　車検をキャンセルまでをクリックできるように**」
+
+     🔴🔴 **PitFlow の車検予定ボードと MHS の当日ボードで、同じ答えになること。**
+        画面が2つに増えた瞬間、片方だけ直して食い違うのが今までのやられ方
+        （2026-08-15 の「時間の表・お名前・課・売上なし」がまさにそれ）。
+        ＝ **どう変わるかは、この関数1本**。shaken.js も MHS もここを呼ぶだけにする。
+
+     ◎渡すもの
+       insp … いまの `card.inspSchedule`（無ければ null でよい）
+       act  … 'done'（✓完了）／'recheck'（↺再検）／'flip'（午前⇄午後）
+               ／'cancel'（予定を取り消す）／'reopen'（済 → 予定に戻す）
+       opt  … { staff, office, officeName, round, today }
+               ⚠ 窓に出ている担当・陸運局・R も**一緒に確定する**（別々に保存させない）。
+     ◎返すもの
+       { insp: 新しい inspSchedule, log: フローに残す1行, act: 受け取った act }
+       ⚠ **渡した insp は書き換えない**（写しを作って返す）。呼ぶ側が入れ替える。
+
+     ⚠ 'tocand'（候補＝行ける日に戻す）は**ここには無い**。
+        あれは PitFlow のガント（行ける日の枠）を触る操作で、
+        🔴 ゆうた「**候補に戻すは MHS 上だと分からないので要らない**」＝MHSには出さない。
+        PitFlow 側は今までどおり shaken.js の `unassign` が受け持つ。
+     ══════════════════════════════════════════════════════════════════════════ */
+  var PIT_SHAKEN_ACTS = ['done', 'recheck', 'flip', 'cancel', 'reopen'];
+  w.PIT_SHAKEN_ACTS = PIT_SHAKEN_ACTS;
+
+  function _shkSlotT(sl){ return sl === 'pm' ? '午後' : '午前'; }
+  function _shkMD(iso){
+    if (!iso) return '';
+    var d = new Date(String(iso) + 'T00:00:00');
+    return isNaN(d.getTime()) ? '' : ((d.getMonth() + 1) + '/' + d.getDate());
+  }
+  function _shkToday(){
+    var t = new Date(); t.setHours(0, 0, 0, 0);
+    var q = function(n){ return (n < 10 ? '0' : '') + n; };
+    return t.getFullYear() + '-' + q(t.getMonth() + 1) + '-' + q(t.getDate());
+  }
+
+  function pitShakenApply(insp, act, opt){
+    opt = opt || {};
+    if (PIT_SHAKEN_ACTS.indexOf(act) < 0) return null;   /* 知らない指示では何もしない */
+    /* 写しを作る（渡されたものは触らない）。history は中身も配列ごと作り直す。 */
+    var s = {};
+    for (var k in (insp || {})) if (Object.prototype.hasOwnProperty.call(insp, k)) s[k] = insp[k];
+    if (!s.slots || typeof s.slots !== 'object') s.slots = {};
+    s.history = Array.isArray(s.history) ? s.history.slice() : [];
+    if (!s.mode) s.mode = 'manual';
+    if (s.cutBefore == null) s.cutBefore = '';
+
+    var today = opt.today || _shkToday();
+    /* 🔴 窓に出ている3つは、どの指示でも一緒に確定する（v1.119.0 の決めごとをそのまま） */
+    var staff = (opt.staff != null) ? String(opt.staff) : (s.resultStaff || '');
+    if (opt.office != null){
+      s.office = String(opt.office || '');
+      s.officeName = s.office ? String(opt.officeName || s.officeName || '') : '';
+    }
+    if (opt.round != null){
+      var r = Number(opt.round || 0);
+      s.round = (r >= 1 && r <= 4) ? r : 0;
+    }
+    var wh = '（回送:' + (staff || '—') + '／' + (s.officeName || '陸運局未定')
+           + '／' + (s.round ? s.round + 'R' : 'R未定') + '）';
+    var log = '';
+
+    if (act === 'done'){
+      var d = s.decided || today, sl = s.decidedSlot || 'am';
+      s.result = 'done'; s.resultDate = d; s.resultSlot = sl; s.resultStaff = staff;
+      log = '車検 済 ' + _shkMD(d) + ' ' + _shkSlotT(sl) + wh;
+    } else if (act === 'recheck'){
+      var d2 = s.decided || today, sl2 = s.decidedSlot || 'am';
+      /* ⚠ その時どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
+      s.history.push({ date: d2, slot: sl2, result: 'recheck', staff: staff,
+                       office: s.office || '', officeName: s.officeName || '', round: s.round || 0 });
+      s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
+      /* ⚠ 陸運局とRは**残す**＝次に決め直す時、たいてい同じ所へ行くので入れ直させない */
+      log = '車検 再検 ' + _shkMD(d2) + ' ' + _shkSlotT(sl2) + wh;
+    } else if (act === 'cancel'){
+      var d3 = s.decided || '', sl3 = s.decidedSlot || '';
+      s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = '';
+      log = '車検の予定を取り消し' + (d3 ? '（' + _shkMD(d3) + ' ' + _shkSlotT(sl3) + '）' : '');
+    } else if (act === 'reopen'){
+      s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
+      log = '車検を予定に戻した';
+    } else if (act === 'flip'){
+      s.decidedSlot = (s.decidedSlot === 'pm') ? 'am' : 'pm';
+      log = '車検の予定を' + _shkSlotT(s.decidedSlot) + 'に変更' + (s.decided ? '（' + _shkMD(s.decided) + '）' : '');
+    }
+    /* 🔴 v1.160.0 窓に出ている**担当も、陸運局・Rと同じように一緒に確定する**。
+       ⚠ v1.119.0 の決めごと（3つを別々に保存させない）に担当だけ抜けていて、
+          「担当を選んでから “午後に変更” を押すと担当が消える」状態だった。
+       ⚠ 再検・予定に戻す は**わざと担当を空にする**指示なので、ここでは戻さない。 */
+    if (opt.staff != null && act !== 'recheck' && act !== 'reopen') s.resultStaff = staff;
+    return { insp: s, log: log, act: act };
+  }
+  w.pitShakenApply = pitShakenApply;
+
+  /* 📍 陸運局の一覧・名前＝**場所の表を渡せば、どのアプリでも同じ答え**（v1.160.0）
+     🔴 「陸運支局のバッジが付いている・有効なもの」＋並び（よく使う→並び順→名前）はここ1本。
+        PitFlow（members-pit.js）も MHS も、自分が持っている `coreLocations` の中身を渡すだけ。
+     ⚠ カテゴリの名札は CoreMembers で作り直せるので、**鍵が rikuun か、名札に「陸運」**で拾う。 */
+  function pitRikuunFrom(locs, catLabel){
+    var lab = (typeof catLabel === 'function') ? catLabel : function(k){ return k === 'rikuun' ? '陸運局' : ''; };
+    return (Array.isArray(locs) ? locs : []).filter(function(l){
+      if (!l || l.active === false) return false;
+      if (l.category === 'rikuun') return true;
+      return /陸運/.test(lab(l.category) || '');
+    }).sort(function(a, b){
+      return (b.frequent ? 1 : 0) - (a.frequent ? 1 : 0)
+          || (a.order || 0) - (b.order || 0)
+          || String(a.name || '').localeCompare(String(b.name || ''), 'ja');
+    }).map(function(l){
+      return { id: l.id, name: String(l.name || ''), aliases: l.aliases || [],
+               frequent: !!l.frequent, address: l.address || '' };
+    });
+  }
+  function pitLocNameFrom(locs, id){
+    if (!id) return '';
+    var h = (Array.isArray(locs) ? locs : []).find(function(l){ return l && l.id === id; });
+    return h ? String(h.name || '') : '';
+  }
+  w.pitRikuunFrom  = pitRikuunFrom;
+  w.pitLocNameFrom = pitLocNameFrom;
 
   /* ══════════════════════════════════════════════════════════════════════════
      🚗 代車の呼び名と、当日メモに出す1行（PitFlow v1.111.0 / MHS v1.21.0・2026-08-17）

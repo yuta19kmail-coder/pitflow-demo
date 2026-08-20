@@ -308,9 +308,29 @@
     if (host.nextSibling !== g) body.insertBefore(g, host.nextSibling);
   }
 
+  /* 🔴🔴 v1.159.1（ゆうた報告）**列のいちばん下の「ここにドラッグ」にも落とせるようにする。**
+     🗣「カードがあって、ラインが一番下の時に、その下にある **ここにドラッグ が反応しない**」
+
+     ⚠ なにが起きていたか＝`.kanban-col-body` の**外**は、ぜんぶ「枠の外」＝**消す**扱いだった。
+        ところが「ここにドラッグ」（`.kanban-td2`）は**列の中に見えていて、カードの下にある**。
+        ＝ **ラインが一番下にある時、その下へ落とせる場所がそこしか無いのに、
+           新しい線は入らず（反応しない）、動かしていた線は黙って消えていた。**
+     🔴 直し＝**「ここにドラッグ」は、その列のいちばん下として受ける。**
+        ⚠ 消えるのは今までどおり「**列そのものの外**」に出した時だけ（決めごとは変えない）。
+        ⚠ 試運転の枠に落ちた時も同じ扱い（区切りラインは試運転の枠には住まないので、
+           **消すより、その列のいちばん下に置く**方が驚かない）。 */
+  function bodyFor(e){
+    var t = e.target.closest && e.target.closest('.kanban-col-body[data-drop="status"]');
+    if (t) return t;
+    var strip = e.target.closest && e.target.closest('.kanban-td2');
+    if (!strip) return null;
+    var col = strip.closest('.kanban-col');
+    return col ? col.querySelector('.kanban-col-body[data-drop="status"]') : null;
+  }
+
   d.addEventListener('dragover', function (e) {
     if (!dragging && !draggingNew) return;
-    var body = e.target.closest && e.target.closest('.kanban-col-body[data-drop="status"]');
+    var body = bodyFor(e);
     e.preventDefault();
     e.stopPropagation();
     if (e.dataTransfer) e.dataTransfer.dropEffect = draggingNew ? 'copy' : 'move';
@@ -319,6 +339,8 @@
     });
     if (!body){ ghostOff(); return; }     /* 枠の外＝ゴーストを消す＝「離すと消える」が見て分かる */
     body.classList.add('kb-line-over');
+    /* ⚠ 「ここにドラッグ」の上にいる時は、マウスのYが列の下にあるので
+          afterFromPoint はそのまま**いちばん下**を返す＝ゴーストも列のいちばん下に出る。 */
     ghostTo(body, afterFromPoint(body, e.clientY));
   }, true);
 
@@ -326,7 +348,7 @@
     if (!dragging && !draggingNew) return;
     e.preventDefault();
     e.stopPropagation();   /* dnd.js のカード用ドロップに流さない */
-    var body = e.target.closest && e.target.closest('.kanban-col-body[data-drop="status"]');
+    var body = bodyFor(e);              /* 🔴 v1.159.1 「ここにドラッグ」＝その列のいちばん下 */
     ghostOff();
     Array.prototype.forEach.call(d.querySelectorAll('.kb-line-over'), function(el){ el.classList.remove('kb-line-over'); });
     if (!body){

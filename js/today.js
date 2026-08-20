@@ -337,10 +337,20 @@ window.pitTodayCancel = function(id, isReturn){
   if (!_todPendOk(c, isReturn)) return;   /* 🆕 v1.149.0 未完はここでは外せない（直すのはカードの中） */
   /* 🔵 v1.75.0 聞くのはアプリ内ダイアログ（pitAsk）。
      ⚠ 聞き方は入庫／返車で2通りあるが、**続きは _go 1本**（写しを作らない）。 */
+  /* 🔄 v1.155.0（ゆうた確定）**「来店なし」では代車の予定を外さない。**
+     🗣「**2・3 は勘違いしてくるってパターンが結構あるから、未入庫に入る時点では残しておいて**」
+     ＝ 来なかったように見えても、あとから連絡が来て**そのまま入庫することがよくある**。
+        ここで代車を外すと、戻した時に**押さえ直し**になる（先に別の人へ貸されているかもしれない）。
+     🔴 外すかどうかは**人が決める**＝未入庫の一覧に「代車予定クリア」を置いた（undetermined.js）。
+     ⚠ 30日たって自動でアーカイブされる時には、一緒に消える（そこまで来たらもう戻らない）。
+     ⚠ v1.154.0 はここで自動で外していた。**わざと戻した。** */
+  const _lo = (!isReturn && window.pitLoanerPlanOf) ? pitLoanerPlanOf(c.id) : { n: 0, text: '' };
   const ask = isReturn
     ? pitAsk('返車予定をキャンセルして「返車・未定」へ戻しますか？', { danger:true, ok:'戻す' })
     : pitAsk('この入庫予約をキャンセルしますか？', { danger:true, ok:'キャンセルする',
-              detail:'「未入庫」リストに残り、1ヶ月後に自動でアーカイブされます。' });
+              detail:'「未入庫」リストに残り、1ヶ月後に自動でアーカイブされます。'
+                     + (_lo.n ? '\n※ 代車の予定（' + _lo.text + '）は**そのまま残ります**。'
+                              + '外すときは未入庫の一覧の「代車予定クリア」から' : '') });
   ask.then(function(yes){ if (yes) _go(); });
 
   function _go(){
@@ -361,12 +371,15 @@ window.pitTodayCancel = function(id, isReturn){
     c.noShow = true;
     c.noShowAt = c.noShowAt || ymd(new Date());
     c.cancelledAt = ymd(new Date());
-    if (window.logFlow) logFlow(c, 'キャンセル（来店なし）');
+    /* 🔄 v1.155.0 代車の予定は**外さない**（人が未入庫の一覧で決める）。何が残っているかはフローに書く。 */
+    if (window.logFlow) logFlow(c, 'キャンセル（来店なし）'
+      + (_lo.n ? '（代車の予定はそのまま：' + _lo.text + '）' : ''));
   }
   if (window.PitDB) PitDB.save();
   pitTodayActionClose();
   renderToday();
-  if (window.pitToast) pitToast(isReturn ? '返車・未定へ戻しました': '未入庫へ移しました');
+  if (window.pitToast) pitToast(isReturn ? '返車・未定へ戻しました'
+    : ('未入庫へ移しました' + (_lo.n ? '（代車の予定はそのまま）' : '')));
   }
 };
 window.pitTodayActionClose = function(){

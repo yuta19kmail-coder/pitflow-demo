@@ -1237,6 +1237,65 @@ window.loCancelUndo = function(){
 };
 window.loCancelCanUndo = function(){ return !!_loCancelSnap; };
 
+/* 🔴🔴 v1.154.0（ゆうた報告 2026-08-20）
+   　「**予約をキャンセルした場合に代車の予定が同時にキャンセルにならない**」
+   ------------------------------------------------------------------
+   ◎なにが起きていたか
+     予約をキャンセルしても（人が押した／来店なし／入庫日を過ぎて自動／カードを消去）、
+     **代車カレンダーの予定だけが残り続けていた。**
+     ＝ 来ない車のために代車が押さえられたまま＝**空いている代車が「貸せない」ように見える。**
+     しかも予約カードはもう箱から消えているので、**誰も気づけないし、外す道もほぼ無い**
+     （代車カレンダーの「この予約の代車をキャンセル」は、その札を見つけられた人しか押せない）。
+
+   ◎🔴 ここが唯一の入口。どの道からも必ずここを通す
+     ・予約キャンセル（人が押した）… `card-view.js` `cvCancelResv`
+     ・キャンセル（来店なし）      … `today.js` `pitTodayCancel`
+     ・入庫日を過ぎた自動の未入庫  … `overdue-pit.js` `pitAutoOverdue`
+     ・カードの消去                … `card-view.js` `cvDeleteCard`
+     🔴 **写しを作らない。** 新しくキャンセルの道を足す時も、ここを呼ぶこと。
+
+   🔴 返却済みの貸出は不可侵（2026-08-19 の決めごと L1）
+     すでに貸して返ってきた記録は**何があっても消さない**。
+     ＝返却済みしか無いカードには **1文字も触らない**（カードの代車の設定も残す）。
+
+   ⚠ 保存（`PitDB.save`）と画面の描き直しは**呼んだ側**でやる
+      （キャンセルの処理の途中で二重に保存しないため）。
+
+   戻り値 … { n: 外した件数, names: ['タント（5）（8/20〜8/22）', …], text: '画面に出す1行' } */
+function _loActiveAssignsOf(cardId){
+  if (!cardId) return [];
+  return (state.loanerAssigns || []).filter(function(a){ return a && a.cardId === cardId && !a.returned; });
+}
+/* 見るだけ（窓に「何が消えるか」を書くため）。**ここでは何も変えない。** */
+window.pitLoanerPlanOf = function(cardId){
+  var list = _loActiveAssignsOf(cardId);
+  var md = window.pitLoanerMD;
+  var names = list.map(function(a){
+    var nm = _loName(a.loanerId);
+    var span = md ? ((a.toDate && a.toDate !== a.fromDate) ? (md(a.fromDate) + '〜' + md(a.toDate)) : md(a.fromDate)) : '';
+    return nm + (span ? '（' + span + '）' : '');
+  });
+  return { n: list.length, names: names, text: names.join('／') };
+};
+/* 実際に外す。why＝理由の1行（フローと操作ログに残す） */
+window.pitLoanerReleaseForCard = function(cardId, why){
+  var plan = pitLoanerPlanOf(cardId);
+  if (!plan.n) return plan;                       /* 返却済みしか無い／もともと無い＝触らない */
+  state.loanerAssigns = (state.loanerAssigns || []).filter(function(a){
+    return !(a && a.cardId === cardId && !a.returned);
+  });
+  var card = (state.cards || []).find(function(c){ return c.id === cardId; });
+  if (card){
+    /* 🔴 カード側の設定も空にする＝`loCancelLoaner`（手で押す代車キャンセル）と**同じ答え**にする。
+       ⚠ 片方だけ残すと「代車 必要なのにカレンダーに居ない」という食い違いができる。 */
+    card.needLoaner = false; card.loanerId = ''; card.loanerFrom = ''; card.loanerTo = ''; card.loanerFixed = false;
+    if (window.logFlow) logFlow(card, '代車の予定も一緒にキャンセル（' + plan.text + '）' + (why ? '＝' + why : ''));
+  }
+  if (window.pitLog) pitLog('代車の予定をキャンセル（予約のキャンセルに合わせて）',
+    { cardId: cardId, kind: 'delete', label: plan.text + (why ? ' / ' + why : '') });
+  return plan;
+};
+
 /* ===== v0.98.0 予約以外の貸出ブロック／緊急車両追加（軽量モーダル） ===== */
 function _loModalOpen(html){
   _loModalClose();

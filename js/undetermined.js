@@ -21,7 +21,17 @@ function pitAutoArchive(){
       const p = c.cancelledAt.split('-');
       const cd = new Date(+p[0], +p[1]-1, +p[2]);
       const days = Math.floor((today - cd) / 86400000);
-      if (days >= UNDET_ARCHIVE_DAYS){ c.archived = true; changed = true; }
+      if (days >= UNDET_ARCHIVE_DAYS){
+        c.archived = true; changed = true;
+        /* 🔴 v1.155.0（ゆうた確定）**ここで代車の予定も一緒に消す。**
+           🗣「もしくは30日後、消去したタイミングで同時にスケジュールも消滅するって流れでいいでしょ？」
+           ＝ 未入庫に入った時点では残す（あとから連絡が来ることがよくあるため）。
+              30日たって自動アーカイブまで来たら**もう戻らない**ので、そこで外す。
+           🔴 中身は loaner.js の `pitLoanerReleaseForCard` 1本（返却済みの貸出には触らない）。 */
+        if (window.pitLoanerReleaseForCard){
+          try { pitLoanerReleaseForCard(c.id, UNDET_ARCHIVE_DAYS + '日たって自動アーカイブ'); } catch (e) {}
+        }
+      }
     }
   });
   if (changed && window.PitDB) PitDB.save();
@@ -80,20 +90,75 @@ function renderReserveTbd(){
     'カードの<i data-ic=calendar data-ics=16></i>で入庫日を入れると予約カレンダーへ移ります。');
 
   h += col('<i data-ic=ban data-ics=16></i> 未入庫 <small>（来店なし）</small>', noShow.length,
-    noShow.length ? noShow.map(c => item(c, '<button class="rtbd-act" onclick="event.stopPropagation();pitUndRestore(\'' + c.id + '\')">↩ 予約に戻す</button>')).join('') : empty,
+    noShow.length ? noShow.map(c => item(c, _undNoShowActs(c))).join('') : empty,
     '<b>入庫日を過ぎても入庫済みにならなかった予約は、ここへ自動で入ります</b>（仮予約と承認待ちは動きません）。'
     /* 🔴 v1.139.0 アーカイブされたあと**どうなるか**まで書く。
        ⚠ v1.138.0 までは「自動でアーカイブされます」だけで、
           そのあと**このボタンが消える**ことが誰にも見えていなかった。
        ⚠ v1.139.0 からは「戻せなくなる」ではなく「**管理者だけになる**」＝カードの ⋮ から戻せる。 */
     + '連絡が来たら「↩ 予約に戻す」。<br>'
+    /* 🔴 v1.155.0（ゆうた確定）代車の扱いを**ここに書く**。
+       ⚠ 書かないと「未入庫なのに代車が押さえられたまま」に誰も気づけない。 */
+    + '🚗 <b>代車の予定はそのまま残ります</b>（あとから連絡が来てそのまま入庫することがあるため）。'
+    + '外していいと決まったら「代車予定クリア」。<br>'
     + '※ ' + UNDET_ARCHIVE_DAYS + '日たつと自動でアーカイブされ、'
-    + '<b>そのあと戻せるのは管理者だけ</b>になります（カードを開いて ⋮ から）。');
+    + '<b>そのあと戻せるのは管理者だけ</b>になります（カードを開いて ⋮ から）。'
+    + 'このとき<b>代車の予定も一緒に消えます</b>。');
 
   h += '</div>';
   wrap.innerHTML = h;
 }
 window.renderReserveTbd = renderReserveTbd;
+
+function _undEsc(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+
+/* 🆕 v1.155.0（ゆうた指定 2026-08-20）未入庫のカードの下に出すボタン。
+   🗣「**未入庫に入る時点では残しておいて、で代車有の場合は
+   　　下に出る予約に戻るを半分サイズにして 代車予定クリア ボタンを作って
+   　　ポップアップの確認画面を挟む。この部分はあくまで人が判断する**」
+
+   ・代車の予定が無い車 … 今までどおり「↩ 予約に戻す」1つ（幅いっぱい）
+   ・代車の予定がある車 … **半分ずつ2つ**（予約に戻す／代車予定クリア）＋
+   　　　　　　　　　　　 **何の代車がいつまで押さえられているか**を1行で出す
+   🔴 判定も文字も loaner.js の `pitLoanerPlanOf` 1本。ここで組み立てない。 */
+function _undNoShowActs(c){
+  const back = 'event.stopPropagation();pitUndRestore(\'' + c.id + '\')';
+  const lo = (window.pitLoanerPlanOf ? pitLoanerPlanOf(c.id) : { n: 0, text: '' });
+  if (!lo.n) return '<button class="rtbd-act" onclick="' + back + '">↩ 予約に戻す</button>';
+  return '<div class="rtbd-lo"><i data-ic=car data-ics=14></i> 代車の予定あり：' + _undEsc(lo.text) + '</div>'
+    + '<div class="rtbd-acts">'
+    + '<button class="rtbd-act half" onclick="' + back + '">↩ 予約に戻す</button>'
+    + '<button class="rtbd-act half warn" onclick="event.stopPropagation();pitUndClearLoaner(\'' + c.id + '\')">'
+    + '<i data-ic=car data-ics=14></i> 代車予定クリア</button>'
+    + '</div>';
+}
+
+/* 🆕 v1.155.0 未入庫の車の代車の予定を、**人が決めて**外す。
+   🔴 ポップアップで**何が消えるかを全部言う**（代車キャンセルの窓と同じ決めごと）。
+   🔴 外す中身は loaner.js の1本（返却済みの貸出には触らない）。ここに書き写さない。 */
+window.pitUndClearLoaner = function(id){
+  const c = (state.cards || []).find(x => x.id === id);
+  if (!c) return;
+  const lo = (window.pitLoanerPlanOf ? pitLoanerPlanOf(id) : { n: 0, text: '' });
+  if (!lo.n){
+    if (window.pitToast) pitToast('この予約に外せる代車の予定はありません', 'PF-3034');
+    renderReserveTbd(); return;
+  }
+  const nm = ((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || 'この予約');
+  const ask = window.pitAsk
+    ? pitAsk(nm + ' の代車の予定を外しますか？', { danger: true, ok: '代車予定をクリアする',
+        detail: '外すもの：' + lo.text + '\n'
+              + '代車カレンダーから消え、予約カードの代車の設定（代車 必要のチェック・使用代車・貸出日・返却日）も空になります。\n'
+              + '⚠ このあと「予約に戻す」で戻しても、代車は戻りません（押さえ直しになります）。' })
+    : Promise.resolve(true);
+  ask.then(function(yes){
+    if (!yes) return;
+    const r = (window.pitLoanerReleaseForCard ? pitLoanerReleaseForCard(id, '未入庫の一覧から手で外した') : { n: 0, text: '' });
+    if (window.PitDB) PitDB.save();
+    renderReserveTbd();
+    if (window.pitToast) pitToast('代車の予定を外しました（' + r.text + '）');
+  });
+};
 
 /* 返車ビュー内「未定」タブ：4カラム（完TEL待ち／返車日未定／返車時間未定／入金待ち）。標準カード表示。
    🔴 v1.60.0（ゆうた指定）「返車未定」を **返車日未定** と **返車時間未定** の2つに割った。

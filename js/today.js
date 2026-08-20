@@ -243,18 +243,32 @@ window.pitTodayTap = function(id, isReturn){
   /* 🔴 v1.103.0 判断も文言も pit-share.js の1本から（MHS の Todayボードも同じものを借りる）。 */
   const canDone = !isReturn || (window.pitReturnCanDone ? pitReturnCanDone(c) : !!c.returnStage);
   const doneWhy = '<span class="ta-why">' + (window.PIT_RETURN_WHY || '') + '</span>';
+  /* 🆕 v1.149.0（ゆうた確定）**未完の車はここでは触らせない＝見えるだけ。**
+     ◎なぜ
+       返す日は決まっているが、作業も完TELもまだ。ここから日時を直したりキャンセルできると、
+       **盤面の車を当日ビューから動かす別の道**ができてしまう（v1.132.0 で1本にした所が崩れる）。
+     ⚠ 直すのはカードの中（詳細）。返すには今までどおり完TELのドラッグを通る。
+     🔴 ボタンを消すだけにしない。実行する所（pitTodaySaveDt / pitTodayCancel）でも同じ条件で止める。 */
+  const _pend   = !!(isReturn && window.pitReturnIsPending && pitReturnIsPending(c));
+  const pendWhy = '<span class="ta-why">' + (window.PIT_PENDING_WHY || '') + '</span>';
   back.innerHTML =
     '<div class="ta-sheet">' +
       '<div class="ta-head"><b>' + ((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</b>　' +
         (c.maker ? c.maker + ' ' : '') + (c.car || '') + (c.plate ? '<span class="ta-plate">' + c.plate + '</span>' : '') +
-        '<div class="ta-sub">' + team + (wt ? '・' + wt.label : '') + (isReturn ? '・返車' : '・入庫') + '</div>' +
+        '<div class="ta-sub">' + team + (wt ? '・' + wt.label : '') + (isReturn ? '・返車' : '・入庫')
+          + (_pend ? '　<span class="ret-pend ret-pend-row">' + (window.PIT_PENDING_LABEL || '未完') + '</span>' : '') + '</div>' +
       '</div>' +
+      (_pend ? '<div class="ta-note">' + (window.PIT_PENDING_TITLE || '') + '</div>' : '') +
       '<button class="ta-btn primary' + (canDone ? '' : ' is-off') + '"' +
         (canDone ? ' onclick="' + doneFn + '(\'' + id + '\')"' : ' disabled') +
         '><b>' + doneLabel + '</b><span>' + doneSub + '</span>' + (canDone ? '' : doneWhy) + '</button>' +
-      '<button class="ta-btn" onclick="pitTodayEditDt(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"><b><i data-ic=clock data-ics=16></i> 日時変更</b><span>' + (isReturn ? '返車' : '入庫') + 'の日付・時間だけ変更</span></button>' +
+      '<button class="ta-btn' + (_pend ? ' is-off' : '') + '"' +
+        (_pend ? ' disabled' : ' onclick="pitTodayEditDt(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"') +
+        '><b><i data-ic=clock data-ics=16></i> 日時変更</b><span>' + (isReturn ? '返車' : '入庫') + 'の日付・時間だけ変更</span>' + (_pend ? pendWhy : '') + '</button>' +
       '<button class="ta-btn" onclick="pitTodayDetail(\'' + id + '\')"><b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b><span>カードを開いて確認・編集</span></button>' +
-      '<button class="ta-btn danger" onclick="pitTodayCancel(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"><b>' + cancelLabel + '</b><span>' + cancelSub + '</span></button>' +
+      '<button class="ta-btn danger' + (_pend ? ' is-off' : '') + '"' +
+        (_pend ? ' disabled' : ' onclick="pitTodayCancel(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"') +
+        '><b>' + cancelLabel + '</b><span>' + cancelSub + '</span>' + (_pend ? pendWhy : '') + '</button>' +
       '<button class="ta-cancel" onclick="pitTodayActionClose()">閉じる</button>' +
     '</div>';
   back.classList.add('show');
@@ -264,6 +278,7 @@ window.pitTodayTap = function(id, isReturn){
 window.pitTodayEditDt = function(id, isReturn){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  if (!_todPendOk(c, isReturn)) return;   /* 🆕 v1.149.0 未完はここでは直せない */
   const back = document.getElementById('today-action');
   if (!back) return;
   const dVal = isReturn ? (c.returnDate || '') : (c.reserveDate || '');
@@ -278,9 +293,19 @@ window.pitTodayEditDt = function(id, isReturn){
       '<button class="ta-cancel" onclick="pitTodayTap(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')">← 戻る</button>' +
     '</div>';
 };
+/* 🆕 v1.149.0 未完（盤面のまま確定返車日だけ入っている車）は、当日ビューから触らせない。
+   🔴 ボタンを消すだけにしない＝**実行する所でも同じ条件で止める**（2026-08-19 の決めごと）。
+   true＝進んでよい／false＝止めた（理由をトーストで出す）。 */
+function _todPendOk(c, isReturn){
+  if (!isReturn) return true;
+  if (!(window.pitReturnIsPending && pitReturnIsPending(c))) return true;
+  return window.pitPendingStop ? pitPendingStop() : false;   /* 言葉も番号も return-slot.js の1本 */
+}
+
 window.pitTodaySaveDt = function(id, isReturn){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  if (!_todPendOk(c, isReturn)) return;   /* 🆕 v1.149.0 未完はここでは直せない */
   const d = (document.getElementById('ta-dt-d') || {}).value || '';
   const t = (document.getElementById('ta-dt-t') || {}).value || '';
   if (isReturn){
@@ -309,6 +334,7 @@ window.pitTodaySaveDt = function(id, isReturn){
 window.pitTodayCancel = function(id, isReturn){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  if (!_todPendOk(c, isReturn)) return;   /* 🆕 v1.149.0 未完はここでは外せない（直すのはカードの中） */
   /* 🔵 v1.75.0 聞くのはアプリ内ダイアログ（pitAsk）。
      ⚠ 聞き方は入庫／返車で2通りあるが、**続きは _go 1本**（写しを作らない）。 */
   const ask = isReturn
@@ -543,8 +569,14 @@ function todayRow(c, isReturn, inBreak){
     ? '<div class="tr-time is-range">' + tLines.map((x,i) => '<span class="tt-l' + (i===1 ? ' tt-sep' : '') + '">' + _todEsc(x) + '</span>').join('') + '</div>'
     : '<div class="tr-time">' + _todEsc(tLines[0] || '') + '</div>';
 
+  /* 🆕 v1.149.0（ゆうた指定）**未完**＝盤面のまま確定返車日だけ入っている車。
+     返車の列にグレーで出す（返す日は決まっているが、まだ作業も完TELも終わっていない）。
+     🔴 判定も言葉も return-slot.js の1本。ここで条件を書き写さない。
+     ⚠ 見えるだけ。「返車済みにする」は今までどおり pitReturnCanDone の関門で止まる。 */
+  const _pend = !!(isReturn && window.pitReturnIsPending && pitReturnIsPending(c));
+
   let h = '';
-  h += '<div class="today-row' + (c.urgent ? ' is-urgent' : '') + (inBreak ? ' in-break' : '') + '" onclick="pitTodayTap(\'' + c.id + '\',' + (isReturn ? 'true' : 'false') + ')" style="--team:' + teamColor + '">';
+  h += '<div class="today-row' + (c.urgent ? ' is-urgent' : '') + (inBreak ? ' in-break' : '') + (_pend ? ' is-retpend' : '') + '" onclick="pitTodayTap(\'' + c.id + '\',' + (isReturn ? 'true' : 'false') + ')" style="--team:' + teamColor + '">';
   h += timeHtml;
   // 担当フロント縦書きバッジ（人が無ければ課）
   if (frontName){
@@ -568,6 +600,7 @@ function todayRow(c, isReturn, inBreak){
 
   // 右側タグ：固定3スロット（添え物｜受付タイプ｜作業タイプ）で全幅揃え
   let side = '';
+  if (_pend && window.pitPendingBadge) side += pitPendingBadge('row');   /* 🆕 v1.149.0 未完 */
   if (c.consult)              side += '<span class="tag-side consult">相談</span>';
   if (c.needLoaner)           side += '<span class="tag-side loaner">代車</span>';
   if (isReturn && c.needWash) side += '<span class="tag-side wash'+(c.washSalesDone?' done':'')+'">洗車</span>';   // 入庫に洗車は出さない・済＝他ビューと同じ赤スタンプ v0.123.3

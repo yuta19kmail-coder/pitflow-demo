@@ -14,7 +14,9 @@
      'dateTbd'   … 返車日未定  （完TEL済だが返車日がまだ）
      'timeTbd'   … 返車時間未定（日は決まったが時間がまだ＝「未定」か空）
      'calendar'  … 返車予定カレンダー（日と時間がそろった）
-     null        … 返車の待ち行列にいない（実績・廃車など）
+     null        … 返車の待ち行列にいない（盤面の車・実績・廃車など）
+     🔴 v1.149.0「未完」（盤面のまま確定返車日が入っている車）は **null のまま**＝ここは変えない。
+        カレンダーに出るのは「出す側で拾っている」だけで、返車系に入ったわけではない。
      ⚠ 'timeTbd' の車は**返車カレンダーの「時刻未定」にも同時に出る**（ゆうた指定）。
         カレンダー側のふるい（return.js）は returnDate があるかどうかで見ているので、
         こちらを足しても向こうは触らなくてよい。
@@ -104,18 +106,77 @@
   function pitReturnDates(c){ return { a: pitReturnA(c), b: pitReturnB(c), c: pitReturnC(c) }; }
 
   /* ---------------------------------------------------------------
+     🆕 v1.149.0（ゆうた指定 2026-08-19）＝**未完**
+     　　「盤面にいるまま、確定返車日だけ先に入っている車」を返車の一覧に**グレーで**出す。
+     🗣「確定返車日を入れた状態で、完TELドラッグがない状態の時に、返車カレンダー、
+     　　ひいては当日であれば当日にも表示してほしい。ただし完TELを通ってない以上『未完』ではあるから、
+     　　未完なりグレーアウトなり、終わってるわけではないのは伝えつつ、
+     　　ただ返車として確定はしてるんだなってのを入れたい」
+
+     🔴 **v1.132.0 の関門はそのまま。** 「返車系へ入る（＝盤面から消える）」のは今までどおり
+        完TEL依頼／完TEL済のドラッグだけ。ここでやるのは**出す側で拾うだけ**＝
+        `returnStage` は付けない・カードは盤面に残る・データは1文字も変えない。
+        （待ち・当日返しを入庫日で拾っているのとまったく同じやり方）
+
+     🔴 **判定に status を使う理由**＝確定返車日の入力欄が出るのは**作業完了に入ってから**
+        （card-view.js の `cvCanFixReturn`）。だから「作業完了で日付を持っている」＝
+        人が確定日として入れたもの、と言い切れる。
+        ⚠ 作業完了より前の車が持っている日付は**お客様への約束（B）**なので拾わない。
+        　 ここを緩めると v1.65.0 で潰した「確定していない車が返車予定に出る」が戻る。
+
+     ⚠ 待ち・当日返しの車はここを通らない（もともと入庫日で出ているので二重に拾わない）。
+     --------------------------------------------------------------- */
+  function pitReturnPending(c){
+    if (!c) return '';
+    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled' || c.status === 'reserved') return '';
+    if (c.returnStage) return '';            /* すでに返車系にいる＝未完ではない */
+    if (pitDropIsSameDay(c)) return '';      /* 待ち・当日返しは今までどおり入庫日で出る */
+    if (c.status !== 'workDone') return '';  /* 確定返車日を入れられるのは作業完了から */
+    return String(c.returnDate || c.returnDateFinal || '');
+  }
+  function pitReturnIsPending(c){ return !!pitReturnPending(c); }
+  window.pitReturnPending   = pitReturnPending;
+  window.pitReturnIsPending = pitReturnIsPending;
+
+  /* 🔴 画面に出す言葉と印は**ここ1本**。各画面で書き写さないこと。 */
+  window.PIT_PENDING_LABEL = '未完';
+  window.PIT_PENDING_TITLE = '返車日は確定していますが、まだ完TELを通っていません（作業はまだ終わっていません）';
+  window.PIT_PENDING_WHY   = '完TELを通っていない車は、ここでは動かせません。タスクボードで完TEL済／完TEL依頼へ入れてください';
+  function pitPendingBadge(kind){
+    return '<span class="ret-pend ret-pend-' + (kind || 'std') + '" title="' + _esc(window.PIT_PENDING_TITLE) + '">'
+         + _esc(window.PIT_PENDING_LABEL) + '</span>';
+  }
+  window.pitPendingBadge = pitPendingBadge;
+  /* カードの外枠に足すクラス（グレーアウト）。**返車系の画面だけ**で使う。
+     ⚠ タスクボードのカードには付けない（盤面では普通の車として扱う）。 */
+  function pitPendingCls(c){ return pitReturnIsPending(c) ? ' is-retpend' : ''; }
+  window.pitPendingCls = pitPendingCls;
+
+  /* 「未完の車はここでは触れない」と伝えるのも**ここ1本**。
+     🔴 エラー番号は**1か所からしか出さない**（同じ番号を2ファイルに書かない＝test_errcode の決めごと）。
+     戻り値は false 固定＝呼ぶ側で `if (!ok) return;` と書けるようにしてある。 */
+  function pitPendingStop(){
+    if (window.pitToast) pitToast(window.PIT_PENDING_WHY || '', 'PF-4011');
+    return false;
+  }
+  window.pitPendingStop = pitPendingStop;
+
+  /* ---------------------------------------------------------------
      ⓪-2 「返車の一覧に、どの日で出すか」＝ここ1本で決める
      🔴 返車カレンダー・当日ビュー・ダッシュボード・新規予約の右パネルは、**全部これを呼ぶだけ**。
         「returnDate が…かつ returnStage が…」と条件を書き写さないこと。
 
      ・C が入っていれば → その日
      ・待・当で C がまだ → **入庫日**。ただし **その日にならないと出さない**（ゆうた指定：入庫前は出さない）
-     ・預かりで完TEL前 → **出さない**（盤面で入れた日付はあくまで約束＝B なので、カレンダーには使わない）
+     ・作業完了で確定返車日だけ入っている（完TEL前）→ **その日（＝未完）**。v1.149.0 で足した
+     ・それ以外の預かりで完TEL前 → **出さない**（盤面で入れた日付はあくまで約束＝B なので使わない）
      --------------------------------------------------------------- */
   function pitReturnListDate(c, todayStr){
     if (!c || c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return '';
     var C = pitReturnC(c);
     if (C) return C;
+    var P = pitReturnPending(c);   /* 🆕 v1.149.0 未完（盤面に残ったまま、確定返車日だけ入っている） */
+    if (P) return P;
     if (pitDropIsSameDay(c) && c.reserveDate){
       var td = todayStr || _today();
       if (String(c.reserveDate) <= td) return String(c.reserveDate);   /* その日になったら自動で入る */

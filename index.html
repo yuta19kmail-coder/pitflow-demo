@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.148.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.149.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/coreflow-ui.css?v=756022d3"><!-- 見た目の基準（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=9">
-<link rel="stylesheet" href="css/views.css?v=50">
+<link rel="stylesheet" href="css/views.css?v=51">
 <link rel="stylesheet" href="css/polish.css?v=206">
 <link rel="stylesheet" href="css/floor.css?v=23">
 <link rel="stylesheet" href="css/board-notes.css?v=2">
@@ -121,7 +121,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.148.0</div>
+    <div class="login-ver">v1.149.0</div>
   </div>
 </div>
 
@@ -135,7 +135,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.148.0</span>
+    <span class="ver">v1.149.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -832,7 +832,7 @@
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
 <script src="js/pit-share.js?v=12"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=f85dcc35"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
-<script src="js/errcode-pit.js?v=4"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
+<script src="js/errcode-pit.js?v=5"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
 <script src="js/state.js?v=71"></script>
 <script src="js/coreflow-loaner-remain.js?v=608d586a"></script><!-- 🚙 代車の残り日数と色（全アプリ共通・_shared から配布）。loaner-free.js より **前** に読むこと -->
@@ -850,7 +850,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/sample-fleet.js?v=13"></script>
 <script src="https://coreflow.kobayashi-motors.com/usage-log.js"></script><!-- 利用状況の記録（CoreFlow集約・自己完結・マスターだけ閲覧） -->
 <script src="js/db-pit.js?v=47"></script>
-<script src="js/return-slot.js?v=8"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
+<script src="js/return-slot.js?v=9"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
 <script src="js/overdue-pit.js?v=1"></script><!-- 🔴 v1.101.0 当日を過ぎた予約・返車を自動で正しい箱へ移す。return-slot.js より後ろ、views.js（showView から呼ぶ）より前 -->
 <script src="js/approval-pit.js?v=2"></script><!-- 🔵 v1.74.0 新規予約の「承認」制度（承認待ちの印・承認する・入庫前に1回聞く）。印を出す側（reserve / card-hover / loaner / card-view / undetermined）より前に読む -->
 <script src="js/views.js?v=52"></script>
@@ -883,10 +883,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/settings-transfer.js?v=3"></script>
 <script src="js/import-bizcloud.js?v=8"></script>
 <script src="js/rules.js?v=16"></script>
-<script src="js/today.js?v=45"></script>
+<script src="js/today.js?v=46"></script>
 <script src="js/undetermined.js?v=18"></script>
-<script src="js/reserve.js?v=73"></script>
-<script src="js/return.js?v=26"></script>
+<script src="js/reserve.js?v=74"></script>
+<script src="js/return.js?v=27"></script>
 <script src="js/car-sales.js?v=5"></script>
 <script src="js/task.js?v=24"></script>
 <script src="js/work.js?v=14"></script>
@@ -904,7 +904,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/holidays.js?v=1c79064f"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>
 <script src="js/cal-pit.js?v=a3f77ecd"></script><!-- 🚫 会社の営業日カレンダー（MHSが基準）。state.js より後ろ。営業日判定はすべて PitCal を通す -->
-<script src="js/dnd.js?v=20"></script>
+<script src="js/dnd.js?v=21"></script>
 <script src="js/board-order.js?v=2"></script><!-- 🔴 v1.140.0 タスクボードのマスター並び（task.js / dnd.js から呼ばれる） -->
 <script src="js/board-sort.js?v=3"></script><!-- 🔴 v1.140.0 タスクボードの一時並び替え（task.js / board-line.js / dnd.js から呼ばれる） -->
 <script src="js/board-line.js?v=7"></script><!-- タスクボードの区切りライン（task.js / ctxmenu-pit.js から呼ばれる） -->

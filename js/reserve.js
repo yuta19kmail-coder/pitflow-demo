@@ -123,7 +123,11 @@ function weekMiniCard(c, slotHH, isRet){
   const _showT = _tv && !(slotHH && _tv === slotHH + ':00');
   const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';
   const wts = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType ? [c.workType] : []);
+  /* 🆕 v1.149.0 未完＝盤面のまま確定返車日だけ入っている車（返車の週ビューだけ）。
+     判定も言葉も return-slot.js の1本。ここで条件を書き写さない。 */
+  const _pend = !!(isRet && window.pitReturnIsPending && pitReturnIsPending(c));
   let badges = '';
+  if (_pend && window.pitPendingBadge) badges += pitPendingBadge('mini');
   if (c.tentative) badges += '<span class="kari-mini" title="仮予約">仮</span>';
   /* 🔵 v1.74.0 承認待ちの「承」。印のHTMLは approval-pit.js 1本（ここで組み立てない） */
   if (window.pitApprovalBadge) badges += pitApprovalBadge(c, 'mini');
@@ -136,7 +140,7 @@ function weekMiniCard(c, slotHH, isRet){
   const _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
   /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
   const _stf = (window.pitStaffShort ? pitStaffShort(staff) : (window.pitSurname ? pitSurname(staff) : staff));
-  let h = '<div class="rwk-card' + (c.codeRed ? ' rwk-claim' : '') + '" draggable="true" data-card-id="' + c.id + '" onclick="openDetail(\'' + c.id + '\')" style="border-left-color:' + teamColor + ';">';
+  let h = '<div class="rwk-card' + (c.codeRed ? ' rwk-claim' : '') + (_pend ? ' is-retpend' : '') + '" draggable="' + (_pend ? 'false' : 'true') + '" data-card-id="' + c.id + '" onclick="openDetail(\'' + c.id + '\')" style="border-left-color:' + teamColor + ';">';
   h += '<div class="rwk-r">' + (_showT ? '<span class="rwk-t">' + at(_tv) + '</span>' : '')
      + '<span class="rwk-name">' + _nm + ' 様</span><span class="rwk-badges">' + badges + '</span></div>';
   h += '<div class="rwk-r"><span class="rwk-car">' + (c.car || '') + '</span>' + (_stf ? '<span class="rwk-front">' + at(_stf) + '</span>' : '') + '</div>';
@@ -428,7 +432,8 @@ window.pitReserveDayPopup = function(dateStr, mode){
   const dow = '日月火水木金土'[d.getDay()];
   const head = (d.getMonth() + 1) + '月' + d.getDate() + '日（' + dow + '）　' + (mode === 'return' ? '返車予定' : '入庫予定') + '　' + cards.length + '件';
   const body = cards.length
-    ? cards.map(function(c){ return cardHtml(c, { compact: true }); }).join('')
+    /* 🆕 v1.149.0 返車のときは retView＝未完をグレーで出す（セル本体と同じ見え方にする） */
+    ? cards.map(function(c){ return cardHtml(c, { compact: true, retView: (mode === 'return') }); }).join('')
     : '<div class="pdp-empty">予定はありません</div>';
   back.innerHTML = '<div class="pdp-box"><div class="pdp-head"><span>' + head + '</span><button class="pdp-x" onclick="pitReserveDayPopClose()"><i data-ic=close data-ics=16></i></button></div>'
     + '<div class="pdp-list" onclick="pitReserveDayPopClose()">' + body + '</div></div>';
@@ -469,6 +474,16 @@ function cardHtml(c, opts){
   const dt = state.dropTypes.find(d => d.id === c.dropType);
   const accent = wt ? wt.color : 'var(--brand)';
 
+  /* 🆕 v1.149.0「未完」＝盤面のまま確定返車日だけ入っている車。
+     🔴 **返車系の画面から呼ばれた時だけ**グレーにする（opts.retView）。
+        タスクボードや作業ビューでは今までどおり普通のカード。
+     🔴 判定も言葉も return-slot.js の1本（ここで条件を書き写さない）。
+     ⚠ 見えるだけ＝**つかめない**（ゆうた確定 2026-08-19）。落とす側の門番は dnd.js。 */
+  const _pend = !!(opts.retView && window.pitReturnIsPending && pitReturnIsPending(c));
+  const _pendCls  = _pend ? ' is-retpend' : '';
+  const _pendDrag = _pend ? 'false' : 'true';
+  const _pendBadge = (_pend && window.pitPendingBadge) ? pitPendingBadge('mini') : '';
+
   /* === コンパクト版（整備ビュー＝看板/作業で統一）：客名・車種・作業内容(最大2)・預かり・代車・フロントだけ。移動はドラッグのみ === */
   if (opts.compact){
     const DROP_COLOR = { wait: '#f59e0b', sameDay: '#3b82f6', drop: '#26a269' };
@@ -478,7 +493,7 @@ function cardHtml(c, opts){
       ? c.workTypes : (c.workType ? [c.workType] : []);
     // 右上＝左から：代車（ある時）→ 当/待（ある時・預かりは出さない）→ 作業内容（一番右固定）
     const at = (window.escAttr ? escAttr : function(s){ return String(s==null?'':s); });
-    let top = '';
+    let top = _pendBadge;   /* 🆕 v1.149.0 未完はいちばん左（いちばん先に目に入る場所） */
     if (c.needLoaner){
       /* 🔴 v1.82.0 返ってきたかは loaner-free.js に聞く（ここで日付を引き算しない）。
          ⚠ 以前は日付だけで見ていたので、**返却済みでも黒（超過）の代車バッジ**が出ていた。 */
@@ -511,7 +526,7 @@ function cardHtml(c, opts){
     // 看板内はカード自体をドロップ先(reorder)にして同フェーズ内の並び替えに対応
     var _reorderAttr = opts.kanban ? (' data-drop="reorder" data-drop-val="' + c.id + '"') : '';
     const _clickC = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");
-    let h = '<div class="pit-card pcm' + (c.codeRed ? ' pcm-claim' : '') + (c.resNo ? ' pcm-tab' : '') + (placed ? ' pcm-placed' : '') + (c.tentative ? ' is-tentative' : '') + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="true" data-card-id="' + c.id + '"' + _reorderAttr + ' onclick="' + _clickC + '" style="border-left-color:' + teamColor + ';">';
+    let h = '<div class="pit-card pcm' + (c.codeRed ? ' pcm-claim' : '') + (c.resNo ? ' pcm-tab' : '') + (placed ? ' pcm-placed' : '') + (c.tentative ? ' is-tentative' : '') + _pendCls + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="' + _pendDrag + '" data-card-id="' + c.id + '"' + _reorderAttr + ' onclick="' + _clickC + '" style="border-left-color:' + teamColor + ';">';
     h += (c.resNo ? '<div class="pcm-ear" style="border-left-color:' + (c.codeRed ? '#ef4444' : teamColor) + (c.codeRed ? ';border-top-color:#ef4444' : '') + '">' + at(c.resNo) + '</div><i class="pcm-ear-slide"></i>' : '');
     /* 車両注意タブ（左/M/T/車高/土禁・左M/T合体・最大3・該当時のみ・耳の右の上辺）
        🔴 v1.121.0 言い方は **pit-share.js の `pitCarCautions` 1本**にした（車検予定と同じ言葉になる）。
@@ -551,12 +566,13 @@ function cardHtml(c, opts){
 
   let html = '';
   const _clickJs = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");
-  html += '<div class="pit-card' + (isRet ? ' return' : '') + (c.urgent ? ' is-urgent' : '') + (c.tentative ? ' is-tentative' : '') + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="true" data-card-id="' + c.id + '" onclick="' + _clickJs + '" style="min-width:200px;border-left-color:' + accent2 + ';">';
+  html += '<div class="pit-card' + (isRet ? ' return' : '') + (c.urgent ? ' is-urgent' : '') + (c.tentative ? ' is-tentative' : '') + _pendCls + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="' + _pendDrag + '" data-card-id="' + c.id + '" onclick="' + _clickJs + '" style="min-width:200px;border-left-color:' + accent2 + ';">';
   if (c.tentative) html += '<span class="kari-stamp">仮</span>';   // 仮予約スタンプ v0.100.0
   if (window.pitApprovalBadge) html += pitApprovalBadge(c, 'stamp');   // 🔵 v1.74.0 承認待ちスタンプ
   html += '<div class="pc-line1">';
   html += '<span class="pc-time">' + timeStr + '</span>';
   html += '<span class="pc-status" style="--sc:' + statusColor(c.status) + ';">' + statusLabel(c.status) + '</span>';
+  html += _pendBadge;   /* 🆕 v1.149.0 未完 */
   if (c.urgent) html += '<span class="pc-urg">緊急</span>';
   html += '</div>';
   html += '<div class="pc-customer">' + ((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</div>';

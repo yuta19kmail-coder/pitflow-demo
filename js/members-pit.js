@@ -428,15 +428,13 @@
     { id: 'sample_rik_narsh', name: '習志野自動車検査登録事務所', category: 'rikuun', frequent: false, order: 2, active: true }
   ];
   /* 陸運局の一覧（車検予定の「どこへ行くか」の選択肢） */
+  /* 🔴 v1.160.0 絞り込みと並びは **pit-share.js の `pitRikuunFrom` 1本**。
+     ＝ MHS も同じ関数に自分の場所の表を渡すので、**どちらの画面でも同じ順・同じ中身**になる。
+     ⚠ ここでやるのは「どの表を渡すか」だけ（本番＝購読した中身／サンプル＝見本）。 */
   function pitRikuunList() {
     var src = (!window.PIT_CLOUD && !_coreLocs.length) ? SAMPLE_RIKUUN : _coreLocs;
-    return src.filter(pitIsRikuunLoc).sort(function (a, b) {
-      return (b.frequent ? 1 : 0) - (a.frequent ? 1 : 0)
-          || (a.order || 0) - (b.order || 0)
-          || String(a.name || '').localeCompare(String(b.name || ''), 'ja');
-    }).map(function (l) {
-      return { id: l.id, name: String(l.name || ''), aliases: l.aliases || [], frequent: !!l.frequent, address: l.address || '' };
-    });
+    if (window.pitRikuunFrom) return pitRikuunFrom(src, _locCatLabel);
+    return src.filter(pitIsRikuunLoc);
   }
   /* 場所の名前を引く。⚠ 消された・名前が変わった時に備えて、呼ぶ側は写しを後ろ盾に持つこと。 */
   function pitLocName(id) {

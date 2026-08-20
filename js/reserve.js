@@ -119,7 +119,9 @@ function renderReserveDay(){
    ＝「朝一」「09:30」「08:00（9時の行に寄せた分）」が、どれか分かるようにするため。 */
 function weekMiniCard(c, slotHH, isRet){
   const at = (window.escAttr ? escAttr : function(s){ return String(s==null?'':s); });
-  const _tv = String((isRet ? (c.returnTime || c.reserveTime) : c.reserveTime) || '').trim();
+  /* 🔴 v1.150.0 返車時間が無い車を**入庫時刻で代用しない**（言葉は return-slot.js の1本） */
+  const _tv = String((isRet ? (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || ''))
+                            : c.reserveTime) || '').trim();
   const _showT = _tv && !(slotHH && _tv === slotHH + ':00');
   const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';
   const wts = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType ? [c.workType] : []);
@@ -417,6 +419,9 @@ window.pitReserveDayPopup = function(dateStr, mode){
                                                            : (c.returnDate === dateStr && c.status !== 'returned' && c.status !== 'scrap');
     return c.reserveDate === dateStr && c.status === 'reserved';
   }).sort(function(a, b){
+    /* 🔴 v1.150.0 返車の並びは return-slot.js の物差し1本（入庫時刻で代用しない）。
+       ⚠ ここだけ `returnTime || reserveTime` で並べていたので、同じ日の並びが日ビューと食い違っていた。 */
+    if (mode === 'return' && window.pitReturnSortMin) return pitReturnSortMin(a) - pitReturnSortMin(b);
     return _min(mode === 'return' ? (a.returnTime || a.reserveTime) : a.reserveTime) - _min(mode === 'return' ? (b.returnTime || b.reserveTime) : b.reserveTime);
   });
 
@@ -562,7 +567,9 @@ function cardHtml(c, opts){
   /* === 返車ビュー（returnView）：入庫カードと同じ作りのまま、時刻＝返車時刻・左アクセント＝緑で統一 === */
   const isRet = !!opts.returnView;
   const accent2 = isRet ? 'var(--green)' : accent;
-  const timeStr = isRet ? (c.returnTime || c.reserveTime || '') : (c.reserveTime || '');
+  /* 🔴 v1.150.0 返車時間が無い車を**入庫時刻で代用しない**（言葉は return-slot.js の1本） */
+  const timeStr = isRet ? (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || ''))
+                        : (c.reserveTime || '');
 
   let html = '';
   const _clickJs = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");

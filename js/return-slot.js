@@ -143,8 +143,11 @@
   window.PIT_PENDING_TITLE = '返車日は確定していますが、まだ完TELを通っていません（作業はまだ終わっていません）';
   window.PIT_PENDING_WHY   = '完TELを通っていない車は、ここでは動かせません。タスクボードで完TEL済／完TEL依頼へ入れてください';
   function pitPendingBadge(kind){
-    return '<span class="ret-pend ret-pend-' + (kind || 'std') + '" title="' + _esc(window.PIT_PENDING_TITLE) + '">'
-         + _esc(window.PIT_PENDING_LABEL) + '</span>';
+    kind = kind || 'std';
+    /* 🔄 v1.150.0（ゆうた指摘）当日ビューの札は、となりの札（相談・代車・洗車）と**同じ大きさ**にそろえる。
+       ＝同じ `tag-side` を着せて寸法を借りる。色は `.ret-pend` が後から上書きする（＝ハッキリしたオレンジ）。 */
+    return '<span class="' + (kind === 'row' ? 'tag-side ' : '') + 'ret-pend ret-pend-' + kind
+         + '" title="' + _esc(window.PIT_PENDING_TITLE) + '">' + _esc(window.PIT_PENDING_LABEL) + '</span>';
   }
   window.pitPendingBadge = pitPendingBadge;
   /* カードの外枠に足すクラス（グレーアウト）。**返車系の画面だけ**で使う。
@@ -211,6 +214,31 @@
     if (c.returnStage || !pitDropIsSameDay(c)) return false;
     return _timeMin(c.returnTime) == null;              /* 時間があるなら終日ではない */
   }
+
+  /* ---------------------------------------------------------------
+     🆕 v1.150.0（ゆうた報告 2026-08-20）
+     　「**返車時間が入っていない＝未定なのに、当日ボードに AM が入っている**」
+     ---------------------------------------------------------------
+     🔴 正体＝**返車時間が無い車を、入庫時刻で代用して表示していた**（`returnTime || reserveTime`）。
+        v1.65.0 で「入庫時刻で代用しない」と決めて**並び順は直した**が、
+        **画面に出す文字の方に代用が残っていた**。
+        ＝入庫が「AM」の車は、返車時間を1文字も入れていないのに返車の欄に「AM」と出る。
+        現場からは「AM に返す約束をした」ようにしか見えない＝**嘘が出ていた**。
+
+     🔴 これからは**代用しない**。無いものは無いと出す。
+        ・返車時間がある            → その文字
+        ・待ち・当日返しで完TEL前   → **終日**（返車カレンダーの枠と同じ言葉）
+        ・それ以外で時間が無い      → **未定**
+     🔴 返車の時間を画面に出す所は**全部これを呼ぶ**（当日ビュー・返車カレンダー・週・月）。
+        `returnTime || reserveTime` と書かないこと。
+     --------------------------------------------------------------- */
+  function pitReturnTimeText(c){
+    if (!c) return '';
+    var t = String(c.returnTime == null ? '' : c.returnTime).trim();
+    if (t) return t;
+    return pitReturnAllDay(c) ? '終日' : '未定';
+  }
+  window.pitReturnTimeText = pitReturnTimeText;
 
   window.pitDropIsSameDay  = pitDropIsSameDay;
   window.pitReturnA        = pitReturnA;

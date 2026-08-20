@@ -541,7 +541,11 @@ function todayRow(c, isReturn, inBreak){
   const wt = state.workTypes.find(w => w.id === c.workType);
   const dt = state.dropTypes.find(d => d.id === c.dropType);
   const teamColor = _todTeamColor(c);
-  const time = isReturn ? (c.returnTime || c.reserveTime || '') : (c.reserveTime || '');
+  /* 🔴 v1.150.0（ゆうた報告）**返車時間が無い車を入庫時刻で代用しない。**
+     ＝入庫が「AM」の車の返車欄に「AM」と出ていた（返車時間は1文字も入れていないのに）。
+     言葉は return-slot.js の1本（無ければ「終日」か「未定」）。ここで組み立てない。 */
+  const time = isReturn ? (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || ''))
+                        : (c.reserveTime || '');
   /* フロント担当（縦書きバッジ・1課=緑/2課=ピンク／課が空ならグレー）
      🔴 v1.104.0 名前は **pitStaffShort** を通す＝自社（小林モータース）は「コバモ」。
         幅 22px の縦書きにフルの会社名は入らない（ゆうた指定 2026-08-16）。 */

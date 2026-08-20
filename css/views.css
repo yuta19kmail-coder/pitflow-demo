@@ -1003,55 +1003,80 @@ select.cf-input{
   letter-spacing:0;
 }
 
+
 /* ==========================================================================
    🆕 v1.149.0（ゆうた指定 2026-08-19）＝**未完**
    　　「盤面にいるまま、確定返車日だけ先に入っている車」の見せ方。
    🗣「完TELを通ってない以上『未完』ではあるから、未完なりグレーアウトなり、
    　　終わってるわけではないのは伝えつつ、ただ返車として確定はしてるんだなってのを入れたい」
+   🔄 v1.150.0（ゆうた指摘）＝「**グレーアウトはいい。ただ未完の札だけ色をはっきり入れて視認性を上げて**」
+
+   🔴🔴 だから **カード全体に filter / opacity を掛けない。**
+   　　 親に掛けると **中の「未完」の札まで色が抜けて薄くなる**（＝ゆうた指摘の正体）。
+   　　 CSS の filter と opacity は**中身ごとまとめて**効くので、子で打ち消せない。
+   　　 → **グレーは「色を指定して」作る。札だけは色をそのまま残す。**
 
    🔴 決めごと
-     ・**グレー**にする＝終わっていないことが一目で分かる
-     ・でも**消さない・薄くしすぎない**（読めなくなると意味がない）＝文字は読める濃さで残す
-     ・**「未完」の札**を必ず付ける（色だけに頼らない＝色が分かりにくい人にも伝わる）
-     ・**つかめない**（ドラッグ不可）＝見えるだけ。カーソルも「指さし」のまま変えない
-   ⚠ 付けるのは**返車系の画面だけ**。タスクボードのカードには付けない（is-retpend を出さない）。
+     ・カードは**グレー**にする＝終わっていないことが一目で分かる
+     ・でも**読めなくしない**（文字は落ち着いた色にするだけ）
+     ・**「未完」の札はハッキリした色**（色だけに頼らず、字でも分かる）
+     ・**つかめない**（ドラッグ不可）＝見えるだけ
+   ⚠ 付けるのは**返車系の画面だけ**。タスクボードのカードには付けない。
    ========================================================================== */
 
-/* 「未完」の札。どの画面でも同じ形・同じ言葉（HTMLは return-slot.js の1本） */
+/* ── 「未完」の札：どの画面でも同じ形・同じ言葉（HTMLは return-slot.js の1本）
+   🔴 グレーの上でいちばん目立つ**塗りつぶしのオレンジ**。字は白。
+   　 （赤＝緊急・クレーム／青＝当日返し と役割がぶつからない色を選んでいる） */
 .ret-pend{
   display:inline-flex; align-items:center; justify-content:center;
-  font-weight:700; letter-spacing:.5px; white-space:nowrap;
-  background:rgba(131,144,166,.18); color:#8390a6; border:1px solid rgba(131,144,166,.55);
-  border-radius:4px;
+  font-weight:800; letter-spacing:.5px; white-space:nowrap;
+  background:#f59e0b; color:#fff; border:1px solid #b45309;
+  border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,.25);
 }
 .ret-pend-mini{ font-size:9.5px; line-height:1; padding:2px 4px; }
 .ret-pend-std { font-size:10.5px; line-height:1; padding:3px 6px; }
-.ret-pend-row { font-size:10px; line-height:1; padding:3px 5px; }
+/* 🔄 v1.150.0（ゆうた指摘）当日ビューは**ほかの札と同じ大きさ**にそろえる（.tag-side と同じ寸法） */
+.ret-pend-row { font-size:10.5px; font-weight:800; padding:3px 6px; border-radius:5px; line-height:1.25; }
 
-/* カード本体＝グレーに寄せる。
-   ⚠ opacity だけで薄くすると文字まで読みにくくなるので、**彩度を落として**少しだけ薄くする。 */
+/* ── カード本体＝グレーへ（filter は使わない） */
 .pit-card.is-retpend,
 .rwk-card.is-retpend,
 .rml-ev.is-retpend,
 .reserve-month-event.is-retpend,
 .today-row.is-retpend{
-  filter:grayscale(.85);
-  opacity:.72;
+  background:rgba(131,144,166,.10);
+  border-color:rgba(131,144,166,.45);
   border-left-color:#8390a6 !important;   /* 左の色（国産緑／輸入ピンク）もグレーへ */
-  border-style:dashed;                    /* 点線＝「まだ確定の途中」を形でも出す */
+  border-left-style:dashed;               /* 点線＝「まだ途中」を形でも出す */
 }
 .pit-card.is-retpend:hover,
 .rwk-card.is-retpend:hover,
 .rml-ev.is-retpend:hover,
 .reserve-month-event.is-retpend:hover,
-.today-row.is-retpend:hover{ opacity:.92; }   /* 見たい時ははっきりする */
+.today-row.is-retpend:hover{ background:rgba(131,144,166,.18); }
 
-/* 当日ビューの行は左の色帯（--team）も持っているのでそこもグレーに */
+/* 中の文字は落ち着いたグレーに（読めなくはしない） */
+.is-retpend .pcm-name, .is-retpend .pcm-sama, .is-retpend .pcm-car, .is-retpend .pcm-front,
+.is-retpend .pc-customer, .is-retpend .pc-car, .is-retpend .pc-time,
+.is-retpend .rwk-name, .is-retpend .rwk-car, .is-retpend .rwk-front, .is-retpend .rwk-t,
+.is-retpend .tr-customer, .is-retpend .tr-carname, .is-retpend .tr-time,
+.is-retpend .rme-txt{ color:var(--text3) !important; }
+
+/* 色つきの小さなバッジ（作業・代車・受付・洗車 など）は彩度を落とす。
+   ⚠ **「未完」の札は対象にしない**（:not で外す）＝ここが今回のキモ。 */
+.is-retpend .pcm-wt, .is-retpend .pcm-loaner, .is-retpend .pcm-drop, .is-retpend .pcm-wash,
+.is-retpend .rwk-wb, .is-retpend .rwk-lo,
+.is-retpend .rme-wt, .is-retpend .rme-loaner,
+.is-retpend .tag-work, .is-retpend .tag-drop,
+.is-retpend .tag-side:not(.ret-pend){ filter:grayscale(.9); opacity:.72; }
+
+/* 当日ビュー：担当者（課）の縦バッジもグレーへ。左の色帯もグレー */
 .today-row.is-retpend{ --team:#8390a6; }
+.today-row.is-retpend .tr-front{ background:#8390a6 !important; }
 
 /* アクションシート（当日ビューのカードをタップ）の説明文 */
 .ta-note{
   margin:6px 0 2px; padding:7px 9px;
-  background:rgba(131,144,166,.12); border:1px solid rgba(131,144,166,.4); border-radius:7px;
+  background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.45); border-radius:7px;
   font-size:11.5px; line-height:1.5; color:var(--text2);
 }

@@ -126,30 +126,15 @@
 
      ⚠ 待ち・当日返しの車はここを通らない（もともと入庫日で出ているので二重に拾わない）。
      --------------------------------------------------------------- */
-  function pitReturnPending(c){
-    if (!c) return '';
-    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled' || c.status === 'reserved') return '';
-    if (c.returnStage) return '';            /* すでに返車系にいる＝未完ではない */
-    if (pitDropIsSameDay(c)) return '';      /* 待ち・当日返しは今までどおり入庫日で出る */
-    if (c.status !== 'workDone') return '';  /* 確定返車日を入れられるのは作業完了から */
-    return String(c.returnDate || c.returnDateFinal || '');
-  }
+  /* 🔄 v1.153.0 **判定も札も `_shared/coreflow-return-plan.js` の1本に移した。**
+     ＝ CarFlow の「整備依頼業務」は PitFlow の出張画面なので、同じ答えにするため
+     　（2026-08-19 の代車と同じやり方。🔴 写しを作らない）。
+     ここでは**呼ぶだけ**。中身はそちらを見ること（index.html でこの前に読み込んでいる）。 */
+  function pitReturnPending(c){ return window.CFReturnPlan ? CFReturnPlan.pending(c) : ''; }
   function pitReturnIsPending(c){ return !!pitReturnPending(c); }
-  window.pitReturnPending   = pitReturnPending;
-  window.pitReturnIsPending = pitReturnIsPending;
 
-  /* 🔴 画面に出す言葉と印は**ここ1本**。各画面で書き写さないこと。 */
-  window.PIT_PENDING_LABEL = '未完';
-  window.PIT_PENDING_TITLE = '返車日は確定していますが、まだ完TELを通っていません（作業はまだ終わっていません）';
-  window.PIT_PENDING_WHY   = '完TELを通っていない車は、ここでは動かせません。タスクボードで完TEL済／完TEL依頼へ入れてください';
-  function pitPendingBadge(kind){
-    kind = kind || 'std';
-    /* 🔄 v1.150.0（ゆうた指摘）当日ビューの札は、となりの札（相談・代車・洗車）と**同じ大きさ**にそろえる。
-       ＝同じ `tag-side` を着せて寸法を借りる。色は `.ret-pend` が後から上書きする（＝ハッキリしたオレンジ）。 */
-    return '<span class="' + (kind === 'row' ? 'tag-side ' : '') + 'ret-pend ret-pend-' + kind
-         + '" title="' + _esc(window.PIT_PENDING_TITLE) + '">' + _esc(window.PIT_PENDING_LABEL) + '</span>';
-  }
-  window.pitPendingBadge = pitPendingBadge;
+  /* 🔄 v1.153.0 言葉（未完・暫定・未定）と札のHTMLも _shared/coreflow-return-plan.js へ移した。
+     　　window.PIT_PENDING_LABEL / pitPendingBadge などはそちらが入れている。 */
   /* カードの外枠に足すクラス（グレーアウト）。**返車系の画面だけ**で使う。
      ⚠ タスクボードのカードには付けない（盤面では普通の車として扱う）。 */
   function pitPendingCls(c){ return pitReturnIsPending(c) ? ' is-retpend' : ''; }
@@ -260,53 +245,9 @@
        ③ 暫定（受注のときのお客様への約束＝B）→ `plan`
        ④ 待ち・当日返しの入庫日          → `sameday`
      =============================================================== */
-  function pitReturnPlanDate(c){
-    if (!c) return '';
-    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return '';
-    var C = pitReturnC(c);       if (C) return C;
-    var P = pitReturnPending(c); if (P) return P;
-    var B = pitReturnB(c);       if (B) return B;
-    if (pitDropIsSameDay(c) && c.reserveDate) return String(c.reserveDate);
-    return '';
-  }
-  function pitReturnPlanKind(c){
-    if (!c) return '';
-    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return '';
-    if (pitReturnC(c))       return 'fixed';
-    if (pitReturnPending(c)) return 'pending';
-    if (pitReturnB(c))       return 'plan';
-    if (pitDropIsSameDay(c) && c.reserveDate) return 'sameday';
-    /* 🆕 v1.152.0 完TELまで来たのに日が決まっていない＝**未定**。
-       ＝いちばん弱いのではなく「**日を決めに行かないといけない車**」。別枠に隔離せず、
-       　同じ並びに札を付けて出す（ゆうた指摘「別枠だとこのエリアの重要度が分からなくなる」）。 */
-    if (c.returnStage) return 'tbd';
-    return '';
-  }
-  window.pitReturnPlanDate = pitReturnPlanDate;
-  window.pitReturnPlanKind = pitReturnPlanKind;
-
-  /* 「暫定」の札＝まだお客様への約束の段階（＝日が動くことがある）。
-     🔴 「未完」より弱い印にする（＝塗りつぶさず、枠だけの同じ色）。
-        同じ色の濃淡で「確からしさ」を表す＝別の色を増やすより読み取りやすい。 */
-  window.PIT_PLAN_LABEL = '暫定';
-  window.PIT_PLAN_TITLE = '受注のときにお客様へ伝えた返車予定です（まだ確定していないので、日が動くことがあります）';
-  function pitPlanBadge(kind){
-    kind = kind || 'std';
-    return '<span class="' + (kind === 'row' ? 'tag-side ' : '') + 'ret-plan ret-pend-' + kind
-         + '" title="' + _esc(window.PIT_PLAN_TITLE) + '">' + _esc(window.PIT_PLAN_LABEL) + '</span>';
-  }
-  window.pitPlanBadge = pitPlanBadge;
-
-  /* 🆕 v1.152.0「未定」の札＝完TELまで来たのに返車日が決まっていない。
-     🔴 同じオレンジの**破線の枠**＝「同じ話の続きだが、日がまだ入っていない」を形で出す。 */
-  window.PIT_TBD_LABEL = '未定';
-  window.PIT_TBD_TITLE = '完TELまで来ていますが、返車日がまだ決まっていません（日を決めに行く車）';
-  function pitTbdBadge(kind){
-    kind = kind || 'std';
-    return '<span class="' + (kind === 'row' ? 'tag-side ' : '') + 'ret-tbd ret-pend-' + kind
-         + '" title="' + _esc(window.PIT_TBD_TITLE) + '">' + _esc(window.PIT_TBD_LABEL) + '</span>';
-  }
-  window.pitTbdBadge = pitTbdBadge;
+  /* 🔄 v1.153.0 「いつ返す予定か（確定→未完→暫定→待・当）」と「暫定・未定の札」も
+     　　_shared/coreflow-return-plan.js の1本へ。window.pitReturnPlanDate / pitReturnPlanKind /
+     　　pitPlanBadge / pitTbdBadge はそちらが入れている。**ここには書かない。** */
 
   window.pitDropIsSameDay  = pitDropIsSameDay;
   window.pitReturnA        = pitReturnA;

@@ -276,6 +276,10 @@
     if (pitReturnPending(c)) return 'pending';
     if (pitReturnB(c))       return 'plan';
     if (pitDropIsSameDay(c) && c.reserveDate) return 'sameday';
+    /* 🆕 v1.152.0 完TELまで来たのに日が決まっていない＝**未定**。
+       ＝いちばん弱いのではなく「**日を決めに行かないといけない車**」。別枠に隔離せず、
+       　同じ並びに札を付けて出す（ゆうた指摘「別枠だとこのエリアの重要度が分からなくなる」）。 */
+    if (c.returnStage) return 'tbd';
     return '';
   }
   window.pitReturnPlanDate = pitReturnPlanDate;
@@ -292,6 +296,17 @@
          + '" title="' + _esc(window.PIT_PLAN_TITLE) + '">' + _esc(window.PIT_PLAN_LABEL) + '</span>';
   }
   window.pitPlanBadge = pitPlanBadge;
+
+  /* 🆕 v1.152.0「未定」の札＝完TELまで来たのに返車日が決まっていない。
+     🔴 同じオレンジの**破線の枠**＝「同じ話の続きだが、日がまだ入っていない」を形で出す。 */
+  window.PIT_TBD_LABEL = '未定';
+  window.PIT_TBD_TITLE = '完TELまで来ていますが、返車日がまだ決まっていません（日を決めに行く車）';
+  function pitTbdBadge(kind){
+    kind = kind || 'std';
+    return '<span class="' + (kind === 'row' ? 'tag-side ' : '') + 'ret-tbd ret-pend-' + kind
+         + '" title="' + _esc(window.PIT_TBD_TITLE) + '">' + _esc(window.PIT_TBD_LABEL) + '</span>';
+  }
+  window.pitTbdBadge = pitTbdBadge;
 
   window.pitDropIsSameDay  = pitDropIsSameDay;
   window.pitReturnA        = pitReturnA;

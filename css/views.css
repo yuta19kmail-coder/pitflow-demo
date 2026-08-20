@@ -1091,3 +1091,13 @@ select.cf-input{
   background:rgba(245,158,11,.14); color:#b45309; border:1px solid #f59e0b;
   border-radius:5px;
 }
+
+/* 🆕 v1.152.0（ゆうた指摘）「未定」＝完TELまで来たのに返車日が決まっていない車。
+   🔴 別枠に隔離せず、同じ並びに札で混ぜる（枠を分けると下にあるほど軽く見えて、重要度が逆に伝わる）。
+   🔴 同じオレンジの**破線の枠**＝「同じ話の続きだが、日がまだ入っていない」を形でも出す。 */
+.ret-tbd{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:800; letter-spacing:.5px; white-space:nowrap;
+  background:transparent; color:#b45309; border:1px dashed #f59e0b;
+  border-radius:5px;
+}

@@ -147,16 +147,23 @@ function renderCarSales(){
     const doneHtml = st.done.concat(sm.done).map(c=>_csDoneCard(c,'wash')).join('');
     h += _csSec('<i data-ic=drop data-ics=16></i> 洗車', '今日・明日ぶん（暫定・未完も出します）', bodyHtml, doneHtml);
   }
-  // ② 今週の洗車予定（日付決定 ＋ 返車日未定）
+  /* ② 今週の洗車予定
+     🔄 v1.152.0（ゆうた指摘）**「洗車で返車日未定」を別枠から出して、同じ並びに混ぜた。**
+     🗣「そうすると今度**このエリアの重要度が分からなくなる**から、
+     　　**未定バッジをつけて一緒に並べちゃった方がよくない？**」
+     ◎なぜ別枠がまずかったか
+       枠が分かれていると「今週のぶん」と「未定のぶん」が**別の仕事に見える**。
+       実際は **どちらも今週中に洗う車**で、未定の方はむしろ**日を決めに行かないといけない**＝重い。
+       枠に隔離すると、下にあるほど軽く見える＝**重要度が逆に伝わる**。
+     🔴 だから **1本の並びにして、確からしさは札で出す**（確定＝札なし／未完／暫定／未定）。
+     ⚠ 日付が無い車は並びの最後（sortDate が 9999 として扱う）。**消えはしない。** */
   {
-    const sw = split(washWeek.sort(sortDate), 'washSalesDone');
-    const sn = split(washNoDate.sort(sortTime), 'washSalesDone');
-    let bodyHtml = '<div class="cs-subh"><i data-ic=calendar data-ics=16></i> 予定決定（〜今週日曜）</div>'
-      + (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csWashLabel(c))).join('') : '<div class="cs-empty">なし</div>')
-      + '<div class="cs-subh"><i data-ic=help data-ics=16></i> 洗車で返車日未定 <small>（完TELまで来たのに日が決まっていない車）</small></div>'
-      + (sn.open.length ? sn.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>');
-    const doneHtml = sw.done.concat(sn.done).map(c=>_csDoneCard(c,'wash')).join('');
-    h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '暫定・未完も出します', bodyHtml, doneHtml);
+    const weekAll = washWeek.concat(washNoDate);
+    const sw = split(weekAll.sort(sortDate), 'washSalesDone');
+    let bodyHtml = (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csWashLabel(c))).join('')
+                                   : '<div class="cs-empty">なし</div>');
+    const doneHtml = sw.done.map(c=>_csDoneCard(c,'wash')).join('');
+    h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '〜今週日曜（暫定・未完・未定も一緒に）', bodyHtml, doneHtml);
   }
   // ③ 車検ヘッドライト磨き
   {
@@ -211,6 +218,7 @@ function _csWashLabel(c){
   let badge = '';
   if (k === 'pending' && window.pitPendingBadge) badge = pitPendingBadge('mini') + ' ';
   else if ((k === 'plan' || k === 'sameday') && window.pitPlanBadge) badge = pitPlanBadge('mini') + ' ';
+  else if (k === 'tbd' && window.pitTbdBadge) badge = pitTbdBadge('mini') + ' ';   /* 🆕 v1.152.0 */
   if (d){
     const dt = new Date(d + 'T00:00:00');
     if (!isNaN(dt)) return badge + '<i data-ic=car data-ics=16></i> 返車 ' + (dt.getMonth()+1) + '/' + dt.getDate()

@@ -1080,3 +1080,14 @@ select.cf-input{
   background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.45); border-radius:7px;
   font-size:11.5px; line-height:1.5; color:var(--text2);
 }
+
+/* 🆕 v1.151.0（ゆうた指定 2026-08-20）「暫定」＝受注のときのお客様への約束の日。
+   🔴 「未完」より**弱い印**にする＝同じオレンジで**枠だけ**。
+      色を増やすより、同じ色の濃淡で「確からしさ」を出す方が読み取りやすい。
+   （車販作業の洗車予定で使う。返車カレンダーには出さない＝あちらは確定だけ） */
+.ret-plan{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:800; letter-spacing:.5px; white-space:nowrap;
+  background:rgba(245,158,11,.14); color:#b45309; border:1px solid #f59e0b;
+  border-radius:5px;
+}

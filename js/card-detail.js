@@ -1070,8 +1070,14 @@ function _cfsShortHtml(c, team, today, tStr, ro){
   if (typeof dashEarliestIntake !== 'function') return '';
   const teamColor = (team === 'import') ? '#ec4899' : '#1db97a';
   const teamName  = (team === 'import') ? '<i data-ic=globe data-ics=16></i> 輸入車' : '<i data-ic=car data-ics=16></i> 国産車';
-  /* 🆕 v1.157.0 目印を付ける＝**この枠だけ作り直せる**ようにするため（打つたびに全部を描き直さない） */
-  let h = '<div class="cfs-card cfs-short" data-team="' + team + '"' + (ro ? ' data-ro="1"' : '') + '>';
+  /* 🆕 v1.157.0 目印を付ける＝**この枠だけ作り直せる**ようにするため（打つたびに全部を描き直さない）
+     🔴🔴 v1.157.1（ゆうた報告「全体的に動きが悪い」）**目印は `data-shortbox` 専用にする。**
+        `cfs-short` は**予約カレンダーの「いつもと時間が違う日」のマスにも付いている**
+        （`_cfsCalHtml` の `calTone === 'short'`）。しかも**あちらにも `data-team` がある**。
+        ＝ `.cfs-short[data-team]` で拾うと、打つたびに
+        **短縮営業日のマスまで「最短入庫カード」で置き換わって消えていた。**
+        ⚠ 「クラス名が同じだから拾える」で選ばないこと。**作り直す物には専用の目印を付ける。** */
+  let h = '<div class="cfs-card cfs-short" data-shortbox="1" data-team="' + team + '"' + (ro ? ' data-ro="1"' : '') + '>';
   h += '<div class="cfs-h" style="border-left-color:' + teamColor + '"><i data-ic=clock data-ics=16></i> 最短入庫 <span class="cfs-team" style="color:' + teamColor + '">' + teamName + '</span></div>';
   /* 🔴🔴 v1.156.0（ゆうた指定）代車ありの最短は「**きちんと枠が取れる日**」から案内する。
      ・作業タイプ未選択 … 1週間きっちり
@@ -1364,8 +1370,10 @@ window.pitCfPlanSync = function (c) {
   const t = new Date(); t.setHours(0, 0, 0, 0);
   const tStr = ymd(t);
 
-  /* ① 最短入庫の枠（国産／輸入が未選択なら2枚出ている） */
-  Array.prototype.forEach.call(document.querySelectorAll('.cfs-short[data-team]'), function (box) {
+  /* ① 最短入庫の枠（国産／輸入が未選択なら2枚出ている）
+     🔴 v1.157.1 目印は **`data-shortbox` だけ**で拾う。`.cfs-short` で拾うと
+        予約カレンダーの短縮営業日のマスまで巻き込む（_cfsShortHtml の注意書き参照）。 */
+  Array.prototype.forEach.call(document.querySelectorAll('.cfs-card[data-shortbox]'), function (box) {
     const team = box.getAttribute('data-team');
     box.outerHTML = _cfsShortHtml(c, team, t, tStr, box.getAttribute('data-ro') === '1');
   });

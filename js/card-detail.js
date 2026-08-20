@@ -958,9 +958,23 @@ function _cfsDayListHtml(c){
     items.sort(function(a,b){ return a.min-b.min; });
     return items.map(function(i){ return i.html; }).join('');
   }
-  let h = '<div class="dl"><div class="dl-cols">';
-  h += '<div class="dl-col"><div class="dl-h in"><i data-ic=download data-ics=16></i> 入庫</div><div class="dl-body">'+col(intake,false)+'</div></div>';
-  h += '<div class="dl-col"><div class="dl-h ret"><i data-ic=upload data-ics=16></i> 返車</div><div class="dl-body">'+col(ret,true)+'</div></div>';
+  /* 🆕 v1.156.0（ゆうた指定）**入庫と返車の真ん中に、その日の日付をバッジで出す。**
+     🗣「上のカレンダーでアクティブになってるから分かるのだが、実際表示かわってる？
+     　　これ何日のスケジュール？ってちょっと不安になるから」
+     ＝ 日を選び直しても画面の形が変わらないので、**今どの日を見ているのかが分からなくなる。** */
+  const _d = new Date(ds + 'T00:00:00');
+  const _dLbl = isNaN(_d.getTime()) ? ds
+    : ((_d.getMonth()+1) + '/' + _d.getDate() + '（' + '日月火水木金土'[_d.getDay()] + '）');
+  const _isToday = (ds === ymd(new Date()));
+  let h = '<div class="dl">';
+  h += '<div class="dl-hrow">';
+  h += '<div class="dl-h in"><i data-ic=download data-ics=16></i> 入庫</div>';
+  h += '<div class="dl-datechip' + (_isToday ? ' today' : '') + '">' + _pe(_dLbl) + (_isToday ? '<em>今日</em>' : '') + '</div>';
+  h += '<div class="dl-h ret"><i data-ic=upload data-ics=16></i> 返車</div>';
+  h += '</div>';
+  h += '<div class="dl-cols">';
+  h += '<div class="dl-col"><div class="dl-body">'+col(intake,false)+'</div></div>';
+  h += '<div class="dl-col"><div class="dl-body">'+col(ret,true)+'</div></div>';
   h += '</div></div>';
   return h;
 }
@@ -1058,19 +1072,30 @@ function _cfsShortHtml(c, team, today, tStr, ro){
   const teamName  = (team === 'import') ? '<i data-ic=globe data-ics=16></i> 輸入車' : '<i data-ic=car data-ics=16></i> 国産車';
   let h = '<div class="cfs-card">';
   h += '<div class="cfs-h" style="border-left-color:' + teamColor + '"><i data-ic=clock data-ics=16></i> 最短入庫 <span class="cfs-team" style="color:' + teamColor + '">' + teamName + '</span></div>';
-  // 代車ありの最短は、作業タイプの概算預かり日数ぶん代車が連続で空く日を探す（車検5日なら5日連続確保できる日・v0.101.4）
-  const _holdOv = (c && c.estHoldDays != null && c.estHoldDays !== '' && +c.estHoldDays > 0) ? +c.estHoldDays : null;
+  /* 🔴🔴 v1.156.0（ゆうた指定）代車ありの最短は「**きちんと枠が取れる日**」から案内する。
+     ・作業タイプ未選択 … 1週間きっちり
+     ・作業タイプ選択済 … 前日〜入庫日＋預かり日数（＝預かり日数＋前後1日）
+     ・お客様が国産車なら**輸入車の代車は数えない**（案内では避ける。あとから選ぶのは自由）
+     🔴 判定は loaner-free.js の `pitLoanerPlanWindow` 1本。ここに条件を書き写さない。
+     ⚠ 「どの決まりで出した日なのか」を必ず1行出す。出さないと現場が数字を信じられない。 */
+  const _holdOv = (window.pitCardHoldDays ? pitCardHoldDays(c) : null);
+  const _need   = (window.pitLoanerPlanNeed ? pitLoanerPlanNeed(_holdOv) : { why: '' });
   [{ k: 'noLoaner', n: '代車なし' }, { k: 'loaner', n: '代車あり' }, { k: 'same', n: '当日作業' }].forEach(function (x) {
-    const d = dashEarliestIntake(team, x.k, today, x.k === 'loaner' ? _holdOv : null);
+    const d = dashEarliestIntake(team, x.k, today, x.k === 'loaner' ? _holdOv : null, { board: team });
     const ds = d ? ymd(d) : null;
     const lbl = !d ? 'なし' : (ds === tStr ? '今日' : (d.getMonth()+1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）');
+    const why = (x.k === 'loaner') ? '<span class="cfs-el-why">' + _need.why + 'が取れる日</span>' : '';
     if (ro){
-      h += '<div class="cfs-el cfs-el-ro"><span class="cfs-el-n">' + x.n + '</span><b>' + lbl + '</b></div>';
+      h += '<div class="cfs-el cfs-el-ro"><span class="cfs-el-n">' + x.n + '</span><b>' + lbl + '</b>' + why + '</div>';
     } else {
       h += '<button type="button" class="cfs-el' + (ds && c.reserveDate === ds ? ' sel' : '') + '"' + (ds ? ' onclick="cfPickShort(\'' + ds + '\',\'' + team + '\',\'' + x.k + '\')"' : ' disabled') + '>'
-         + '<span class="cfs-el-n">' + x.n + '</span><b>' + lbl + '</b><span class="cfs-el-go">タップで入庫日に入る</span></button>';
+         + '<span class="cfs-el-n">' + x.n + '</span><b>' + lbl + '</b>' + why + '<span class="cfs-el-go">タップで入庫日に入る</span></button>';
     }
   });
+  /* 国産のお客様には「輸入の代車は避けて出している」ことを言う（黙って絞らない） */
+  if (team === 'default'){
+    h += '<div class="cfs-el-note"><i data-ic=car data-ics=14></i> 国産車のお客様なので、輸入車の代車は避けて案内しています（あとから選ぶことはできます）</div>';
+  }
   h += '</div>';
   return h;
 }
@@ -1153,6 +1178,7 @@ function _cfsCalHtml(c, team, tStr, ro){
 function _cfsLgRows(from, to, today, tStr, c, ro){
   const loaners = _cfsLgLoaners(c);
   const assigns = state.loanerAssigns || [];
+  const _band = _cfsPlanBand(c);   /* 🆕 v1.156.0 いま案内している期間（透過グリーンの帯） */
   let h = '';
   for (let i = from; i < to; i++){
     const d = addDays(today, i);
@@ -1160,7 +1186,9 @@ function _cfsLgRows(from, to, today, tStr, c, ro){
     const dow = d.getDay();
     const dCls = (dow === 0) ? ' red' : (dow === 6 ? ' sat' : '');
     /* v1.35.0 日付を押すと、その日の行を点線で囲う（もう一度押すと消える） */
-    h += '<tr data-ds="' + ds + '"><td class="cfs-lg-d cfs-lg-dpick' + dCls + (ds === tStr ? ' today' : '') + '" data-lgrow="' + ds + '" title="クリックでこの日の行を目立たせる">' + (d.getMonth()+1) + '/' + d.getDate() + '<span>' + '日月火水木金土'[dow] + '</span></td>';
+    /* 🆕 v1.156.0 いま案内している期間は行ごと透過グリーン（どこを指しているか） */
+    const inBand = !!(_band && ds >= _band.from && ds <= _band.to);
+    h += '<tr data-ds="' + ds + '"' + (inBand ? ' class="cfs-lg-band"' : '') + '><td class="cfs-lg-d cfs-lg-dpick' + dCls + (ds === tStr ? ' today' : '') + '" data-lgrow="' + ds + '" title="クリックでこの日の行を目立たせる">' + (d.getMonth()+1) + '/' + d.getDate() + '<span>' + '日月火水木金土'[dow] + '</span></td>';
     loaners.forEach(function (l) {
       /* 🔴 v1.80.0 ふさがっている理由は loaner-free.js に聞く
          ＝貸出だけでなく **代車自身の車検・点検（車両管理の予定）でも塞がる**。
@@ -1239,6 +1267,30 @@ window.cfsLgRerender = function(){
   if (window.pitLgSync) pitLgSync(c);   /* v1.35.0 並べ替えたあとも選択の色を保つ */
 };
 
+/* 🆕 v1.156.0（ゆうた指定）**代車カレンダーに「いまどこを指しているか」を透過グリーンの帯で出す。**
+   🗣「右カラムの代車カレンダーには**透過のグリーンでどこを指しているのかわかるように**したい」
+
+   ◎どこを塗るか（ゆうた確定＝期間を縦に帯で）
+     ・入庫日が入っていれば **その日を入庫日にしたときの窓**
+     ・まだなら **いま案内している最短入庫日の窓**
+     窓＝1週間 or「前日〜入庫日＋預かり日数」（loaner-free.js の `pitLoanerPlanWindow` 1本）
+   🔴 塗るのは**日付の行ぜんぶ**（代車の列は絞らない）＝「この幅を見ている」が一目で分かる。
+   ⚠ ここで日数を計算しないこと。窓の決め方は部品が持つ。 */
+function _cfsPlanBand(c){
+  if (!c || !window.pitLoanerPlanWindow) return null;
+  const hold = (window.pitCardHoldDays ? pitCardHoldDays(c) : null);
+  const board = (c.boardId === 'default' || c.boardId === 'import') ? c.boardId : null;
+  let base = c.reserveDate || '';
+  if (!base && typeof dashEarliestIntake === 'function'){
+    const t = new Date(); t.setHours(0,0,0,0);
+    const d = dashEarliestIntake(board || 'default', 'loaner', t, hold, { board: board });
+    base = d ? ymd(d) : '';
+  }
+  if (!base) return null;
+  const w = pitLoanerPlanWindow(base, hold, { board: board });
+  return { from: w.from, to: w.to, ok: w.ok, why: w.why, base: base };
+}
+
 function _cfsLoanerGanttHtml(today, tStr, c, ro){
   const loaners = _cfsLgLoaners(c);
   if (!window._cfsLgN) window._cfsLgN = 28;
@@ -1251,6 +1303,17 @@ function _cfsLoanerGanttHtml(today, tStr, c, ro){
   let h = '<div class="cfs-card" id="cfs-lg-card">';
   h += '<div class="cfs-h" style="border-left-color:#f59e0b"><span style="color:#f59e0b"><i data-ic=van data-ics=16></i> 代車カレンダー</span>'
      + '<span class="cfs-nav">' + sortBtn + '<button type="button" onclick="cfsLgToday()" title="一番上（今日）に戻る"><i data-ic=location data-ics=16></i> 今日へ</button></span></div>';
+  /* 🆕 v1.156.0 何の期間を緑にしているのかを、必ず言葉でも出す（色だけに頼らない） */
+  const _bd = _cfsPlanBand(c);
+  if (_bd){
+    const _md = window.pitLoanerMD || function(x){ return x; };
+    h += '<div class="cfs-lg-bandnote"><span class="cfs-lg-bandsw"></span>'
+       + (c && c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅')
+       + '：<b>' + _md(_bd.from) + '〜' + _md(_bd.to) + '</b>'
+       + '<span class="cfs-lg-bandwhy">' + _bd.why + '</span>'
+       + (_bd.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>')
+       + '</div>';
+  }
   h += '<div class="cfs-lg-scroll" id="cfs-lg-scroll" onscroll="cfsLgScroll(this)"><table class="cfs-lg">';
   h += '<thead><tr><th class="cfs-lg-d"></th>';
   loaners.forEach(function (l) {

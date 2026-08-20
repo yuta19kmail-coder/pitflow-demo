@@ -2215,3 +2215,47 @@ th.cfs-lg-d{ z-index:3; }
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .rtbd-act.warn{ border-color:#f59e0b; color:#b45309; }
 .rtbd-act.warn:hover{ background:rgba(245,158,11,.14); border-color:#f59e0b; color:#b45309; }
+
+/* ==========================================================================
+   🆕 v1.156.0（ゆうた指定 2026-08-20）新規予約の右パネルまわり
+   ========================================================================== */
+
+/* ── 最短入庫カード：どの決まりで出した日なのかを1行で（数字だけ出さない） */
+.cfs-el-why{ display:block; font-size:9.5px; font-weight:700; color:#b45309;
+  background:rgba(245,158,11,.14); border:1px solid rgba(245,158,11,.45);
+  border-radius:5px; padding:1px 5px; margin-top:3px; white-space:nowrap; }
+.cfs-el-note{ font-size:10px; line-height:1.45; color:var(--text3); padding:4px 8px 6px;
+  display:flex; align-items:flex-start; gap:4px; }
+
+/* ── 代車カレンダー：いま案内している期間を透過グリーンの帯で
+   🔴 色だけに頼らないため、上に「何の期間か」を必ず言葉で出す（.cfs-lg-bandnote）。 */
+.cfs-lg-bandnote{ display:flex; align-items:center; flex-wrap:wrap; gap:5px;
+  font-size:10.5px; font-weight:700; color:var(--text2);
+  padding:5px 8px; background:rgba(29,185,122,.08);
+  border-top:1px solid rgba(29,185,122,.30); border-bottom:1px solid rgba(29,185,122,.30); }
+.cfs-lg-bandnote b{ color:#1db97a; }
+.cfs-lg-bandsw{ width:14px; height:12px; border-radius:3px;
+  background:rgba(29,185,122,.22); border:1px solid rgba(29,185,122,.55); flex:0 0 auto; }
+.cfs-lg-bandwhy{ font-size:9.5px; font-weight:700; color:var(--text3);
+  background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
+.cfs-lg-bandng{ font-size:9.5px; font-weight:800; color:#fff; background:#ef4444;
+  border-radius:5px; padding:1px 5px; }
+/* 帯そのもの。⚠ 貸出中のマス（.cfs-lg-busy）や選んだマス（.cfs-lg-pick）の色は消さない
+   ＝あくまで「どこを見ているか」の下敷き。 */
+.cfs-lg tr.cfs-lg-band > td{ background-color:rgba(29,185,122,.13); }
+.cfs-lg tr.cfs-lg-band > td.cfs-lg-d{ background:rgba(29,185,122,.20) !important; color:#1db97a; }
+.cfs-lg tr.cfs-lg-band > td.cfs-lg-busy{ background-color:rgba(239,68,68,.30); }
+.cfs-lg tr.cfs-lg-band > td.cfs-lg-pick{ background:#1db97a !important; }
+
+/* ── 入庫／返車のミニ一覧：真ん中に「何日ぶんを見ているか」のバッジ
+   🔴 日を選び直しても画面の形が変わらないので、これが無いと今どの日か分からなくなる。 */
+.dl-hrow{ display:flex; align-items:stretch; background:var(--bg2);
+  border-bottom:1px solid var(--border); }
+.dl-hrow .dl-h{ flex:1; min-width:0; background:transparent; border-bottom:0; }
+.dl-datechip{ flex:0 0 auto; align-self:center; display:flex; align-items:center; gap:4px;
+  font-size:11px; font-weight:800; font-variant-numeric:tabular-nums;
+  color:var(--text); background:var(--bg3); border:1px solid var(--border2);
+  border-radius:999px; padding:2px 10px; margin:4px 6px; white-space:nowrap; }
+.dl-datechip.today{ color:#06281d; background:#1db97a; border-color:#1db97a; }
+.dl-datechip em{ font-style:normal; font-size:9px; font-weight:800;
+  background:rgba(0,0,0,.18); border-radius:4px; padding:0 4px; }

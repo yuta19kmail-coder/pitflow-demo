@@ -260,7 +260,8 @@ function _rmlRowsReturn(from, to){
       html += '<span class="rml-empty">' + (isClosed ? '休' : '—') + '</span>';
     } else {
       cardsOfDay.forEach(c => {
-        const tt = (c.returnTime || c.reserveTime || '--:--');
+        /* 🔴 v1.150.0 返車時間が無い車を**入庫時刻で代用しない**（言葉は return-slot.js の1本） */
+        const tt = (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || '')) || '--:--';
         const _wid = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
         const wt = state.workTypes.find(w => w.id === _wid);
         const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';

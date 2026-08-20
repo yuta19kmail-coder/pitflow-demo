@@ -115,6 +115,74 @@
     return usableList(opt).filter(function (l) { return !busyOn(l, ds, opt); });
   }
 
+  /* ==================================================================
+     🆕 v1.156.0（ゆうた指定 2026-08-20）＝**案内できる最短入庫日の物差し**
+     ------------------------------------------------------------------
+     🗣「現状**代車が1日でも空いてたらOKの扱い**だから、結局最短入庫日が『今日』から動かない。
+     　　ただ実態としてはさすがに違う。だから最短可能日の日付は
+     　　**1週間きちっと枠がとれる日程**から案内するようにして。
+     　　加えて、作業タイプを選んだ場合はそこに入っている**暫定預かり日数と前後1日ずつの予備**が
+     　　とれる日程を最短入庫日に指定したい」
+     🗣「客の車が国産車／輸入車かバッジが入力された場合は、
+     　　**国産車→国産車、輸入車→国産車・輸入車**で、国産車の場合は**輸入車の代車も避けて**案内してほしい
+     　　（最終的に輸入車の代車で予約することは可能）。**あくまで初期の案内の日付の付け方として**」
+
+     ◎いる窓（ゆうた確定）
+       ・作業タイプ**未選択** … 入庫日から **7日連続**（1週間きっちり取れる日から案内）
+       ・作業タイプ**選択済** … **入庫日の前日 〜 入庫日＋預かり日数** ＝ **預かり日数＋2日 連続**
+         　　　　　　　　　　　（前の人が延びても、この人が延びても、こたえられる幅）
+       ⚠ 前日が「今日より前」になる時は今日から数える（過ぎた日は押さえられない）。
+
+     ◎車格（ゆうた確定）
+       ・お客様が**国産車** … 🔴 **輸入車の代車は数えない**（案内では避ける）
+       ・お客様が**輸入車** … 国産車も輸入車も数える
+       ・まだ選んでいない   … 絞らない
+       🔴 **これは「初期の案内」だけの決まり。**あとから輸入車の代車を選んで予約するのは自由。
+          ここで**貸せなくするのではない**＝カレンダーの列も減らさない。
+
+     ⚠ 実際に貸すかどうか・ぶつかりの判定は今までどおり busyOn / conflicts。ここは**案内専用**。
+     ================================================================== */
+
+  /* お客様の車（国産＝default／輸入＝import）に合う代車か（案内のときだけ使う） */
+  function fitsBoard(l, board) {
+    if (!l) return false;
+    if (board === 'default') return l.category !== 'import';   /* 国産のお客様＝輸入の代車は避ける */
+    return true;                                               /* 輸入のお客様・未選択＝全部 */
+  }
+
+  /* 案内にいる窓（何日ぶん・前に何日ぶら下げるか）。hold＝暫定預かり日数（未選択なら null） */
+  var PLAN_WEEK = 7;          /* 作業タイプ未選択のときに要る連続日数 */
+  var PLAN_PAD  = 1;          /* 作業タイプ選択時の予備（前後1日ずつ） */
+  function planNeed(hold) {
+    var h = +hold;
+    if (!isFinite(h) || h <= 0) return { days: PLAN_WEEK, back: 0, why: '1週間' };
+    return { days: h + PLAN_PAD * 2, back: PLAN_PAD, why: '預かり' + h + '日＋前後' + PLAN_PAD + '日' };
+  }
+
+  /* その日を入庫日にしたとき、案内していい窓が取れるか。
+     戻り値 { ok, from, to, days, why, car }（car＝その窓を丸ごと取れる代車。ok の時だけ入る） */
+  function planWindow(dateStr, hold, opt) {
+    opt = opt || {};
+    var need = planNeed(hold);
+    var d = _pd(dateStr);
+    if (isNaN(d.getTime())) return { ok: false, from: '', to: '', days: 0, why: need.why, car: null };
+    var rawFrom = _add(d, -need.back);
+    var to = _add(rawFrom, need.days - 1);
+    /* 過ぎた日は押さえられないので、今日より前には遡らない */
+    var today = _pd(_ymd(new Date()));
+    var from = (rawFrom < today) ? today : rawFrom;
+    var ls = usableList(opt).filter(function (l) { return fitsBoard(l, opt.board); });
+    var car = null;
+    ls.some(function (l) {
+      for (var x = new Date(from); x <= to; x = _add(x, 1)) {
+        if (busyOn(l, _ymd(x), opt)) return false;
+      }
+      car = l; return true;
+    });
+    return { ok: !!car, from: _ymd(from), to: _ymd(to), days: need.days, why: need.why, car: car };
+  }
+  function planOk(dateStr, hold, opt) { return planWindow(dateStr, hold, opt).ok; }
+
   /* ------------------------------------------------------------------
      ④ 2つの期間がぶつかるか
      🔴 **返却日＝次の貸出の開始日（当日かぶり）は、ぶつかりに数えない。**
@@ -267,6 +335,10 @@
   w.pitLoanerBusyOn      = busyOn;
   w.pitLoanerBusyWhy     = busyWhy;
   w.pitLoanerFreeRun     = freeRun;
+  w.pitLoanerFitsBoard   = fitsBoard;
+  w.pitLoanerPlanNeed    = planNeed;
+  w.pitLoanerPlanWindow  = planWindow;
+  w.pitLoanerPlanOk      = planOk;
   w.pitLoanerFreeOn      = freeOn;
   w.pitLoanerOverlap     = overlap;
   w.pitLoanerConflicts   = conflicts;

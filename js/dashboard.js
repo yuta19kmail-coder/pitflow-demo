@@ -59,9 +59,23 @@ function _vdTeam(ds, team){
 function _loanerFreeRun(startStr, days){
   return window.pitLoanerFreeRun ? pitLoanerFreeRun(startStr, days) : false;
 }
-function dashEarliestIntake(team, kind, today, holdOverride){
-  // holdOverride（作業タイプの概算預かり日数）が来たら、その日数ぶん代車が連続で空く日を最短に（v0.101.4）
-  const hold = (holdOverride && +holdOverride > 0) ? +holdOverride : ((state.settings && state.settings.holdDaysDefault) || 3);
+/* 🔴🔴 v1.156.0（ゆうた指定 2026-08-20）**代車ありの最短入庫日を作り直した。**
+   🗣「現状**代車が1日でも空いてたらOKの扱い**だから、結局最短入庫日が『今日』から動かない。
+   　　ただ実態としてはさすがに違う」
+
+   ◎前（v1.155.0 まで）
+     `pitLoanerFreeRun(その日, 預かり日数)` ＝ **その日から預かり日数ぶん空いていればOK**。
+     ⚠ 予備がゼロなので、**前の人が1日延びただけで約束が崩れる**。
+     ⚠ しかも作業タイプ未選択のときは既定の3日しか見ていないので、実質いつでも「今日」になっていた。
+
+   ◎今（判定は loaner-free.js の `pitLoanerPlanWindow` 1本。ここに条件を書き写さない）
+     ・作業タイプ**未選択** … **1週間きっちり**取れる日から案内
+     ・作業タイプ**選択済** … **前日〜入庫日＋預かり日数**（＝預かり日数＋2日）が取れる日
+     ・お客様が**国産車**なら**輸入車の代車は数えない**（案内では避ける・あとから選ぶのは自由）
+   ⚠ opt.board にお客様の車（default／import）を渡す。渡さなければ絞らない。 */
+function dashEarliestIntake(team, kind, today, holdOverride, opt){
+  const hold = (holdOverride && +holdOverride > 0) ? +holdOverride : null;
+  const lopt = { board: (opt && opt.board) || null };
   for (let i = 0; i < 180; i++){
     const d = addDays(today, i);
     const ds = ymd(d);
@@ -70,7 +84,9 @@ function dashEarliestIntake(team, kind, today, holdOverride){
     if (kind === 'same') return d;                        // 当日作業＝営業日ならOK
     if (tv.mark === '×') continue;                        // 枠が埋まっている日は不可
     if (kind === 'noLoaner') return d;                    // 代車なし＝枠が空けばOK
-    if (_loanerFreeRun(ds, hold)) return d;               // 代車あり＝代車の連続空きも必要
+    /* 代車あり＝**きちんと取れる窓**が要る（1週間 or 預かり日数＋前後1日） */
+    if (window.pitLoanerPlanOk ? pitLoanerPlanOk(ds, hold, lopt)
+                               : _loanerFreeRun(ds, hold || 7)) return d;
   }
   return null;
 }

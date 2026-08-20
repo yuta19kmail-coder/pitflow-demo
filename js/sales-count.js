@@ -74,6 +74,28 @@
     return 5;
   }
 
+  /* 🆕 v1.156.0（ゆうた指定）**案内用の「暫定預かり日数」。まだ決まっていなければ null。**
+     ⚠ 上の holdOf は最後に必ず 5 を返す（売上の見込みには日付が要るため）。
+     　 最短入庫日の案内は「**作業タイプを選んだか／まだか**」で決まりが変わるので、
+     　 決まっていない時は **null** と答えるこちらを使う。
+     🔴 元になる表は settings の estHold（作業タイプ別の目安）1本。ここで日数を決め打ちしない。 */
+  function planHoldOf(c){
+    if (!c) return null;
+    if (c.estHoldDays != null && c.estHoldDays !== ''){
+      var v = Math.max(0, n(c.estHoldDays));
+      return v > 0 ? v : null;
+    }
+    var wt = c.workType || ((Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : '');
+    if (!wt) return null;                 /* 作業タイプ未選択＝まだ決まっていない */
+    if (window.pitEstHold){
+      try {
+        var h = Math.max(0, n(pitEstHold(wt, c.dropType, window.pitTeamKey ? pitTeamKey(c) : 'default')));
+        return h > 0 ? h : null;          /* 待ち・当日返しは 0＝代車の話にならない */
+      } catch (e) {}
+    }
+    return null;
+  }
+
   /* ===== ①その車の金額を「いつ」数えるか =====
      🔴 v1.65.0（ゆうた確定）返車日は**3段のチェーン**になった（return-slot.js）。
         まだ返していない車は **C（確定返車日）→ B（受注時の約束）→ A（概算＝入庫日＋預かり日数）** の順に見る。
@@ -132,4 +154,5 @@
   window.pitSalesTier      = pitSalesTier;
   window.pitSalesInRange   = pitSalesInRange;
   window.pitSalesHoldOf    = holdOf;
+  window.pitCardHoldDays   = planHoldOf;   /* 🆕 v1.156.0 案内用（未選択なら null） */
 })();

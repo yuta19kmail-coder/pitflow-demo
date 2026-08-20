@@ -1070,7 +1070,8 @@ function _cfsShortHtml(c, team, today, tStr, ro){
   if (typeof dashEarliestIntake !== 'function') return '';
   const teamColor = (team === 'import') ? '#ec4899' : '#1db97a';
   const teamName  = (team === 'import') ? '<i data-ic=globe data-ics=16></i> 輸入車' : '<i data-ic=car data-ics=16></i> 国産車';
-  let h = '<div class="cfs-card">';
+  /* 🆕 v1.157.0 目印を付ける＝**この枠だけ作り直せる**ようにするため（打つたびに全部を描き直さない） */
+  let h = '<div class="cfs-card cfs-short" data-team="' + team + '"' + (ro ? ' data-ro="1"' : '') + '>';
   h += '<div class="cfs-h" style="border-left-color:' + teamColor + '"><i data-ic=clock data-ics=16></i> 最短入庫 <span class="cfs-team" style="color:' + teamColor + '">' + teamName + '</span></div>';
   /* 🔴🔴 v1.156.0（ゆうた指定）代車ありの最短は「**きちんと枠が取れる日**」から案内する。
      ・作業タイプ未選択 … 1週間きっちり
@@ -1278,6 +1279,15 @@ window.cfsLgRerender = function(){
    ⚠ ここで日数を計算しないこと。窓の決め方は部品が持つ。 */
 function _cfsPlanBand(c){
   if (!c || !window.pitLoanerPlanWindow) return null;
+  /* 🔴🔴 v1.157.0（ゆうた指定 2026-08-20）
+     🗣「代車の**「まで」が入ってない間（いわば検討中の段階）**であれば、
+     　　作業タイプや国産／輸入のチップ、手入力の概算預かり日数で
+     　　**最短入庫日と、それに伴うカレンダーの透過グリーンがリニアに変わる**ようにしてほしい」
+     ＝ **「まで」が入った時点で人が決めた**ので、そこで止める。
+        以後は**決まった貸出の期間**を指す（勝手に動かさない）。 */
+  if (c.loanerFrom && c.loanerTo){
+    return { from: c.loanerFrom, to: c.loanerTo, ok: true, why: '決まった貸出', fixed: true, base: c.loanerFrom };
+  }
   const hold = (window.pitCardHoldDays ? pitCardHoldDays(c) : null);
   const board = (c.boardId === 'default' || c.boardId === 'import') ? c.boardId : null;
   let base = c.reserveDate || '';
@@ -1307,8 +1317,8 @@ function _cfsLoanerGanttHtml(today, tStr, c, ro){
   const _bd = _cfsPlanBand(c);
   if (_bd){
     const _md = window.pitLoanerMD || function(x){ return x; };
-    h += '<div class="cfs-lg-bandnote"><span class="cfs-lg-bandsw"></span>'
-       + (c && c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅')
+    h += '<div class="cfs-lg-bandnote' + (_bd.fixed ? ' fixed' : '') + '"><span class="cfs-lg-bandsw"></span>'
+       + (_bd.fixed ? '決まった貸出の幅' : (c && c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅'))
        + '：<b>' + _md(_bd.from) + '〜' + _md(_bd.to) + '</b>'
        + '<span class="cfs-lg-bandwhy">' + _bd.why + '</span>'
        + (_bd.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>')
@@ -1335,6 +1345,50 @@ function _cfsLoanerGanttHtml(today, tStr, c, ro){
   h += '</div>';
   return h;
 }
+
+/* 🆕 v1.157.0（ゆうた指定）**打っている最中でも、最短入庫日と緑の帯だけを描き直す。**
+   🗣「作業タイプや国産／輸入のチップ、**手入力の概算預かり日数**で
+   　　最短入庫日と、それに伴うカレンダーの透過グリーンが**リニアに変わる**ように」
+
+   🔴 **全体（renderCardForm）を描き直さない。**
+      ・打っている最中に描き直すと**入力欄から焦点が飛ぶ**（数字が打てなくなる）
+      ・代車ガントのドラッグは中身を作り直すと**効かなくなる**（つかむ相手が入れ替わるため）
+   👉 だから **①最短入庫の枠だけ作り直す（中のボタンは onclick 属性なので付け直し不要）**
+      **②帯はクラスを付け外しするだけ** ＝ 中身は1つも作り直さない。
+
+   ⚠ チップ（作業タイプ・国産／輸入・受付タイプ）は今までどおり renderCardForm で全部描き直す。
+      あちらは押した瞬間なので焦点が飛んでも困らない。 */
+window.pitCfPlanSync = function (c) {
+  c = c || state.cards.find(function (x) { return x.id === _editingCardId; });
+  if (!c) return;
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const tStr = ymd(t);
+
+  /* ① 最短入庫の枠（国産／輸入が未選択なら2枚出ている） */
+  Array.prototype.forEach.call(document.querySelectorAll('.cfs-short[data-team]'), function (box) {
+    const team = box.getAttribute('data-team');
+    box.outerHTML = _cfsShortHtml(c, team, t, tStr, box.getAttribute('data-ro') === '1');
+  });
+
+  /* ② 緑の帯（クラスの付け外しだけ＝ドラッグの当たり判定を壊さない） */
+  const band = _cfsPlanBand(c);
+  Array.prototype.forEach.call(document.querySelectorAll('#cfs-lg-body tr[data-ds]'), function (tr) {
+    const ds = tr.getAttribute('data-ds');
+    tr.classList.toggle('cfs-lg-band', !!(band && ds >= band.from && ds <= band.to));
+  });
+
+  /* ③ 帯の説明（何の期間か・幅・取れるか） */
+  const note = document.querySelector('.cfs-lg-bandnote');
+  if (note && band){
+    const md = window.pitLoanerMD || function (x) { return x; };
+    note.classList.toggle('fixed', !!band.fixed);
+    note.innerHTML = '<span class="cfs-lg-bandsw"></span>'
+      + (band.fixed ? '決まった貸出の幅' : (c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅'))
+      + '：<b>' + md(band.from) + '〜' + md(band.to) + '</b>'
+      + '<span class="cfs-lg-bandwhy">' + band.why + '</span>'
+      + (band.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>');
+  }
+};
 
 /* 代車ガント：行を継ぎ足す共通処理（スクロール位置はそのまま） */
 function _cfsLgAppend (count) {
@@ -2261,6 +2315,11 @@ function bindCardFormEvents(root){
       c[key] = v;
       if (_cardCheckOn) _cardMarkMisses(c, root);   // 入力したら、その項目の赤枠はその場で外れる
       if (window.PitDB) PitDB.save();   // v0.83.1 入力を自動保存（従来は close/unload 任せで取りこぼし＝「保存されない」原因）
+      /* 🆕 v1.157.0（ゆうた指定）**打っている最中に、最短入庫日と緑の帯をリニアに動かす。**
+         ⚠ ここで renderCardForm を呼ばないこと（焦点が飛んで数字が打てなくなる）。 */
+      if (key === 'estHoldDays' || key === 'loanerFrom' || key === 'loanerTo'){
+        if (window.pitCfPlanSync) pitCfPlanSync(c);
+      }
     });
     el.addEventListener('change', () => {
       const key = el.dataset.key;

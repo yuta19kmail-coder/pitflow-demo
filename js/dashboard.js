@@ -74,7 +74,12 @@ function _loanerFreeRun(startStr, days){
      ・お客様が**国産車**なら**輸入車の代車は数えない**（案内では避ける・あとから選ぶのは自由）
    ⚠ opt.board にお客様の車（default／import）を渡す。渡さなければ絞らない。 */
 function dashEarliestIntake(team, kind, today, holdOverride, opt){
-  const hold = (holdOverride && +holdOverride > 0) ? +holdOverride : null;
+  /* 🔴🔴 v1.158.0（ゆうた確定）**0（当日返し）を落とさないこと。**
+     `holdOverride && +holdOverride > 0` だと **0 が null に化けて「1週間」の窓**になっていた。
+     ＝「いって帰ってくるだけ」の人に、1週間まるごと空いている日しか案内できていなかった。
+     🔴 意味を持つのは3つ＝ **null/''（まだ決まっていない）／0（当日返し）／1以上**。 */
+  const hold = (holdOverride == null || holdOverride === '' || !isFinite(+holdOverride) || +holdOverride < 0)
+             ? null : +holdOverride;
   const lopt = { board: (opt && opt.board) || null };
   for (let i = 0; i < 180; i++){
     const d = addDays(today, i);

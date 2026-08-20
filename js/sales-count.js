@@ -79,19 +79,22 @@
      　 最短入庫日の案内は「**作業タイプを選んだか／まだか**」で決まりが変わるので、
      　 決まっていない時は **null** と答えるこちらを使う。
      🔴 元になる表は settings の estHold（作業タイプ別の目安）1本。ここで日数を決め打ちしない。 */
+  /* 🔴🔴 v1.158.0（ゆうた確定）**0 を null に潰さないこと。**
+     🗣「**0日あり得る。いって帰ってくるだけで代車使いたいと。代車的には1日利用として存在する**」
+     ＝ `0`（当日返し）は**決まっている答え**。`null`（まだ決まっていない）とは別物。
+     ⚠ v1.157.1 までは 0 を null にしていたので、当日返しのお客様に
+        **「1週間まるごと空いている日」からしか案内できていなかった**（loaner-free.js の planNeed 参照）。 */
   function planHoldOf(c){
     if (!c) return null;
     if (c.estHoldDays != null && c.estHoldDays !== ''){
-      var v = Math.max(0, n(c.estHoldDays));
-      return v > 0 ? v : null;
+      return Math.max(0, n(c.estHoldDays));      /* 0＝当日返し。そのまま返す */
     }
     var wt = c.workType || ((Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : '');
     if (!wt) return null;                 /* 作業タイプ未選択＝まだ決まっていない */
     if (window.pitEstHold){
       try {
-        var h = Math.max(0, n(pitEstHold(wt, c.dropType, window.pitTeamKey ? pitTeamKey(c) : 'default')));
-        return h > 0 ? h : null;          /* 待ち・当日返しは 0＝代車の話にならない */
-      } catch (e) {}
+        return Math.max(0, n(pitEstHold(wt, c.dropType, window.pitTeamKey ? pitTeamKey(c) : 'default')));
+      } catch (e) {}                      /* 待ち・当日仕上げは 0＝代車を使うなら1日ぶん */
     }
     return null;
   }

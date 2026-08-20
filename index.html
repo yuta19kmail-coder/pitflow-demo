@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.157.1"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.158.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -121,7 +121,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.157.1</div>
+    <div class="login-ver">v1.158.0</div>
   </div>
 </div>
 
@@ -135,7 +135,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.157.1</span>
+    <span class="ver">v1.158.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -836,7 +836,7 @@
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
 <script src="js/state.js?v=71"></script>
 <script src="js/coreflow-loaner-remain.js?v=608d586a"></script><!-- 🚙 代車の残り日数と色（全アプリ共通・_shared から配布）。loaner-free.js より **前** に読むこと -->
-<script src="js/loaner-free.js?v=5"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
+<script src="js/loaner-free.js?v=6"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
 <script src="js/theme.js?v=5"></script>
 <script src="js/sync-pit.js?v=3"></script>
 <meta name="app-key" content="pitflow">
@@ -868,13 +868,13 @@ window.PIT_DEMO = true;</script>
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=31"></script>
-<script src="js/dashboard.js?v=21"></script>
+<script src="js/dashboard.js?v=22"></script>
 <script src="js/parking.js?v=8"></script>
 <script src="js/coreflow-note-reply.js?v=a224b9c0"></script><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
 <script src="js/coreflow-note-all.js?v=830ce1ff"></script><!-- 📎 付箋のまとめて表示（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
 <script src="js/board-notes.js?v=11"></script>
 <script src="js/search.js?v=16"></script>
-<script src="js/sales-count.js?v=5"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
+<script src="js/sales-count.js?v=6"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=5"></script>
 <script src="js/sales.js?v=16"></script>
 <script src="js/sales-print.js?v=5"></script>

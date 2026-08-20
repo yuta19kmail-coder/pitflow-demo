@@ -240,6 +240,59 @@
   }
   window.pitReturnTimeText = pitReturnTimeText;
 
+  /* ===============================================================
+     🆕 v1.151.0（ゆうた指定 2026-08-20）＝**段取り用の「いつ返す予定か」**
+     ---------------------------------------------------------------
+     🗣「今日明日、今週の洗車予定に関しては、さっきの未完も含めて、
+     　　タスクボード上にあったとしても、暫定返車予定・確定返車予定が
+     　　今日明日 or 今週末にかぶるようなら基本表示させるようにして」
+     🗣「**とにかく状況によっては整備完了を待たずに洗車も始めないと
+     　　スケジュールが追いつかなくなることがある**」
+
+     🔴🔴 **返車カレンダー・当日ビューは これを使わない。**
+     　　 あちらは **「確定したものだけ出す」** が決めごと（v1.65.0）。
+     　　 ここは **段取りの都合で先に手をつける**ための、**別の物差し**。
+     　　 ⚠ 混ぜると「確定していない車が返車予定に出る」が戻る。**必ず使い分ける。**
+
+     ◎拾う順（いちばん確からしいものから）
+       ① 確定（完TELを通った）          → `fixed`
+       ② 未完（盤面のまま確定日が入った）→ `pending`
+       ③ 暫定（受注のときのお客様への約束＝B）→ `plan`
+       ④ 待ち・当日返しの入庫日          → `sameday`
+     =============================================================== */
+  function pitReturnPlanDate(c){
+    if (!c) return '';
+    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return '';
+    var C = pitReturnC(c);       if (C) return C;
+    var P = pitReturnPending(c); if (P) return P;
+    var B = pitReturnB(c);       if (B) return B;
+    if (pitDropIsSameDay(c) && c.reserveDate) return String(c.reserveDate);
+    return '';
+  }
+  function pitReturnPlanKind(c){
+    if (!c) return '';
+    if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return '';
+    if (pitReturnC(c))       return 'fixed';
+    if (pitReturnPending(c)) return 'pending';
+    if (pitReturnB(c))       return 'plan';
+    if (pitDropIsSameDay(c) && c.reserveDate) return 'sameday';
+    return '';
+  }
+  window.pitReturnPlanDate = pitReturnPlanDate;
+  window.pitReturnPlanKind = pitReturnPlanKind;
+
+  /* 「暫定」の札＝まだお客様への約束の段階（＝日が動くことがある）。
+     🔴 「未完」より弱い印にする（＝塗りつぶさず、枠だけの同じ色）。
+        同じ色の濃淡で「確からしさ」を表す＝別の色を増やすより読み取りやすい。 */
+  window.PIT_PLAN_LABEL = '暫定';
+  window.PIT_PLAN_TITLE = '受注のときにお客様へ伝えた返車予定です（まだ確定していないので、日が動くことがあります）';
+  function pitPlanBadge(kind){
+    kind = kind || 'std';
+    return '<span class="' + (kind === 'row' ? 'tag-side ' : '') + 'ret-plan ret-pend-' + kind
+         + '" title="' + _esc(window.PIT_PLAN_TITLE) + '">' + _esc(window.PIT_PLAN_LABEL) + '</span>';
+  }
+  window.pitPlanBadge = pitPlanBadge;
+
   window.pitDropIsSameDay  = pitDropIsSameDay;
   window.pitReturnA        = pitReturnA;
   window.pitReturnB        = pitReturnB;

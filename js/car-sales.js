@@ -82,14 +82,30 @@ function renderCarSales(){
   const nextBiz = ymd(_csNextBizDay());
   const sun = _csThisSunday();
 
-  // 洗車対象＝returnStage（完TEL以降）かつ needWash
-  const washAll = cards.filter(c => c.needWash && c.returnStage && _csActive(c));
+  /* 🔴🔴 v1.151.0（ゆうた指定 2026-08-20）**洗車は完TELを待たない。**
+     🗣「今日明日、今週の洗車予定に関しては、さっきの未完も含めて、**タスクボード上にあったとしても**、
+     　　暫定返車予定・確定返車予定が今日明日 or 今週末にかぶるようなら**基本表示させる**」
+     🗣「**とにかく状況によっては整備完了を待たずに洗車も始めないとスケジュールが追いつかなくなる**」
+
+     ◎前（v1.150.0 まで）＝ `needWash` かつ **完TELを通った車だけ**。
+       ＝ 今週返す約束をしている車でも、完TELを通るまで洗車の一覧に1台も出てこなかった。
+     ◎今 ＝ **needWash なら、まだ盤面にいても拾う。**
+       日付は `pitReturnPlanDate`（確定 → 未完 → 暫定 → 待・当の入庫日）1本で決める。
+     ⚠ **まだ入庫していない車（reserved）とキャンセルは拾わない**（洗う車がここに無い）。
+     ⚠ 🔴 **返車カレンダー・当日ビューは今までどおり「確定だけ」。** ここだけ物差しが違う（段取り用）。 */
+  const washAll = cards.filter(c => c.needWash && _csActive(c)
+                                 && c.status !== 'reserved' && c.status !== 'cancelled');
+  /* 「いつ返す予定か」＝ return-slot.js の1本。ここで組み立てない */
+  const _wd = c => (window.pitReturnPlanDate ? pitReturnPlanDate(c) : (c.returnDate || ''));
 
   // ① 明日の洗車
-  const washTomorrow = washAll.filter(c => c.returnStage==='returnWait' && c.returnDate === nextBiz);
+  const washTomorrow = washAll.filter(c => _wd(c) === nextBiz);
   // ② 今週の洗車予定（翌営業日より後〜今週日曜）＋ 返車日未定（区別）
-  const washWeek = washAll.filter(c => c.returnStage==='returnWait' && c.returnDate && c.returnDate > nextBiz && c.returnDate <= sun);
-  const washNoDate = washAll.filter(c => !c.returnDate);
+  const washWeek = washAll.filter(c => { const d = _wd(c); return d && d > nextBiz && d <= sun; });
+  /* ⚠ 「洗車で返車日未定」は**今までどおり完TELを通った車だけ**。
+     　 ここまで広げると、日付がまだ何も決まっていない車が全部並んで一覧が埋まる（＝役に立たなくなる）。
+     　 この枠の意味は「**完TELまで来たのに返車日が決まっていない＝要注意**」。変えない。 */
+  const washNoDate = washAll.filter(c => c.returnStage && !_wd(c));
 
   // ③ 車検ヘッドライト磨き
   const headlight = cards.filter(c => c.headlight && _csActive(c));
@@ -110,7 +126,8 @@ function renderCarSales(){
         返車時間が無ければ入庫時刻で見る（カレンダーの「代用しない」とは別の目的）。 */
   const _tmin = t => (window.pitTimeMin ? pitTimeMin(t) : (t ? 0 : 99999));
   const sortTime = (a,b) => _tmin(a.returnTime||a.reserveTime||'') - _tmin(b.returnTime||b.reserveTime||'');
-  const sortDate = (a,b) => String(a.returnDate||'9999').localeCompare(String(b.returnDate||'9999'));
+  /* 🔴 v1.151.0 並びも「いつ返す予定か」1本で（確定だけを見ていたので、暫定の車が最後尾に固まっていた） */
+  const sortDate = (a,b) => String(_wd(a)||'9999').localeCompare(String(_wd(b)||'9999'));
 
   const split = (arr, flag) => ({ open: arr.filter(c=>!c[flag]), done: arr.filter(c=>c[flag]) });
 
@@ -118,26 +135,28 @@ function renderCarSales(){
 
   // ① 洗車（今日・明日）＝枠は1つ。中を「今日」「明日」の2グループに分ける v0.123.4
   {
-    const washToday = washAll.filter(c => c.returnStage==='returnWait' && c.returnDate === todayStr);
+    const washToday = washAll.filter(c => _wd(c) === todayStr);
     const st = split(washToday.sort(sortTime), 'washSalesDone');
     const sm = split(washTomorrow.sort(sortTime), 'washSalesDone');
+    /* 🔴 v1.151.0 どの札の日で出ているのかが分からないと現場が困るので、**全部に返車予定を付ける**
+       （確定／未完／暫定 の印つき。文字は _csWashLabel の1本） */
     const bodyHtml = '<div class="cs-subh"><i data-ic=sun data-ics=16></i> 今日</div>'
-      + (st.open.length ? st.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>')
+      + (st.open.length ? st.open.map(c=>_csCard(c,'wash',_csWashLabel(c))).join('') : '<div class="cs-empty">なし</div>')
       + '<div class="cs-subh"><i data-ic=moon data-ics=16></i> 明日 <small>（翌営業日 ' + nextBiz.slice(5).replace('-','/') + '）</small></div>'
-      + (sm.open.length ? sm.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>');
+      + (sm.open.length ? sm.open.map(c=>_csCard(c,'wash',_csWashLabel(c))).join('') : '<div class="cs-empty">なし</div>');
     const doneHtml = st.done.concat(sm.done).map(c=>_csDoneCard(c,'wash')).join('');
-    h += _csSec('<i data-ic=drop data-ics=16></i> 洗車', '今日・明日ぶん', bodyHtml, doneHtml);
+    h += _csSec('<i data-ic=drop data-ics=16></i> 洗車', '今日・明日ぶん（暫定・未完も出します）', bodyHtml, doneHtml);
   }
   // ② 今週の洗車予定（日付決定 ＋ 返車日未定）
   {
     const sw = split(washWeek.sort(sortDate), 'washSalesDone');
     const sn = split(washNoDate.sort(sortTime), 'washSalesDone');
     let bodyHtml = '<div class="cs-subh"><i data-ic=calendar data-ics=16></i> 予定決定（〜今週日曜）</div>'
-      + (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csRetLabel(c))).join('') : '<div class="cs-empty">なし</div>')
-      + '<div class="cs-subh"><i data-ic=help data-ics=16></i> 洗車で返車日未定</div>'
+      + (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csWashLabel(c))).join('') : '<div class="cs-empty">なし</div>')
+      + '<div class="cs-subh"><i data-ic=help data-ics=16></i> 洗車で返車日未定 <small>（完TELまで来たのに日が決まっていない車）</small></div>'
       + (sn.open.length ? sn.open.map(c=>_csCard(c,'wash')).join('') : '<div class="cs-empty">なし</div>');
     const doneHtml = sw.done.concat(sn.done).map(c=>_csDoneCard(c,'wash')).join('');
-    h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '', bodyHtml, doneHtml);
+    h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '暫定・未完も出します', bodyHtml, doneHtml);
   }
   // ③ 車検ヘッドライト磨き
   {
@@ -180,6 +199,26 @@ function _csRetLabel(c){
   }
   return '<i data-ic=car data-ics=16></i> 返車日未定';
 }
+/* 🆕 v1.151.0 洗車の行に出す「いつ返す予定か」＋その確からしさ。
+   🔴 日付も印も return-slot.js の1本から。ここで条件を書き写さない。
+     ・確定 … 完TELを通った日（印なし＝ふつう）
+     ・未完 … 盤面のまま確定返車日が入っている（🟠 未完）
+     ・暫定 … 受注のときのお客様への約束（🟠枠 暫定＝日が動くことがある）
+     ・待・当 … 入庫日に返る車（暫定と同じ扱いで出す） */
+function _csWashLabel(c){
+  const d = window.pitReturnPlanDate ? pitReturnPlanDate(c) : (c.returnDate || '');
+  const k = window.pitReturnPlanKind ? pitReturnPlanKind(c) : '';
+  let badge = '';
+  if (k === 'pending' && window.pitPendingBadge) badge = pitPendingBadge('mini') + ' ';
+  else if ((k === 'plan' || k === 'sameday') && window.pitPlanBadge) badge = pitPlanBadge('mini') + ' ';
+  if (d){
+    const dt = new Date(d + 'T00:00:00');
+    if (!isNaN(dt)) return badge + '<i data-ic=car data-ics=16></i> 返車 ' + (dt.getMonth()+1) + '/' + dt.getDate()
+      + '（' + '日月火水木金土'[dt.getDay()] + '）' + (c.returnTime ? ' ' + c.returnTime : '');
+  }
+  return badge + '<i data-ic=car data-ics=16></i> 返車日未定';
+}
+
 /* 入庫/予約ラベル（コーティング予定用） */
 function _csInLabel(c){
   if (c.status === 'reserved'){

@@ -1118,9 +1118,12 @@
      ⚠ 実績カウント日か確定売上を持っている車は、**何が消えるかを名指しで言う**。 */
   function delPopHtml(c, link){
     const hasResult = !!(c && (c.completedAt || (c.amountFinal != null && c.amountFinal !== '')));
+    /* 🔴 v1.154.0 代車の予定も一緒に消える＝**何が消えるかを全部書く**（代車キャンセルの窓と同じ決めごと） */
+    const _lo = (c && window.pitLoanerPlanOf) ? pitLoanerPlanOf(c.id) : { n: 0, text: '' };
     const note = (hasResult
         ? '🔴 <b>実績・確定売上・お客様の来店履歴</b>からも、この1台ぶんが消えます。<br>'
         : '')
+      + (_lo.n ? ('🚗 <b>代車の予定</b>も一緒に消えます（' + esc(_lo.text) + '）。<br>') : '')
       + '<b>元に戻せません。</b>予約番号は欠番として残ります（再利用しません）。';
     return '<div class="cv-delpop' + (hasResult ? ' cv-delpop-hard' : '') + '" id="cv-delpop">'
       + '<div class="cv-dpt">本当に消去しますか？</div>'
@@ -1690,8 +1693,15 @@
     /* 🔴 v1.139.0（ゆうた指定）**重さを先に言う。**
        押した瞬間にアーカイブされ、そこから戻せるのは管理者だけになる。
        ⚠ 顧客・車両のアーカイブの窓と同じ、最後の1行をそろえる。 */
+    /* 🔴 v1.154.0（ゆうた報告）**代車の予定も一緒に消えることを、押す前に言う。**
+       ⚠ 「何が消えるかを全部書く」＝代車キャンセルの窓（v1.143.0）と同じ決めごと。
+       ⚠ 戻しても代車の予定は戻らない（押さえ直しになる）ので、それも言う。 */
+    const _lo = (window.pitLoanerPlanOf ? pitLoanerPlanOf(c.id) : { n: 0, text: '' });
+    const _loLine = _lo.n
+      ? ('\n※ 代車の予定も一緒にキャンセルされます（' + _lo.text + '）。戻しても代車は戻りません')
+      : '';
     const ask = (window.pitAskText)
-      ? pitAskText('キャンセルの理由（任意・1行）\n※ アーカイブされます。戻せるのは管理者だけです', '',
+      ? pitAskText('キャンセルの理由（任意・1行）\n※ アーカイブされます。戻せるのは管理者だけです' + _loLine, '',
                    { ok: '予約をキャンセルする', title: '予約キャンセル', placeholder: '例）日程変更／よそでやることになった' })
       : Promise.resolve('');
     ask.then(function(reason){
@@ -1712,10 +1722,15 @@
     c.tentative = false; c.approvalPending = false;
     c.bayId = null; c.baySlot = null;
     if (window.logFlow) logFlow(c, '予約をキャンセルした' + (c.cancelReason ? '（' + c.cancelReason + '）' : ''));
+    /* 🔴 v1.154.0（ゆうた報告）**代車の予定も一緒に外す。**
+       ＝来ない車のために代車を押さえたままにしない（返却済みの貸出には触らない）。
+       🔴 中身は loaner.js の1本。ここに書き写さないこと。 */
+    const _rel = (window.pitLoanerReleaseForCard ? pitLoanerReleaseForCard(c.id, '予約キャンセル') : { n: 0, text: '' });
     if (window.pitLog) pitLog('予約をキャンセルした', { cardId: c.id, kind: 'delete',
       label: _cvLabel(c) + (c.cancelReason ? ' / ' + c.cancelReason : '') });
     save(); cvRefreshBg();
-    if (window.pitToast) pitToast('予約をキャンセルしました（来店履歴に残ります）');
+    if (window.pitToast) pitToast('予約をキャンセルしました（来店履歴に残ります）'
+      + (_rel.n ? '／代車の予定も外しました（' + _rel.text + '）' : ''));
     if (window.closeDetail) closeDetail();
   };
 
@@ -1982,6 +1997,9 @@
 
   window.cvDeleteCard = function(){
     if(!_c) return; const idx = state.cards.findIndex(c=>c.id===_c.id);
+    /* 🔴 v1.154.0 カードを消す時も代車の予定を外す。
+       ＝残すと**持ち主のいない予定**が代車カレンダーに居座り、外す道がなくなる（返却済みは触らない）。 */
+    if (window.pitLoanerReleaseForCard) pitLoanerReleaseForCard(_c.id, 'カードの消去');
     if(window.pitLog) pitLog('予約カードを消去', { kind:'delete', label: (_c.resNo? '['+_c.resNo+'] ':'') + ((window.pitCustName?pitCustName(_c):_c.customer)? (window.pitCustName?pitCustName(_c):_c.customer)+' 様':'') + (_c.car? ' / '+_c.car:'') });
     if(idx>=0) state.cards.splice(idx,1);
     cvCloseDel();

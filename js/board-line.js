@@ -11,6 +11,7 @@
      ・**枠の外（列の外）へ落とすと消える。**（v1.37.0 で ✕ ボタンは廃止＝消し方はこれだけ）
      ・**動かしている最中はゴーストが先に動く**＝どこに入るかが見えてから離せる（v1.37.0）。
      ・**名前は最初は無い＝ただの線。ダブルクリックで入れて、初めて文字が出る**（v1.37.0）。空にすると線だけに戻る。
+     ・🆕 **ダブルクリックの窓では色も選べる**（7色・v1.159.0）。**線ごと**に変わる。線の種類は点線のまま。
      ・カードの**右クリック →「この下にラインを入れる」**でも入る。
      ・**ボタンをクリック＝使い方の吹き出しが出る**（v1.38.0／v1.39.0 で簡易表示に）。ドラッグの直後は開かない。
        くわしい説明はヘルプ画面の「課タスクボード」に置いてある。
@@ -18,7 +19,8 @@
    ◎保存
      🔴 **全員で共有**＝`state.settings.boardLines` に入れて `pitSettings/main` へ保存される
         （課ごとの共通認識に使うものなので、自分の端末だけに置かない）。
-     形＝ { id, boardId, status, after, label }
+     形＝ { id, boardId, status, after, label, color }
+       color … 色の**名前**（'orange'/'red'/… ＝ COLORS のキー）。無ければ 'orange'（昔のライン）
        after … そのラインが「どのカードの下」にあるか。列の先頭は '__top'。
                ⚠ カードが工程を移ったり消えたりして相手が居なくなったら、**列の末尾に寄せて残す**（黙って消さない）。
 
@@ -61,6 +63,47 @@
     return null;
   }
 
+  /* ---------- 🎨 色（v1.159.0・ゆうた指定 2026-08-20） ----------
+     🗣「**色も複数色用意して、点線から含め色を個別に変えられるように。色は5〜7色ぐらいが普通かな？**」
+     → **7色（今のオレンジ＋6色）**でゆうた確定。線の種類は**点線のまま**（実線・太線は作らない）。
+
+     🔴🔴 **色の表はここ1本。CSSにも画面にも書き写さない。**
+        polish.css 側は `--kbl*`（CSS変数）を見るだけにしてある＝色を足す時はこの配列に1行足すだけ。
+     ⚠ `d` は**明るいテーマ用の濃い方**。薄い色（オレンジ・グレー）は白い下地に溶けるので、
+        文字だけ一段濃くする（v1.36.0 で .kb-lineadd に入れたのと同じ考え）。
+     ⚠ 保存するのは**色の名前（キー）だけ**。色そのもの（#e0a33a）は保存しない
+        ＝あとで色みを直したくなった時に、保存済みのラインも一緒に直る。 */
+  var COLORS = [
+    { k: 'orange', n: 'オレンジ', c: '#e0a33a', d: '#a86a10' },
+    { k: 'red',    n: '赤',       c: '#ef4444', d: '#b91c1c' },
+    { k: 'green',  n: '緑',       c: '#1db97a', d: '#0f7a52' },
+    { k: 'blue',   n: '青',       c: '#378ADD', d: '#1d5fa8' },
+    { k: 'purple', n: '紫',       c: '#a855f7', d: '#7127c0' },
+    { k: 'pink',   n: 'ピンク',   c: '#ec4899', d: '#be185d' },
+    { k: 'gray',   n: 'グレー',   c: '#94a3b8', d: '#475569' }
+  ];
+  var DEFCOLOR = 'orange';                 /* 色が入っていない昔のラインは今までどおりのオレンジ */
+  function colorOf(l){
+    var k = (l && l.color) || DEFCOLOR;
+    for (var i = 0; i < COLORS.length; i++){ if (COLORS[i].k === k) return COLORS[i]; }
+    return COLORS[0];                      /* 知らない名前＝既定に戻す（黙って色を消さない） */
+  }
+  function _rgb(hex){
+    var h = String(hex).replace('#', '');
+    return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+  }
+  function _rgba(hex, a){ var r = _rgb(hex); return 'rgba(' + r[0] + ',' + r[1] + ',' + r[2] + ',' + a + ')'; }
+  function _lighten(hex, p){                /* マウスを乗せた時の明るい方 */
+    var r = _rgb(hex).map(function(v){ return Math.round(v + (255 - v) * p); });
+    return 'rgb(' + r[0] + ',' + r[1] + ',' + r[2] + ')';
+  }
+  /* その色の CSS変数ひとそろい。線にも、色見本にも、ゴーストにも**同じものを渡す**＝見た目がズレない */
+  function colorVars(co){
+    return '--kbl:' + co.c + ';--kbl-d:' + co.d + ';--kbl-s:' + _rgba(co.c, .14)
+         + ';--kbl-e:' + _rgba(co.c, .5) + ';--kbl-h:' + _lighten(co.c, .32)
+         + ';--kbl-g:' + _rgba(co.c, .7);
+  }
+
   /* ---------- 描く ---------- */
 
   /* 🔴 v1.37.0（ゆうた指定）
@@ -73,10 +116,13 @@
   function lineHtml(l){
     var t = String(l.label || '').trim();
     var tmp = tmpOn();
+    var co = colorOf(l);                                   /* 🆕 v1.159.0 線ごとの色 */
     return '<div class="kb-line' + (tmp ? ' kb-line-tmp' : '') + '"'
+         + ' style="' + colorVars(co) + '"'
          + (tmp ? '' : ' draggable="true"') + ' data-lineid="' + esc(l.id) + '"'
+         + ' data-linecolor="' + esc(co.k) + '"'
          + ' title="' + (tmp ? '並び替えて見ている間は動かせません（マスター並びでの位置に出しています）'
-                             : 'ドラッグで移動（枠の外へ出すと消えます）／ダブルクリックで名前を入れる') + '">'
+                             : 'ドラッグで移動（枠の外へ出すと消えます）／ダブルクリックで名前と色を直す') + '">'
          + '<span class="kb-line-bar"></span>'
          + (t ? '<span class="kb-line-t">' + esc(t) + '</span><span class="kb-line-bar"></span>' : '')
          + '</div>';
@@ -142,8 +188,9 @@
 
   /* ---------- 入れる・動かす・消す ---------- */
 
-  function put(boardId, status, after, label){
-    var l = { id: newId(), boardId: boardId, status: status, after: after || TOP, label: label || '' };
+  function put(boardId, status, after, label, color){
+    var l = { id: newId(), boardId: boardId, status: status, after: after || TOP,
+              label: label || '', color: color || DEFCOLOR };
     lines().push(l);
     save();
     return l;
@@ -235,10 +282,15 @@
      ⚠ 動かしている本人（既にある線）は薄くして、ゴーストと二重に見えないようにする。 */
   var ghost = null;
   function ghostEl(){
-    if (ghost) return ghost;
-    ghost = d.createElement('div');
-    ghost.className = 'kb-line kb-line-ghost';
-    ghost.innerHTML = '<span class="kb-line-bar"></span>';
+    if (!ghost){
+      ghost = d.createElement('div');
+      ghost.className = 'kb-line kb-line-ghost';
+      ghost.innerHTML = '<span class="kb-line-bar"></span>';
+    }
+    /* 🆕 v1.159.0 動かしている線の色でゴーストを出す
+       ＝赤い線を掴んでいるのにオレンジのゴーストが出る、という取り違えを起こさない。
+       新しく引き出している時（ボタンから）は既定の色。 */
+    ghost.setAttribute('style', colorVars(colorOf(dragging ? byId(dragging.id) : null)));
     return ghost;
   }
   function ghostOff(){
@@ -291,22 +343,103 @@
     rerender();
   }, true);
 
-  /* ---------- ダブルクリックで名前を入れる（v1.37.0・ゆうた指定） ----------
-     ⚠ 1回クリックでは何も起きない＝ドラッグの掴み損ねで勝手に入力欄が出ない。
-     ⚠ 空にすると名前なし（ただの線）に戻る。 */
+  /* ---------- ダブルクリック＝名前と色を直す窓（v1.37.0 → 🆕 v1.159.0） ----------
+     🗣 ゆうた「**ダブルクリックして、名前編集画面に。色も複数色用意して、
+     　　点線から含め色を個別に変えられるように**」
+
+     ⚠ 1回クリックでは何も起きない＝ドラッグの掴み損ねで勝手に入力欄が出ない（v1.37.0 のまま）。
+     ⚠ 空にすると名前なし（ただの線）に戻る（v1.37.0 のまま）。
+
+     🔴 **共通の窓（UI.prompt）は使えない。** あちらは `_shared\ui-dialog.js` が本体で、
+        色見本を足すには全アプリ共通の部品を触ることになる。区切りラインは**PitFlowだけの機能**なので、
+        窓もこのファイルの中で完結させる（見た目は ui-dialog に合わせてある）。
+     🔴 **色だけを見せない。** 窓の中に**実物と同じ線＋名前**を出して、
+        押したその場で変わるようにする（現場は色の名前では選ばない）。 */
+  var dlg = null;
+
+  function dlgClose(){
+    if (dlg && dlg.parentNode) dlg.parentNode.removeChild(dlg);
+    dlg = null;
+    d.removeEventListener('keydown', dlgKey, true);
+  }
+  function dlgKey(e){
+    if (!dlg) return;
+    if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); dlgClose(); }
+  }
+
+  function openEditor(l){
+    dlgClose();
+    var label = String(l.label || '');
+    var ckey  = colorOf(l).k;
+
+    dlg = d.createElement('div');
+    dlg.className = 'kbl-ov';
+    var sw = COLORS.map(function(co){
+      return '<button type="button" class="kbl-sw' + (co.k === ckey ? ' on' : '') + '"'
+           + ' style="' + colorVars(co) + '" data-ck="' + co.k + '" title="' + esc(co.n) + '">'
+           + '<span class="kbl-sw-bar"></span><span class="kbl-sw-n">' + esc(co.n) + '</span></button>';
+    }).join('');
+    dlg.innerHTML =
+      '<div class="kbl-card" role="dialog" aria-label="区切りラインを直す">'
+      + '<h4>区切りラインを直す</h4>'
+      + '<p class="kbl-d">名前は<b>空にすると線だけ</b>に戻ります。色は<b>この線だけ</b>変わります。</p>'
+      + '<input type="text" class="kbl-in" maxlength="24" placeholder="例：今日はここまで">'
+      + '<div class="kbl-swrap">' + sw + '</div>'
+      + '<div class="kbl-prev-h">見え方</div>'
+      + '<div class="kbl-prev"><div class="kb-line"><span class="kb-line-bar"></span>'
+      +   '<span class="kb-line-t"></span><span class="kb-line-bar"></span></div></div>'
+      + '<div class="kbl-b"><button type="button" class="kbl-cancel">やめる</button>'
+      +   '<button type="button" class="kbl-ok pri">決定</button></div>'
+      + '</div>';
+    d.body.appendChild(dlg);
+
+    var input = dlg.querySelector('.kbl-in');
+    var prev  = dlg.querySelector('.kbl-prev .kb-line');
+    var prevT = dlg.querySelector('.kbl-prev .kb-line-t');
+    input.value = label;
+
+    /* 窓の中の見本を、いまの入力と色でそのまま描く（＝盤面に出る形と同じ） */
+    function paint(){
+      var co = colorOf({ color: ckey });
+      prev.setAttribute('style', colorVars(co));
+      var t = String(input.value || '').trim();
+      prevT.textContent = t;
+      prevT.style.display = t ? '' : 'none';       /* 名前が無ければ線だけ＝盤面と同じ見え方 */
+      Array.prototype.forEach.call(dlg.querySelectorAll('.kbl-sw'), function(b){
+        b.classList.toggle('on', b.getAttribute('data-ck') === ckey);
+      });
+    }
+    paint();
+
+    dlg.addEventListener('click', function(e){
+      var b = e.target.closest && e.target.closest('.kbl-sw');
+      if (b){ ckey = b.getAttribute('data-ck'); paint(); input.focus(); return; }
+      if (e.target.closest && e.target.closest('.kbl-cancel')){ dlgClose(); return; }
+      if (e.target.closest && e.target.closest('.kbl-ok')){ commit(); return; }
+      if (e.target === dlg) dlgClose();             /* 外側を押す＝やめる（保存しない） */
+    });
+    input.addEventListener('input', paint);
+    input.addEventListener('keydown', function(e){
+      if (e.key === 'Enter'){ e.preventDefault(); commit(); }
+    });
+    d.addEventListener('keydown', dlgKey, true);
+    setTimeout(function(){ input.focus(); input.select(); }, 0);
+
+    function commit(){
+      /* ⚠ 消えたラインに書き戻さない（窓を開けている間に誰かが消したかもしれない） */
+      var cur = byId(l.id);
+      if (cur){ cur.label = String(input.value || '').trim(); cur.color = ckey; save(); }
+      dlgClose();
+      rerender();
+    }
+  }
+
   d.addEventListener('dblclick', function (e) {
     var el = e.target.closest && e.target.closest('[data-lineid]');
     if (!el) return;
     e.preventDefault(); e.stopPropagation();
     var l = byId(el.getAttribute('data-lineid')); if (!l) return;
-    var ask = (w.UI && UI.prompt)
-      ? UI.prompt('この区切りに書く言葉は？（空にすると線だけになります）', l.label || '', { placeholder: '例：今日はここまで' })
-      : Promise.resolve(w.prompt ? w.prompt('この区切りに書く言葉は？（空にすると線だけになります）', l.label || '') : null);
-    Promise.resolve(ask).then(function(v){
-      if (v == null) return;
-      l.label = String(v).trim();
-      save(); rerender();
-    });
+    openEditor(l);
   }, true);
 
   /* ---------- 🔴 v1.38.0（ゆうた指定）ボタンをクリック＝使い方の吹き出し ----------
@@ -332,7 +465,7 @@
       + '<li>カードとカードのあいだへ<b>ドラッグ</b>して入れる</li>'
       + '<li>入った線は<b>ドラッグで移動</b>（別の工程へも）</li>'
       + '<li><b>枠の外へ出すと消える</b></li>'
-      + '<li><b>ダブルクリックで名前</b>（例：今日はここまで）</li>'
+      + '<li><b>ダブルクリックで名前と色</b>（例：今日はここまで／7色から選べます）</li>'
       + '</ul>';
     d.body.appendChild(helpBox);
     var r = btn.getBoundingClientRect();
@@ -403,7 +536,9 @@
     renderColumn: renderColumn, ctxItem: ctxItem,
     /* テスト用（出す条件をここ1本から確かめる） */
     _onBoardView: onBoardView, _onBoardCard: onBoardCard,
-    put: put, moveTo: moveTo, remove: remove, all: lines, TOP: TOP
+    put: put, moveTo: moveTo, remove: remove, all: lines, TOP: TOP,
+    /* 🎨 v1.159.0 色の表はここ1本。画面もテストもここを見る（写しを作らない） */
+    COLORS: COLORS, DEFCOLOR: DEFCOLOR, colorOf: colorOf, openEditor: openEditor
   };
   console.log('[board-line] ready（タスクボードの区切りライン）');
 })(window, document);

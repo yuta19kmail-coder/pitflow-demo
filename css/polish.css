@@ -1403,14 +1403,24 @@ th.cfs-lg-d{ z-index:3; }
 
 /* 盤面に入ったライン。カードとカードのあいだに挟まる。
    ⚠ v1.37.0 ✕ は廃止（消すのは枠の外へドラッグ）。名前は入っている時だけ出る。 */
-.kb-line{ display:flex; align-items:center; gap:7px; margin:5px 2px; padding:3px 2px; cursor:pointer; user-select:none; }
+/* 🎨 v1.159.0（ゆうた指定）**線ごとに色を変えられる。**
+   🔴🔴 色そのものはここに書かない。**色の表は board-line.js の COLORS 1本**で、
+      あちらが `--kbl*`（CSS変数）を線に直接付けてくる。ここは**変数を使うだけ**。
+      ＝色を足す・色みを直す時は **board-line.js の1か所**を直せば、線も色見本もゴーストも一緒に変わる。
+   ⚠ 下の既定値は**変数が来なかった時の予備**（昔のオレンジ）。ここを色の一覧にしないこと。 */
+.kb-line{ display:flex; align-items:center; gap:7px; margin:5px 2px; padding:3px 2px; cursor:pointer; user-select:none;
+  --kbl:#e0a33a; --kbl-d:#a86a10; --kbl-s:rgba(224,163,58,.14); --kbl-e:rgba(224,163,58,.5);
+  --kbl-h:#f0bb6a; --kbl-g:rgba(224,163,58,.7); }
 .kb-line:active{ cursor:pointer; }
-.kb-line-bar{ flex:1 1 auto; height:0; border-top:2px dashed #e0a33a; }
-.kb-line-t{ flex:0 0 auto; max-width:60%; font-size:10.5px; font-weight:800; color:#e0a33a;
-  background:rgba(224,163,58,.14); border:1px solid rgba(224,163,58,.5); border-radius:999px;
+.kb-line-bar{ flex:1 1 auto; height:0; border-top:2px dashed var(--kbl); }
+.kb-line-t{ flex:0 0 auto; max-width:60%; font-size:10.5px; font-weight:800; color:var(--kbl);
+  background:var(--kbl-s); border:1px solid var(--kbl-e); border-radius:999px;
   padding:1px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.kb-line:hover .kb-line-bar{ border-top-color:#f0bb6a; }
+.kb-line:hover .kb-line-bar{ border-top-color:var(--kbl-h); }
 .kb-line.kb-line-drag{ opacity:.3; }
+/* ⚠ 明るいテーマだと薄い色（オレンジ・グレー）が白い下地に溶けるので、**文字だけ**一段濃くする。
+   線（点線）はそのまま＝色みは変えない。 */
+[data-theme^="light"] .kb-line-t{ color:var(--kbl-d); }
 /* 🔴 v1.69.0 「担当車両」で、よその課から集めてきたカードのまとまりの頭に付くバー（myonly-pit.js）。
    ⚠ 全員で共有している区切りライン（黄）とは**別物**＝掴めない・保存されない。
       取り違えないよう、色をグレーにして、カーソルも通常のまま（掴めそうに見せない）。 */
@@ -1421,11 +1431,47 @@ th.cfs-lg-d{ z-index:3; }
 .kb-line.kb-line-xb:hover .kb-line-bar{ border-top-color:var(--text3); }
 /* この下の1枚目は、カードの印（国産／輸入）がバーに被らないよう少しだけ空ける */
 .kb-line.kb-line-xb + .pit-card.pcm.kb-xboard{ margin-top:11px; }
-/* 🔴 v1.37.0 ドラッグ中に「そこに入るよ」と先に見せるゴースト */
+/* 🔴 v1.37.0 ドラッグ中に「そこに入るよ」と先に見せるゴースト
+   🆕 v1.159.0 動かしている線の色で出す（赤い線を掴んでいるのに橙のゴースト、を無くす） */
 .kb-line-ghost{ pointer-events:none; margin:5px 2px; }
-.kb-line-ghost .kb-line-bar{ border-top:3px solid #e0a33a; box-shadow:0 0 8px rgba(224,163,58,.7); }
+.kb-line-ghost .kb-line-bar{ border-top:3px solid var(--kbl); box-shadow:0 0 8px var(--kbl-g); }
 /* 落とし先の列を光らせる（カードのドラッグとは別の色＝取り違えない） */
 .kanban-col-body.kb-line-over{ box-shadow:inset 0 0 0 2px rgba(224,163,58,.75); border-radius:8px; }
+
+/* 🎨 v1.159.0 ダブルクリックで出る「区切りラインを直す」窓（board-line.js）
+   🔴 共通の窓（_shared\ui-dialog.js）は色見本を入れられないので、この機能ぶんだけ自前で持つ。
+      ⚠ 見た目は ui-dialog に合わせてある（違う窓が2種類あるように見せない）。 */
+.kbl-ov{ position:fixed; inset:0; z-index:99000; display:flex; align-items:center; justify-content:center;
+  background:rgba(6,10,14,.55); backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
+.kbl-card{ width:min(92vw,430px); background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; box-shadow:0 26px 70px rgba(0,0,0,.55); padding:20px 20px 16px; color:var(--text); }
+.kbl-card h4{ margin:0 0 6px; font-size:15.5px; font-weight:800; line-height:1.5; }
+.kbl-d{ font-size:12.5px; line-height:1.75; color:var(--text2); margin:0 0 14px; }
+.kbl-d b{ color:var(--text); }
+.kbl-in{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  border-radius:9px; padding:9px 11px; font-size:14px; font-family:inherit; outline:none; box-sizing:border-box; }
+.kbl-in:focus{ border-color:var(--acc); }
+/* 色見本＝**実物と同じ点線**を出す。丸い色玉だと「線がどう見えるか」が分からないため */
+.kbl-swrap{ display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin:13px 0 4px; }
+.kbl-sw{ display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer;
+  background:var(--bg3); border:1px solid var(--border); border-radius:9px; padding:8px 4px 6px;
+  font-family:inherit; }
+.kbl-sw:hover{ border-color:var(--kbl-e); background:var(--kbl-s); }
+.kbl-sw-bar{ width:100%; height:0; border-top:3px dashed var(--kbl); }
+.kbl-sw-n{ font-size:10px; font-weight:800; color:var(--text2); white-space:nowrap; }
+.kbl-sw.on{ border-color:var(--kbl); background:var(--kbl-s); box-shadow:0 0 0 1px var(--kbl) inset; }
+.kbl-sw.on .kbl-sw-n{ color:var(--kbl); }
+[data-theme^="light"] .kbl-sw.on .kbl-sw-n{ color:var(--kbl-d); }
+/* 🔴 色だけ見せない＝実際の見え方（線＋名前）をその場に出す */
+.kbl-prev-h{ font-size:10px; font-weight:800; color:var(--text3); margin:12px 0 2px; }
+.kbl-prev{ background:var(--bg3); border:1px solid var(--border); border-radius:9px; padding:6px 10px; }
+.kbl-prev .kb-line{ cursor:default; margin:0; }
+.kbl-b{ display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
+.kbl-b button{ border:1px solid var(--border); background:var(--bg3); color:var(--text);
+  border-radius:9px; padding:9px 18px; font-size:13.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+.kbl-b button:hover{ border-color:var(--acc); }
+.kbl-b button.pri{ background:var(--accd); border-color:var(--accd); color:#fff; }
+.kbl-b button.pri:hover{ filter:brightness(1.12); }
 
 /* 💬 v1.38.0 ボタンをクリックした時の使い方の吹き出し（board-line.js）
    ⚠ 盤面から離れずに読めるよう、その場に出す。くわしく読みたい人にはヘルプへのボタンを置く。 */

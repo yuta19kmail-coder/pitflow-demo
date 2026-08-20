@@ -18,6 +18,17 @@
         （日付も時間も入っているのに「まだ電話していない」箱から出ない）。
      ⚠ 保存・描き直し・お知らせも pitReturnCommit にまとめてある。ここで書き写さない。 */
   function _returnDrop(c, date, time){
+    /* 🆕 v1.149.0（ゆうた確定）**未完の車は返車カレンダーで動かせない＝見えるだけ。**
+       ◎なぜ
+         「盤面にいるまま確定返車日だけ入っている車」をカレンダーに出すようにした（v1.149.0）。
+         ここでつかんで動かせると、**盤面の車の日付を返車カレンダーから書き換える道**ができる。
+         返車系への入口は完TELのドラッグだけ（v1.132.0）＝その決めごとを崩さない。
+       🔴 カードは draggable="false" で出しているが、**落とす側でも同じ条件で止める**
+          （2026-08-19 の決めごと「ボタンを消すだけにしない」）。 */
+    if (window.pitReturnIsPending && pitReturnIsPending(c)){
+      if (window.pitPendingStop) pitPendingStop();   /* 言葉も番号も return-slot.js の1本 */
+      return;
+    }
     if (window.pitReturnSetDateTime){
       var res = pitReturnSetDateTime(c, date, time);
       if (window.pitReturnCommit) return pitReturnCommit(c, res);

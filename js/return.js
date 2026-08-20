@@ -6,7 +6,9 @@
       ここに「returnDate が…かつ returnStage が…」と条件を書き写さないこと。
       ・完TELを通った車 … 確定返車日（C）の日
       ・待・当の車       … **入庫日**。ただし**その日にならないと出さない**（入庫前は出さない）
-      ・預かりで完TEL前  … 出さない（盤面で入れた日付は「約束」＝B なのでカレンダーには使わない）
+      ・作業完了で確定返車日だけ入っている（完TEL前）… **「未完」としてグレーで出す**（v1.149.0）
+        ⚠ 見えるだけ＝**つかめない・返車済みにできない**。返すには今までどおり完TELのドラッグを通る
+      ・それ以外の預かりで完TEL前 … 出さない（盤面で入れた日付は「約束」＝B なので使わない）
    🔴 並び順も1本（`pitReturnSortMin`）。**返車時間は確定返車日にしか付かない**ので、
       時間がまだ無い車は「終日」として**いちばん後ろ**に置く（入庫時刻で代用しない）。
    ======================================== */
@@ -96,7 +98,7 @@ function renderReturnDay(){
       if (inSlot.length === 0){
         html += '<span style="color:var(--text3);font-size:11px;align-self:center;">空き</span>';
       } else {
-        html += inSlot.map(c => cardHtml(c, { compact: true })).join('');
+        html += inSlot.map(c => cardHtml(c, { compact: true, retView: true })).join('');
       }
       html += '</div></div>';
     });
@@ -106,7 +108,7 @@ function renderReturnDay(){
     const allDay = todays.filter(c => _allDay(c)).sort(_bySort);
     if (allDay.length > 0){
       html += '<div class="reserve-slot rs-allday"><div class="reserve-slot-time">終日<small>待ち・当日返し</small></div><div class="reserve-slot-cards" data-drop="returnTime" data-drop-val="">';
-      html += allDay.map(c => cardHtml(c, { compact: true })).join('');
+      html += allDay.map(c => cardHtml(c, { compact: true, retView: true })).join('');
       html += '</div></div>';
     }
     /* 時刻未定＝完TEL済で日は決まったが時間がまだ（ここへドロップで時刻を未定に戻せる）。
@@ -114,7 +116,7 @@ function renderReturnDay(){
     const noTime = todays.filter(c => _hourOf(c) === null && !_allDay(c)).sort(_bySort);   /* v1.34.0 */
     if (noTime.length > 0){
       html += '<div class="reserve-slot"><div class="reserve-slot-time">時刻未定</div><div class="reserve-slot-cards" data-drop="returnTime" data-drop-val="">';
-      html += noTime.map(c => cardHtml(c, { compact: true })).join('');
+      html += noTime.map(c => cardHtml(c, { compact: true, retView: true })).join('');
       html += '</div></div>';
     }
   }
@@ -263,10 +265,13 @@ function _rmlRowsReturn(from, to){
         const wt = state.workTypes.find(w => w.id === _wid);
         const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';
         const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
+        /* 🆕 v1.149.0 未完＝盤面のまま確定返車日だけ入っている車。判定は return-slot.js の1本 */
+        const _pd = !!(window.pitReturnIsPending && pitReturnIsPending(c));
         let side = '';
+        if (_pd && window.pitPendingBadge) side += pitPendingBadge('mini');
         if (c.needLoaner) side += '<span class="rme-loaner">代</span>';
         if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
-        html += '<div class="rml-ev return' + (c.urgent ? ' urgent' : '') + '" draggable="true" data-card-id="' + c.id + '"'
+        html += '<div class="rml-ev return' + (c.urgent ? ' urgent' : '') + (_pd ? ' is-retpend' : '') + '" draggable="' + (_pd ? 'false' : 'true') + '" data-card-id="' + c.id + '"'
              + ' style="border-left-color:' + teamColor + '"'
              + ' onclick="openDetail(\'' + c.id + '\')">'
              + '<b>' + tt + '</b> ' + nm + ' 様' + (c.car ? ' ' + c.car : '')
@@ -350,10 +355,13 @@ function monthGridCellsReturn(refDate){
       const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
       const _wid = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
       const wt = state.workTypes.find(w => w.id === _wid);
+      /* 🆕 v1.149.0 未完＝盤面のまま確定返車日だけ入っている車。判定は return-slot.js の1本 */
+      const _pd = !!(window.pitReturnIsPending && pitReturnIsPending(c));
       let side = '';
+      if (_pd && window.pitPendingBadge) side += pitPendingBadge('mini');
       if (c.needLoaner) side += '<span class="rme-loaner">代</span>';   // 並び＝代→作業
       if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
-      html += '<div class="reserve-month-event return' + (c.urgent ? ' urgent' : '') + '" draggable="true" data-card-id="' + c.id + '"';
+      html += '<div class="reserve-month-event return' + (c.urgent ? ' urgent' : '') + (_pd ? ' is-retpend' : '') + '" draggable="' + (_pd ? 'false' : 'true') + '" data-card-id="' + c.id + '"';
       if (!c.urgent) html += ' style="border-left-color:' + teamColor + '"';
       html += ' onclick="event.stopPropagation();openDetail(\'' + c.id + '\')">';
       html += '<span class="rme-txt">' + nm + ' 様' + (c.car ? ' ' + c.car : '') + '</span>';

@@ -1002,3 +1002,56 @@ select.cf-input{
 .tr-front.is-div{
   letter-spacing:0;
 }
+
+/* ==========================================================================
+   🆕 v1.149.0（ゆうた指定 2026-08-19）＝**未完**
+   　　「盤面にいるまま、確定返車日だけ先に入っている車」の見せ方。
+   🗣「完TELを通ってない以上『未完』ではあるから、未完なりグレーアウトなり、
+   　　終わってるわけではないのは伝えつつ、ただ返車として確定はしてるんだなってのを入れたい」
+
+   🔴 決めごと
+     ・**グレー**にする＝終わっていないことが一目で分かる
+     ・でも**消さない・薄くしすぎない**（読めなくなると意味がない）＝文字は読める濃さで残す
+     ・**「未完」の札**を必ず付ける（色だけに頼らない＝色が分かりにくい人にも伝わる）
+     ・**つかめない**（ドラッグ不可）＝見えるだけ。カーソルも「指さし」のまま変えない
+   ⚠ 付けるのは**返車系の画面だけ**。タスクボードのカードには付けない（is-retpend を出さない）。
+   ========================================================================== */
+
+/* 「未完」の札。どの画面でも同じ形・同じ言葉（HTMLは return-slot.js の1本） */
+.ret-pend{
+  display:inline-flex; align-items:center; justify-content:center;
+  font-weight:700; letter-spacing:.5px; white-space:nowrap;
+  background:rgba(131,144,166,.18); color:#8390a6; border:1px solid rgba(131,144,166,.55);
+  border-radius:4px;
+}
+.ret-pend-mini{ font-size:9.5px; line-height:1; padding:2px 4px; }
+.ret-pend-std { font-size:10.5px; line-height:1; padding:3px 6px; }
+.ret-pend-row { font-size:10px; line-height:1; padding:3px 5px; }
+
+/* カード本体＝グレーに寄せる。
+   ⚠ opacity だけで薄くすると文字まで読みにくくなるので、**彩度を落として**少しだけ薄くする。 */
+.pit-card.is-retpend,
+.rwk-card.is-retpend,
+.rml-ev.is-retpend,
+.reserve-month-event.is-retpend,
+.today-row.is-retpend{
+  filter:grayscale(.85);
+  opacity:.72;
+  border-left-color:#8390a6 !important;   /* 左の色（国産緑／輸入ピンク）もグレーへ */
+  border-style:dashed;                    /* 点線＝「まだ確定の途中」を形でも出す */
+}
+.pit-card.is-retpend:hover,
+.rwk-card.is-retpend:hover,
+.rml-ev.is-retpend:hover,
+.reserve-month-event.is-retpend:hover,
+.today-row.is-retpend:hover{ opacity:.92; }   /* 見たい時ははっきりする */
+
+/* 当日ビューの行は左の色帯（--team）も持っているのでそこもグレーに */
+.today-row.is-retpend{ --team:#8390a6; }
+
+/* アクションシート（当日ビューのカードをタップ）の説明文 */
+.ta-note{
+  margin:6px 0 2px; padding:7px 9px;
+  background:rgba(131,144,166,.12); border:1px solid rgba(131,144,166,.4); border-radius:7px;
+  font-size:11.5px; line-height:1.5; color:var(--text2);
+}

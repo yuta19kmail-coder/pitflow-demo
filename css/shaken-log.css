@@ -27,9 +27,28 @@
 .skl-day.out{ background:rgba(0,0,0,.14); }
 .skl-day.out .skl-d{ opacity:.4; }
 .skl-day.today{ background:rgba(31,122,77,.12); }
+/* 🚫 v1.165.0（ゆうた指定）**行っていない日は斜線。**
+   ・`skl-off-riku` … 土日祝＝**陸運局が休み**（薄い斜線・字は出さない＝日付の色で分かる）
+   ・`skl-off-shop` … **自社の定休**（MHSの定休日カレンダー・濃い斜線＋理由の字）
+   ⚠ どちらの日かの見分けは JS（pit-share.js の pitShakenDayOff）。CSS は塗るだけ。
+   ⚠ チップ（実績）は斜線の上でも読めるように、背景の上に普通に重なる。 */
+.skl-day.skl-off-riku{ background-image:repeating-linear-gradient(45deg,
+  rgba(140,150,170,.10), rgba(140,150,170,.10) 5px, transparent 5px, transparent 10px); }
+.skl-day.skl-off-shop{ background-image:repeating-linear-gradient(45deg,
+  rgba(140,150,170,.22), rgba(140,150,170,.22) 5px, transparent 5px, transparent 10px); }
+/* 月の外のマスは、もともと暗いので斜線を控えめに（うるさくしない） */
+.skl-day.out.skl-off-riku, .skl-day.out.skl-off-shop{ background-image:repeating-linear-gradient(45deg,
+  rgba(140,150,170,.08), rgba(140,150,170,.08) 5px, transparent 5px, transparent 10px); }
+/* 自社の休みの理由（お盆休み・臨時休業…）。日付のすぐ右に小さく。 */
+.skl-offtag{ font-size:9px; font-weight:700; color:var(--text3); background:var(--bg3);
+  border:1px solid var(--border); border-radius:4px; padding:0 5px; margin-left:5px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:78px; }
+@media (max-width:720px){ .skl-offtag{ max-width:48px; } }
 .skl-dh{ display:flex; align-items:center; justify-content:space-between; }
 .skl-d{ font-size:12px; font-weight:800; color:var(--text2); }
 .skl-d.sun{ color:#ef6a6a; } .skl-d.sat{ color:#6db0ec; }
+/* 🔴 v1.165.0 祝日は日曜と同じ赤（＝平日なのに斜線の理由が、字を出さなくても分かる） */
+.skl-d.holi{ color:#ef6a6a; }
 .skl-cnt{ font-size:9px; color:var(--text3); background:var(--bg3); border-radius:999px; padding:0 6px; }
 /* v0.124.4 2行化：1行目＝AM/PM・名前・済再／2行目＝車種・担当 */
 .skl-chip{ display:flex; flex-direction:column; gap:1px; border:1px solid var(--border); border-left:3px solid var(--green); border-radius:5px; padding:2px 5px; background:var(--bg3); cursor:pointer; overflow:hidden; }

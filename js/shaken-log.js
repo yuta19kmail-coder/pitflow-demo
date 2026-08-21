@@ -18,6 +18,12 @@
   function team(c){ return window.pitDivisionColor?pitDivisionColor(c):'#1db97a'; }
   function isShaken(c){ return window.pitIsShaken?pitIsShaken(c):false; }
   function ins(c){ return c.inspSchedule||{}; }
+  /* 🚫 v1.165.0（ゆうた指定）**行っていない日は斜線で塗る。**
+     ・土日祝＝**陸運局が休み**（薄い斜線）／自社の定休＝**MHS のカレンダー**（濃い斜線＋理由）
+     ⚠ 見分けは pit-share.js の `pitShakenDayOff` 1本。ここで曜日を数えない。
+     ⚠ 昔の月は MHS のカレンダーの範囲外になることがあり、その時は定休曜日だけの予備判断
+        （＝臨時休業までは遡れない）。**下の ※ にそう書いてある。** */
+  function dayOff(iso){ return window.pitShakenDayOff ? pitShakenDayOff(iso) : { off:false, kind:'', label:'', short:'' }; }
   function todayIso(){ var t=new Date(); t.setHours(0,0,0,0); return ymd(t); }
 
   // 事実ベースの実績レコードを収集
@@ -90,8 +96,15 @@
       var d=new Date(start); d.setDate(start.getDate()+i); var iso=ymd(d); var inM=(d.getMonth()===mo);
       var arr=(byDay[iso]||[]).slice().sort(function(a,b){ return (a.slot===b.slot?0:(a.slot==='am'?-1:1)); });
       var w=d.getDay();
-      h+='<div class="skl-day'+(inM?'':' out')+(iso===tIso?' today':'')+'">'
-        + '<div class="skl-dh"><span class="skl-d '+(w===0?'sun':w===6?'sat':'')+'">'+d.getDate()+'</span>'+(arr.length?'<span class="skl-cnt">'+arr.length+'</span>':'')+'</div>'
+      var off=dayOff(iso);
+      /* 🚫 斜線は2種類＝陸運局休（薄い）／自社定休（濃い）。理由の字は**自社の休みの時だけ**出す。 */
+      var offCls = off.off ? (' skl-off skl-off-' + (off.kind==='shop' ? 'shop' : 'riku')) : '';
+      var offTag = (off.off && off.kind==='shop') ? '<span class="skl-offtag">'+esc(off.short)+'</span>' : '';
+      var offTitle = off.off ? ' title="'+esc(off.label + (off.holiName ? '（'+off.holiName+'）' : ''))+'"' : '';
+      h+='<div class="skl-day'+(inM?'':' out')+(iso===tIso?' today':'')+offCls+'"'+offTitle+'>'
+        /* 🔴 祝日は日付を日曜と同じ赤に。＝**火曜なのに斜線**の理由が、字を出さなくても伝わる
+             （ゆうた指定「理由の字は自社の休みの時だけ」なので、色で分かるようにする）。 */
+        + '<div class="skl-dh"><span class="skl-d '+(off.kind==='holiday'?'holi':(w===0?'sun':w===6?'sat':''))+'">'+d.getDate()+'</span>'+offTag+(arr.length?'<span class="skl-cnt">'+arr.length+'</span>':'')+'</div>'
         + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?'済':'再検')+' '+(r.slot==='pm'?'PM':'AM')+(r.staff?' / '+esc(r.staff):'')+'">'
             + '<div class="skl-r1"><span class="skl-ap '+r.slot+'">'+(r.slot==='pm'?'PM':'AM')+'</span>'
             + '<span class="skl-nm">'+esc(surname(r.c))+'様</span>'
@@ -102,7 +115,9 @@
         + '</div>';
     }
     h+='</div></div>';
-    h+='<div class="skl-note">※ 事実ベースの記録のみ（予定は含みません）。済＝受かって陸運局へ行った実績、再＝再検で行った実績。誰が行ったか（担当）も記録。月送りで過去すべてを振り返れます。</div>';
+    h+='<div class="skl-note">※ 事実ベースの記録のみ（予定は含みません）。済＝受かって陸運局へ行った実績、再＝再検で行った実績。誰が行ったか（担当）も記録。月送りで過去すべてを振り返れます。'
+      + '<br>※ 斜線は行けない日です。<b>薄い斜線＝土日祝（陸運局が休み）</b>／<b>濃い斜線＝自社の定休</b>（MHSの定休日カレンダー・理由も出ます）。'
+      + '<br>※ 古い月は MHS のカレンダーが届いている範囲を外れることがあり、その時は<b>定休曜日だけ</b>の表示になります（臨時休業までは遡れません）。</div>';
     return h;
   }
 

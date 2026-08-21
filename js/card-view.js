@@ -2021,16 +2021,17 @@
   function shopClosed(d){ return window.PitCal ? PitCal.isClosed(_isoOf(d)) : false; }
   function shopNote(iso){ return window.PitCal ? PitCal.label(iso) : ''; }
   function _isoOf(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  /* 🔴 v1.165.0 「行けない日」の見分けは pit-share.js の `pitShakenDayOff` 1本。
+     ⚠ 直す前はここと shaken.js（車検予定）に**同じ判定が2つ**あり、
+        同じ土曜を片方は「陸運局休」、片方は「休」と言っていた。
+     ⚠ 見た目のクラス（holi / sun / sat / shop）と出す字は今までと1文字も変えていない。 */
+  const _CS_CLS = { holiday:'off holi', sun:'off sun', sat:'off sat', shop:'off shop' };
   function dayState(d){
     const iso = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-    const dow = d.getDay();
-    const holi = (window.Holidays && Holidays.is) ? Holidays.is(iso) : false;
-    const holiName = (window.Holidays && Holidays.name) ? Holidays.name(iso) : null;
-    if(holi) return {iso:iso,cls:'off holi',off:true,tag:'祝・休',holiName:holiName};
-    if(dow===0) return {iso:iso,cls:'off sun',off:true,tag:'陸運局休'};
-    if(dow===6) return {iso:iso,cls:'off sat',off:true,tag:'陸運局休'};
-    if(shopClosed(d)) return {iso:iso,cls:'off shop',off:true,tag:(shopNote(iso)||'自社定休')};
-    return {iso:iso,cls:'valid',off:false,tag:''};
+    const o = window.pitShakenDayOff ? pitShakenDayOff(iso) : { off:false };
+    if(!o.off) return {iso:iso,cls:'valid',off:false,tag:''};
+    return {iso:iso, cls:_CS_CLS[o.kind]||'off', off:true,
+            tag:(o.kind==='shop' ? (o.label||'自社定休') : o.label), holiName:o.holiName||null};
   }
   function cvBuildCal(){
     const track = document.getElementById('cv-cstrack'); if(!track || !_c) return;

@@ -553,6 +553,51 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitShakenSlot = pitShakenSlot;
 
   /* ===================================================================
+     🚫 v1.165.0 **車検の日として「行けない日」の物差し。**（2026-08-21）
+     -------------------------------------------------------------------
+     ◎車検の日には**2種類の休み**があって、意味がまるで違う。
+       ・**陸運局が休み**（土・日・祝）… 会社が開いていても**持って行けない**
+       ・**自社が定休**（MHS の定休日カレンダー）… 陸運局は開いているが**うちが動けない**
+     🔴 **この見分けはここ1本。** 画面ごとに曜日を数えたり `PitCal` を呼び直したりしない。
+     ⚠ 直す前は **card-view.js（車検の日を選ぶカレンダー）と shaken.js（車検予定）に
+        同じ判定が2つ**あり、言葉も `'陸運局休'` と `'休'` で食い違っていた。
+
+     戻り値
+       { off:真偽, kind:'holiday'|'sun'|'sat'|'shop'|'', label:長い言い方, short:狭い枠用, holiName:祝日の名前 }
+       ・順番＝**祝日 → 日 → 土 → 自社定休**（重なった時にどちらを言うかを固定する）
+       ・`kind==='shop'` の時だけ **MHS に入っている理由**（お盆休み・臨時休業…）が label に出る
+     ⚠ 過去の日付は MHS のカレンダーの範囲外になることがあり、その時は
+        **定休曜日だけの予備判断**になる（PitCal がそう決めている）。ここでは足さない。 */
+  function pitShakenDayOff(iso){
+    var out = { off:false, kind:'', label:'', short:'', holiName:null };
+    var s = String(iso == null ? '' : iso);
+    if (!s) return out;
+    var d = new Date(s + 'T00:00:00');
+    if (isNaN(d.getTime())) return out;
+    var H = w.Holidays;
+    if (H && H.is && H.is(s)){
+      out.off = true; out.kind = 'holiday'; out.label = '祝・休'; out.short = '休';
+      out.holiName = (H.name ? H.name(s) : null);
+      return out;
+    }
+    var dow = d.getDay();
+    if (dow === 0 || dow === 6){
+      out.off = true; out.kind = (dow === 0 ? 'sun' : 'sat');
+      out.label = '陸運局休'; out.short = '休';
+      return out;
+    }
+    if (w.PitCal && w.PitCal.isClosed && w.PitCal.isClosed(s)){
+      var note = (w.PitCal.label ? w.PitCal.label(s) : '') || '';
+      out.off = true; out.kind = 'shop';
+      out.label = note || '自社定休';
+      out.short = note || '定休';
+      return out;
+    }
+    return out;
+  }
+  w.pitShakenDayOff = pitShakenDayOff;
+
+  /* ===================================================================
      🏷 v1.164.0（ゆうた指摘 2026-08-21）**「予約キャンセル」と「未入庫」は別物。**
      -------------------------------------------------------------------
      🗣「予約キャンセルと未入庫は素直に行動が、というか意味合いが違くない？ たしか決めたよ」

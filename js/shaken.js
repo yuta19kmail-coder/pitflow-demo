@@ -31,8 +31,13 @@
   /* 🚫 v1.50.0 自社の休みは MHS の定休日カレンダー（PitCal）が基準＝臨時休業・お盆も休みになる */
   function shopClosed(iso){ return window.PitCal ? PitCal.isClosed(iso) : false; }
   function shopNote(iso){ return window.PitCal ? PitCal.label(iso) : ''; }
-  function isOff(iso){ var w=new Date(iso+'T00:00:00').getDay(); if(w===0||w===6) return true; if(window.Holidays&&Holidays.is&&Holidays.is(iso)) return true; if(shopClosed(iso)) return true; return false; }
-  function offLabel(iso){ var w=new Date(iso+'T00:00:00').getDay(); if(w!==0&&w!==6&&!(window.Holidays&&Holidays.is&&Holidays.is(iso))&&shopClosed(iso)) return shopNote(iso)||'定休'; return '休'; }
+  /* 🔴 v1.165.0 「行けない日」の見分けは pit-share.js の `pitShakenDayOff` 1本。
+     ⚠ 直す前はここと card-view.js（車検の日を選ぶカレンダー）に**同じ判定が2つ**あった。
+     ⚠ 出す言葉は今までどおり（狭い枠なので `short`＝土日祝は「休」・自社定休は理由か「定休」）。 */
+  function dayOff(iso){ return window.pitShakenDayOff ? pitShakenDayOff(iso)
+                          : { off:false, kind:'', label:'', short:'' }; }
+  function isOff(iso){ return !!dayOff(iso).off; }
+  function offLabel(iso){ var o=dayOff(iso); return o.off ? (o.short||'休') : '休'; }
   function fmtMD(iso){ var d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }
   /* 🔴 v1.116.0 入庫待ちの日付は**曜日つき**で出す（ゆうた指定「8/22入 → 8/22(土)」）。
      ⚠ 土日が休みなので、曜日が見えないと「土曜に入庫？」の勘違いが起きる。 */

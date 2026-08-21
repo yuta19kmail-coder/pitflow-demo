@@ -155,17 +155,25 @@
     return cards;
   }
 
-  // 代車予約：先行して埋まっており、最短の空きは「8月お盆明け」あたり
+  /* 代車予約：先行して埋まっていて、空きはしばらく先――という見本を作る。
+     🔴🔴 2026-08-21 修正（見張り `test_loaner_name` が「貸出のバッジが0」で落ちていた正体）
+       直す前は **「今年の 8/17（お盆明け）まで」** という**カレンダーの決め打ち**だった。
+       ＝ **8/18 を過ぎた日から翌年の春まで、1件も作られない。**
+       デモ版の代車カレンダーが**まるごと空っぽ**になり、しかも
+       「今日は8月18日以降だから」なので**エラーは1つも出ない**（毎年 半年ちかく空のまま）。
+     🔴 **見本データに「◯月◯日まで」と書かない。必ず今日からの日数で書く。**
+       ここは **今日の3日前 〜 今日の28日後**を埋める（どの日に開いても同じ見え方になる）。 */
+  var SAMPLE_LOANER_BACK_DAYS = 3;      /* 何日前から埋めるか（過去の帯＝返却済みの見本） */
+  var SAMPLE_LOANER_AHEAD_DAYS = 28;    /* 何日先まで埋めるか */
   function genLoaners(){
     const today = new Date(); today.setHours(0,0,0,0);
-    // 今年の8/17（お盆明け）まで、4台の代車を背中合わせで埋める
-    const obon = new Date(today.getFullYear(), 7, 17);  // 8月17日
+    const until = add(today, SAMPLE_LOANER_AHEAD_DAYS);
     const assigns = [];
     let aid = 0;
     const loaners = (state.loaners || [{id:'L01'},{id:'L02'},{id:'L03'},{id:'L04'}]);
     loaners.forEach(function(l){
-      let cur = add(today, -ri(0, 3));
-      while (cur < obon){
+      let cur = add(today, -ri(0, SAMPLE_LOANER_BACK_DAYS));
+      while (cur < until){
         const len = ri(3, 10);
         const to = add(cur, len - 1);
         aid++;

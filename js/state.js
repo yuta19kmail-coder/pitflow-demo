@@ -492,7 +492,10 @@ function pitStaffPrintName(name){
         （画面の狭い枠は「コバモ」でよいが、紙はフル＝2026-08-16 の決めごと）。 */
   var n = String(name == null ? '' : name).trim();
   if (!n) return '';
-  if (window.pitIsSelfName && pitIsSelfName(n)) return pitSurname(n);
+  /* 🔴 v1.163.0 自社と分かったら**書き方を1つに寄せる**（pit-share.js の PIT_SELF_NAME）。
+     ⚠ 直す前は `pitSurname(n)` を通していたので、「小林モータース株式会社」で入っている行だけ
+        **「小林モータース㈱」**と刷られ、同じ会社なのに紙の上で食い違っていた。 */
+  if (window.pitIsSelfName && pitIsSelfName(n)) return (window.PIT_SELF_NAME || pitSurname(n));
   return window.pitStaffCall ? pitStaffCall(n) : pitSurname(n);
 }
 window.pitStaffPrintName = pitStaffPrintName;

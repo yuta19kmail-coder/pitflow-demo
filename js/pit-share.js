@@ -109,6 +109,13 @@ w.pitCustSurname = pitCustSurname;
    ⚠ **お客様名には使わない。** お客様としての「小林モータース」は今までどおりフル（略記のみ）。
    ⚠ 表記ゆれ（株式会社つき・(株)・全角カッコ）も同じ1つとして扱う。 */
 var PIT_SELF_SHORT = 'コバモ';
+/* 🔴 v1.163.0 **自社の正式な書き方は1つだけ。**
+   ⚠ 整備ソフト由来のデータには「小林モータース株式会社」「(株)小林モータース」など
+      **同じ会社の書き方ちがい**が混ざる。そのまま出すと、紙の担当欄が
+      「小林モータース」と「小林モータース㈱」で**行ごとに食い違う**。
+   🔴 自社と分かったら、書き方は**必ずこの1つ**に寄せる（広い枠＝紙・予約詳細）。
+      狭い枠は今までどおり `PIT_SELF_SHORT`（コバモ）。 */
+var PIT_SELF_NAME = '小林モータース';
 var _PIT_CORP = '(?:株式会社|有限会社|合同会社|[（(]株[）)]|[（(]有[）)]|[（(]同[）)]|㈱|㈲)';
 var _PIT_SELF_RE = new RegExp('^' + _PIT_CORP + '?小林モータース' + _PIT_CORP + '?$');
 function pitIsSelfName(name){
@@ -124,6 +131,7 @@ function pitStaffShort(name){
   return pitSurname(n);
 }
 w.PIT_SELF_SHORT = PIT_SELF_SHORT;
+w.PIT_SELF_NAME  = PIT_SELF_NAME;
 w.pitIsSelfName  = pitIsSelfName;
 w.pitStaffShort  = pitStaffShort;
 

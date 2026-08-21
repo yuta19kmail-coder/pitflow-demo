@@ -31,8 +31,8 @@
        → { at, cards, findings:[…], byLevel, byCat, byRule, muted, marked }
      所見（finding）1件 ＝
        { key, ruleId, cat, level, title, why, fix, kind:'card'|'veh', refId, name, text, mark }
-       ⚠ `key` は **規則ID + 対象ID**。これが「見た／これは仕様／直した」の札を貼る先。
-     pitInspectMark(key, v) … 札を貼る（'seen' 見た / 'spec' これは仕様 / 'fixed' 直した / '' はがす）
+       ⚠ `key` は **規則ID + 対象ID**。これが「見た／これでOK／直した」の札を貼る先。
+     pitInspectMark(key, v) … 札を貼る（'seen' 見た / 'spec' これでOK / 'fixed' 直した / '' はがす）
      pitInspectMute(ruleId, on) … 規則ごと黙らせる（「うちはこれで正しい」時）
      pitInspectExport()   … ②③へ渡す JSON
 
@@ -102,10 +102,16 @@
     { id:'amber', label:'確認',   color:'#f59e0b', note:'たぶん入れ忘れ。見て決めてください' },
     { id:'gray',  label:'気づき', color:'#94a3b8', note:'仕様かもしれません。数が多いのでまとめて' }
   ];
+  /* 🔴 v1.168.1（ゆうた指摘 2026-08-21）**「これは仕様」→「これでOK」に言い換えた。**
+     🗣「仕様っていうと、なんか**仕組み的にあってる**みたいなニュアンスが強いかな」
+     ＝ ここで言いたいのは「プログラムとして正しい」ではなく
+       「**見た。うちのやり方ではこれで正しい**」という**現場の判断**。
+     🔴 `id`（'spec'）は**変えないこと。** これは札の貼り先そのもので、
+        変えると**今までに貼った札が全部はがれる**（言葉だけ直す）。 */
   var MARKS = [
-    { id:'seen',  label:'見た',       note:'目は通した。まだ直していない' },
-    { id:'spec',  label:'これは仕様', note:'うちではこれで正しい。次から出さない' },
-    { id:'fixed', label:'直した',     note:'直した。次の点検で消える' }
+    { id:'seen',  label:'見た',    note:'目は通した。まだ決めていない（次も出る）' },
+    { id:'spec',  label:'これでOK', note:'見た。うちのやり方ではこれで正しい（次から出さない）' },
+    { id:'fixed', label:'直した',  note:'直した。次の点検で消える' }
   ];
 
   /* ================================================================
@@ -168,7 +174,7 @@
      1件＝{ id, cat, level, title, why, fix, each?(c,ctx), all?(ctx) }
        each … カード1枚ずつ見る。**文字を返したら所見**（空なら異常なし）
        all  … 束で見る（二重予約・代車のダブりなど）。[{refId, text, kind?, name?}] を返す
-     🔴 id は**変えない**（札〈これは仕様〉の貼り先だから。変えると札がはがれる）
+     🔴 id は**変えない**（札〈これでOK〉の貼り先だから。変えると札がはがれる）
      ================================================================ */
   var RULES = [
 
@@ -218,7 +224,7 @@
     { id:'M05', cat:'money', level:'amber',
       title:'金額のけたが大きすぎる',
       why:'1台で ' + man(LIM.huge) + ' を超えています。0を1つ多く打った可能性があります。',
-      fix:'金額を見直してください。本当に合っていれば「これは仕様」を付けてください。',
+      fix:'金額を見直してください。本当に合っていれば「これでOK」を付けてください。',
       each: function(c){
         var f = [['amountFinal','確定金額'],['amountOrder','受注金額'],['amountQuote','見積金額']]
           .filter(function(x){ return num(c[x[0]]) >= LIM.huge; })
@@ -346,7 +352,7 @@
     { id:'F07', cat:'flow', level:'amber',
       title:'返車予定日が、ずっと先',
       why:'今日から ' + LIM.farReturn + '日より先です。年や月を打ち間違えた可能性があります。',
-      fix:'日付を見直してください。本当に先の予定なら「これは仕様」を付けてください。',
+      fix:'日付を見直してください。本当に先の予定なら「これでOK」を付けてください。',
       each: function(c, ctx){
         if (!isLive(c) || !t(c.returnDate)) return '';
         var n = days(ctx.today, c.returnDate);
@@ -1088,7 +1094,11 @@
           対象: f.kind, id: f.refId, お客様: f.name, 車: f.car || '', ナンバー: f.plate || '',
           予約番号: f.resNo || '', 状態: f.state || '', 課: f.div || '',
           担当: f.staff || '', 車検担当: f.staff2 || '', 金額: f.amount || 0,
-          中身: f.text, 札: f.mark || ''
+          中身: f.text,
+          /* 🔴 v1.168.1 札は**人が読む言葉**で出す（'spec' のままだと②③で意味が伝わらない）。
+             ⚠ 言葉の元は上の MARKS 表1本。ここで綴らない。 */
+          札: (function(){ var m = MARKS.filter(function(x){ return x.id === f.mark; })[0]; return m ? m.label : ''; })(),
+          札の印: f.mark || '', 札をつけた日: f.markAt || ''
         };
       })
     };

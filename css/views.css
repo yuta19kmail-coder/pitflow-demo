@@ -653,6 +653,12 @@
 .tr-time.is-range{ font-size:12.5px; line-height:1.14; text-align:left; }
 .tr-time.is-range .tt-l{ display:block; }
 .tr-time.is-range .tt-sep{ font-size:9.5px; line-height:1; color:var(--text3); font-weight:700; }
+/* 🔴 v1.166.0（ゆうた報告「決まり次第が見切れる」）**長い言葉は2段。**
+   ⚠ 5文字（決まり次第・勝手に取る）は 15px だと 76px 必要で、62px の列から 14px はみ出していた。
+   ⚠ 時間帯（is-range）と違って**どちらの段もふつうの色・同じ大きさ**（片方が「〜」ではないため）。
+   ⚠ 切る場所は pit-share.js の表。CSS は並べるだけ。 */
+.tr-time.is-word2{ font-size:13px; line-height:1.18; text-align:left; }
+.tr-time.is-word2 .tt-l{ display:block; }
 .tr-front{
   writing-mode:vertical-rl; text-orientation:upright;
   font-size:11px; font-weight:800; color:#fff; border-radius:5px;

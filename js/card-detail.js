@@ -929,7 +929,14 @@ function _cfsDayListHtml(c){
   const who = (c.frontStaff || '').trim();
   /* v1.33.0 物差しは state.js の pitTimeMin に一本化（ショートカットの時間も解決される） */
   const toMin = function (s){ return window.pitTimeMin ? pitTimeMin(s) : 99999; };
-  const live = function (x){ return x.status !== 'returned' && x.status !== 'scrap' && x.status !== 'canceled'; };
+  /* 🔴 v1.161.0（ゆうた報告「新規予約画面の右カラム、予定にもキャンセルした車両が表示されてる」）
+     **まだ生きているカードかは pit-share.js の `pitCardActive` 1本**に聞く。
+     ⚠ ここは `'canceled'`（L が1つ）と書いてあった。PitFlow の値は `'cancelled'`（L が2つ）なので、
+        **この行は1件も外していなかった**＝キャンセルした車がずっと予定に並び続けていた。
+        JSエラーは1つも出ないので、綴りの間違いに誰も気づけない。
+        ⚠ **状態の名前を自分で綴らない。1本に聞く。** */
+  const _alive = window.pitCardActive || function (x){ return !!x && x.status !== 'scrap' && x.status !== 'cancelled'; };
+  const live = function (x){ return x.status !== 'returned' && _alive(x); };
   /* v1.17.0：他の人が書きかけの下書き（_draft）は、この一覧にも出さない */
   const intake = (state.cards||[]).filter(function(x){ return x && !x._draft && x.id!==me && x.reserveDate===ds && live(x); });
   /* 🔴 v1.65.0 返車の日は return-slot.js の物差し1本から取る */
@@ -939,11 +946,28 @@ function _cfsDayListHtml(c){
     const imp = (x.boardId==='import');
     const isHl = who && (x.frontStaff||'').trim()===who;
     /* 🔴 v1.104.0 自社（小林モータース）は狭いバッジだと入らないので「コバモ」（pit-share.js の1本） */
-    const front = (window.pitStaffShort ? pitStaffShort(x.frontStaff||'') : (window.pitSurname ? pitSurname(x.frontStaff||'') : (x.frontStaff||''))) || '—';
+    const front = (window.pitStaffShort ? pitStaffShort(x.frontStaff||'') : (window.pitSurname ? pitSurname(x.frontStaff||'') : (x.frontStaff||'')));
+    /* 🔴 v1.161.0（ゆうた指定）**担当フロントが決まっていない時は、代わりに課（1課／2課）を出す。**
+       ＝当日ビューは v1.98.0 でそうなったのに、**新規予約の右カラムだけ「—」のまま**だった。
+       ⚠ 課は `c.division`（予約画面のボタン）だけで決まる。国産／輸入から逆算しない（v1.92.0 の決めごと）。
+       ⚠ 課のボタンも空なら、今までどおり「—」。無いものを作らない。 */
+    const divL = front ? '' : (window.pitDivisionLabel ? pitDivisionLabel(x) : '');
+    /* 🔴 v1.161.0 **バッジの色も課から引く。課が空ならコバモのグレー**（`PIT_DIV_NONE_COLOR`）。
+       ⚠ 直す前は CSS（`.dl-badge` / `.dl-ev.imp .dl-badge`）が
+          **車（国産／輸入）から色を作っていた**ので、課を何も押していなくても
+          必ず緑かピンクが付き「入っている」ように見えていた。
+          当日ビューでは v1.104.0 で追い出した筋が、ここにだけ残っていた。
+       ⚠ 色をここにも CSS にも書き写さない。物差しは `pitDivisionColorOr` の1本。 */
+    const badgeBg = window.pitDivisionColorOr ? pitDivisionColorOr(x)
+                                              : ((window.pitDivisionColor ? pitDivisionColor(x) : '') || '#8390a6');
+    const badge = front || divL || '—';
     const car = (x.car || '').trim();   // v0.84.1 メーカーは出さない＝車種のみ
     const nm = ((window.pitCustSurname ? pitCustSurname(x) : (x.customer||'')) || '（未入力）');   // v0.86.1 名字だけ（法人はフル）
     return '<div class="dl-ev'+(imp?' imp':'')+(isHl?' hl':'')+'">'
-      + '<div class="dl-top"><span class="dl-time">'+_pe(t||'—')+'</span><span class="dl-badge">'+_pe(front)+'</span></div>'
+      + '<div class="dl-top"><span class="dl-time">'+_pe(t||'—')+'</span>'
+      + '<span class="dl-badge'+(front?'':(divL?' is-div':' is-none'))+'" style="background:'+_pe(badgeBg)+'"'
+      + (divL ? ' title="担当者はまだ決まっていません（'+_pe(divL)+'）"' : '')
+      + '>'+_pe(badge)+'</span></div>'
       + '<div class="dl-line">'+_pe(nm)+' 様 <span class="dl-car">'+_pe(car)+'</span></div></div>';
   }
   function col(list, isRet){

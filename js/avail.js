@@ -21,7 +21,12 @@ function _availRow(c){
   const isImp = (c.boardId === 'import');
   const teamColor = isImp ? '#ec4899' : '#1db97a';
   const time = (c.reserveTime || '').trim();
-  const name = ((window.pitSurname ? pitSurname(c.customer) : (c.customer || '')) || '（未入力）') + ' 様';
+  /* 🔴 v1.161.0（ゆうた報告「空きカレンダービューで名前の漢字→カナの仕組みが入ってない」）
+     お名前は **pit-share.js の `pitCustSurname` 1本**を通す。
+     ⚠ ここだけ `pitSurname(c.customer)` と直に書いていたので、
+        **漢字がまだ分からずカナだけ入れたお客様が「（未入力）」**になっていた。
+        （車検予定・車検ログで 8/16 に直したのとまったく同じ筋。ここが最後の1か所。） */
+  const name = ((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）') + ' 様';
   const done = !!(c.status && c.status !== 'reserved');   // 入庫済み等（予約から先へ進んだ）
 
   // 作業バッジ（基本＋併用・最大2個・設定の色）
@@ -51,9 +56,17 @@ function _availRow(c){
 function _availList(team, ds){
   const teamColor = (team === 'import') ? '#ec4899' : '#1db97a';
   const teamName  = (team === 'import') ? '<i data-ic=globe data-ics=16></i> 輸入車の入庫' : '<i data-ic=car data-ics=16></i> 国産車の入庫';
-  // 入庫＝その日に入庫予定（廃車・返車済みは除く）。時間順。
+  /* 入庫＝その日に入庫予定。返車済みは出さない。時間順。
+     🔴 v1.161.0（ゆうた報告「キャンセルした車両が入庫済みとして表示されている」）
+        **まだ生きているカードかの物差しは pit-share.js の `pitCardActive` 1本。**
+        ⚠ ここは `scrap` と `returned` しか外していなかったので
+           **予約キャンセル（`cancelled`）・未入庫・売上なしが残っていた**。
+           しかも下の `done` は「`reserved` 以外＝入庫済」なので、
+           **キャンセルした車に「入庫済」の札が付く**という見え方になっていた。
+        ⚠ 条件をここに書き戻さないこと。何を外すかは全部あちらで決める。 */
+  const _alive = window.pitCardActive || function (c) { return !!c && c.status !== 'scrap' && c.status !== 'cancelled'; };
   const cards = (state.cards || []).filter(function (c) {
-    return c.boardId === team && c.reserveDate === ds && c.status !== 'scrap' && c.status !== 'returned';
+    return c.boardId === team && c.reserveDate === ds && _alive(c) && c.status !== 'returned';
   }).sort(function (a, b) {
     /* 🔴 v1.70.0 物差しは state.js の pitTimeMin 1本。
        ⚠ v1.69.0 まで**文字くらべ**で並べていたので、「朝一」が「夕方」より後ろ、

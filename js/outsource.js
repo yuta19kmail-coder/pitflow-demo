@@ -22,7 +22,8 @@
 
   // タスクボードと同じコンパクトカード＋右側に「完了予定・何日目」
   function osItem(c){
-    var card = (typeof cardHtml === 'function') ? cardHtml(c, { compact:true }) : ('<div class="os-card">'+esc(c.customer||'')+'</div>');
+    var card = (typeof cardHtml === 'function') ? cardHtml(c, { compact:true })
+             : ('<div class="os-card">'+esc((window.pitCustName?pitCustName(c):(c.customer||''))||'')+'</div>');
     var dueTxt = c.outsourceDue ? mdShort(c.outsourceDue) : '未定';
     var d = dayNo(c);
     var side = '<div class="os-side"><div class="os-side-due">完了予定<br><b>'+esc(dueTxt)+'</b></div>'

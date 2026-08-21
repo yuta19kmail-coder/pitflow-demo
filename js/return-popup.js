@@ -126,7 +126,8 @@
     el('rp-title').textContent = toResult ? '実績化 — 確定金額を入れてください'
                                : (isDone ? '完TEL済 → 返車予定へ': '完TEL依頼（先に金額だけ）');
     el('rp-ok').textContent = toResult ? '実績に固める' : (isDone ? '返車予定に入れる' : '完TEL待ちへ');
-    el('rp-move').innerHTML = '<span class="pp-to">'+esc((card.customer||'（未入力）')+' 様')+'</span>'
+    /* 🔴 v1.162.0 お名前は pitCustName の1本（漢字が無ければカナ）。ここは漢字だけを見ていた。 */
+    el('rp-move').innerHTML = '<span class="pp-to">'+esc((((window.pitCustName?pitCustName(card):card.customer)||'（未入力）'))+' 様')+'</span>'
       + (card.car ? '<span class="pp-who">'+esc(card.car)+'</span>' : '');
 
     // 金額プレフィル＝確定→受注→見積→概算

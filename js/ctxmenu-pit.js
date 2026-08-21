@@ -211,7 +211,8 @@
         var ds = el.getAttribute('data-ds'); return ds ? { title:'', items: dayMenu(ds) } : null; } }
   ];
   function ttl(c){
-    return ((window.pitSurname ? pitSurname(c.customer) : c.customer) || '（未入力）') + ' 様'
+    /* 🔴 v1.162.0 お名前は pitCustSurname の1本（漢字が無ければカナ）。ここは直に組み立てていた。 */
+    return ((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）') + ' 様'
          + (c.car ? '　' + c.car : '');
   }
 

@@ -121,7 +121,8 @@ function renderMaintDash(){
       const sev = o.held >= longN*2 ? ' md-sev2' : '';
       h += '<div class="md-alert-row' + sev + '" onclick="openCard(\'' + c.id + '\',\'page\')">';
       h += '<div class="md-alert-days"><b>' + o.held + '</b><span>日</span></div>';
-      h += '<div class="md-alert-main"><div class="md-alert-car">' + _mdEsc(c.car || '車両') + ' <span class="md-alert-cust">' + _mdEsc(c.customer || '') + '</span></div>'
+      /* 🔴 v1.162.0 お名前は pitCustSurname の1本（漢字が無ければカナ）。ここは漢字だけ＝カナのお客様は空欄だった。 */
+      h += '<div class="md-alert-main"><div class="md-alert-car">' + _mdEsc(c.car || '車両') + ' <span class="md-alert-cust">' + _mdEsc((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '') + '</span></div>'
          + '<div class="md-alert-sub">' + _mdEsc(c.plate || '') + ' ・ ' + _mdEsc(c.menu || '') + '</div></div>';
       h += '<div class="md-alert-tags"><span class="md-alert-div" style="background:' + d.color + '">' + d.label + '</span>'
          + '<span class="md-alert-st" style="color:' + statusColor(c.status) + ';border-color:' + statusColor(c.status) + '">' + statusLabel(c.status) + '</span></div>';

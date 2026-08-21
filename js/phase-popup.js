@@ -101,7 +101,8 @@
     build();
     var fromL = statusName(pending.from), toL = statusName(pending.to);
     el('pp-move').innerHTML = '<span class="pp-from">'+esc(fromL)+'</span><span class="pp-arrow">→</span><span class="pp-to">'+esc(toL)+'</span>'
-      + '<span class="pp-who">'+esc((card.customer||'（未入力）')+' 様')+(card.car?' ／ '+esc(card.car):'')+'</span>';
+      /* 🔴 v1.162.0 お名前は pitCustName の1本（漢字が無ければカナ）。ここは漢字だけを見ていた。 */
+      + '<span class="pp-who">'+esc((((window.pitCustName?pitCustName(card):card.customer)||'（未入力）'))+' 様')+(card.car?' ／ '+esc(card.car):'')+'</span>';
 
     // 車販依頼フィールドは既定で隠す（order時のみ出す）
     var _sf = el('pp-sales-field'); if (_sf){ _sf.style.display = 'none'; _sf.innerHTML = ''; }

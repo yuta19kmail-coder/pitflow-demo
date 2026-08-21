@@ -24,6 +24,10 @@
 .sv-hero-num{ font-size:34px; font-weight:800; line-height:1.15; letter-spacing:-.02em; }
 .sv-hero-num span{ font-size:15px; font-weight:700; margin-left:3px; color:var(--text2); }
 .sv-hero-sub{ font-size:12px; color:var(--text2); margin-top:2px; }
+/* 🔴 v1.167.0（ゆうた指定「両方並べる」）実績見込み（実績＋実績待）と 確度高（＋確定）を横に2つ。
+   ⚠ 狭い画面では素直に縦に折り返す（数字が切れないように）。 */
+.sv-hero-sub2{ display:flex; flex-wrap:wrap; gap:4px 16px; }
+.sv-hero-sub2 b{ margin-left:4px; font-size:13px; }
 .sv-hero-pace{ margin-left:auto; text-align:center; padding:6px 16px; border-radius:12px; border:1px solid var(--border); }
 .sv-hero-pace .sv-hero-num{ font-size:28px; }
 .sv-pace-ok{ background:rgba(29,185,122,.12); border-color:rgba(29,185,122,.5); }
@@ -70,7 +74,9 @@
 .sv-mk-lb{ fill:var(--text3); font-size:9.5px; }
 
 /* 確度別サマリー */
-.sv-tiers{ display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px; }
+/* 🔴 v1.167.0 区分が6つ＋目標＝**7枚**になった（実績待を切り出したため）。
+   ⚠ 数を直に書かず `auto-fit` で並べる＝区分を足しても崩れない。 */
+.sv-tiers{ display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:10px; margin-bottom:14px; }
 @media (max-width:900px){ .sv-tiers{ grid-template-columns:repeat(3,1fr); } }
 @media (max-width:520px){ .sv-tiers{ grid-template-columns:repeat(2,1fr); } }
 .sv-tier{ background:var(--bg2); border:1px solid var(--border); border-top:3px solid var(--tc); border-radius:10px; padding:10px 12px; }
@@ -90,7 +96,8 @@
 .sv-course-team{ font-size:12px; color:var(--text2); }
 .sv-course-land{ margin-left:auto; font-size:12px; font-weight:700; color:var(--text); }
 .sv-mini{ width:100%; height:12px; display:block; border-radius:3px; overflow:hidden; margin-bottom:10px; }
-.sv-course-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+/* 🔴 v1.167.0 区分が6つになったので **3列×2段** できれいに割る（5＋1のはみ出しを作らない） */
+.sv-course-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px 10px; margin-top:8px; }
 @media (max-width:520px){ .sv-course-grid{ grid-template-columns:repeat(3,1fr); } }
 .sv-cc{ display:flex; flex-direction:column; gap:1px; font-size:11px; color:var(--text2); }
 .sv-cc-dot{ width:8px; height:8px; border-radius:50%; }

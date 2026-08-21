@@ -129,6 +129,19 @@
   function loanerBack(c){ return w.pitLoanerBackOf ? w.pitLoanerBackOf(c) : { back:false, at:'' }; }
   /* 代車の呼び名。⚠ 消された代車は名前が引けないので、その時だけ id を出す（人が追える形にする） */
   function loName(id){ return (w.pitLoanerModel ? (w.pitLoanerModel(id) || '') : '') || s(id); }
+  /* 🔴 v1.168.0（ゆうた指定）**所見にはかならず「誰の車か」を出す。**
+     🗣「担当者をそれぞれ記載してほしい」
+     ◎誰を出すか
+       ・ふだんの担当 …… **フロント担当**（無ければ受付した人）＝この車の面倒を見ている人
+       ・車検の所見だけ … **回送の担当**も一緒に（陸運局へ持って行く人。フロントとは別物）
+     🔴 名前の出し方は pit-share.js の1本（`pitStaffCall`＝通称＆苗字）。ここで綴らない。
+     ⚠ 自社（小林モータース）を選んでいる時は「コバモ」に化ける＝それも1本が決めている。 */
+  function staffOf(c){
+    var n = t(c && (c.frontStaff || c.staff));
+    return n ? (w.pitStaffCall ? w.pitStaffCall(n) : n) : '';
+  }
+  /* 担当バッジの色＝課の色（課が空ならグレー）。🔴 画面で色を綴らないための1本 */
+  function staffColorOf(c){ return w.pitDivisionColorOr ? w.pitDivisionColorOr(c) : ''; }
   function shopClosed(iso){ try { return !!(w.PitCal && w.PitCal.isClosed && w.PitCal.isClosed(iso)); } catch(e){ return false; } }
 
   /* 「いま盤面にいる車」＝廃車・キャンセル・売上なし・アーカイブ・返車済みを除いたもの。
@@ -993,6 +1006,14 @@
           f.div   = divLabel(c);
           f.amount = amountOf(c);
           f.resNo = t(c.resNo);
+          /* 🔴 v1.168.0 担当（フロント）。空なら「担当なし」と言い切る
+             ＝ 空欄で黙るより「決まっていない」と分かるほうが動ける。 */
+          f.staff      = staffOf(c);
+          f.staffColor = staffColorOf(c);
+          /* 車検の所見だけ、回送の担当も一緒に出す（フロントとは別の人） */
+          if (f.cat === 'shaken' && isShaken(c)){
+            f.staff2 = w.pitShakenStaffCall ? w.pitShakenStaffCall(c) : shakenStaff(c);
+          }
         } else if (!f.name) { f.name = '（カードなし）'; }
       } else {
         var v = vehIds[f.refId];
@@ -1065,7 +1086,8 @@
         return {
           規則: f.ruleId, 重さ: f.level, 分類: f.cat, 見出し: f.title,
           対象: f.kind, id: f.refId, お客様: f.name, 車: f.car || '', ナンバー: f.plate || '',
-          予約番号: f.resNo || '', 状態: f.state || '', 課: f.div || '', 金額: f.amount || 0,
+          予約番号: f.resNo || '', 状態: f.state || '', 課: f.div || '',
+          担当: f.staff || '', 車検担当: f.staff2 || '', 金額: f.amount || 0,
           中身: f.text, 札: f.mark || ''
         };
       })

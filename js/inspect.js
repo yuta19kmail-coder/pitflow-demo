@@ -167,9 +167,22 @@
     if (f.amount) sub.push(man(f.amount));
     if (f.resNo) sub.push('No.' + esc(f.resNo));
 
+    /* 🔴 v1.168.0（ゆうた指定）**担当をお客様名のとなりに出す。**
+       ・色は課の色（規則表が渡してくる `staffColor`）。⚠ ここで色を綴らない
+       ・決まっていなければ「担当なし」＝黙らずに、決まっていないことを言う
+       ・車検の所見は**回送の担当**も足す（フロントとは別の人） */
+    var badge = '';
+    if (f.kind === 'card'){
+      badge = f.staff
+        ? '<span class="ins-who-st" style="--ins-s:' + (f.staffColor || 'var(--text3)') + '">' + esc(f.staff) + '</span>'
+        : '<span class="ins-who-st none">担当なし</span>';
+      if (f.staff2) badge += '<span class="ins-who-st2">車検 ' + esc(f.staff2) + '</span>';
+      else if (f.cat === 'shaken') badge += '<span class="ins-who-st2 none">車検担当なし</span>';
+    }
+
     var h = '<div class="ins-row' + (f.mark ? ' done' : '') + '">'
           +   '<div class="ins-row-m">'
-          +     '<div class="ins-row-who">' + who + (mk ? '<span class="ins-badge">' + esc(mk.label) + '</span>' : '') + '</div>'
+          +     '<div class="ins-row-who">' + who + badge + (mk ? '<span class="ins-badge">' + esc(mk.label) + '</span>' : '') + '</div>'
           +     (sub.length ? '<div class="ins-row-sub">' + sub.join('　/　') + '</div>' : '')
           +     '<div class="ins-row-txt">' + esc(f.text) + '</div>'
           +   '</div>'

@@ -91,3 +91,12 @@
 .ins-more{ display:block; width:100%; border:0; border-top:1px solid var(--border);
   background:var(--bg); color:var(--text3); padding:7px 12px; font-size:11px; cursor:pointer; }
 .ins-more:hover{ background:var(--bg3); color:var(--text); }
+
+/* 🔴 担当バッジ（v1.168.0・ゆうた指定「担当者をそれぞれ記載してほしい」）
+   ⚠ 色は JS が `--ins-s` で渡す（課の色。課が空ならグレー）。ここに色を書き写さない。 */
+.ins-who-st{ font-size:10px; font-weight:700; color:var(--ins-s); border:1px solid var(--ins-s);
+  border-radius:999px; padding:1px 8px; white-space:nowrap; }
+.ins-who-st.none{ color:var(--text3); border-color:var(--border); font-weight:400; }
+.ins-who-st2{ font-size:10px; font-weight:700; color:var(--text2); background:var(--bg3);
+  border:1px solid var(--border); border-radius:999px; padding:1px 8px; white-space:nowrap; }
+.ins-who-st2.none{ color:var(--text3); font-weight:400; }

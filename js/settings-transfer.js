@@ -22,7 +22,7 @@
 (function () {
   'use strict';
 
-  var KEYS = ['settings', 'bays', 'floorPlan', 'aiVerdicts', 'boardLabels'];
+  var KEYS = ['settings', 'bays', 'floorPlan', 'aiVerdicts', 'boardLabels', 'inspectMarks', 'inspectMutes'];
 
   function payload() {
     var out = { _kind: 'pitflow-settings', _v: 1, _at: new Date().toISOString() };

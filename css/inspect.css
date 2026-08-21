@@ -1,0 +1,93 @@
+/* ========================================
+   inspect.css  -  🩺 点検（健康診断）  PitFlow v1.168.0
+   ⚠ 重さの色（要対応・確認・気づき）は **JS の表から `--ins-c` で渡ってくる**。
+      ここに色を書き写さないこと（表を直しても片方だけ古くなる）。
+   ======================================== */
+#inspect-body{ padding:2px 2px 60px; }
+
+/* ── 上の帯 ── */
+.ins-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:2px 2px 12px; }
+.ins-when{ font-size:12px; color:var(--text3); }
+.ins-when b{ color:var(--text); font-size:13px; }
+.ins-actions{ margin-left:auto; display:inline-flex; gap:6px; }
+.ins-btn{ border:1px solid var(--border); background:var(--bg3); color:var(--text); padding:6px 14px;
+  border-radius:8px; font-size:12px; cursor:pointer; }
+.ins-btn:hover{ border-color:var(--brand,#1f7a4d); }
+
+/* ── 重さのタイル ── */
+.ins-tiles{ display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; margin:0 2px 12px; }
+.ins-tile{ flex:0 0 auto; min-width:150px; text-align:left; cursor:pointer;
+  border:1px solid var(--border); border-left:4px solid var(--ins-c); background:var(--bg2);
+  border-radius:10px; padding:8px 14px; display:flex; flex-direction:column; gap:1px; }
+.ins-tile:hover{ background:var(--bg3); }
+.ins-tile.on{ border-color:var(--ins-c); box-shadow:0 0 0 1px var(--ins-c) inset; }
+.ins-tile-n{ font-size:22px; font-weight:800; color:var(--ins-c); line-height:1.1; }
+.ins-tile-l{ font-size:13px; font-weight:700; color:var(--text); }
+.ins-tile-note{ font-size:10px; color:var(--text3); }
+.ins-tile-sum{ align-self:center; font-size:12px; color:var(--text3); margin-left:4px; }
+.ins-tile-sum b{ color:var(--text2); }
+
+/* ── 分類のタブ ── */
+.ins-bar{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:0 2px 14px; }
+.ins-tab{ border:1px solid var(--border); background:var(--bg2); color:var(--text2);
+  padding:5px 12px; border-radius:999px; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+.ins-tab:hover{ background:var(--bg3); }
+.ins-tab.on{ background:var(--bg3); color:var(--text); border-color:var(--brand,#1f7a4d); font-weight:700; }
+.ins-tab-n{ font-size:10px; color:var(--text3); background:var(--bg); border-radius:999px; padding:0 6px; }
+.ins-chk{ margin-left:auto; font-size:12px; color:var(--text3); display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+
+/* ── 何も無い時 ── */
+.ins-ok{ border:1px solid var(--border); border-radius:12px; background:var(--bg2); padding:28px;
+  text-align:center; display:flex; flex-direction:column; gap:6px; }
+.ins-ok b{ font-size:15px; }
+.ins-ok span{ font-size:12px; color:var(--text3); }
+.ins-empty{ color:var(--text3); padding:24px; }
+
+/* ── 規則ごとのかたまり ── */
+.ins-g{ border:1px solid var(--border); border-left:4px solid var(--ins-c); border-radius:10px;
+  background:var(--bg2); margin:0 2px 10px; overflow:hidden; }
+.ins-g-h{ display:flex; align-items:center; gap:10px; padding:9px 12px; cursor:pointer; }
+.ins-g-h:hover{ background:var(--bg3); }
+.ins-g-lv{ font-size:10px; font-weight:800; color:var(--ins-c); border:1px solid var(--ins-c);
+  border-radius:999px; padding:1px 8px; white-space:nowrap; }
+.ins-g-t{ font-size:13px; font-weight:700; color:var(--text); flex:1; min-width:0; }
+.ins-g-cat{ font-size:10px; color:var(--text3); border:1px solid var(--border); border-radius:999px; padding:1px 8px; white-space:nowrap; }
+.ins-g-n{ font-size:12px; font-weight:700; color:var(--text2); white-space:nowrap; }
+.ins-g-x{ font-size:11px; color:var(--text3); width:12px; text-align:center; }
+
+.ins-g-why{ padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--bg);
+  font-size:11px; color:var(--text3); line-height:1.7; display:flex; flex-direction:column; gap:2px; }
+.ins-g-why b{ color:var(--text2); margin-right:6px; }
+.ins-mute{ align-self:flex-start; margin-top:5px; border:1px solid var(--border); background:var(--bg2);
+  color:var(--text3); padding:3px 10px; border-radius:8px; font-size:11px; cursor:pointer; }
+.ins-mute:hover{ color:var(--text); border-color:var(--text3); }
+
+/* ── 1件ぶんの行 ── */
+.ins-rows{ border-top:1px solid var(--border); }
+.ins-row{ display:flex; align-items:flex-start; gap:10px; padding:8px 12px; border-bottom:1px solid var(--border2,#232c34); }
+.ins-row:last-child{ border-bottom:0; }
+.ins-row:hover{ background:var(--bg3); }
+.ins-row.done{ opacity:.5; }
+.ins-row-m{ flex:1; min-width:0; }
+.ins-row-who{ font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:6px; }
+.ins-badge{ font-size:10px; font-weight:700; color:var(--text3); border:1px solid var(--border); border-radius:999px; padding:0 7px; }
+.ins-row-sub{ font-size:11px; color:var(--text3); margin-top:1px; }
+.ins-row-txt{ font-size:12px; color:var(--text2); margin-top:3px; word-break:break-all; }
+.ins-row-b{ display:inline-flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; flex:0 0 auto; }
+.ins-open{ border:1px solid var(--border); background:var(--bg3); color:var(--text); padding:4px 12px;
+  border-radius:8px; font-size:11px; cursor:pointer; white-space:nowrap; }
+.ins-open:hover{ border-color:var(--brand,#1f7a4d); }
+.ins-mk{ border:1px solid var(--border); background:transparent; color:var(--text3); padding:4px 9px;
+  border-radius:8px; font-size:11px; cursor:pointer; white-space:nowrap; }
+.ins-mk:hover{ color:var(--text); border-color:var(--text3); }
+.ins-mk.on{ background:var(--bg3); color:var(--text); border-color:var(--brand,#1f7a4d); font-weight:700; }
+
+@media (max-width: 860px){
+  .ins-row{ flex-direction:column; }
+  .ins-row-b{ justify-content:flex-start; }
+}
+
+/* 「ほか◯件を出す」＝1つの規則が多すぎる時。⚠ 黙って切り捨てず、必ず件数を出す */
+.ins-more{ display:block; width:100%; border:0; border-top:1px solid var(--border);
+  background:var(--bg); color:var(--text3); padding:7px 12px; font-size:11px; cursor:pointer; }
+.ins-more:hover{ background:var(--bg3); color:var(--text); }

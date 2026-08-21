@@ -206,10 +206,16 @@ var PIT_TIME_ALL = [
   { label: '朝一',       from: '09:00', to: '09:30' },
   { label: 'お昼',       from: '12:00', to: '13:00' },
   { label: '夕方',       from: '16:30', to: '19:00' },
-  { label: '決まり次第', unknown: true },
+  /* 🔴 v1.166.0（ゆうた報告「当日ビューの『決まり次第』が見切れる（MHSも）」）
+     `lines` ＝ **狭い枠（当日ビューの時間の列＝62px）で2段に折るときの切り方**。
+     ⚠ 5文字（決まり次第・勝手に取る）は 15px だと **76px** 必要で、**14px はみ出して隠れていた**。
+     🔴 **切る場所は人がここに書く。機械に切らせない。**
+        `lines` を書いていない言葉（レッカー・鍵ポスト・朝一…）は**今までどおり切らない**。
+     ⚠ ここに書けば PitFlow と MHS の両方が同じ切り方になる（MHS はこの表を借りている）。 */
+  { label: '決まり次第', unknown: true, lines: ['決まり', '次第'] },
   { label: 'レッカー',   unknown: true },
   { label: '鍵ポスト',   unknown: true, intakeOnly: true },
-  { label: '勝手に取る', unknown: true, returnOnly: true },
+  { label: '勝手に取る', unknown: true, returnOnly: true, lines: ['勝手に', '取る'] },
   { label: '未定',       unknown: true, tbd: true }
 ];
 w.PIT_TIME_ALL = PIT_TIME_ALL;
@@ -312,13 +318,19 @@ w.pitTimeMin = pitTimeMin;
      ・範囲（09:00-10:00 / 9:00〜10:00 …）… `['09:00','〜','10:00']` の3つ
      ・それ以外（09:00・AM・レッカー・空）… そのまま1つ（言葉は切らない）
    ⚠ 返り値は**必ず配列**。呼ぶ側は length>1 のときだけ小さく組む。 */
-function pitTimeLines(v){
+function pitTimeParts(v){
   var s = String(v == null ? '' : v).trim();
-  if (!s) return [];
+  if (!s) return { kind: 'one', lines: [] };
   var m = s.match(/^(\d{1,2}:\d{2})\s*[-–—~〜～ー]\s*(\d{1,2}:\d{2})$/);
-  if (m) return [m[1], '〜', m[2]];
-  return [s];
+  if (m) return { kind: 'range', lines: [m[1], '〜', m[2]] };
+  /* 🔴 v1.166.0 表に「2段の切り方」が書いてある言葉だけ折る。書いていなければ切らない。 */
+  var q = pitTimeQuick(s);
+  if (q && Array.isArray(q.lines) && q.lines.length > 1) return { kind: 'word2', lines: q.lines.slice() };
+  return { kind: 'one', lines: [s] };
 }
+w.pitTimeParts = pitTimeParts;
+/* 前からある呼び方（配列だけ返す）。中身は上と同じ1本。 */
+function pitTimeLines(v){ return pitTimeParts(v).lines; }
 w.pitTimeLines = pitTimeLines;
 
 /* ===================================================================

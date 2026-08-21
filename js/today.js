@@ -581,10 +581,18 @@ function todayRow(c, isReturn, inBreak){
 
   /* 🔴 v1.104.0（ゆうた指定）**時間帯（09:00-10:00）は3段に折る。**
      時間の列は 62px しかなく、1行だと右がはみ出て隠れていた。折る判断は pitTimeLines 1本。 */
-  const tLines = window.pitTimeLines ? pitTimeLines(time) : (time ? [time] : []);
-  const timeHtml = (tLines.length > 1)
-    ? '<div class="tr-time is-range">' + tLines.map((x,i) => '<span class="tt-l' + (i===1 ? ' tt-sep' : '') + '">' + _todEsc(x) + '</span>').join('') + '</div>'
-    : '<div class="tr-time">' + _todEsc(tLines[0] || '') + '</div>';
+  /* 🔴 v1.166.0（ゆうた報告）**言葉が長い時（決まり次第・勝手に取る）は2段に折る。**
+     ⚠ 62px の列に 5文字は入らず、**担当バッジの下に潜って見切れていた**。
+     🔴 折るかどうかも切り方も pit-share.js の `pitTimeParts` 1本（表に書いた切り方だけ）。
+     ⚠ 真ん中の「〜」を小さい灰色にするのは**時間帯（range）の時だけ**。
+        言葉の2段（word2）で同じ印を付けると、2つ目の言葉が小さい灰色になってしまう。 */
+  const tp = window.pitTimeParts ? pitTimeParts(time)
+           : { kind: (time ? 'one' : 'one'), lines: (time ? [time] : []) };
+  const timeHtml = (tp.lines.length > 1)
+    ? '<div class="tr-time ' + (tp.kind === 'range' ? 'is-range' : 'is-word2') + '">'
+      + tp.lines.map((x,i) => '<span class="tt-l' + (tp.kind === 'range' && i === 1 ? ' tt-sep' : '') + '">' + _todEsc(x) + '</span>').join('')
+      + '</div>'
+    : '<div class="tr-time">' + _todEsc(tp.lines[0] || '') + '</div>';
 
   /* 🆕 v1.149.0（ゆうた指定）**未完**＝盤面のまま確定返車日だけ入っている車。
      返車の列にグレーで出す（返す日は決まっているが、まだ作業も完TELも終わっていない）。

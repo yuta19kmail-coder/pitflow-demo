@@ -85,8 +85,11 @@
          +   '<span class="ins-tile-note">' + esc(l.note) + '</span>'
          + '</button>';
     });
+    /* 🔴 v1.168.1 札の言葉は**表から並べる**（ここで綴ると、言い換えた時に片方だけ古くなる。
+       実際 v1.168.1 でボタンを「これでOK」にした時、ここだけ「仕様」のまま残っていた）。 */
     h += '<div class="ins-tile-sum">'
-       +   '片づけた（見た・仕様・直した）<b>' + res.marked + '</b>件'
+       +   '片づけた（' + markDefs().map(function(m){ return esc(m.label); }).join('・') + '）'
+       +   '<b>' + res.marked + '</b>件'
        + '</div>';
     h += '</div>';
 

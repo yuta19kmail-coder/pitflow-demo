@@ -60,7 +60,8 @@ function _resultMonthCells(y, mo){
 
     visible.forEach(function(c){
       const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';   // 国産緑/輸入ピンク
-      const nm = (window.pitSurname ? pitSurname(c.customer) : (c.customer || '')) || '（未入力）';
+      /* 🔴 v1.162.0 お名前は pitCustSurname の1本（漢字が無ければカナ）。ここは直に組み立てていた。 */
+      const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
       const _wid = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
       const wt = state.workTypes.find(function(w){ return w.id === _wid; });
       let side = '';
@@ -102,7 +103,8 @@ window.pitResultDayPopup = function(dateStr){
   const dow = '日月火水木金土'[d.getDay()];
   const head = (d.getMonth() + 1) + '月' + d.getDate() + '日（' + dow + '）　実績　' + cards.length + '件';
   const body = cards.length
-    ? cards.map(function(c){ return (typeof cardHtml === 'function') ? cardHtml(c, { compact: true }) : ('<div>' + (c.customer || '') + '</div>'); }).join('')
+    ? cards.map(function(c){ return (typeof cardHtml === 'function') ? cardHtml(c, { compact: true })
+        : ('<div>' + ((window.pitCustName ? pitCustName(c) : (c.customer || '')) || '') + '</div>'); }).join('')
     : '<div class="pdp-empty">実績はありません</div>';
   back.innerHTML = '<div class="pdp-box"><div class="pdp-head"><span>' + head + '</span><button class="pdp-x" onclick="pitReserveDayPopClose()"><i data-ic=close data-ics=16></i></button></div>'
     + '<div class="pdp-list" onclick="pitReserveDayPopClose()">' + body + '</div></div>';

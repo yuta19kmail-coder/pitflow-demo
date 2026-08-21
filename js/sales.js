@@ -12,14 +12,27 @@
 (function(){
   'use strict';
 
+  /* 🔴 v1.167.0（ゆうた指定 2026-08-21）**「確定」から「実績待」を切り出して6区分にした。**
+     🗣「実際にはここには**完了してるけど返車してないだけ**と**完了してないこれから作業する**が混ざっちゃってる」
+     ⚠ **区分に入るかどうかを決めるのは sales-count.js の `pitSalesTier` 1本。**
+        ここは**名前・色・説明**を持つだけ。条件をここに書かないこと。
+     ⚠ 並びは**確からしい順**。画面はこの表の順に出す（表を並べ替えれば画面もそろって変わる）。 */
   var TIERS = [
-    { id:'actual',    label:'実績', color:'#1db97a', note:'返車済み（確定売上）' },
-    { id:'confirmed', label:'確定', color:'#2563eb', note:'パーツ待ち以降・受注済（返車予定日がこの月）' },
-    { id:'planned',   label:'予定', color:'#38bdf8', note:'連絡中・見積提示済（返車予定日がこの月）' },
-    { id:'prospect',  label:'見込', color:'#f59e0b', note:'入庫済・受注前（返車予定日がこの月・概算）' },
-    { id:'forecast',  label:'予測', color:'#9ca3af', note:'未入庫予約・返車予定がこの月（概算）' }
+    { id:'actual',     label:'実績',   color:'#1db97a', note:'返車済み（実績カレンダーに入った・確定売上）' },
+    { id:'actualWait', label:'実績待', color:'#14b8a6', note:'作業完了・返車待ち（実績カレンダーにはまだ入っていない）' },
+    { id:'confirmed',  label:'確定',   color:'#2563eb', note:'受注済・これから作業する（返車予定日がこの月）' },
+    { id:'planned',    label:'予定',   color:'#38bdf8', note:'連絡中・見積提示済（返車予定日がこの月）' },
+    { id:'prospect',   label:'見込',   color:'#f59e0b', note:'入庫済・受注前（返車予定日がこの月・概算）' },
+    { id:'forecast',   label:'予測',   color:'#9ca3af', note:'未入庫予約・返車予定がこの月（概算）' }
   ];
   var TIER_BY = {}; TIERS.forEach(function(t){ TIER_BY[t.id] = t; });
+  /* 🔴 v1.167.0 「ぜんぶ」「ほぼ確実」「確度高」の3つも**ここ1本**。
+     ⚠ 画面ごとに `['actual','confirmed',…]` と並べ直さないこと（区分を足した時に必ず取りこぼす）。 */
+  var TIER_IDS  = TIERS.map(function(t){ return t.id; });          /* ぜんぶ＝着地見込み */
+  var TIER_NEAR = ['actual','actualWait'];                          /* 実績見込み＝もう作業は終わっている */
+  var TIER_HIGH = ['actual','actualWait','confirmed'];              /* 確度高＝受注まで済んでいる */
+  /* フロント別の表に出す区分（台数の多い順ではなく、確からしい順） */
+  var TIER_FRONT = ['actual','actualWait','confirmed','planned'];
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
   function num(v){ v = +v; return isFinite(v) ? v : 0; }
@@ -48,8 +61,17 @@
     if (!tier) return null;
     return inRange(c, moS, moE, todayStr) ? tier : null;
   }
+  /* 🔴 v1.167.0（ゆうた指定）**実績と実績待は、同じ拾い方にする。**
+     ＝ `pitFinalAmountOf`（pit-share.js の1本）＝**確定 → 受注 → 見積 → 概算**。
+     ◎なぜ
+       実績待は**完TELを通っていて確定金額が入っている**ことが多い。
+       実績化のときと同じ順で拾えば、**実績になった瞬間に数字が動かない**。
+     ⚠ 拾う順をここに書き写さないこと（実績化の窓と食い違う）。 */
   function amtOf(c, tier){
-    if (tier==='actual')    return num(c.amountFinal)||num(c.amountOrder)||estA(c);
+    if (tier==='actual' || tier==='actualWait'){
+      return window.pitFinalAmountOf ? num(pitFinalAmountOf(c))
+           : (num(c.amountFinal)||num(c.amountOrder)||num(c.amountQuote)||estA(c));
+    }
     if (tier==='confirmed') return num(c.amountOrder)||num(c.amountFinal)||num(c.amountQuote)||estA(c);
     if (tier==='planned')   return num(c.amountQuote)||estA(c);
     return estA(c);   // prospect / forecast ＝概算
@@ -65,7 +87,7 @@
     ['div1','div2'].forEach(function(k){ TIERS.forEach(function(t){ byCourse[k][t.id]={sum:0,count:0}; }); });
     var lastDay = pd(moE).getDate();
     var dayActual = []; for (var i=0;i<=lastDay;i++) dayActual[i]=0;   // 1..lastDay
-    var fronts = {};   // frontStaff -> {actual,confirmed,planned,count}
+    var fronts = {};   // frontStaff -> { 区分ごとの金額 … , count }（区分は TIER_FRONT）
     (state.cards||[]).forEach(function(c){
       var tier = tierOf(c, moS, moE, todayStr); if (!tier) return;
       var amt = amtOf(c, tier);
@@ -75,9 +97,10 @@
         var d = countDate(c); var dd = pd(d).getDate();
         if (dd>=1 && dd<=lastDay) dayActual[dd] += amt;
       }
-      if (tier==='actual' || tier==='confirmed' || tier==='planned'){
+      /* 🔴 v1.167.0 フロント別にも**実績待**の列を足した（区分は TIER_FRONT 1本） */
+      if (TIER_FRONT.indexOf(tier) >= 0){
         var fn = (c.frontStaff||c.staff||'（未割当）');
-        if (!fronts[fn]) fronts[fn] = { actual:0, confirmed:0, planned:0, count:0 };
+        if (!fronts[fn]){ fronts[fn] = { count:0 }; TIER_FRONT.forEach(function(id){ fronts[fn][id]=0; }); }
         fronts[fn][tier] += amt; fronts[fn].count++;
       }
     });
@@ -232,8 +255,9 @@
     var data = collectMonth(moS, moE);
     var t = data.tiers;
     var tg = target();
-    var landing = sumTiers(t, ['actual','confirmed','planned','prospect','forecast']);
-    var committed = sumTiers(t, ['actual','confirmed']);
+    var landing   = sumTiers(t, TIER_IDS);    /* 着地見込み＝ぜんぶ */
+    var nearSure  = sumTiers(t, TIER_NEAR);   /* 🆕 v1.167.0 実績見込み＝実績＋実績待（もう作業は終わっている） */
+    var committed = sumTiers(t, TIER_HIGH);   /* 確度高＝＋確定（受注まで済んでいる） */
     var actual = t.actual.sum;
 
     // 今日の位置（当月なら本日まで／過去月は満了／未来月は0）
@@ -251,8 +275,14 @@
     h += '<div class="sv-hero-row">';
     h += '<div class="sv-hero-main"><div class="sv-hero-lb">実績（返車済み）</div><div class="sv-hero-num" style="color:#1db97a">'+man(actual)+'<span>円</span></div>'
        + '<div class="sv-hero-sub">目標 '+man(tg.min)+'〜'+man(tg.max)+' ／ 達成率 <b>'+(tg.min>0?Math.round(actual/tg.min*100):0)+'%</b>（最低比）</div></div>';
+    /* 🔴 v1.167.0（ゆうた指定「両方並べる」）
+       ・**実績見込み**（実績＋実績待）＝**作業は終わっているので、ほぼこの額は入る**
+       ・**確度高**（＋確定）＝受注まで済んでいる分も入れた額 */
     h += '<div class="sv-hero-main"><div class="sv-hero-lb">着地見込み（実績＋パイプライン）</div><div class="sv-hero-num" style="color:'+(landing>=tg.min?'#1db97a':'#f59e0b')+'">'+man(landing)+'<span>円</span></div>'
-       + '<div class="sv-hero-sub">確度高（実績＋確定）だけで <b>'+man(committed)+'</b></div></div>';
+       + '<div class="sv-hero-sub sv-hero-sub2">'
+       + '<span>実績見込み（実績＋実績待）<b style="color:#14b8a6">'+man(nearSure)+'</b></span>'
+       + '<span>確度高（＋確定）<b style="color:#2563eb">'+man(committed)+'</b></span>'
+       + '</div></div>';
     if (isThis && todayIdx>0){
       var pc = pacePct>=100?'ok':(pacePct>=85?'near':'warn');
       h += '<div class="sv-hero-pace sv-pace-'+pc+'"><div class="sv-hero-lb">本日ペース</div><div class="sv-hero-num">'+pacePct+'<span>%</span></div><div class="sv-hero-sub">'+man(actual)+' / ペース目安 '+man(paceTarget)+'</div></div>';
@@ -281,11 +311,11 @@
     h += '</div>';
 
     // 課別（1課/2課）
-    var scaleC = Math.max(tg.max/1, sumTiers(data.byCourse.div1,['actual','confirmed','planned','prospect','forecast']), sumTiers(data.byCourse.div2,['actual','confirmed','planned','prospect','forecast']),1);
+    var scaleC = Math.max(tg.max/1, sumTiers(data.byCourse.div1,TIER_IDS), sumTiers(data.byCourse.div2,TIER_IDS),1);
     h += '<div class="sv-courses">';
     [{id:'div1',label:'1課',team:'<i data-ic=car data-ics=16></i> 国産',color:'#1db97a'},{id:'div2',label:'2課',team:'<i data-ic=globe data-ics=16></i> 輸入',color:'#ec4899'}].forEach(function(d){
       var cc=data.byCourse[d.id];
-      var cLanding=sumTiers(cc,['actual','confirmed','planned','prospect','forecast']);
+      var cLanding=sumTiers(cc,TIER_IDS);
       h += '<div class="sv-course" style="--cc:'+d.color+'">';
       h += '<div class="sv-course-h"><span class="sv-course-pill" style="background:'+d.color+'">'+d.label+'</span><span class="sv-course-team">'+d.team+'</span><span class="sv-course-land">着地 '+man(cLanding)+'</span></div>';
       h += miniStack(cc, scaleC);
@@ -307,13 +337,26 @@
       + '<div class="sv-tier-num">'+big+'</div><div class="sv-tier-note">'+esc(note)+'</div></div>';
   }
 
+  /* 🔴 v1.167.0 列は TIER_FRONT（実績・実績待・確定・予定）1本から作る。
+     ⚠ 見出しも色も**区分の表から引く**＝区分を足した時にここが取りこぼさない。 */
   function frontTable(fronts){
-    var rows = Object.keys(fronts).map(function(k){ var f=fronts[k]; return { name:k, actual:f.actual, confirmed:f.confirmed, planned:f.planned, count:f.count, total:f.actual+f.confirmed+f.planned }; });
+    var rows = Object.keys(fronts).map(function(k){
+      var f = fronts[k], o = { name:k, count:f.count, total:0 };
+      TIER_FRONT.forEach(function(id){ o[id] = f[id]||0; o.total += o[id]; });
+      return o;
+    });
     rows.sort(function(a,b){ return b.actual-a.actual || b.total-a.total; });
-    var h = '<div class="sv-card"><div class="sv-card-h"><span><i data-ic=user data-ics=16></i> フロント別（実績・確定・予定）</span></div>';
+    var labels = TIER_FRONT.map(function(id){ return TIER_BY[id].label; });
+    var h = '<div class="sv-card"><div class="sv-card-h"><span><i data-ic=user data-ics=16></i> フロント別（'+labels.join('・')+'）</span></div>';
     if (!rows.length){ h += '<div class="sv-empty">対象データがありません</div></div>'; return h; }
-    h += '<table class="sv-table"><thead><tr><th>フロント</th><th>実績</th><th>確定</th><th>予定</th><th>台数</th></tr></thead><tbody>';
-    rows.forEach(function(r){ h += '<tr><td class="sv-td-name">'+esc(r.name)+'</td><td class="sv-num" style="color:#1db97a">'+man(r.actual)+'</td><td class="sv-num" style="color:#2563eb">'+man(r.confirmed)+'</td><td class="sv-num" style="color:#38bdf8">'+man(r.planned)+'</td><td class="sv-num">'+r.count+'</td></tr>'; });
+    h += '<table class="sv-table"><thead><tr><th>フロント</th>'
+       + TIER_FRONT.map(function(id){ return '<th>'+TIER_BY[id].label+'</th>'; }).join('')
+       + '<th>台数</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      h += '<tr><td class="sv-td-name">'+esc(r.name)+'</td>'
+         + TIER_FRONT.map(function(id){ return '<td class="sv-num" style="color:'+TIER_BY[id].color+'">'+man(r[id])+'</td>'; }).join('')
+         + '<td class="sv-num">'+r.count+'</td></tr>';
+    });
     h += '</tbody></table></div>';
     return h;
   }
@@ -404,7 +447,7 @@
   function qAlloc(y, m1){ if (window.pitQAlloc){ try{ return pitQAlloc(y, m1); }catch(e){} } return null; }
   function pct(a,b){ return b>0?Math.round(a/b*100):0; }
 
-  // ================= クォーター：当月（月4分割＋6区分・翌Qリミット） =================
+  // ================= クォーター：当月（月4分割＋確度の区分・翌Qリミット） =================
   function qWindow(y,m,qi){ var last=new Date(y,m+1,0).getDate(); var rr=[[1,7],[8,15],[16,23],[24,last]][qi]; return { s:ymdL(new Date(y,m,rr[0])), e:ymdL(new Date(y,m,rr[1])), f:rr[0], t:rr[1] }; }
   function nextQEnd(y,m,qi){ if(qi<3) return qWindow(y,m,qi+1).e; var nm=new Date(y,m+1,1); return qWindow(nm.getFullYear(),nm.getMonth(),0).e; }
   /* 🔴 v1.61.0 区分と「数える日」は物差し（sales-count.js）から。ここはクォーターの窓に当てはめるだけ。
@@ -433,7 +476,7 @@
     var qw=qWindow(y,m,todayQ); var nqE=nextQEnd(y,m,todayQ);
     var qt={}; TIERS.forEach(function(t){ qt[t.id]={sum:0,count:0}; });
     (state.cards||[]).forEach(function(c){ var tr=qTierOf(c,qw.s,qw.e,nqE,todayStr); if(!tr)return; qt[tr].sum+=amtOf(c,tr); qt[tr].count++; });
-    var qLanding=sumTiers(qt,['actual','confirmed','planned','prospect','forecast']);
+    var qLanding=sumTiers(qt,TIER_IDS);
     h+='<div class="sv-hero"><div class="sv-hero-row">';
     h+='<div class="sv-hero-main"><div class="sv-hero-lb">現クォーター Q'+(todayQ+1)+'（'+qw.f+'〜'+qw.t+'日）実績</div><div class="sv-hero-num" style="color:#1db97a">'+man(qt.actual.sum)+'<span>円</span></div><div class="sv-hero-sub">Q目標 '+man(qMin[todayQ])+'〜'+man(qMax[todayQ])+'</div></div>';
     h+='<div class="sv-hero-main"><div class="sv-hero-lb">着地見込み（翌Qまで含む）</div><div class="sv-hero-num" style="color:'+(qLanding>=qMin[todayQ]?'#1db97a':'#f59e0b')+'">'+man(qLanding)+'<span>円</span></div><div class="sv-hero-sub">当月実績合計 '+man(actualM)+'</div></div>';
@@ -444,7 +487,7 @@
     TIERS.forEach(function(tt){ h+=tierCard(tt.id,tt.label,tt.color,man(qt[tt.id].sum),qt[tt.id].count+'台',tt.note); });
     h+='</div>';
     // 4Qカード＋累計
-    h+='<div class="sv-card"><div class="sv-card-h"><span><i data-ic=calendar data-ics=16></i> クォーター実績（月4分割・営業日配分）</span><span class="sv-legend"><i class="sv-lg sv-lg-actual"></i>実績累計 <i class="sv-lg sv-lg-min"></i>目標累計(最低)</span></div>'+quarterChartSvg(qAct,qMin,todayQ)+'<div class="sv-note">クォーター＝1〜7 / 8〜15 / 16〜23 / 24〜末。実績は実績カウント日で計上。上の6区分は現Qの着地見込み（確定/予定/見込/予測は返車予定日で振り分け・翌Q末までが上限）。</div></div>';
+    h+='<div class="sv-card"><div class="sv-card-h"><span><i data-ic=calendar data-ics=16></i> クォーター実績（月4分割・営業日配分）</span><span class="sv-legend"><i class="sv-lg sv-lg-actual"></i>実績累計 <i class="sv-lg sv-lg-min"></i>目標累計(最低)</span></div>'+quarterChartSvg(qAct,qMin,todayQ)+'<div class="sv-note">クォーター＝1〜7 / 8〜15 / 16〜23 / 24〜末。実績は実績カウント日で計上。上の区分は現Qの着地見込み（実績待/確定/予定/見込/予測は返車予定日で振り分け・翌Q末までが上限）。</div></div>';
     h+='<div class="sv-qcards">';
     for(i=0;i<4;i++){ var p=pct(qAct[i],qMin[i]); var pc=p>=100?'ok':(p>=85?'near':'warn');
       h+='<div class="sv-qcard'+(i===todayQ?' now':'')+'"><div class="sv-qcard-h">Q'+(i+1)+' <span>'+qs[i].f+'〜'+qs[i].t+'日</span>'+(i===todayQ?'<em>進行中</em>':'')+'</div><div class="sv-qcard-num" style="color:#1db97a">'+man(qAct[i])+'</div><div class="sv-qbar"><i class="sv-'+pc+'" style="width:'+Math.min(100,p)+'%"></i></div><div class="sv-qcard-sub">目標 '+man(qMin[i])+'〜'+man(qMax[i])+' ／ <b class="sv-'+pc+'">'+p+'%</b> ／ '+qCnt[i]+'台</div></div>';
@@ -856,7 +899,7 @@
 
 
   // ===== PDF用：現ビューのデータモデル（sales-print.js が A4ベクターPDFに描画） =====
-  function _mAll(t){ return sumTiers(t,['actual','confirmed','planned','prospect','forecast']); }
+  function _mAll(t){ return sumTiers(t,TIER_IDS); }
   function svReportModel(){
     var tab=window._svTab||'sales', yr=(window._svMode==='year'); var tg=target();
     var SLOT=[12,1,2,3,4,5,6,7,8,9,10,11];
@@ -864,13 +907,20 @@
       var ym=window._svYM; var d=collectMonth(ymdL(new Date(ym.y,ym.m,1)),ymdL(new Date(ym.y,ym.m+1,0))); var t=d.tiers;
       var tierRows=[['目標',man(tg.min)+'〜'+man(tg.max),'']].concat(TIERS.map(function(x){return [x.label,man(t[x.id].sum),t[x.id].count+'台'];}));
       var courseRows=[]; [['div1','1課(国産)'],['div2','2課(輸入)']].forEach(function(c){ var cc=d.byCourse[c[0]]; courseRows.push([c[1]].concat(TIERS.map(function(x){return man(cc[x.id].sum);})).concat([man(_mAll(cc))])); });
-      var frontRows=Object.keys(d.fronts).map(function(n){var f=d.fronts[n];return {n:n,a:f.actual,c:f.confirmed,p:f.planned};}).sort(function(a,b){return b.a-a.a;}).map(function(r){return [r.n,man(r.a),man(r.c),man(r.p)];});
+      /* 🔴 v1.167.0 紙も画面と同じ区分（TIER_FRONT）から作る。ここで列を書き並べない。 */
+      var frontRows=Object.keys(d.fronts).map(function(n){ var f=d.fronts[n];
+        return { n:n, a:(f.actual||0), cells:TIER_FRONT.map(function(id){ return man(f[id]||0); }) }; })
+        .sort(function(a,b){return b.a-a.a;}).map(function(r){ return [r.n].concat(r.cells); });
       return { title:'売上サマリー', period:ym.y+'年'+(ym.m+1)+'月',
-        kpis:[{label:'実績（返車済）',value:man(t.actual.sum)},{label:'着地見込み',value:man(_mAll(t))},{label:'月目標',value:man(tg.min)+'〜'+man(tg.max)}],
+        kpis:[{label:'実績（返車済）',value:man(t.actual.sum)},{label:'実績見込み（＋実績待）',value:man(sumTiers(t,TIER_NEAR))},{label:'着地見込み',value:man(_mAll(t))},{label:'月目標',value:man(tg.min)+'〜'+man(tg.max)}],
         sections:[
           {type:'table',title:'確度別',head:['区分','金額','台数'],rows:tierRows,align:['l','r','r']},
-          {type:'table',title:'課別（実績/確定/予定/見込/予測/着地）',head:['課','実績','確定','予定','見込','予測','着地'],rows:courseRows,align:['l','r','r','r','r','r','r']},
-          {type:'table',title:'フロント別（実績/確定/予定）',head:['フロント','実績','確定','予定'],rows:frontRows,align:['l','r','r','r']}
+          {type:'table',title:'課別（'+TIERS.map(function(x){return x.label;}).join('/')+'/着地）',
+           head:['課'].concat(TIERS.map(function(x){return x.label;})).concat(['着地']),
+           rows:courseRows,align:['l'].concat(TIERS.map(function(){return 'r';})).concat(['r'])},
+          {type:'table',title:'フロント別（'+TIER_FRONT.map(function(id){return TIER_BY[id].label;}).join('/')+'）',
+           head:['フロント'].concat(TIER_FRONT.map(function(id){return TIER_BY[id].label;})),
+           rows:frontRows,align:['l'].concat(TIER_FRONT.map(function(){return 'r';}))}
         ]};
     }
     if(tab==='sales' && yr){

@@ -18,7 +18,7 @@
      | 状態 | 数える日 |
      |---|---|
      | 実績（返車済み） | **実績カウント日 `completedAt`**（無ければ確定返車日→返車日） |
-     | 進行中（受注済・見積提示済・入庫済） | **返車予定日 `returnDate`** |
+     | 実績待・進行中（作業完了・返車待ち・受注済・見積提示済・入庫済） | **返車予定日 `returnDate`** |
      | 予約（未入庫） | **返車予定日**。無ければ **入庫予定日＋概算 預かり日数** |
 
      - **返車予定日が空（未定）＝当月に寄せる**（決まった時点で自動でその月へ移る）
@@ -27,7 +27,10 @@
 
    ◎使い方
      - `pitSalesCountDate(c)` … その車の金額を数える日（'YYYY-MM-DD'／未定は ''）
-     - `pitSalesTier(c)`      … 確度の区分（actual/confirmed/planned/prospect/forecast／対象外は null）
+     - `pitSalesTier(c)`      … 確度の区分（🔴 v1.167.0 から **6つ**）
+         `actual`（実績）/ `actualWait`（実績待）/ `confirmed`（確定）/
+         `planned`（予定）/ `prospect`（見込）/ `forecast`（予測）／対象外は null
+       ⚠ **並びは確からしい順**。画面はこの順に出す。
      - `pitSalesInRange(c, fromStr, toStr, todayStr)` … その期間に数えるか（true/false）
 
    🔴 **写しを作らないこと。** 期間で絞る集計は必ずこの3本を通す。
@@ -47,7 +50,19 @@
 (function(){
   'use strict';
 
-  var CONFIRMED = ['parts','work','workDone','outsource'];   // 受注済＝パーツ待ち以降
+  /* 🔴 v1.167.0（ゆうた指定 2026-08-21）**「確定」から「実績待」を切り出した。**
+     🗣「現状 実績→確定 のながれだが、実際にはここには
+        **完了してるけど返車してないだけ**。と**完了してないこれから作業する**。が混ざっちゃってる」
+     ＝ 直す前の「確定」は `parts / work / workDone / outsource ＋ 完TEL待ち以降` を**ひとまとめ**にしていた。
+        **作業が終わっている車**と**これから作業する車**が同じ数字に入っていて、
+        「あといくら確実に入るのか」が読めなかった。
+     🔴 これから
+        ・**実績待**＝**作業完了エリア（workDone）** または **返車カレンダーにいる（returnStage）**
+          ＝ **実績カレンダーに入っていない**（まだ `returned` ではない）
+        ・**確定**＝受注済だが**まだ作業が終わっていない**（パーツ待ち・作業待ち・外注）
+     ⚠ ここが唯一の見分け。画面ごとに `status==='workDone'` と書かないこと。 */
+  var CONFIRMED  = ['parts','work','outsource'];   // 受注済だが、まだ作業が終わっていない
+  var DONE_WORK  = ['workDone'];                   // 作業完了エリア
 
   /* ===== ⓪「売上なしでアーカイブ」した車か =====
      🔴 v1.103.0 **判定そのものは `js/pit-share.js` に移した**（MHS からも借りるため）。
@@ -125,9 +140,12 @@
     if (!c || c.status === 'scrap') return null;
     if (pitCardNoSale(c)) return null;      /* 🔴 v1.99.0 売上なし＝どの区分にも入れない */
     var st = c.status;
-    if (st === 'returned') return 'actual';                                            /* 実績＝返車済み */
+    if (st === 'returned') return 'actual';                                            /* 実績＝返車済み（実績カレンダーに入った） */
     if (st === 'reserved') return 'forecast';                                          /* 予測＝未入庫の予約 */
-    if (c.returnStage || CONFIRMED.indexOf(st) >= 0) return 'confirmed';               /* 確定＝受注済（パーツ待ち以降・完TEL待ち） */
+    /* 🔴 v1.167.0 実績待＝**作業は終わっている。あとは返すだけ。**
+       作業完了エリアにいる or 返車カレンダーにいる（完TEL待ち以降）＝実績カレンダーにはまだ入っていない。 */
+    if (DONE_WORK.indexOf(st) >= 0 || c.returnStage) return 'actualWait';
+    if (CONFIRMED.indexOf(st) >= 0) return 'confirmed';                                /* 確定＝受注済・これから作業する */
     if (st === 'contact') return 'planned';                                            /* 予定＝連絡中（見積提示済） */
     if (st === 'check' || st === 'estim') return 'prospect';                            /* 見込＝入庫済・受注前 */
     return null;

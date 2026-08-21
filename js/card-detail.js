@@ -1493,67 +1493,34 @@ function _cardMarkMisses(c, root){
      🔴 赤（必須）＝これが空だと**保存できない**（ゆうた指定 v1.76.0）
      🟡 黄（推奨）＝空でも保存できるが、**1回だけ聞く**（「入れなくてもいいが、入るのでは？」）
      -------------------------------------------------------------------
-     ◎ゆうた指定（2026-08-10）
-       ・漢字の名前＝黄／**カナ＝赤**
-       ・初回／リピーター＝赤
-       ・入庫日＝赤
-       ・入庫時間＝黄
-       ・作業内容＝黄
-       ・**国産／輸入・メーカー・車種は黄に落とす**
-       ・🔴 **TEL は 2026-08-13 に黄へ格下げ（v1.89.0・ゆうた指定）**。
-         ＝電話番号が分からなくても予約は取れる。空なら1回だけ聞いて通す。
-         ⚠ 元は赤（v1.76.0）。**戻す時はゆうたに確認してから。**
-       ・受付タイプ（預かりなど）＝赤。**赤が埋まっていなければ保存禁止＋どこがダメか伝える**
-     ⚠ 代車を「必要」にした時の3項目と、車検の諸費用は**今までどおり赤**（指定に無いので変えない）。
-     🔴 この表がこの画面の唯一の物差し。**保存の関門（_pitCardGuard）も入力チェックもここを見る。**
+     🔴🔴 v1.168.0 **表そのものは `js/card-miss.js` の `pitCardMisses` 1本に移した。**
+        ◎なぜ動かしたか
+          点検（健康診断）は**画面を開かずに全カードを見る**ので、ここに表があると
+          あちらに**写し**を作るしかなくなる。写しは必ずいつか食い違う（v1.161.0 の実話）。
+        ⚠ **項目を足す・色を変えるのは card-miss.js だけ。**ここに書き戻さないこと。
+        ⚠ ここが受け持つのは「**どの入力欄に赤枠／黄枠を塗るか**」だけ。
      =================================================================== */
-  const need = [
-    /* --- 🔴 赤（必須） --- */
-    ['kana',        'カナ',            !!(c.kana || '').trim(),                                 'red'],
-    ['repeat',      '初回／リピーター', !!(c.repeat || '').trim(),                               'red'],
-    ['reserveDate', '入庫日',          !!c.reserveDate,                                         'red'],
-    ['dropType',    '受付タイプ',      !!c.dropType,                                            'red'],
-    ['workType',    '作業タイプ',      !!c.workType || !!((c.workAddons||[]).length),           'red'],
-    /* --- 🟡 黄（入れたほうがいい） --- */
-    ['customer',    'お客様名（漢字）', !!(c.customer || '').trim(),                             'yellow'],
-    ['tel',         'TEL',             !!(c.tel || '').trim(),                                  'yellow'],
-    ['boardId',     '国産車／輸入車',  c.boardId === 'default' || c.boardId === 'import',       'yellow'],
-    ['maker',       'メーカー',        !!(c.maker || '').trim(),                                'yellow'],
-    ['car',         '車種（グレード）', !!(c.car || '').trim(),                                  'yellow'],
-    ['reserveTime', '入庫時刻',        !!(c.reserveTime || '').trim(),                          'yellow'],
-    ['menu',        '作業内容',        !!(c.menu || '').trim(),                                 'yellow'],
-  ];
-  if (c.needLoaner){
-    need.push(['loanerId',   '使用代車', !!c.loanerId,   'red']);
-    need.push(['loanerFrom', '貸出から', !!c.loanerFrom, 'red']);
-    need.push(['loanerTo',   '貸出まで', !!c.loanerTo,   'red']);
-  }
-  /* 🔴 v1.40.0（ゆうた指定）**車検の時だけ諸費用も必須**。
-     ⚠ 車検以外は今までどおり任意（入れなくても色は付かない）。
-     ⚠ 0 は「0円と決めた」ことがあるので通す＝空っぽ（未入力）だけを見る。 */
-  const _wts = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType ? [c.workType] : []);
-  if (_wts.indexOf('shaken') >= 0){
-    need.push(['feeAmount', '諸費用（車検）', !(c.feeAmount == null || c.feeAmount === ''), 'red']);
-  }
+  const m    = window.pitCardMisses ? pitCardMisses(c) : { need: [], keys: [], red: [], yellow: [] };
+  const need = m.need;
+
   // 代車を「不要」にした時・車検を外した時など、対象外になったキーの色は消す
-  const activeKeys = need.map(n => n[0]);
-  ['loanerId', 'loanerFrom', 'loanerTo', 'feeAmount'].forEach(function (k){
-    if (activeKeys.indexOf(k) < 0){
+  (window.PIT_MISS_OPTIONAL || []).forEach(function (k){
+    if (m.keys.indexOf(k) < 0){
       const el = root.querySelector('[data-key="' + k + '"]');
       if (el) { el.classList.remove('cf-miss'); el.classList.remove('cf-warn'); }
     }
   });
-  const red = [], yellow = [];
   need.forEach(function (n) {
-    const el   = root.querySelector('[data-key="' + n[0] + '"]');
-    const isRed = (n[3] !== 'yellow');
+    const el    = root.querySelector('[data-key="' + n.key + '"]');
+    const isRed = (n.lv !== 'yellow');
     // 未入力→枠を付ける／入力済→外す。toggle(force)なので既に付いている項目は再アニメしない（入力中のチラつき防止）
     if (el){
-      el.classList.toggle('cf-miss', isRed  && !n[2]);   /* 赤 */
-      el.classList.toggle('cf-warn', !isRed && !n[2]);   /* 黄 */
+      el.classList.toggle('cf-miss', isRed  && !n.ok);   /* 赤 */
+      el.classList.toggle('cf-warn', !isRed && !n.ok);   /* 黄 */
     }
-    if (!n[2]) (isRed ? red : yellow).push(n[1]);
   });
+  const red    = m.red.map(function (n) { return n.label; });
+  const yellow = m.yellow.map(function (n) { return n.label; });
   return { red: red, yellow: yellow, all: red.concat(yellow) };
 }
 

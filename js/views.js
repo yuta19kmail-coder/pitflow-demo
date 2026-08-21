@@ -62,6 +62,7 @@ function showView(viewId){
   if (viewId === 'shakencal' && window.renderShaken) renderShaken();
   if (viewId === 'shakenlog' && window.renderShakenLog) renderShakenLog();
   if (viewId === 'sales' && window.renderSales) renderSales();
+  if (viewId === 'inspect' && window.renderInspect) renderInspect();   // 🩺 v1.168.0 点検（健康診断）
   if (viewId === 'worksum' && window.renderWorkSummary) renderWorkSummary();   // <i data-ic=user data-ics=16></i> 作業サマリー（v0.129.0）
   if (viewId === 'parking' && window.renderParking) renderParking();
   if (viewId === 'fleet' && window.renderFleet) renderFleet();

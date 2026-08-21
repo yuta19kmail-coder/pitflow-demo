@@ -86,6 +86,9 @@
       office:'', boardId: board, division: div,
       frontStaff: front, staff: rnd(MECH[div]),
       workType: wt, workAddons: [], menu: MENU[wt] || '整備', dropType: dt,
+      /* 🔴 v1.168.0 保存の関門で必須のもの（card-miss.js の🔴赤）。見本にも入れる */
+      repeat: (Math.random() < 0.75 ? 'repeat' : 'first'),
+      feeAmount: (wt === 'shaken') ? (35000 + Math.floor(Math.random() * 41) * 1000) : null,
       reserveDate: date, reserveTime: rndTime(),
       returnDate: '', returnTime: '', status: status,
       bayId: null, needLoaner: false, loanerId:'', loanerFrom:'', loanerTo:'', loanerFixed:false,
@@ -199,8 +202,9 @@
           c.status = 'reserved'; c.returnDate = retStr; c.returnTbd = false;
         } else if (retMs < todayMs){
           // ── 過去に返車済み＝実績（確定売上）──
-          c.status = 'returned'; c.returnDate = retStr; c.returnTime = rndTime();
-          c.completedAt = retStr; c.returnDateFinal = retStr;
+          /* 🔴 v1.168.0 返車済み＝完TELを通ってから実績（v1.97.0 の関門）。見本もその形にする */
+          c.status = 'returned'; c.returnStage = 'returnWait'; c.returnDate = retStr; c.returnTime = rndTime();
+          c.completedAt = retStr; c.returnDateFinal = retStr; c.completeCallAt = retStr;
           c.amountQuote = c.amountOrder = c.amountFinal = c.estAmount;
           // 実績の約30%に代車を付ける（新しい実績ホバー「代車 期間」の確認用）v0.120.0
           if (availLoanerIds.length && Math.random() < 0.30){
@@ -290,7 +294,7 @@
         // 日付で状態を決める（過去＝返却済み・今またぎ＝預かり中・未来＝予約）
         if (fromD.getTime() > todayMs){ c.status = 'reserved'; c.returnDate = toStr; }
         else if (toD.getTime() < todayMs){
-          c.status = 'returned'; c.returnDate = toStr; c.returnTime = rndTime(); c.completedAt = toStr; c.returnDateFinal = toStr;
+          c.status = 'returned'; c.returnStage = 'returnWait'; c.returnDate = toStr; c.returnTime = rndTime(); c.completedAt = toStr; c.returnDateFinal = toStr; c.completeCallAt = toStr;
           c.amountQuote = c.amountOrder = c.amountFinal = c.estAmount;
         } else {
           const span = Math.max(1, Math.round((toD.getTime() - fromD.getTime()) / 86400000));

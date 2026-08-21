@@ -221,6 +221,15 @@ window.state = {
   // 空のうちは計算式の仮判定（pitVerdict）がそのまま使われる
   aiVerdicts: {},
 
+  // 🩺 点検（健康診断）の札と、黙らせている規則（v1.168.0）
+  //   inspectMarks … { '規則ID:対象ID': { v:'seen'|'spec'|'fixed', at:'YYYY-MM-DD', by:'名前' } }
+  //     ⚠ もう出なくなった所見の札は、点検のたびに自動で捨てる（たまり続けないように）
+  //   inspectMutes … { '規則ID': 1 } ＝ その規則まるごと出さない（「うちはこれで正しい」時）
+  //   🔴 どちらも**全員で共有する**もの（設定と同じ場所に保存＝db-pit.js の _SETTINGS_KEYS）。
+  //      片づけたかどうかが端末ごとに違うと、同じ車を2人が別々に追いかけることになる。
+  inspectMarks: {},
+  inspectMutes: {},
+
   // 作業タイプ（2026-06-05 ゆうた確定の7種。設定画面で増減可能＝settings.workTypes に保存され、ここを上書きする）
   workTypes: [
     { id: 'shaken',  label: '車検',           color: '#ef4444' },

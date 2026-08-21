@@ -351,12 +351,16 @@ w.pitTimeLines = pitTimeLines;
       **逆算（車→課）をやめただけで、自動入力はやめていない。**
    =================================================================== */
 function pitDivisionId(c){ return (c && c.division) ? String(c.division) : ''; }
+/* 🔴 v1.168.0 **課の id から名前**（カードではなく、メンバーの所属など「カードが手元に無い所」用）。
+   ⚠ これが無いと、呼ぶ側が `id === 'div1' ? '1課' : '2課'` と**字を直に書く**しかなくなる
+      （＝設定で課の名前を変えた時、そこだけ古いまま。v1.92.0 で潰した形がそのまま戻る）。 */
+function pitDivisionLabelById(id){
+  if (!id) return '';
+  const d = _divisions().find(x => x && x.id === String(id));
+  return d ? String(d.label || '') : '';
+}
 function pitDivisionLabel(c){
-  const id = pitDivisionId(c);
-  if (!id) return '';                       /* ボタンが押されていない＝空。車から作らない */
-  const list = _divisions();
-  const d = list.find(x => x && x.id === id);
-  return d ? String(d.label || '') : '';    /* 表にない課＝出さない（勝手に1課にしない） */
+  return pitDivisionLabelById(pitDivisionId(c));   /* ボタンが押されていない＝空。車から作らない */
 }
 /* 🔴 v1.98.0 課の**色**も同じ表から引く（既定は 1課＝緑・2課＝ピンク）。
    ⚠ 色を画面に直に書かないこと。設定で色を変えたら、出ている所がそろって変わるように。
@@ -389,6 +393,7 @@ try {
 w.pitDivisionColorOr = pitDivisionColorOr;
 w.pitDivisionId = pitDivisionId;
 w.pitDivisionLabel = pitDivisionLabel;
+w.pitDivisionLabelById = pitDivisionLabelById;
 w.pitDivisionColor = pitDivisionColor;
 
 

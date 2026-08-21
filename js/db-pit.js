@@ -27,13 +27,17 @@
         ⚠ デモの名前・車・件数を変えたら **`pitflow_demo_v◯` の数字を上げること。**
      =================================================================== */
   const LS_KEY = (window.pitIsDemo && window.pitIsDemo())
-    ? 'pitflow_demo_v2'    // v2: 明らかに架空の名前・車・電話へ（v1.79.0）
-    : 'pitflow_data_v12';  // v12: メカニック実績（点検/整備担当＋確定売上）をサンプルに追加で再シード（v11=サンプル全面刷新）
+    ? 'pitflow_demo_v3'    // v3: 見本のカードにカナ・初回/リピーター・作業内容・車検の諸費用・完TELの印を入れた（v1.168.0）
+    : 'pitflow_data_v13';  // v13: 見本のカードが自分たちの保存の関門を通れなかったのを直した＝カナ・初回/リピーター・作業内容・車検の諸費用・完TELの印・課に合ったフロント担当（v1.168.0・点検が見つけた）
 
   const PitDB = {
     mode: 'local',      // 'local' | 'cloud'
     ready: false,
     _t: null,
+    /* 🔴 v1.168.0 いま使っている保存キー。**見張りはここを読むこと。**
+       ⚠ 見本の中身を変えるたびにキーの数字が上がる。見張りが `'pitflow_data_v12'` と
+          書き写していると、**中身を直すたびに関係ない見張りが落ちる**（実際に落ちた）。 */
+    lsKey: LS_KEY,
 
     /* 起動：localStorage 優先で state を上書き。無ければサンプルを初期保存
        ⚠ クラウドモード（本番）では localStorage のデータは読まない。
@@ -97,6 +101,8 @@
               if (d.floorPlan && typeof d.floorPlan === 'object') state.floorPlan = d.floorPlan; // v0.46.0：壁・建物・ドア
             }
             if (d.aiVerdicts && typeof d.aiVerdicts === 'object') state.aiVerdicts = d.aiVerdicts;
+            if (d.inspectMarks && typeof d.inspectMarks === 'object') state.inspectMarks = d.inspectMarks;
+            if (d.inspectMutes && typeof d.inspectMutes === 'object') state.inspectMutes = d.inspectMutes;
             if (Array.isArray(d.boardNotes)) state.boardNotes = d.boardNotes;            // v0.63.0：付箋ボード
             if (d.boardLabels && typeof d.boardLabels === 'object') state.boardLabels = d.boardLabels; // v0.63.0：色ラベル
             this._mergeSettings(d.settings);
@@ -179,6 +185,8 @@
             bays: state.bays,                          // v0.46.0：PIT配置図の枠（位置・大きさ・課）
             floorPlan: state.floorPlan || { shapes: [] }, // v0.46.0：壁・通路線
             aiVerdicts: state.aiVerdicts || {},
+            inspectMarks: state.inspectMarks || {},
+            inspectMutes: state.inspectMutes || {},
             boardNotes: state.boardNotes || [],       // v0.63.0：ダッシュボードの付箋ボード
             boardLabels: state.boardLabels || {},      // v0.63.0：付箋の色ラベル
             settings: state.settings,
@@ -271,7 +279,7 @@
       boardNotes:    'pitBoardNotes'
     },
     /* まとめて1枚に入れるもの */
-    _SETTINGS_KEYS: ['settings', 'bays', 'floorPlan', 'aiVerdicts', 'boardLabels'],
+    _SETTINGS_KEYS: ['settings', 'bays', 'floorPlan', 'aiVerdicts', 'boardLabels', 'inspectMarks', 'inspectMutes'],
 
     _loaded: false,     // v1.2.1：クラウドの中身を読み終わったか（読む前に書かないための鍵）
     _shadow: null,      // 最後にクラウドと合っていた内容（差分を出すための控え）
@@ -413,7 +421,8 @@
         if (self._pending['@settings']) return;                    // 自分がいま書いた分＝見送る
         const js = self._js({
           settings: sv.settings, bays: sv.bays, floorPlan: sv.floorPlan,
-          aiVerdicts: sv.aiVerdicts, boardLabels: sv.boardLabels
+          aiVerdicts: sv.aiVerdicts, boardLabels: sv.boardLabels,
+          inspectMarks: sv.inspectMarks, inspectMutes: sv.inspectMutes
         });
         if (js === self._shadow.settings) return;
         self._applying = true;
@@ -443,7 +452,10 @@
         bays: state.bays || [],
         floorPlan: state.floorPlan || { shapes: [] },
         aiVerdicts: state.aiVerdicts || {},
-        boardLabels: state.boardLabels || {}
+        boardLabels: state.boardLabels || {},
+        /* 🩺 v1.168.0 点検の札と、黙らせている規則（みんなで共有する） */
+        inspectMarks: state.inspectMarks || {},
+        inspectMutes: state.inspectMutes || {}
       };
     },
 

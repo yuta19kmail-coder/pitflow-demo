@@ -75,7 +75,8 @@ function cfFlowHtml(c){
       h += _flowRow(_x, _t + (_w ? '　・　' + _w : ''), null);
     });
     if (c.returnDate)  h += _flowRow('返車予定', c.returnDate + (c.returnTime ? ' ' + c.returnTime : ''));
-    h += '<div class="cf-flowrow now"><span class="cf-flowdot"></span><div class="cf-flowmain"><div class="cf-flowt">現在：' + statusLabel(c.status) + '</div></div></div>';
+    /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
+    h += '<div class="cf-flowrow now"><span class="cf-flowdot"></span><div class="cf-flowmain"><div class="cf-flowt">現在：' + (window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</div></div></div>';
     h += '</div>';
   }
 

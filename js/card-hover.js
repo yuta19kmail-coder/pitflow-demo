@@ -313,7 +313,8 @@
          + '<div class="ph-stat-num">'+(phaseN!=null?phaseN:'—')+'<span class="u">日目</span></div>'
          + '<div class="ph-stat-sub">〜'+esc(dueTxt)+'</div></div>';
     } else {
-      var phaseLb = window.statusLabel ? statusLabel(c.status) : (c.status||'');
+      /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
+      var phaseLb = window.pitCardStatusText ? pitCardStatusText(c) : (window.statusLabel ? statusLabel(c.status) : (c.status||''));
       var phaseSub = pms!=null ? (function(){ var d=new Date(pms); return (d.getMonth()+1)+'/'+d.getDate()+'〜'; })() : '—';
       h += '<div class="ph-stat s-phase"><div class="ph-stat-lb">このフェーズ<br>（'+esc(phaseLb)+'）</div>'
          + '<div class="ph-stat-num">'+(phaseN!=null?phaseN:'—')+'<span class="u">日目</span></div>'

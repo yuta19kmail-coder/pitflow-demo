@@ -85,7 +85,8 @@
       /* 🔴 v1.139.0 同じ `cancelled` でも中身が違うので、帯で言い分ける。
          ・`cancelled === true` … 人が「やめます」と決めた＝予約キャンセル
          ・それ以外（`noShow`）  … 来なかった＝未入庫（自動でも当日ビューからでも） */
-      var k = c.cancelled ? 'アーカイブ済み（予約キャンセル）' : 'アーカイブ済み（未入庫）';
+      /* 🔴 v1.164.0 言葉は pit-share.js の `pitCancelText` から借りる（ここで綴らない）。 */
+      var k = 'アーカイブ済み（' + (window.pitCancelText ? pitCancelText(c) : (c.cancelled ? '予約キャンセル' : '未入庫')) + '）';
       if (c.cancelledAt) k += '　' + c.cancelledAt;
       return k;
     }

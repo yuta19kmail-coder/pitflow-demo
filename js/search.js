@@ -52,8 +52,10 @@
   // ステータスの日本語ラベル
   function statusLabel(c) {
     if (c.status === 'reserved') return '予約';
-    /* 🔴 v1.101.0 キャンセル＝人が決めたもの／未入庫＝来なかっただけ。**別物なので言い分ける。** */
-    if (c.status === 'cancelled') return c.cancelled ? 'キャンセル' : '未入庫';
+    /* 🔴 v1.101.0 キャンセル＝人が決めたもの／未入庫＝来なかっただけ。**別物なので言い分ける。**
+       🔴 v1.164.0 言葉は pit-share.js の `pitCancelText` から借りる（ここで綴らない）。
+          ⚠ 直す前はここだけ「キャンセル」で、カード詳細の札は「予約キャンセル」だった。 */
+    if (c.status === 'cancelled') return window.pitCancelText ? pitCancelText(c) : (c.cancelled ? '予約キャンセル' : '未入庫');
     /* 🔴 v1.99.0 売上なしでアーカイブした車は、探した人が取り違えないよう「売上なし」と言い切る */
     if (window.pitCardNoSale && pitCardNoSale(c)) return '売上なし';
     if (c.status === 'returned') return '返車済み';

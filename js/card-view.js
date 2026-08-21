@@ -1077,7 +1077,10 @@
   function topHtml(c){
     const dt = c.reserveDate ? ('入庫 '+fmtMD(c.reserveDate)+(c.reserveTime?' '+c.reserveTime:'')) : '';
     const sc = (window.statusColor ? statusColor(c.status) : '#f59e0b');
-    const sl = (window.statusLabel ? statusLabel(c.status) : (c.status||''));
+    /* 🔴 v1.164.0（ゆうた指摘）状態の札は pit-share.js の `pitCardStatusText` 1本。
+       ⚠ 直す前は `statusLabel(c.status)` に**状態の文字だけ**を渡していたので、
+          `cancelled` を言い分けられず **札に英語で「cancelled」**と出ていた。 */
+    const sl = (window.pitCardStatusText ? pitCardStatusText(c) : (window.statusLabel ? statusLabel(c.status) : (c.status||'')));
     let h = '<div class="cv-top">'
       + (c.resNo?'<span class="cv-resno">'+esc(c.resNo)+'</span>':'')
       + '<span class="cv-status" style="color:'+sc+';border-color:'+sc+'66;background:'+sc+'1f">'+esc(sl)+'</span>'
@@ -1088,9 +1091,11 @@
       /* 🔴 v1.99.0 売上なしでアーカイブした車＝ひと目で分かるように札を出す（金額は請求していない） */
       + ((window.pitCardNoSale && pitCardNoSale(c))?'<span class="cv-nosalebadge">売上なし</span>':'')
       /* 🔴 v1.101.0 キャンセル・未入庫はひと目で分かるように（どちらも盤面から外れている） */
-      + (c.status==='cancelled' ? (c.cancelled
-            ? '<span class="cv-cancelbadge">予約キャンセル</span>'
-            : '<span class="cv-nosalebadge">未入庫</span>') : '')
+      /* 🔴 v1.164.0 言葉は pit-share.js の `pitCancelText` から借りる（見た目だけここで分ける）。 */
+      + (c.status==='cancelled'
+            ? '<span class="'+(c.cancelled?'cv-cancelbadge':'cv-nosalebadge')+'">'
+              + (window.pitCancelText ? pitCancelText(c) : (c.cancelled ? '予約キャンセル' : '未入庫'))
+              + '</span>' : '')
       + (dt?'<span class="cv-intake">'+dt+'</span>':'')
       + '<div class="cv-acts">'
       + '<button class="cv-iconbtn" title="表紙を印刷" onclick="pitPrintCover(\''+c.id+'\')"><i data-ic=printer data-ics=16></i></button>'

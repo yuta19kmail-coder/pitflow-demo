@@ -552,6 +552,36 @@ w.pitDivisionColor = pitDivisionColor;
   function pitShakenSlot(v){ return (v === 'pm') ? 'pm' : 'am'; }
   w.pitShakenSlot = pitShakenSlot;
 
+  /* ===================================================================
+     🏷 v1.164.0（ゆうた指摘 2026-08-21）**「予約キャンセル」と「未入庫」は別物。**
+     -------------------------------------------------------------------
+     🗣「予約キャンセルと未入庫は素直に行動が、というか意味合いが違くない？ たしか決めたよ」
+
+     決まっているとおり（v1.101.0 ゆうた指定）──
+       ・**予約キャンセル**（`c.cancelled === true`）… **人が「やめます」と決めた。**
+         来店履歴に残す／代車の予定も一緒に外す
+       ・**未入庫**（それ以外＝`noShow`）……………… **来なかっただけ。**
+         来店履歴には出さない／代車の予定は残す（勘違いで来ることがあるため）
+
+     ◎ここに置いた理由（実際に起きていたこと）
+       入れ物（`status`）は**どちらも `'cancelled'` の1つ**で、見分けは `c.cancelled` の印。
+       ところが状態の言葉を出す `statusLabel(s)` は**状態の文字しか受け取らない**ので
+       見分けようがなく、**画面の札に英語で「cancelled」と出ていた**（2026-08-21 確認）。
+     🔴 **カードの状態を画面に出す時は、状態の文字ではなく「カードごと」この1本に渡すこと。**
+     ⚠ 言葉をここ以外に書かない（アーカイブの帯・検索・カード詳細で食い違わせない）。 */
+  var PIT_CANCEL_TEXT = { user: '予約キャンセル', noShow: '未入庫' };
+  function pitCancelKind(c){ return (c && c.cancelled) ? 'user' : 'noShow'; }
+  function pitCancelText(c){ return PIT_CANCEL_TEXT[pitCancelKind(c)]; }
+  function pitCardStatusText(c){
+    if (!c) return '';
+    if (c.status === 'cancelled') return pitCancelText(c);
+    return w.statusLabel ? w.statusLabel(c.status) : String(c.status == null ? '' : c.status);
+  }
+  w.PIT_CANCEL_TEXT    = PIT_CANCEL_TEXT;
+  w.pitCancelKind      = pitCancelKind;
+  w.pitCancelText      = pitCancelText;
+  w.pitCardStatusText  = pitCardStatusText;
+
   /* 🔴 まだ生きているカードか＝盤面に残るもの。**廃車・予約キャンセル・売上なしは出さない。**
      ⚠ 車検予定だけキャンセルを素通りさせていた（ほかの一覧は前から除外していた）。 */
   function pitCardActive(c){

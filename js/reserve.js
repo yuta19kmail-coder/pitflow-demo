@@ -578,7 +578,8 @@ function cardHtml(c, opts){
   if (window.pitApprovalBadge) html += pitApprovalBadge(c, 'stamp');   // 🔵 v1.74.0 承認待ちスタンプ
   html += '<div class="pc-line1">';
   html += '<span class="pc-time">' + timeStr + '</span>';
-  html += '<span class="pc-status" style="--sc:' + statusColor(c.status) + ';">' + statusLabel(c.status) + '</span>';
+  /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
+  html += '<span class="pc-status" style="--sc:' + statusColor(c.status) + ';">' + (window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</span>';
   html += _pendBadge;   /* 🆕 v1.149.0 未完 */
   if (c.urgent) html += '<span class="pc-urg">緊急</span>';
   html += '</div>';

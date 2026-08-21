@@ -125,7 +125,8 @@ function renderMaintDash(){
       h += '<div class="md-alert-main"><div class="md-alert-car">' + _mdEsc(c.car || '車両') + ' <span class="md-alert-cust">' + _mdEsc((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '') + '</span></div>'
          + '<div class="md-alert-sub">' + _mdEsc(c.plate || '') + ' ・ ' + _mdEsc(c.menu || '') + '</div></div>';
       h += '<div class="md-alert-tags"><span class="md-alert-div" style="background:' + d.color + '">' + d.label + '</span>'
-         + '<span class="md-alert-st" style="color:' + statusColor(c.status) + ';border-color:' + statusColor(c.status) + '">' + statusLabel(c.status) + '</span></div>';
+         /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
+         + '<span class="md-alert-st" style="color:' + statusColor(c.status) + ';border-color:' + statusColor(c.status) + '">' + (window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</span></div>';
       h += '</div>';
     });
     h += '</div>';

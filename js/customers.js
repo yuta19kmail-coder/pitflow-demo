@@ -653,7 +653,10 @@
       cards.forEach(c=>{
         const wt=(state.workTypes||[]).find(w=>w.id===c.workType);
         const wl=wt?wt.label:(c.workType||'—');
-        const st=(typeof statusLabel==='function')?statusLabel(c.status):(c.status||'');
+        /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の `pitCardStatusText` 1本。
+           ⚠ 来店履歴には**人が押した予約キャンセル**が並ぶ（v1.101.0）。
+              ここに状態の文字だけを渡していたので、その行に**英語で「cancelled」**と出ていた。 */
+        const st=(window.pitCardStatusText)?pitCardStatusText(c):((typeof statusLabel==='function')?statusLabel(c.status):(c.status||''));
         const amt=_cardCancelled(c)?'キャンセル':_cardNoSale(c)?'売上なし':((c.estAmount!=null&&c.estAmount!=='')?('¥'+Number(c.estAmount).toLocaleString()):'—');
         const dt=_doneDate(c)||'日付未定';
         let loa='';

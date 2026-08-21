@@ -236,7 +236,8 @@ function _csInLabel(c){
     if (c.reserveDate){ const d=new Date(c.reserveDate+'T00:00:00'); if(!isNaN(d)) return '<i data-ic=calendar data-ics=16></i> 入庫予約 '+(d.getMonth()+1)+'/'+d.getDate(); }
     return '<i data-ic=calendar data-ics=16></i> 予約';
   }
-  return '<i data-ic=factory data-ics=16></i> 入庫中（' + (window.statusLabel ? statusLabel(c.status) : c.status) + '）';
+  /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
+  return '<i data-ic=factory data-ics=16></i> 入庫中（' + (window.pitCardStatusText ? pitCardStatusText(c) : (window.statusLabel ? statusLabel(c.status) : c.status)) + '）';
 }
 
 /* 完了／戻す */

@@ -150,3 +150,15 @@
   .psr-l1 { white-space: normal; }
   #pit-search-input { font-size: 16px; } /* iOSズーム防止 */
 }
+
+/* ===== 🔎 v1.176.0（ゆうた指定）当たった所を塗る ==========================
+   🗣「ナンバーで 920 で検索した時に 9/20 とかでヒットして？？？って迷って意外とはかどらない」
+   ・塗り＝**探して見つけた印**。付箋・課（国産＝緑／輸入＝桃）の色とぶつからない黄色
+   ・その下の1行＝**どの欄で当たったか**（画面に出ていない欄＝メモ・作業内容・代車 でも分かる）
+   ========================================================================= */
+mark.psr-hit{ background:rgba(250,204,21,.28); color:inherit; border-radius:3px; padding:0 1px; font-weight:800; }
+.psr-where{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:3px;
+  font-size:10.5px; color:var(--text3); }
+.psr-where span{ background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:0 6px; }
+/* 当たった「書き方」（日付＝9/20 など）。画面に出ている 2026-09-20 とは形が違うので、これが要る */
+.psr-where em{ font-style:normal; color:var(--text2); margin-left:4px; }

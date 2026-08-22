@@ -263,15 +263,31 @@
     entries.sort((a,b)=>nz(a.cust.kana+a.cust.name).localeCompare(nz(b.cust.kana+b.cust.name),'ja'));
     if(!entries.length){ box.innerHTML=''; box.style.display='none'; return; }
     const HINT_FROM = 30;   /* この数を超えたら「何件出ているか」を添える（切るための数ではない） */
+    /* 🔴🔴 v1.176.0（ゆうた指定）**当たった所を塗る／どの欄で当たったかを出す。**
+       🗣「ナンバーで 920 で検索した時に 9/20 とかでヒットして？？？って迷って意外とはかどらない」
+       🔴 塗り方も「どの欄か」も **search.js の1本**（`pitSearchMark` / `pitSearchWhere`）。
+          ⚠ ここに書き写さない。探し方（`pitSearchWords`）を借りているのと同じ筋。
+       ⚠ **拾う範囲は1文字も変えていない**（見えるようにするだけ）。 */
+    const mk = window.pitSearchMark ? function(t){ return pitSearchMark(t, words); } : esc;
+    const where = function(cust, v){
+      if (!window.pitSearchWhere) return '';
+      const F = [];
+      const add = (label, x) => { if (x) F.push({ label: label, text: String(x) }); };
+      add('お名前', cust.name); add('カナ', cust.kana);
+      (cust.contacts||[]).forEach(ct => { add('TEL', ct && ct.tel); });
+      if (v){ add('ナンバー', v.plate); add('メーカー', v.maker); add('車種', v.car); }
+      const w = pitSearchWhere(F, words);
+      return w.length ? '<span class="cf-recall-where">'+w.map(function(x){ return esc(x.label)+(x.as?'（'+esc(x.as)+'）':''); }).join('・')+'に一致</span>' : '';
+    };
     box.innerHTML=(entries.length>HINT_FROM
         ? '<div class="cf-recall-more">'+entries.length+'件（全部出しています）。名前と車種など、スペースで区切ってもう1語足すと絞れます</div>'
         : '')
       +entries.map(function(e){
       const t=e.v?teamInfo(e.v):{label:'',color:'#64748b'};
       const tag=t.label?(' <i style="color:'+t.color+'">●</i>'+esc(t.label)):'';
-      const vtxt=e.v?(esc(vehLabel(e.v))+(e.v.plate?' / '+esc(e.v.plate):'')):'（車両なし）';
+      const vtxt=e.v?(mk(vehLabel(e.v))+(e.v.plate?' / '+mk(e.v.plate):'')):'（車両なし）';
       return '<button type="button" class="cf-recall-item" onclick="custPick(\''+e.cust.id+'\',\''+(e.v?e.v.id:'')+'\')">'+
-        '<b>'+esc(custDispName(e.cust)||'(無名)')+'</b> <span>'+vtxt+tag+'</span></button>';
+        '<b>'+mk(custDispName(e.cust)||'(無名)')+'</b> <span>'+vtxt+tag+'</span>'+where(e.cust,e.v)+'</button>';
     }).join('');
     box.style.display='block';
   };

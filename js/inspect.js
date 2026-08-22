@@ -1,24 +1,40 @@
 /* ========================================
-   inspect.js  -  🩺 点検（健康診断）の**画面**  PitFlow v1.168.0
+   inspect.js  -  🩺 データチェックの**画面**  PitFlow v1.170.0
    ----------------------------------------
    ◎ここが受け持つこと＝**並べて見せるだけ。**
      🔴 何が「おかしい」かの判定は **js/inspect-rules.js の規則表1本**。
         ここに条件を1行も書かないこと（画面と規則が食い違ったら、直しようがなくなる）。
      ・重さ（要対応／確認／気づき）と分類の**名前も色もあちらの表から引く**。ここで綴らない。
+     🔴 直せる欄（「ここを直す」）の中身は **js/inspect-fix.js の表1本**。ここで欄を組み立てない。
+
+   ◎名前（v1.170.0・ゆうた指定 2026-08-22）
+     🔴 **「点検」→「データチェック」に言い換えた。**
+        ＝ PitFlow の中で「点検」は**車の12ヶ月点検・タスクボードの点検待ち**を指す言葉。
+          同じ字でデータの見直しも呼ぶと、現場で必ず取り違える。
+        ⚠ 車のほうの「点検」は**そのまま**（言い換えない）。
+
+   ◎中の2つ（v1.170.0・ゆうた指定）
+     🗣「ビューの中に **日常チェック** と **クォーターチェック** に一番上部で切り替えられるように」
+       ・日常チェック …… いまの規則表（PitFlow の中だけで分かる矛盾）。お金はかからない
+       ・クォーターチェック … ②売上チェックリストPDFの突合 ＋ ③AIチェック（およそ週1）
 
    ◎使い方（ゆうた）
      🔴 v1.169.2（ゆうた指定）**この画面は隠さない。全部出す。**
         減らすなら**規則の側**で（この車では言わない、と理由を持って決める）。
-     ① 左のメニュー「点検」を開く → その場で全カードを見て、気になる所を並べます
+     ① 左のメニュー「データチェック」を開く → その場で全カードを見て、気になる所を並べます
      ② 1件ずつ、右のボタンで札を貼れます
           見た … 目は通した。まだ直していない（次も出る）
           これでOK … 見た。うちのやり方ではこれで正しい（次から**この1件だけ**出さない）
                        ⚠ v1.168.1 で「これは仕様」から言い換えた（ゆうた指摘＝仕組みの話に聞こえる）
-          直した … 直した（次の点検で自然に消える）
-     ③ 「この規則は出さない」＝その**規則まるごと**黙らせる（あとで戻せます）
-     ④ 「書き出し」＝②の突合・③のAI判断へ渡す JSON を落とします
+          直した … 直した（次のチェックで自然に消える）
+     ③ **ここを直す** … 🔴 v1.170.0 **指摘された欄だけ**を小窓で直す
+          ＝ **アーカイブ済みの車でも誰でも直せる**（ゆうた指定）。ほかの欄は開きません。
+          ⚠ **確定金額と確定日だけは、これまで通り管理者だけ**（見えるが直せない）。
+     ④ 「この規則は出さない」＝その**規則まるごと**黙らせる（あとで戻せます）
+     ⑤ 「書き出し」＝②の突合・③のAI判断へ渡す JSON を落とします
 
-   ⚠ 点検は**1文字も書き換えません**（札の記録だけ）。読んで、数えて、並べるだけ。
+   ⚠ 規則そのものは**1文字も書き換えません**（読んで、数えて、並べるだけ）。
+      書き換えが起きるのは、人が「ここを直す」を押して保存した時だけ。
    ======================================== */
 (function () {
   'use strict';
@@ -33,9 +49,16 @@
     return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
+  /* 🔴 v1.170.0 いちばん上の切り替え（ゆうた指定）。**言葉はこの表1本**。画面で綴らない。 */
+  var MODES = [
+    { id:'daily',   label:'日常チェック',      note:'PitFlow の中だけで分かる食い違いを、毎日ここで拾います' },
+    { id:'quarter', label:'クォーターチェック', note:'売上チェックリストPDFとの突合と、AIチェック（およそ週1）' }
+  ];
+
   /* 画面の覚え（絞り込みと、開いている規則）。⚠ データではないので保存しない */
-  var UI = window._insp = window._insp || { level:'', cat:'', done:false, open:{}, all:{}, res:null };
+  var UI = window._insp = window._insp || { mode:'daily', level:'', cat:'', done:false, open:{}, all:{}, res:null };
   if (!UI.all) UI.all = {};
+  if (!UI.mode) UI.mode = 'daily';
   var ROWS_CAP = 20;   /* 1つの規則で最初に出す件数（超えたぶんは「ほか◯件」で開く） */
 
   function cats(){ return window.PIT_INSPECT_CATS || []; }
@@ -46,15 +69,15 @@
   function levelOf(id){ return levels().filter(function(l){ return l.id === id; })[0] || {}; }
   function catOf(id){ return cats().filter(function(c){ return c.id === id; })[0] || {}; }
 
-  /* ===== 点検する（データは触らない） ===== */
+  /* ===== チェックする（規則は data を触らない） ===== */
   function run(){
     UI.res = window.pitInspectRun ? window.pitInspectRun() : null;
     return UI.res;
   }
 
-  /* 🔴 v1.169.1（ゆうた報告「また点検が動かない」）**画面ごと落とさない。**
+  /* 🔴 v1.169.1（ゆうた報告「またチェックが動かない」）**画面ごと落とさない。**
      ◎なぜ要るか
-       点検は**全カードを読む**画面なので、1台でも思わぬ形のデータがあると、
+       データチェックは**全カードを読む**画面なので、1台でも思わぬ形のデータがあると、
        そこで止まって**画面がまるごと真っ白**になる。しかも何も出ないので原因が分からない。
      🔴 つまずいたら、**つまずいたと言う**。黙って白くしない。
      ⚠ 規則1本ずつのつまずきは pitInspectRun 側で受け止めている。ここは**描く側**の保険。 */
@@ -65,18 +88,33 @@
     catch (e) {
       console.error('[inspect] 画面を描く途中でつまずきました', e);
       body.innerHTML = '<div class="ins-empty">'
-        + '<b>点検の画面を出す途中でつまずきました。</b><br>'
+        + '<b>データチェックの画面を出す途中でつまずきました。</b><br>'
         + 'いちど画面を開き直してみてください。それでも出ない時は、この文をそのまま伝えてください：<br>'
         + '<code>' + esc(String(e && e.message ? e.message : e)) + '</code>'
         + '</div>';
     }
   };
 
+  /* いちばん上の切り替え（日常／クォーター） */
+  function modeBar(){
+    var h = '<div class="ins-mode">';
+    MODES.forEach(function (m) {
+      h += '<button class="ins-mode-b' + (UI.mode === m.id ? ' on' : '') + '"'
+         +   ' onclick="pitInspectMode(\'' + m.id + '\')">'
+         +   '<span class="ins-mode-l">' + esc(m.label) + '</span>'
+         +   '<span class="ins-mode-n">' + esc(m.note) + '</span>'
+         + '</button>';
+    });
+    return h + '</div>';
+  }
+
   function _renderInspect(body) {
     if (!window.pitInspectRun){
-      body.innerHTML = '<div class="ins-empty">点検の規則が読み込めていません。画面を開き直してください。</div>';
+      body.innerHTML = '<div class="ins-empty">データチェックの規則が読み込めていません。画面を開き直してください。</div>';
       return;
     }
+    if (UI.mode === 'quarter'){ body.innerHTML = modeBar() + quarterHtml(); if (window.pitIcons) try { pitIcons(body); } catch(e){} return; }
+
     var res = run();
     var mutes = (window.state && state.inspectMutes) || {};
 
@@ -84,7 +122,7 @@
        🔴🔴 v1.169.2（ゆうた指定 2026-08-22）**「確実に全て出して」**
           ＝ v1.169.0 で入れた「いま動いている車／終わった記録」の**出し分けは全部やめた**。
             ボタン2つ → チェック1つ → **そもそも分けない**、の順で戻している。
-          ⚠ 点検が**黙って何かを隠す**と、出ていないものが有るのか無いのか分からなくなる。
+          ⚠ データチェックが**黙って何かを隠す**と、出ていないものが有るのか無いのか分からなくなる。
              減らすなら**規則の側**でやる（この車では言わない、と理由を持って決める）。
              画面の側で隠すのはやらない。 */
     var lvN = res.byLevel, ctN = res.byCat, markedN = res.marked;
@@ -96,20 +134,20 @@
       return true;
     });
 
-    var h = '';
+    var h = modeBar();
 
     /* ===== 上の帯（いつ・何台・いくつ） ===== */
     h += '<div class="ins-head">'
-       /* 🔴 v1.169.2（ゆうた報告）「もう一度点検を押しても動いてる感じがしない」
+       /* 🔴 v1.169.2（ゆうた報告）「もう一度押しても動いてる感じがしない」
           ＝ 出していたのが**日付だけ**だったので、押しても字が1つも変わらなかった。
             中身が同じなら画面も同じ＝**本当に走ったのかどうかが分からない。**
           🔴 **走った時刻を出す。** 押すたびにここが変わる＝走った証拠になる。 */
-       +   '<div class="ins-when">' + esc(res.today) + ' <b>' + esc(hhmm(res.at)) + '</b> に点検'
+       +   '<div class="ins-when">' + esc(res.today) + ' <b>' + esc(hhmm(res.at)) + '</b> にチェック'
        +     ' ／ 対象 <b>' + res.cards + '</b>台 ／ 規則 <b>' + res.rules + '</b>本'
        +     (res.muted ? ' ／ 黙らせている規則 ' + res.muted + '本' : '')
        +   '</div>'
        +   '<div class="ins-actions">'
-       +     '<button class="ins-btn" id="ins-rerun" onclick="pitInspectRerun()">もう一度点検</button>'
+       +     '<button class="ins-btn" id="ins-rerun" onclick="pitInspectRerun()">もう一度チェック</button>'
        +     '<button class="ins-btn" onclick="pitInspectDownload()">書き出し</button>'
        +   '</div>'
        + '</div>';
@@ -199,6 +237,66 @@
     if (window.pitIcons) try { pitIcons(body); } catch(e){}
   }
 
+  /* ================================================================
+     クォーターチェック（②売上チェックリストPDFの突合 ＋ ③AIチェック）
+     ----------------------------------------------------------------
+     🔴 v1.170.0 いまは**器だけ**。器のうちに「何が要るか」を画面に出しておく
+        ＝ 空の画面を出して「まだです」と黙るより、**次に何をすれば動くか**が分かる。
+     🔴 クォーターの区切り（月4分割）は **売上の物差し（pitQuarterOf）を借りる**。
+        ここで `1〜7日` と書き写さない（区切りを変えた日に片方だけ古くなる）。
+     ================================================================ */
+  function quarterHtml(){
+    var q = window.pitQuarterOf ? window.pitQuarterOf() : null;
+    var res = UI.res || run();
+    var openN = res ? res.findings.filter(function(f){ return !f.mark; }).length : 0;
+
+    var h = '';
+    h += '<div class="ins-q-head">'
+       +   '<div class="ins-q-now">' + (q ? esc(q.label) : 'クォーター')
+       +     (q ? ' <span>' + esc(q.s) + ' 〜 ' + esc(q.e) + '</span>' : '')
+       +   '</div>'
+       +   '<div class="ins-q-sub">クォーター＝1か月を4つに分けた区切り（1〜7日／8〜15日／16〜23日／24日〜末日）。'
+       +     'およそ週に1度、まとめて見直すための単位です。</div>'
+       + '</div>';
+
+    h += '<div class="ins-q-steps">';
+
+    h += '<section class="ins-q-step">'
+       +   '<div class="ins-q-st"><span class="ins-q-no">②</span>売上チェックリストPDFとの突合</div>'
+       +   '<div class="ins-q-sd">整備ソフトから出した売上チェックリストPDFと、PitFlow の実績を1台ずつ突き合わせます。'
+       +     '<b>PitFlow にしか無い車・整備ソフトにしか無い車・金額の違う車</b>を出します。</div>'
+       +   '<div class="ins-q-todo"><b>動かすのに要るもの</b>'
+       +     '<ul><li>その期間の売上チェックリストPDF（整備ソフトから）</li>'
+       +     '<li>下の「書き出し」で落とした、PitFlow 側のデータ</li></ul></div>'
+       +   '<div class="ins-q-soon">いまは手作業でお預かりして突き合わせています。画面の中で回せるようになったら、ここに出ます。</div>'
+       + '</section>';
+
+    h += '<section class="ins-q-step">'
+       +   '<div class="ins-q-st"><span class="ins-q-no">③</span>AIチェック</div>'
+       +   '<div class="ins-q-sd">日常チェックと②の結果をまとめてAIに読ませ、'
+       +     '<b>規則では拾えない粗さ</b>（同じ人・同じ工程でくり返し起きている抜け、'
+       +     '入力が後回しになっている車）を出します。</div>'
+       +   '<div class="ins-q-todo"><b>いまはまだ足りないもの</b>'
+       +     '<ul><li><b>母数</b>＝担当ごとの担当台数（何台のうち何件かが分からないと、人を比べられません）</li>'
+       +     '<li><b>車の中身</b>＝フローとメモ（文章が無いと「なぜ止まったか」が読めません）</li>'
+       +     '<li><b>前回の書き出し</b>（1回だけの出来事と、くり返しているクセを見分けるため）</li></ul></div>'
+       +   '<div class="ins-q-soon">⚠ 3つがそろうまでは、AIは「一度きりの出来事」を「クセ」と読み違えます。'
+       +     'そろえてから動かします。</div>'
+       + '</section>';
+
+    h += '</div>';
+
+    h += '<div class="ins-q-foot">'
+       +   '<div class="ins-q-fn">いまの日常チェックは <b>' + openN + '</b>件（片づけていないもの）。'
+       +     'この中身がそのまま②③へ渡ります。</div>'
+       +   '<div class="ins-actions">'
+       +     '<button class="ins-btn" onclick="pitInspectMode(\'daily\')">日常チェックを見る</button>'
+       +     '<button class="ins-btn" onclick="pitInspectDownload()">書き出し</button>'
+       +   '</div>'
+       + '</div>';
+    return h;
+  }
+
   /* 1件ぶんの行 */
   function row(f){
     var mk = markDefs().filter(function(m){ return m.id === f.mark; })[0];
@@ -231,6 +329,12 @@
           +     '<div class="ins-row-txt">' + esc(f.text) + '</div>'
           +   '</div>'
           +   '<div class="ins-row-b">';
+    /* 🔴🔴 v1.170.0（ゆうた指定）**「ここを直す」＝指摘された欄だけの小窓。**
+       ・**アーカイブ済みの車でも誰でも押せる**（そこが今回の大きな変化）
+       ・出す／出さないは inspect-fix.js の表が決める（欄が1つに決まらない規則には出ない）
+       ⚠ 確定金額・確定日は小窓の中で「🔒 管理のみ」になる（表が持っている） */
+    var canFix = window.pitFixFieldsFor ? (window.pitFixFieldsFor(f) || []).length : 0;
+    if (canFix) h += '<button class="ins-fixb" onclick="pitFixOpen(\'' + esc(f.key) + '\')">ここを直す</button>';
     if (f.kind === 'card' && f.refId) h += '<button class="ins-open" onclick="pitInspectGo(\'' + esc(f.refId) + '\')">開く</button>';
     if (f.kind === 'veh')             h += '<button class="ins-open" onclick="showView(\'fleet\')">車両管理</button>';
     markDefs().forEach(function (m) {
@@ -242,6 +346,7 @@
   }
 
   /* ===== ボタンの受け口 ===== */
+  window.pitInspectMode = function (m) { UI.mode = m; renderInspect(); };
   window.pitInspectFilter = function (kind, v) {
     if (kind === 'level') UI.level = (UI.level === v ? '' : v);
     else UI.cat = v;
@@ -264,7 +369,7 @@
     var ask = window.pitAsk ? pitAsk : function (m, o) { return Promise.resolve(true); };
     ask('この規則を出さないようにしますか？', {
       title: r.title || '規則を黙らせる',
-      detail: '「' + (r.title || rid) + '」を、これから点検で出さなくなります。\n'
+      detail: '「' + (r.title || rid) + '」を、これからデータチェックで出さなくなります。\n'
             + '1件ずつ「これでOK」を押すのが大変なくらい出ている＝\n'
             + 'うちのやり方ではこれで正しい、という時に使ってください。\n\n'
             + '⚠ あとから同じ場所の「この規則をまた出す」で戻せます。',
@@ -276,24 +381,24 @@
     });
   };
 
-  /* 🔴 v1.169.2 「もう一度点検」＝押したことが分かるようにする。
+  /* 🔴 v1.169.2 「もう一度チェック」＝押したことが分かるようにする。
      ・上の時刻が変わる（走った証拠）
-     ・ボタンが一瞬「点検中…」になる
+     ・ボタンが一瞬「チェック中…」になる
      ・件数が変わっていなくても「変わっていない」と言い切る（黙らない）
      ⚠ 変わっていない時にこそ、押した人は不安になる。**必ず何か言う。** */
   window.pitInspectRerun = function () {
     var btn = document.getElementById('ins-rerun');
     var before = UI.res ? UI.res.findings.filter(function(f){ return !f.mark; }).length : null;
-    if (btn) { btn.textContent = '点検中…'; btn.disabled = true; }
+    if (btn) { btn.textContent = 'チェック中…'; btn.disabled = true; }
     setTimeout(function () {
       renderInspect();
       var after = UI.res ? UI.res.findings.filter(function(f){ return !f.mark; }).length : 0;
       if (window.pitToast) {
         pitToast(before == null || before === after
-          ? '点検しました。変わりはありません（' + after + '件）'
-          : '点検しました。' + before + '件 → ' + after + '件');
+          ? 'チェックしました。変わりはありません（' + after + '件）'
+          : 'チェックしました。' + before + '件 → ' + after + '件');
       }
-    }, 60);   /* 「点検中…」が一瞬でも見えるように、描き直しを次の順番へ回す */
+    }, 60);   /* 「チェック中…」が一瞬でも見えるように、描き直しを次の順番へ回す */
   };
 
   /* カードを開く。⚠ 開き方は card-detail.js の1本（ここで窓を作らない） */
@@ -302,7 +407,7 @@
   /* ②突合・③AI判断へ渡す JSON を落とす */
   window.pitInspectDownload = function () {
     var out = window.pitInspectExport(UI.res || run());
-    var name = 'PitFlow点検_' + out.今日 + '.json';
+    var name = 'PitFlowデータチェック_' + out.今日 + '.json';
     var blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = name;
@@ -310,4 +415,6 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     if (window.pitToast) pitToast(name + ' を書き出しました');
   };
+
+  window.PIT_INSPECT_MODES = MODES;
 })();

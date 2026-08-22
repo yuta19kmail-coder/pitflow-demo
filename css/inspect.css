@@ -1,9 +1,19 @@
 /* ========================================
-   inspect.css  -  🩺 点検（健康診断）  PitFlow v1.168.0
+   inspect.css  -  🩺 データチェック  PitFlow v1.170.0
    ⚠ 重さの色（要対応・確認・気づき）は **JS の表から `--ins-c` で渡ってくる**。
       ここに色を書き写さないこと（表を直しても片方だけ古くなる）。
    ======================================== */
 #inspect-body{ padding:2px 2px 60px; }
+
+/* ── 🔴 v1.170.0 いちばん上の切り替え（日常チェック／クォーターチェック）── */
+.ins-mode{ display:flex; gap:8px; margin:2px 2px 14px; flex-wrap:wrap; }
+.ins-mode-b{ flex:1 1 260px; text-align:left; cursor:pointer; border:1px solid var(--border);
+  background:var(--bg2); border-radius:10px; padding:9px 14px; display:flex; flex-direction:column; gap:2px; }
+.ins-mode-b:hover{ background:var(--bg3); }
+.ins-mode-b.on{ border-color:var(--brand,#1f7a4d); box-shadow:0 0 0 1px var(--brand,#1f7a4d) inset; background:var(--bg3); }
+.ins-mode-l{ font-size:14px; font-weight:700; color:var(--text2); }
+.ins-mode-b.on .ins-mode-l{ color:var(--text); }
+.ins-mode-n{ font-size:11px; color:var(--text3); }
 
 /* ── 上の帯 ── */
 .ins-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:2px 2px 12px; }
@@ -100,6 +110,78 @@
 .ins-who-st2{ font-size:10px; font-weight:700; color:var(--text2); background:var(--bg3);
   border:1px solid var(--border); border-radius:999px; padding:1px 8px; white-space:nowrap; }
 .ins-who-st2.none{ color:var(--text3); font-weight:400; }
+
+/* ────────────────────────────────────────
+   🔴 v1.170.0 クォーターチェック（②突合＋③AIチェック）の器
+   ──────────────────────────────────────── */
+.ins-q-head{ border:1px solid var(--border); border-radius:12px; background:var(--bg2); padding:14px 16px; margin:0 2px 12px; }
+.ins-q-now{ font-size:16px; font-weight:800; color:var(--text); }
+.ins-q-now span{ font-size:12px; font-weight:400; color:var(--text3); margin-left:8px; }
+.ins-q-sub{ font-size:11px; color:var(--text3); margin-top:5px; line-height:1.7; }
+
+.ins-q-steps{ display:flex; gap:10px; flex-wrap:wrap; margin:0 2px 12px; }
+.ins-q-step{ flex:1 1 340px; border:1px solid var(--border); border-radius:12px; background:var(--bg2); padding:14px 16px; }
+.ins-q-st{ font-size:14px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px; }
+.ins-q-no{ font-size:12px; font-weight:800; color:var(--text3); border:1px solid var(--border);
+  border-radius:999px; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; }
+.ins-q-sd{ font-size:12px; color:var(--text2); line-height:1.8; margin-top:7px; }
+.ins-q-todo{ font-size:11px; color:var(--text3); line-height:1.8; margin-top:9px;
+  border-top:1px solid var(--border); padding-top:8px; }
+.ins-q-todo b{ color:var(--text2); }
+.ins-q-todo ul{ margin:4px 0 0; padding-left:1.2em; }
+.ins-q-soon{ font-size:11px; color:var(--text3); line-height:1.7; margin-top:9px;
+  background:var(--bg); border-radius:8px; padding:7px 10px; }
+
+.ins-q-foot{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 2px; }
+.ins-q-fn{ font-size:12px; color:var(--text3); }
+.ins-q-fn b{ color:var(--text); font-size:14px; }
+
+/* ────────────────────────────────────────
+   🔴🔴 v1.170.0 「ここを直す」の小窓（inspect-fix.js）
+   ⚠ ここで**確定金額・確定日だけ管理者**の判定はしない。JS の表が持っている。
+     この CSS は「🔒 管理のみ」の見た目を作るだけ。
+   ──────────────────────────────────────── */
+.ins-fixb{ border:1px solid var(--brand,#1f7a4d); background:var(--bg3); color:var(--text);
+  padding:4px 12px; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.ins-fixb:hover{ background:var(--brand,#1f7a4d); color:#fff; }
+
+.ins-fix{ position:fixed; inset:0; z-index:9000; display:flex; align-items:center; justify-content:center; padding:16px; }
+.ins-fix-bg{ position:absolute; inset:0; background:rgba(0,0,0,.55); }
+.ins-fix-win{ position:relative; width:min(520px,100%); max-height:88vh; overflow:auto;
+  background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:16px 18px 14px;
+  box-shadow:0 18px 60px rgba(0,0,0,.45); }
+.ins-fix-h{ display:flex; align-items:flex-start; gap:10px; }
+.ins-fix-t{ flex:1; font-size:15px; font-weight:800; color:var(--text); line-height:1.5; }
+.ins-fix-x{ border:0; background:transparent; color:var(--text3); font-size:15px; cursor:pointer; padding:2px 4px; }
+.ins-fix-x:hover{ color:var(--text); }
+.ins-fix-who{ font-size:13px; font-weight:700; color:var(--text); margin-top:8px; }
+.ins-fix-who span{ font-size:11px; font-weight:400; color:var(--text3); }
+.ins-fix-txt{ font-size:12px; color:var(--text2); margin-top:4px; line-height:1.7; }
+.ins-fix-arch{ font-size:11px; color:var(--text2); line-height:1.8; margin-top:10px;
+  background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 10px; }
+
+.ins-fix-grid{ display:flex; flex-direction:column; gap:12px; margin:14px 0 4px; }
+.ins-fix-row{ display:flex; flex-direction:column; gap:4px; }
+.ins-fix-l{ font-size:12px; font-weight:700; color:var(--text2); display:flex; align-items:center; gap:7px; }
+.ins-fix-lock{ font-size:10px; font-weight:700; color:var(--text3); border:1px solid var(--border);
+  border-radius:999px; padding:0 7px; white-space:nowrap; }
+.ins-fix-in{ width:100%; border:1px solid var(--border); background:var(--bg); color:var(--text);
+  border-radius:8px; padding:7px 10px; font-size:13px; }
+.ins-fix-in:focus{ outline:none; border-color:var(--brand,#1f7a4d); }
+.ins-fix-ta{ resize:vertical; line-height:1.7; }
+.ins-fix-money{ width:12em; }
+.ins-fix-yen{ font-size:12px; color:var(--text3); margin-right:4px; }
+.ins-fix-ro{ font-size:14px; font-weight:700; color:var(--text2); background:var(--bg);
+  border:1px dashed var(--border); border-radius:8px; padding:7px 10px; }
+.ins-fix-hint{ font-size:10px; color:var(--text3); line-height:1.6; }
+
+.ins-fix-b{ display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+.ins-fix-cancel{ border:1px solid var(--border); background:var(--bg3); color:var(--text2);
+  padding:7px 16px; border-radius:8px; font-size:12px; cursor:pointer; }
+.ins-fix-save{ border:1px solid var(--brand,#1f7a4d); background:var(--brand,#1f7a4d); color:#fff;
+  padding:7px 18px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+.ins-fix-save:hover{ filter:brightness(1.08); }
+.ins-fix-note{ font-size:10px; color:var(--text3); margin-top:8px; line-height:1.6; }
 
 /* 🔴 v1.169.1 切り替えはチェック1つに戻したので、下のボタンの見た目はもう使っていない（消さずに残す） */
 .ins-scope{ border:1px solid var(--border); background:var(--bg2); color:var(--text3);

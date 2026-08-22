@@ -450,6 +450,20 @@
   // ================= クォーター：当月（月4分割＋確度の区分・翌Qリミット） =================
   function qWindow(y,m,qi){ var last=new Date(y,m+1,0).getDate(); var rr=[[1,7],[8,15],[16,23],[24,last]][qi]; return { s:ymdL(new Date(y,m,rr[0])), e:ymdL(new Date(y,m,rr[1])), f:rr[0], t:rr[1] }; }
   function nextQEnd(y,m,qi){ if(qi<3) return qWindow(y,m,qi+1).e; var nm=new Date(y,m+1,1); return qWindow(nm.getFullYear(),nm.getMonth(),0).e; }
+  /* 🔴 v1.170.0 **クォーター（月4分割）の窓を外へ貸す。**
+     ◎なぜ
+       データチェックの「クォーターチェック」が**同じ区切り**を出す必要がある。
+       あちらで `dd<=7?0:…` を書き写すと、区切りを変えた日に**片方だけ古くなる**。
+     ⚠ 区切りそのものは上の qOfDay / qWindow の1本のまま。ここは**呼び口**だけ。
+     戻り＝{ y, m1（1〜12）, qi（0〜3）, no（1〜4）, s, e, label } */
+  window.pitQuarterOf = function (dateStr) {
+    var d = dateStr ? pd(dateStr) : new Date();
+    if (!d || isNaN(d.getTime())) d = new Date();
+    var qi = qOfDay(d.getDate());
+    var wq = qWindow(d.getFullYear(), d.getMonth(), qi);
+    return { y: d.getFullYear(), m1: d.getMonth() + 1, qi: qi, no: qi + 1,
+             s: wq.s, e: wq.e, label: (d.getMonth() + 1) + '月 第' + (qi + 1) + 'クォーター' };
+  };
   /* 🔴 v1.61.0 区分と「数える日」は物差し（sales-count.js）から。ここはクォーターの窓に当てはめるだけ。
         実績＝現Qの中だけ。まだ返していない車＝**返車予定日が翌Q末までに入っているもの**（元からの「翌Qリミット」を踏襲）。 */
   function qTierOf(c,qS,qE,nqE,todayStr){

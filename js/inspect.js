@@ -164,9 +164,9 @@
        +     ' ／ これから直す <b>' + res.openN + '</b>件'
        +     (res.okN ? ' ／ 確認ずみ ' + res.okN + '件' : '')
        +   '</div>'
-       /* 🔴 v1.173.0 起点日＝「この日より前に入れたぶんは、日付の前後を言わない」。
-          🔴 **黙って効かせない。** いつからかを画面に出す（管理なら押して変えられる）。 */
-       +   fromLine(res)
+       /* ⚠ v1.173.2（ゆうた指定）起点日は**画面に出さない。**
+          🗣「表示要らない。あくまで内部処理でつかって。本当にスタート時の誤差ってだけだから」
+          ＝ 現場の人が読む話ではない（引っ越しの跡を黙らせているだけ）。 */
        /* 🔴🔴 v1.172.1（ゆうた訂正）**「出さない」を選んでいた規則が残っていたら、黙って隠さない。**
           ＝ これは「規則ごと消す予定」の控え。**名前を出して、消し忘れないようにする。** */
        +   ((res.mutedIds && res.mutedIds.length)
@@ -336,24 +336,6 @@
     return h;
   }
 
-  /* 🔴🔴 v1.173.0 起点日の1行（＝日付の前後を見る範囲）。**黙って効かせない。**
-     管理なら押して変えられる。物差しは card-view.js の `pitCanEditFinal`（管理かどうか）を借りる。 */
-  function fromLine(res){
-    var can = !window.pitCanEditFinal || !!pitCanEditFinal();
-    var v = res.from || '';
-    return '<div class="ins-from">'
-      + '<span>日付の前後（返車予定・実績が入庫より前）を見るのは、'
-      + (v ? '<b>' + esc(v) + '</b> 以降に入庫した車から' : '<b>ぜんぶの車</b>')
-      + 'です。'
-      + (v ? '<small>それより前は、本番を始めた時にまとめて入れたぶんなので言いません。</small>' : '')
-      + '</span>'
-      + (can
-          ? '<input class="ins-fromin" type="date" value="' + esc(v) + '" onchange="pitInspectSetFrom(this.value)">'
-            + (v ? '<button class="ins-fromclr" onclick="pitInspectSetFrom(\'\')">ぜんぶ見る</button>' : '')
-          : '<span class="ins-fromlock">変えられるのは管理だけです</span>')
-      + '</div>';
-  }
-
   /* 🔴 v1.173.0 「確認した（合っている）」の別枠。**消さずに、数から外す。** */
   function okSection(list){
     if (!list.length) return '';
@@ -442,7 +424,9 @@
   window.pitInspectOpen = function (rid) { UI.open[rid] = (UI.open[rid] === false); renderInspect(); };
   window.pitInspectAll = function (rid) { UI.all[rid] = !UI.all[rid]; renderInspect(); };
   window.pitInspectOkOpen = function () { UI.okOpen = !UI.okOpen; renderInspect(); };
-  /* 🔴🔴 v1.173.0 起点日を決める（管理だけ）。⚠ 会社ぜんぶの数字が動くので、画面から消すだけにしない。 */
+  /* 🔴🔴 v1.173.0 起点日を決める（管理だけ）。⚠ 会社ぜんぶの数字が動くので、書き込む所でも止める。
+     ⚠ v1.173.2（ゆうた指定）**画面にボタンは出していない**＝本番を始めた時の誤差を黙らせるためだけの値。
+        変える時はここを呼ぶ（コンソール）。**新しく画面に出さないこと。** */
   window.pitInspectSetFrom = function (v) {
     if (window.pitCanEditFinal && !pitCanEditFinal()){
       if (window.UI && UI.alert) UI.alert('日付の前後を見る起点日を変えられるのは、設定権限（管理）のある人だけです。',

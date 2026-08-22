@@ -134,14 +134,26 @@
     { id:'past', label:'終わった記録',     note:'返車が済んだ車・アーカイブ。直しても現場は動かない' }
   ];
 
-  /* 🔴 残す札は2つだけ。**どちらも一覧から消さない**（v1.172.0）。
+  /* 🔴🔴 v1.173.0（ゆうた指定 2026-08-22）**規則は2種類ある。札もそれに合わせた。**
+     🗣「見積もりと確定が大きく違うも、間違えの可能性もあるけど 普通にOKなのもある。
+     　　この辺りはどう決着するつもり？」
+
+     | 種類 | 中身 | 終わり方 |
+     |---|---|---|
+     | **抜け・矛盾**（41本） | 金額が空・日付が空・状態が食い違う | **直すしかない。閉じる道は無い** |
+     | 🆕 **要判断**（`judge:true`・7本） | 見積と確定が違う／けたが小さい／ずっと先 など | **見て「合っている」と確認したら閉じる** |
+
+     🔴 **「確認した」は要判断の規則にしか出さない。** 抜け・矛盾の側には**絶対に出さない**。
+        ＝「やらなくていい」ではなく「**見て決めるのが仕事**」の所にだけ、決める手段を置く。
+     🔴 押した**人と日付**が残る（誰が「合っている」と言ったか分からないと、あとで揉める）。
      ⚠ id は変えないこと（変えると今までに貼った札が全部はがれる）。 */
   var MARKS = [
-    { id:'seen',  label:'見た',   note:'目は通した。まだ直っていないので、直るまで出ます' },
-    { id:'fixed', label:'直した', note:'直したつもり。次のチェックで消えれば、本当に直っています' }
+    { id:'fixed', label:'直した',   note:'直したつもり。次のチェックで消えれば、本当に直っています' },
+    { id:'ok',    label:'確認した', note:'見て、これで合っていると決めた（数から外れます）', judge:true }
   ];
-  /* もう使わない札（'spec'＝これでOK）。**見つけたら外す**ためだけに残してある。 */
-  var DEAD_MARKS = { spec: 1 };
+  /* もう使わない札。**見つけたら外す**ためだけに残してある。
+     'spec'＝これでOK（v1.172.0 で廃止）／'seen'＝見た（v1.173.0 で廃止＝押しても 0 に近づかないため） */
+  var DEAD_MARKS = { spec: 1, seen: 1 };
 
   /* ================================================================
      3. すでにある物差しを呼ぶだけの薄い口
@@ -188,6 +200,28 @@
   }
   /* 実績になった車（売上なしは別扱い） */
   function isDone(c){ return !!c && c.status === 'returned' && !noSale(c); }
+
+  /* 🔴🔴 v1.173.0（ゆうた指定 2026-08-22）**起点日＝「この日より前に入庫した車は、日付の前後を言わない」**
+     🗣「8月は中旬に頭からのを入れてスタート切ったからその影響。それはOKにしたいけど、今後は見てほしい」
+     ◎なにが困っていたか
+       本番を始めた時、**8月頭からのぶんを中旬にまとめて入れた**。
+       そのぶんは「返車予定日が入庫日より前」に必ずなるが、**打ち間違いではない＝直しようがない**。
+       1件ずつ札を押しても終わらないし、押した記録も残したくない（そもそも指摘が要らない）。
+     🔴 **1件ずつではなく「いつから入れたデータか」で決める。** これが正しい決着のさせ方。
+     ⚠ 効かせるのは **F05 / F06（日付の前後がおかしい）だけ**。
+        金額の抜けなどは**起点日より前でも直す**（会社の履歴として残すため）。
+     ⚠ 日付は設定 1か所（`state.settings.inspectFrom`）。データチェックの画面から管理者が変えられる。 */
+  function startFrom(){
+    var v = t(((w.state || {}).settings || {}).inspectFrom);
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : '';
+  }
+  /* その車は「起点日より前に入れたぶん」か（＝日付の前後を言わない） */
+  function beforeStart(c){
+    var f = startFrom();
+    if (!f) return false;
+    var d = t(c && c.reserveDate);
+    return !!d && s(d) < s(f);
+  }
 
   /* ⚠ v1.172.2（ゆうた指定）**S01/S08（車検の行く日が未定）と F02（同じエリアに長く止まっている）を
      規則表から消した**ので、その2つだけが使っていた `_shakenUndecided()` と `stayDays()` も一緒に消した。
@@ -251,7 +285,7 @@
       } },
 
 
-    { id:'M06', cat:'money', level:'amber',
+    { id:'M06', cat:'money', level:'amber', judge:true,
       title:'金額のけたが小さすぎる',
       why:'0円ではないのに ' + yen(LIM.tiny) + ' 未満です。0を1つ少なく打った可能性があります。',
       fix:'金額を見直してください。',
@@ -262,7 +296,7 @@
         return '確定金額が ' + yen(a) + ' です';
       } },
 
-    { id:'M07', cat:'money', level:'amber',
+    { id:'M07', cat:'money', level:'amber', judge:true,
       title:'見積と確定が大きく違う',
       why:'見積の ' + LIM.gapRate + '倍以上、または半分以下で固まっています。打ち間違いか、追加作業の入れ忘れかもしれません。',
       fix:'伝票と見比べてください。追加作業なら作業内容も足しておくと、あとで理由が分かります。',
@@ -326,6 +360,7 @@
       why:'返す日のほうが預かる日より前になっています。日付の打ち間違いです。',
       fix:'どちらかの日付を直してください。',
       each: function(c){
+        if (beforeStart(c)) return '';        /* 🔴 v1.173.0 起点日より前に入れたぶんは言わない */
         if (!t(c.reserveDate) || !t(c.returnDate)) return '';
         return (s(c.returnDate) < s(c.reserveDate))
           ? ('入庫 ' + c.reserveDate + ' → 返車予定 ' + c.returnDate) : '';
@@ -336,12 +371,13 @@
       why:'預かる前に返したことになっています。',
       fix:'日付を直してください。',
       each: function(c){
+        if (beforeStart(c)) return '';        /* 🔴 v1.173.0 起点日より前に入れたぶんは言わない */
         if (!isDone(c) || !t(c.completedAt) || !t(c.reserveDate)) return '';
         return (s(c.completedAt) < s(c.reserveDate))
           ? ('入庫 ' + c.reserveDate + ' → 実績 ' + c.completedAt) : '';
       } },
 
-    { id:'F07', cat:'flow', level:'amber',
+    { id:'F07', cat:'flow', level:'amber', judge:true,
       title:'返車予定日が、ずっと先',
       why:'今日から ' + LIM.farReturn + '日より先です。年や月を打ち間違えた可能性があります。',
       fix:'日付を見直してください。本当にこの日でよければ、そのまま置いておけば次も出ます（消す道はありません）。',
@@ -453,7 +489,7 @@
         return out;
       } },
 
-    { id:'R04', cat:'resv', level:'amber',
+    { id:'R04', cat:'resv', level:'amber', judge:true,
       title:'お休みの日に、入庫や返車の予定が入っている',
       why:'その日は会社が休みです（定休日カレンダー）。お客様が来ても誰もいません。',
       fix:'日付をずらすか、その日だけ開けるなら定休日カレンダーを直してください。',
@@ -513,7 +549,7 @@
         return out;
       } },
 
-    { id:'L03', cat:'loaner', level:'amber',
+    { id:'L03', cat:'loaner', level:'amber', judge:true,
       title:'代車の返す日が、車の返車予定日より前',
       why:'返車の前に代車を引き上げる形になっています。お客様の足が無くなります。',
       fix:'代車カレンダーで期間を延ばしてください。',
@@ -716,7 +752,7 @@
         return hit ? ('顧客控えの「' + t(hit.name || hit.kana) + '」とつながっていません') : '';
       } },
 
-    { id:'D08', cat:'data', level:'amber',
+    { id:'D08', cat:'data', level:'amber', judge:true,
       title:'同じ電話番号なのに、お名前の書き方が違う',
       why:'同じお客様が別々の人として数えられています（来店回数・売上が分かれます）。',
       fix:'どちらかの書き方に揃えてください。',
@@ -807,7 +843,7 @@
         return a > 0 ? ('廃車・乗替に ' + yen(a) + ' が入っています') : '';
       } },
 
-    { id:'T08', cat:'state', level:'gray',
+    { id:'T08', cat:'state', level:'gray', judge:true,
       title:'課と、フロント担当の課が食い違う',
       why:'課ごとの売上と、人ごとの売上が合わなくなります。',
       fix:'どちらかを直してください。応援で入ったのなら、そう分かるように課か担当を直してください。',
@@ -864,7 +900,14 @@
        ⚠ 規則を消したら、その時に一緒に片づける。 */
   function sweepEscapes(){
     var mk = marks(), n = 0;
+    /* 🔴 v1.173.0 **「確認した」は要判断の規則にしか付かない。**
+       ほかの規則に付いていたら外す（表を変えた時に、古い札が抜け道になるのを防ぐ）。 */
+    var judgeOf = {};
+    RULES.forEach(function(r){ judgeOf[r.id] = !!r.judge; });
     Object.keys(mk).forEach(function(k){ if (mk[k] && DEAD_MARKS[mk[k].v]) { delete mk[k]; n++; } });
+    Object.keys(mk).forEach(function(k){
+      if (mk[k] && mk[k].v === 'ok' && !judgeOf[String(k).split(':')[0]]) { delete mk[k]; n++; }
+    });
     /* 🔴 v1.172.2 **消した規則に付いていた「出さない」の印は片づける。**
        指す先の規則がもう無いので、残しても誰も読めない（生きている規則の印には触らない）。 */
     var mu = mutes(), have = {}, dead = 0;
@@ -911,9 +954,10 @@
       var m = mk[key];
       findings.push({
         key: key, ruleId: rule.id, cat: rule.cat, level: rule.level,
+        judge: !!rule.judge,                    /* 🔴 v1.173.0 見て決める規則か */
         title: rule.title, why: rule.why, fix: rule.fix,
         kind: kind || 'card', refId: ref, name: name || '', text: text,
-        mark: (m && m.v) || '', markAt: (m && m.at) || ''
+        mark: (m && m.v) || '', markAt: (m && m.at) || '', markBy: (m && m.by) || ''
       });
     }
 
@@ -989,8 +1033,11 @@
     LEVELS.forEach(function(l){ byLevel[l.id] = { n:0, open:0 }; });
     CATS.forEach(function(c){ byCat[c.id] = { n:0, open:0 }; });
     SCOPES.forEach(function(x){ byScope[x.id] = { n:0, open:0 }; });
+    /* 🔴🔴 v1.173.0 **数から外れるのは「確認した」だけ。**
+       「直した」は目印なので数からは外れない（直っていれば次のチェックで規則の側から消える）。
+       ＝ ここに出ている数が「これから直す数」。**0 になったら本当に 0。** */
     findings.forEach(function(f){
-      var open = !f.mark;
+      var open = (f.mark !== 'ok');
       if (!open) markedN++;
       if (byLevel[f.level]) { byLevel[f.level].n++; if (open) byLevel[f.level].open++; }
       if (byCat[f.cat])     { byCat[f.cat].n++;     if (open) byCat[f.cat].open++; }
@@ -1007,6 +1054,7 @@
     return {
       at: new Date().toISOString(), today: td,
       cards: all.length, rules: RULES.length, muted: mutedN, mutedIds: mutedIds, marked: markedN, dropped: dropped,
+      from: startFrom(), okN: markedN, openN: findings.length - markedN,
       findings: findings, byLevel: byLevel, byCat: byCat, byRule: byRule, byScope: byScope
     };
   }
@@ -1014,6 +1062,15 @@
   /* 札を貼る／はがす。v は 'seen' | 'spec' | 'fixed' | ''（はがす） */
   function pitInspectMark(key, v){
     if (!key) return;
+    /* 🔴🔴 v1.173.0 **「確認した」は要判断の規則だけ。** 画面から消すだけにしない（ここでも止める）。 */
+    if (v === 'ok'){
+      var rid = String(key).split(':')[0];
+      var r = RULES.filter(function(x){ return x.id === rid; })[0];
+      if (!r || !r.judge){
+        console.warn('[inspect] この規則に「確認した」は付けられません（見て決める規則ではありません）：' + rid);
+        return;
+      }
+    }
     var mk = marks();
     if (!v) delete mk[key];
     /* 誰が付けたか＝フローの記録と同じ1本（pitFlowMe）。ここで自分で名乗り方を決めない */
@@ -1035,11 +1092,14 @@
       app: 'PitFlow',
       version: (document.querySelector('meta[name="app-version"]') || {}).content || '',
       書き出し: res.at, 今日: res.today,
-      対象台数: res.cards, 規則の数: res.rules, 黙らせている規則: res.muted,
+      対象台数: res.cards, 規則の数: res.rules,
+      日付の前後を見る起点日: res.from || '（決めていない）',
+      直す件数: res.openN, 確認した件数: res.okN,
       重さごと: res.byLevel, 分類ごと: res.byCat, 規則ごと: res.byRule, 車のいまごと: res.byScope,
       所見: res.findings.map(function(f){
         return {
           規則: f.ruleId, 重さ: f.level, 分類: f.cat, 見出し: f.title,
+          種類: (f.judge ? '要判断（見て決める）' : '抜け・矛盾（直す）'),
           車のいま: (f.scope === 'past' ? '終わった記録' : 'いま動いている車'),
           対象: f.kind, id: f.refId, お客様: f.name, 車: f.car || '', ナンバー: f.plate || '',
           予約番号: f.resNo || '', 状態: f.state || '', 課: f.div || '',
@@ -1048,7 +1108,7 @@
           /* 🔴 v1.168.1 札は**人が読む言葉**で出す（'spec' のままだと②③で意味が伝わらない）。
              ⚠ 言葉の元は上の MARKS 表1本。ここで綴らない。 */
           札: (function(){ var m = MARKS.filter(function(x){ return x.id === f.mark; })[0]; return m ? m.label : ''; })(),
-          札の印: f.mark || '', 札をつけた日: f.markAt || ''
+          札の印: f.mark || '', 札をつけた日: f.markAt || '', 札をつけた人: f.markBy || ''
         };
       })
     };

@@ -352,10 +352,70 @@
       + '</div>';
   }
 
+  /* ============================================================
+     🔴🔴 v1.177.0（ゆうた報告「なんか検索ボックスの挙動が おそい・・・」）
+     ------------------------------------------------------------
+     ◎何が遅かったか（6,200人・1,200カードで実測、1文字「9」＝6,230件出る時）
+       ① 行を組み立てる（レイアウト）… **11.5 秒**  ← ほぼ全部これ
+       ② アイコンを流し込む         … 2.5 秒
+       ③ 探して文字を作る           … 0.6 秒
+       ＝ 合計 **約 14.7 秒**。しかも1文字打つたびに、これを最初からやり直していた。
+     ◎直し方（**出す数は1件も減らしていない**）
+       ① CSS の `content-visibility`（css/search.css）… 画面の外にある行は開いた時に組み立てる
+       ② 打っている間は描き直さない（下の `pitTypeSoon`）… 「920」なら3回→1回
+       ③ 顧客の残りは次の周期から足す（下の `restSoon`）… 最初の1画面がすぐ出る
+       ＝ 同じ条件で **約 0.5 秒**。
+     ⚠ **探し方（何が当たるか）も、出す件数も、1文字も変えていない。** 出し方だけ。
+     ⚠ `pitSearchInput(q)` は今までどおり「呼んだらその場で描く」まま
+        （試験・フォーカス復帰・`pitSearchReopen` がこれを使う）。待つのは `pitSearchSoon` の側。
+     ============================================================ */
+  var FIRST = 100;                        /* 顧客の最初に組み立てる件数（残りは restSoon が足す） */
+  var _rest = null;
+  function restSoon(list, from, words) {
+    if (_rest) { clearTimeout(_rest); _rest = null; }
+    var host = document.getElementById('psr-cust-rows');
+    if (!host) return;
+    var i = from;
+    var step = function () {
+      _rest = null;
+      /* 描き直された時は、その箱ごと入れ替わっている＝この続きはもう要らない */
+      if (document.getElementById('psr-cust-rows') !== host) return;
+      var end = Math.min(i + 300, list.length);
+      WORDS = words;
+      var frag = '';
+      for (var k = i; k < end; k++) frag += custRow(list[k]);
+      WORDS = [];
+      host.insertAdjacentHTML('beforeend', frag);
+      i = end;
+      if (i < list.length) _rest = setTimeout(step, 0);
+    };
+    _rest = setTimeout(step, 0);
+  }
+
+  /* 打ち終わるまで待って1回だけ描く。key ごとに別々に数える（マスター検索／呼び出し）。
+     ⚠ 変換中（IME）は長めに待つ＝「やまだ」の途中で数千件を組み立てない。 */
+  var _soon = {};
+  window.pitTypeSoon = function (key, ev, fn) {
+    if (_soon[key]) clearTimeout(_soon[key]);
+    var ms = (ev && ev.isComposing) ? 400 : 140;
+    _soon[key] = setTimeout(function () { _soon[key] = null; fn(); }, ms);
+  };
+  /* 検索欄の oninput はこちらを呼ぶ（消した時だけは待たずにすぐ閉じる） */
+  window.pitSearchSoon = function (q, ev) {
+    var v = String(q == null ? '' : q);
+    if (!v.trim()) {
+      if (_soon.search) { clearTimeout(_soon.search); _soon.search = null; }
+      window.pitSearchInput(v);
+      return;
+    }
+    window.pitTypeSoon('search', ev, function () { window.pitSearchInput(v); });
+  };
+
   // 入力ハンドラ
   window.pitSearchInput = function (q) {
     const box = document.getElementById(ST.results);
     if (!box) return;
+    if (_rest) { clearTimeout(_rest); _rest = null; }   /* 前の続きは捨てる */
     const raw = String(q || '').trim();
     if (!raw) { box.classList.remove('open'); box.innerHTML = ''; return; }
     const words = raw.split(/\s+/).map(norm).filter(Boolean);
@@ -391,13 +451,15 @@
       html += '<div class="psr-head"><i data-ic=user data-ics=16></i> 顧客 ' + custHits.length + '件'
             + (custHits.length > MAX ? '<span style="color:var(--text3)">　全部出しています。スペースで区切ってもう1語足すと絞れます</span>' : '')
             + '</div>';
-      html += custHits.map(custRow).join('');
+      /* 🔴 v1.177.0 顧客は全件出す（v1.102.1 のまま）が、**組み立ては先頭 FIRST 件だけ先に**。
+         残りは下の `restSoon()` が次の周期から足していく（切っていない・数は上の見出しが本当の数）。 */
+      html += '<div id="psr-cust-rows">' + custHits.slice(0, FIRST).map(custRow).join('') + '</div>';
     }
     html += sec('<i data-ic=box data-ics=16></i>', '過去入庫', past, '<span style="color:var(--text3)">（1か月より前の返車済み）</span>');
     box.innerHTML = html;
     WORDS = [];                            /* 描き終わったら空に戻す（次の描き直しで入れ直す） */
-    if (window.pitIcons) { try { pitIcons(box); } catch (e) {} }
     box.classList.add('open');
+    if (custHits.length > FIRST) restSoon(custHits, FIRST, words);
   };
 
   // 顧客の結果クリック＝顧客詳細を直接開く（戻れるようにワードは残す）

@@ -223,6 +223,14 @@
   }
 
   /* ===== カードの「呼び出し」＝候補は車両単位（名前で引けば人の全車両・ナンバーでその車） ===== */
+  /* 🔴 v1.177.0（ゆうた報告「検索ボックスの挙動が おそい」）
+     打ち終わるまで待って1回だけ描く。**待ち方の物差しは search.js の1本**（`pitTypeSoon`）。
+     ⚠ ここに書き写さない。`custSuggest(q)` は今までどおり「呼んだらその場で描く」まま（試験もこれを使う）。 */
+  window.custSuggestSoon=function(qstr,ev){
+    const v=String(qstr==null?'':qstr);
+    if(!window.pitTypeSoon){ custSuggest(v); return; }
+    pitTypeSoon('recall', ev, function(){ custSuggest(v); });
+  };
   window.custSuggest=function(qstr){
     /* 🔴 v1.44.0 候補の箱は**いま開いているフォームの中**から探す。
        入庫カードのフォームは置き場所が2つ（#md-body／#md-body-modal）あり、

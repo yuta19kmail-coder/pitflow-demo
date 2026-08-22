@@ -709,6 +709,26 @@
     if (!window.PIT_CLOUD) return true;                 /* 練習用サイトは全部さわれる */
     return !!(window.pitIsAdmin && pitIsAdmin());
   }
+  /* 🔴🔴 v1.170.0（ゆうた指定 2026-08-22）**確定金額と確定日は、これまで通り管理者のみ。**
+     🗣「確定金額と確定日だけはこれまで通り管理者のみ」
+     ◎なぜ外に出したか
+       データチェックの「ここを直す」（inspect-fix.js）から、**アーカイブ済みの車でも
+       指摘された欄だけは誰でも直せる**ようにした。その時に
+       **確定金額（amountFinal）・実績カウント日（completedAt）・確定返車日（returnDateFinal）だけは
+       通してはいけない。**
+     🔴 そこで**同じ物差しを貸す**（あちらで `pitIsAdmin()` を書き写させない）。
+        書き写すと、いつか片方だけ直って**穴になる**。 */
+  window.pitCanEditFinal = canEditResultDate;
+  /* 🔴 v1.170.0 **実績カウント日を入れる手順は、ここ1本。**
+     ゆうた指定「実績日を変えたら、返車日も一緒に動かす」＝**3つを必ず揃える**。
+     ⚠ データチェックの「ここを直す」からも同じ道を通す。片方だけ入れると
+        実績カレンダーと返車カレンダーがズレる。 */
+  window.pitApplyResultDate = function (c, v) {
+    if (!c) return;
+    c.completedAt = v;
+    c.returnDate = v;
+    c.returnDateFinal = v;
+  };
   function resultDateRow(c){
     const cur = c.completedAt || '';
     const shown = cur ? fmtMD(cur) : '—';
@@ -744,10 +764,8 @@
     if (!v) return;                                  /* 空にはしない＝実績から消えてしまう */
     const before = _c.completedAt || '（なし）';
     if (v === _c.completedAt) return;
-    _c.completedAt = v;
-    /* 🔴 ゆうた指定：返車日も一緒に動かす */
-    _c.returnDate = v;
-    _c.returnDateFinal = v;
+    /* 🔴 ゆうた指定：返車日も一緒に動かす。⚠ 3つ揃える手順は下の1本（pitApplyResultDate） */
+    pitApplyResultDate(_c, v);
     try { if (window.logFlow) logFlow(_c, '実績カウント日を ' + before + ' → ' + v + ' に変更（返車日も同じ日に）'); } catch(e){}
     try {
       if (window.pitLog) pitLog('実績カウント日を変更', { cardId: _c.id, kind: 'result',

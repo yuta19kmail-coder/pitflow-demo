@@ -43,6 +43,89 @@
     const raw = String(qStr || '').trim();
     return raw ? raw.split(/\s+/).map(norm).filter(Boolean) : [];
   };
+  /* ================================================================
+     🔴🔴 v1.176.0（ゆうた指定 2026-08-22）**当たった所を塗る。**
+     🗣「検索がヒットした時に**どこが当たってるのか**ハイライト表示。
+     　　例えばナンバーで **920** で検索した時に **9/20** とかでヒットして
+     　　？？？って迷って意外とはかどらない」
+     ◎なにが困っていたか
+       探し方は**全部つなげた1本の文字列**（`cardBlob`）に対する当たり判定なので、
+       **どの欄で当たったのかが画面に一切出ていなかった**。
+       ナンバーのつもりで打った数字が**日付**に当たっても、行を見ても分からない。
+     🔴 **拾う範囲（何がヒットするか）は1文字も変えない。** 見えるようにするだけ。
+     ================================================================ */
+
+  /* ならし（norm）と同じことを1文字ずつやって、**元の文字の位置**を覚えておく。
+     ⚠ norm は空白を消すので、そのままだと「ならした後の位置」から元の位置に戻れない。 */
+  function normIndex(s) {
+    var raw = (s == null ? '' : String(s));
+    var out = '', idx = [];
+    for (var i = 0; i < raw.length; i++) {
+      var ch = raw[i];
+      if (/\s/.test(ch)) continue;                      /* 空白は消す（norm と同じ） */
+      ch = ch.replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+             .replace(/[ァ-ヶ]/g,        function (c) { return String.fromCharCode(c.charCodeAt(0) - 0x60); })
+             .toLowerCase();
+      for (var k = 0; k < ch.length; k++) { out += ch[k]; idx.push(i); }   /* 1文字が2文字になる字もある */
+    }
+    return { n: out, idx: idx, raw: raw };
+  }
+
+  /* 当たった所を <mark> で塗った HTML を返す（当たらなければ、ただの esc と同じ）。
+     🔴 **塗るのは元の字**（ならした字ではない）＝画面の見た目は変わらない。 */
+  function markHits(raw, words) {
+    var text = (raw == null ? '' : String(raw));
+    if (!text || !words || !words.length) return esc(text);
+    var M = normIndex(text);
+    if (!M.n) return esc(text);
+    var hit = [];                                       /* 塗る場所（元の字の位置） */
+    words.forEach(function (w) {
+      if (!w) return;
+      var from = 0, at;
+      while ((at = M.n.indexOf(w, from)) >= 0) {
+        var s0 = M.idx[at], e0 = M.idx[at + w.length - 1];
+        if (s0 != null && e0 != null) hit.push([s0, e0 + 1]);
+        from = at + 1;                                  /* 重なりも拾う */
+      }
+    });
+    if (!hit.length) return esc(text);
+    hit.sort(function (a, b) { return a[0] - b[0]; });
+    var merged = [];                                    /* 重なった塗りはつなげる */
+    hit.forEach(function (r) {
+      var last = merged[merged.length - 1];
+      if (last && r[0] <= last[1]) { if (r[1] > last[1]) last[1] = r[1]; }
+      else merged.push([r[0], r[1]]);
+    });
+    var html = '', pos = 0;
+    merged.forEach(function (r) {
+      html += esc(text.slice(pos, r[0])) + '<mark class="psr-hit">' + esc(text.slice(r[0], r[1])) + '</mark>';
+      pos = r[1];
+    });
+    return html + esc(text.slice(pos));
+  }
+
+  /* どの欄で当たったか（欄の名前を、出てきた順で重複なしに）。
+     🔴 欄の表は `cardFields` / `custFields` の1本。**画面で組み立てない。**
+     🔴🔴 日付は「9/20」「0920」のような**別の書き方でも当たる**作りなので、
+        当たった書き方（`as`）も一緒に返す。＝ **920 でナンバーのつもりが 9/20 に当たった**時に、
+        画面の「2026-09-20」を見ても分からない、というのが今回の困りごとそのもの。 */
+  function whereHits(fields, words) {
+    var out = [], seen = {};
+    (fields || []).forEach(function (f) {
+      var n = norm(f.text);
+      if (!n) return;
+      var any = (words || []).some(function (w) { return w && n.indexOf(w) >= 0; });
+      if (!any) return;
+      if (seen[f.label]) return;
+      seen[f.label] = 1; out.push({ label: f.label, as: f.as || '' });
+    });
+    return out;
+  }
+
+  /* 🔴 v1.176.0 新規予約の「呼び出し」からも同じものを使う（あちらに書き写さない） */
+  window.pitSearchMark  = markHits;
+  window.pitSearchWhere = whereHits;
+
   // N日前の日付文字列（YYYY-MM-DD）＝返車済みの「直近1か月」判定に使う
   function _daysAgoStr(n) {
     const d = new Date(); d.setDate(d.getDate() - n);
@@ -74,18 +157,37 @@
     return [d, m + '/' + day, (+m) + '/' + (+day), m + day, y + m + day];
   }
 
-  // カード1枚の検索用テキスト（全部つなげて正規化）
-  function cardBlob(c) {
-    const parts = [c.resNo, c.customer, c.kana, c.car, c.maker, c.plate, c.tel, c.menu, c.frontStaff, c.staff, c.memo, c.office, statusLabel(c), teamLabel(c)];
-    (c.contacts || []).forEach(ct => { parts.push(ct.tel, ct.label); });
-    dateForms(c.reserveDate).forEach(x => parts.push(x));
-    dateForms(c.returnDate).forEach(x => parts.push(x));
+  /* 🔴🔴 v1.176.0 **カード1枚の「検索の材料」を、欄の名前つきの表にした。**
+     ＝ 探すのに使う文字と、「どの欄で当たったか」を出す元が**同じ1本**になる。
+     ⚠ 中身（拾う範囲）は**1文字も変えていない**。名前を付けて並べ替えただけ。
+     　 ここに欄を足す＝検索に当たる範囲が広がる、ということ。 */
+  function cardFields(c) {
+    const F = [];
+    const add = (label, v) => { if (v) F.push({ label: label, text: String(v) }); };
+    add('予約番号', c.resNo); add('お名前', c.customer); add('カナ', c.kana);
+    add('車種', c.car); add('メーカー', c.maker); add('ナンバー', c.plate);
+    add('TEL', c.tel); add('作業内容', c.menu);
+    add('担当', c.frontStaff); add('担当', c.staff);
+    add('メモ', c.memo); add('事務', c.office);
+    add('状態', statusLabel(c)); add('国産／輸入', teamLabel(c));
+    (c.contacts || []).forEach(ct => { add('TEL', ct.tel); add('TEL', ct.label); });
+    /* 🔴🔴 v1.176.0 日付は**別の書き方でも当たる**（2026-09-20 / 09/20 / 9/20 / 0920 / 20260920）。
+       ＝ 「920」でナンバーのつもりが**日付に当たる**のは、この 0920 のせい。
+       🔴 どの書き方で当たっても、行には**人が読む形（9/20）**を添える。
+          ⚠ 当たった生の形（0920）をそのまま出しても、読んだ人はやっぱり分からない。 */
+    const nice = (d) => { const q = String(d || '').split('-'); return q.length === 3 ? ((+q[1]) + '/' + (+q[2])) : ''; };
+    dateForms(c.reserveDate).forEach(x => { if (x) F.push({ label:'入庫日', text:String(x), as: nice(c.reserveDate) }); });
+    dateForms(c.returnDate).forEach(x => { if (x) F.push({ label:'返車日', text:String(x), as: nice(c.returnDate) }); });
     if (c.loanerId) {
       const l = (state.loaners || []).find(x => x.id === c.loanerId);
-      if (l) parts.push(l.name, l.model, l.plate);
-      parts.push(c.loanerId, '代車');
+      if (l) { add('代車', l.name); add('代車', l.model); add('代車', l.plate); }
+      add('代車', c.loanerId); add('代車', '代車');
     }
-    return norm(parts.filter(Boolean).join(' '));
+    return F;
+  }
+  // カード1枚の検索用テキスト（全部つなげて正規化）
+  function cardBlob(c) {
+    return norm(cardFields(c).map(f => f.text).join(' '));
   }
 
   // 顧客台帳（人＋車両）の検索用テキスト
@@ -94,15 +196,21 @@
     const p = cs.find(x => x.primary) || cs[0];
     return p ? (p.tel || '') : '';
   }
-  function custBlob(cust) {
-    const parts = [cust.name, cust.kana];
-    (cust.contacts || []).forEach(ct => { parts.push(ct.tel, ct.label); });
+  /* 🔴 v1.176.0 顧客も同じく「欄の名前つきの表」から（拾う範囲は変えていない） */
+  function custFields(cust) {
+    const F = [];
+    const add = (label, v) => { if (v) F.push({ label: label, text: String(v) }); };
+    add('お名前', cust.name); add('カナ', cust.kana);
+    (cust.contacts || []).forEach(ct => { add('TEL', ct.tel); add('TEL', ct.label); });
     /* 🔴 v1.49.0 アーカイブした車のナンバー・車種では、その顧客を検索に出さない。
        ⚠ ここを外すと「片付けたはずの車のナンバー」で顧客が引っかかる。 */
     (cust.vehicles || [])
       .filter(v => (window.PitArchive ? !PitArchive.vehArchived(cust, v) : true))
-      .forEach(v => { parts.push(v.plate, v.maker, v.car); });
-    return norm(parts.filter(Boolean).join(' '));
+      .forEach(v => { add('ナンバー', v.plate); add('メーカー', v.maker); add('車種', v.car); });
+    return F;
+  }
+  function custBlob(cust) {
+    return norm(custFields(cust).map(f => f.text).join(' '));
   }
   function searchCustomers(words) {
     /* 🔴 v1.49.0 アーカイブした顧客は検索に出さない（archive-pit.js が判定）。
@@ -150,9 +258,23 @@
     }
     return b ? ('<span class="psr-bs">' + b + '</span>') : '';
   }
+  /* 🔴 v1.176.0 いま探している語（画面を描くたびに入れ替える）。
+     ⚠ 行を作る関数の引数を増やすと `list.map(resultRow)` が全部壊れるので、
+        **描く直前にここへ置いて、描き終わったら空にする**（画面の中だけの持ち物）。 */
+  var WORDS = [];
+  /* 当たった所の1行（どの欄で当たったか）。⚠ 1つも当たっていなければ何も出さない。 */
+  function hitLine(fields) {
+    const w = whereHits(fields, WORDS);
+    if (!w.length) return '';
+    return '<div class="psr-where"><i data-ic=search data-ics=14></i>'
+         + w.map(function (x) {
+             return '<span>' + esc(x.label) + (x.as ? '<em>' + esc(x.as) + '</em>' : '') + '</span>';
+           }).join('')
+         + 'に一致</div>';
+  }
   function resultRow(c) {
     const id = esc(c.id);
-    const no = c.resNo ? '<span class="psr-no">' + esc(c.resNo) + '</span>' : '';
+    const no = c.resNo ? '<span class="psr-no">' + markHits(c.resNo, WORDS) + '</span>' : '';
     const st = statusLabel(c);
     const team = c.boardId === 'import' ? '#ec4899' : '#1db97a';
     // ステータスバッジは左（予約番号の下）
@@ -188,12 +310,13 @@
     return '<div class="psr-row">'
       + '<div class="psr-lead">' + no + stBadge + '</div>'
       + '<div class="psr-main">'
-      + '<div class="psr-l1"><b class="psr-name">' + esc((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</b>'
-      + (c.car ? '<span class="psr-car">' + esc(c.car) + '</span>' : '')
-      + (c.plate ? '<span class="psr-plate">' + esc(c.plate) + '</span>' : '')
+      + '<div class="psr-l1"><b class="psr-name">' + markHits((window.pitCustName?pitCustName(c):c.customer) || '（未入力）', WORDS) + ' 様</b>'
+      + (c.car ? '<span class="psr-car">' + markHits(c.car, WORDS) + '</span>' : '')
+      + (c.plate ? '<span class="psr-plate">' + markHits(c.plate, WORDS) + '</span>' : '')
       + rowBadges(c)
       + '</div>'
-      + '<div class="psr-l2">' + (tel ? ('<i data-ic=phone data-ics=16></i> ' + esc(tel)) : '') + (dstr ? ((tel ? '　・　' : '') + '<i data-ic=calendar data-ics=16></i> ' + esc(dstr)) : '') + '</div>'
+      + '<div class="psr-l2">' + (tel ? ('<i data-ic=phone data-ics=16></i> ' + markHits(tel, WORDS)) : '') + (dstr ? ((tel ? '　・　' : '') + '<i data-ic=calendar data-ics=16></i> ' + markHits(dstr, WORDS)) : '') + '</div>'
+      + hitLine(cardFields(c))
       + '</div>'
       + '<div class="psr-acts">' + acts + '</div>'
       + '</div>';
@@ -211,15 +334,16 @@
     const tel = custPrimaryTel(cust);
     const vs = cust.vehicles || [];
     const v0 = vs[0] || {};
-    const car = v0.car ? '<span class="psr-car">' + esc(v0.car) + '</span>' : '';
-    const plate = v0.plate ? '<span class="psr-plate">' + esc(v0.plate) + '</span>' : '';
+    const car = v0.car ? '<span class="psr-car">' + markHits(v0.car, WORDS) + '</span>' : '';
+    const plate = v0.plate ? '<span class="psr-plate">' + markHits(v0.plate, WORDS) + '</span>' : '';
     const more = vs.length > 1 ? '<span class="psr-more">ほか' + (vs.length - 1) + '台</span>' : '';
     const last = custLastVisit(cust);
     return '<div class="psr-row">'
       + '<div class="psr-lead"><span class="psr-cust-tag"><i data-ic=user data-ics=16></i></span></div>'
       + '<div class="psr-main">'
-      + '<div class="psr-l1"><b class="psr-name">' + esc(cust.name || '（無名）') + ' 様</b>' + car + plate + more + '</div>'
-      + '<div class="psr-l2">' + (tel ? ('<i data-ic=phone data-ics=16></i> ' + esc(tel)) : '') + (last ? ((tel ? '　・　' : '') + '最終入庫 ' + esc(last)) : '') + '</div>'
+      + '<div class="psr-l1"><b class="psr-name">' + markHits(cust.name || '（無名）', WORDS) + ' 様</b>' + car + plate + more + '</div>'
+      + '<div class="psr-l2">' + (tel ? ('<i data-ic=phone data-ics=16></i> ' + markHits(tel, WORDS)) : '') + (last ? ((tel ? '　・　' : '') + '最終入庫 ' + esc(last)) : '') + '</div>'
+      + hitLine(custFields(cust))
       + '</div>'
       + '<div class="psr-acts">'
       + actBtn('顧客情報', "pitSearchOpenCust('" + esc(cust.id) + "')")
@@ -235,6 +359,7 @@
     const raw = String(q || '').trim();
     if (!raw) { box.classList.remove('open'); box.innerHTML = ''; return; }
     const words = raw.split(/\s+/).map(norm).filter(Boolean);
+    WORDS = words;                         /* 🔴 v1.176.0 この描き直しのあいだだけ、当たった所を塗る */
     const cardHits = search(q);
     const custHits = searchCustomers(words);
     if (!cardHits.length && !custHits.length) {
@@ -270,6 +395,8 @@
     }
     html += sec('<i data-ic=box data-ics=16></i>', '過去入庫', past, '<span style="color:var(--text3)">（1か月より前の返車済み）</span>');
     box.innerHTML = html;
+    WORDS = [];                            /* 描き終わったら空に戻す（次の描き直しで入れ直す） */
+    if (window.pitIcons) { try { pitIcons(box); } catch (e) {} }
     box.classList.add('open');
   };
 

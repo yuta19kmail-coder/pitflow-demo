@@ -216,6 +216,12 @@
 .cf-recall-item:last-child{ border-bottom:0; }
 .cf-recall-item:hover{ background:var(--bg3); }
 .cf-recall-item span{ color:var(--text3); font-size:11.5px; margin-left:4px; }
+/* 🔴 v1.176.0（ゆうた指定）当たった所を塗る／どの欄で当たったかを出す。
+   ⚠ 塗りの色は「探して見つけた」印。付箋・課の色とぶつからない黄色にしてある。 */
+.cf-recall-item mark.psr-hit{ background:rgba(250,204,21,.28); color:inherit; border-radius:3px;
+  padding:0 1px; font-weight:800; }
+.cf-recall-where{ display:block; margin-top:2px; color:var(--text3) !important; font-size:10.5px !important;
+  margin-left:0 !important; }
 
 /* ===== 顧客リスト ビュー ===== */
 .cust-head{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }

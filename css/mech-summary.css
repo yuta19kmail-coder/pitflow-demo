@@ -16,6 +16,15 @@
   transition:background .12s, border-color .12s, color .12s;
 }
 .cf-mchip:hover{ border-color:var(--border2,#444870); }
+/* 🔴 v1.174.0（ゆうた指定）いちばん左の「なし」＝該当者が本当に居ない、という答え。
+   ⚠ 人のチップと**見分けが付く**ようにする（押し間違えると「居ない」と記録されるため）。 */
+.cf-mnone{ font-weight:800; color:var(--text3,#79839a); border-style:dashed; }
+.cf-mnone:hover{ color:var(--text2,#9fa8c7); }
+.cf-mnone.on{ border-style:solid; border-color:var(--text3,#79839a);
+  background:var(--bg,#12141c); color:var(--text,#e8ecf3); }
+/* 見出しの右＝未入力（忘れ）はオレンジ／該当者なし（決めた）は静かに */
+.cf-mech-cnt.miss{ color:#f59e0b; font-weight:800; }
+.cf-mech-cnt.ok{ color:var(--text3,#79839a); }
 .cf-mchip.full{ opacity:.4; cursor:not-allowed; }
 .cf-mchip.on{ border-color:transparent; }
 .cf-mech-i .cf-mchip.on{ background:#38bdf8; color:#06283d; }

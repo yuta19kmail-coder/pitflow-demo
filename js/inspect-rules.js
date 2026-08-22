@@ -795,16 +795,24 @@
       fix:'カードを開いて確定金額と担当を入れてください。',
       each: function(c){ return (isDone(c) && !c.returnStage) ? '完TELの印が無いまま実績になっています' : ''; } },
 
-    { id:'T03', cat:'state', level:'amber',
-      title:'作業が終わっているのに、整備担当が空',
-      why:'メカニックの実績（作業サマリー）に数えられません。誰がやったか残りません。',
-      fix:'カードの整備タブで担当を入れてください。',
+    /* 🔴🔴 v1.174.0（ゆうた指定 2026-08-22）**「なし」ができたので、空っぽ＝100%忘れ。**
+       🗣「リアルに該当者がいない場合に、忘れなのか リアルなのかをこれで判断するように」
+       🗣「**閾値としても入ってないのは100％忘れになるから、そこも加味して作って**」
+       ◎前まで＝**どちらも空の時だけ**「確認」で言っていた。
+         ＝「整備だけ入れて点検は忘れた」が素通りし、しかも**居ないのか忘れたのか読めなかった**。
+       🔴 いま＝**片方でも決まっていなければ「要対応」**。居ないなら「なし」を押せば済むので、
+          空のまま残る理由が1つも無い＝**空＝忘れ**と言い切れる。
+       🔴 決まっているかの物差しは **mech-pick.js の `pitMechUnsettled` 1本**。ここで条件を書き写さない。 */
+    { id:'T03', cat:'state', level:'red',
+      title:'作業が終わっているのに、担当が入っていない',
+      why:'メカニックの実績（作業サマリー）に数えられません。誰がやったか残りません。'
+         + '居ないなら「なし」を選べるので、空のままは入れ忘れです。',
+      fix:'カードの整備タブで担当を入れてください。居ないなら、いちばん左の「なし」を押してください。',
       each: function(c){
         if (c.status !== 'workDone' && !isDone(c)) return '';
         if (noSale(c)) return '';
-        var m = (Array.isArray(c.mechanics) ? c.mechanics : []).filter(Boolean);
-        var i = (Array.isArray(c.inspectors) ? c.inspectors : []).filter(Boolean);
-        return (m.length || i.length) ? '' : '整備担当・点検担当がどちらも空です';
+        var un = w.pitMechUnsettled ? w.pitMechUnsettled(c) : [];
+        return un.length ? (un.join('・') + 'が入っていません（居ないなら「なし」）') : '';
       } },
 
     { id:'T04', cat:'state', level:'amber',

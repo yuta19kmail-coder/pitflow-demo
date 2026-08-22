@@ -189,27 +189,9 @@
   /* 実績になった車（売上なしは別扱い） */
   function isDone(c){ return !!c && c.status === 'returned' && !noSale(c); }
 
-  /* 🔴 v1.169.0 「車検なのに行く日が決まっていない」の中身＝S08（もう預かっている）と S01（これから）で共通。
-     ⚠ 条件を2つの規則に書き写さない（片方だけ直す事故を防ぐ）。戻り＝{ n: 入庫まであと何日 } / null */
-  function _shakenUndecided(c, ctx){
-    if (!isLive(c) || !isShaken(c)) return null;
-    var sc = c.inspSchedule || {};
-    if (sc.result === 'done' || t(sc.decided)) return null;
-    /* ⚠ 再検で戻ってきた車は「まだ決めていない」ではなく「もう一度決め直す」＝S06 が言う */
-    if ((Array.isArray(sc.history) ? sc.history : []).some(function(x){ return x && x.result === 'recheck'; })) return null;
-    if (!t(c.reserveDate)) return null;
-    var n = days(ctx.today, c.reserveDate);
-    if (n == null || n > LIM.soon) return null;   /* まだ先の車は言わない */
-    return { n: n };
-  }
-
-  /* いまの工程に入ってからの日数。🔴 起点は flow-pit.js の1本（phaseAt を直接見ない） */
-  function stayDays(c, td){
-    var ms = w.pitPhaseStartMs ? w.pitPhaseStartMs(c) : (c.phaseAt || null);
-    if (!ms) return null;
-    var d = new Date(+ms); if (isNaN(d.getTime())) return null;
-    return days(ymd(d), td);
-  }
+  /* ⚠ v1.172.2（ゆうた指定）**S01/S08（車検の行く日が未定）と F02（同じエリアに長く止まっている）を
+     規則表から消した**ので、その2つだけが使っていた `_shakenUndecided()` と `stayDays()` も一緒に消した。
+     🔴 **規則を消したら、その規則だけが使っていた道具も消す**（残すと次の人が「まだ使っている」と誤解する）。 */
 
   /* ================================================================
      4. 規則表
@@ -268,16 +250,6 @@
         return '概算 ' + man(a) + '（' + yen(a) + '）だけで数えています';
       } },
 
-    { id:'M05', cat:'money', level:'amber',
-      title:'金額のけたが大きすぎる',
-      why:'1台で ' + man(LIM.huge) + ' を超えています。0を1つ多く打った可能性があります。',
-      fix:'金額を見直してください。打ち間違いなら直す。本当にこの金額なら、そのまま置いておけば次も出ます（消す道はありません）。',
-      each: function(c){
-        var f = [['amountFinal','確定金額'],['amountOrder','受注金額'],['amountQuote','見積金額']]
-          .filter(function(x){ return num(c[x[0]]) >= LIM.huge; })
-          .map(function(x){ return x[1] + ' ' + yen(c[x[0]]); });
-        return f.length ? f.join('／') : '';
-      } },
 
     { id:'M06', cat:'money', level:'amber',
       title:'金額のけたが小さすぎる',
@@ -322,47 +294,13 @@
         return (t(c.noSaleBy) && t(c.noSaleAt)) ? '' : '売上なしにした人か日付が残っていません';
       } },
 
-    { id:'M10', cat:'money', level:'amber',
-      title:'分割払いなのに、入金予定日が空',
-      why:'いつ入るかが分からないと、資金の見通しが立ちません。',
-      fix:'入金予定日を入れてください。',
-      each: function(c){
-        return (c.paymentSeparate && !t(c.paymentDate)) ? '分割払いの印がありますが、入金予定日が空です' : '';
-      } },
 
     /* ── 日付・進行 ─────────────────────────────────────────── */
     /* 🔴 v1.168.1（ゆうた指摘）**「今月に寄せています」は内輪の言葉だった。**
        🗣「41.5万 を今月に寄せています って書き方が恐らくみんなわからないと思う」
        ＝ 「寄せる」は売上の数え方（sales-count.js）の言い方であって、現場の言葉ではない。
           言いたいのは「**この車の金額が、今月の見込みに入ったままになっている**」。 */
-    { id:'F01', cat:'flow', level:'red',
-      title:'返車予定日を過ぎたのに、まだ返していない',
-      why:'売上は「終わった月にあとから足す」ことができない決まりです。'
-         + 'そのため、返車予定日を過ぎた車の金額は今月の見込みに入ったままになります。'
-         + '実際には終わっていないので、今月の着地がそのぶん多く見えます。',
-      fix:'返す日が決まっているなら、返車予定日を今の見込みに直してください。'
-         + '止まっているなら、なぜ止まっているかをカードのフローに一言残してください。',
-      each: function(c, ctx){
-        if (!isLive(c)) return '';
-        var cd = countDate(c);
-        if (!cd || cd >= ctx.today) return '';
-        var n = days(cd, ctx.today);
-        return '返車予定は ' + cd + '（' + n + '日前）。'
-             + 'まだ返していないので、' + man(amountOf(c)) + ' が今月の見込みに入ったままです';
-      } },
 
-    { id:'F02', cat:'flow', level:'amber',
-      title:'同じエリアに長く止まっている',
-      why:'工程が動いていません。お客様への連絡が止まっているか、カードの移動を忘れています。',
-      fix:'進んでいるならタスクボードでカードを動かしてください。止まっているなら理由をカードのフローに。',
-      each: function(c, ctx){
-        if (!isLive(c)) return '';
-        var lim = LIM.stay[c.status];
-        if (lim == null) return '';
-        var d = stayDays(c, ctx.today);
-        if (d == null || d <= lim) return '';
-        return statusText(c) + ' のまま ' + d + '日（目安 ' + lim + '日）';
-      } },
 
     { id:'F03', cat:'flow', level:'red',
       title:'完TELを通ったのに、返車予定日が空',
@@ -449,20 +387,6 @@
              + (t(c.outsourceTo) ? '／' + t(c.outsourceTo) : '')) : '';
       } },
 
-    { id:'F11', cat:'flow', level:'gray',
-      title:'未入庫のまま、まもなく自動で片づきます',
-      why:'未入庫は ' + LIM.noShowAuto + '日で自動アーカイブされます。'
-         + '本当は来る予定だった車なら、消える前に拾ってください。',
-      fix:'来るなら入庫日を入れ直す。来ないなら予約キャンセル（または未入庫）にしてください。',
-      each: function(c, ctx){
-        if (c.status !== 'cancelled' || c.cancelled || c.archived) return '';
-        var from = t(c.cancelledAt) || t(c.noShowAt);
-        if (!from) return '';
-        var d = days(from, ctx.today);
-        if (d == null) return '';
-        var left = LIM.noShowAuto - d;
-        return (left <= LIM.noShowLeft && left >= 0) ? ('あと ' + left + '日で自動アーカイブされます') : '';
-      } },
 
     /* ── 予約 ───────────────────────────────────────────────── */
     { id:'R01', cat:'resv', level:'red',
@@ -541,23 +465,6 @@
         return out.length ? (out.join('／') + ' が定休日です') : '';
       } },
 
-    { id:'R05', cat:'resv', level:'amber',
-      title:'同じ置き場所に2台',
-      why:'PIT配置図の同じマスに2台入っています。どちらかが実際には別の場所にあります。',
-      fix:'配置図で正しい場所へ動かしてください。',
-      all: function(ctx){
-        var g = {}, out = [];
-        ctx.cards.forEach(function(c){
-          if (!isLive(c) || !c.bayId || c.baySlot == null) return;
-          (g[c.bayId + '#' + c.baySlot] = g[c.bayId + '#' + c.baySlot] || []).push(c);
-        });
-        Object.keys(g).forEach(function(k){
-          if (g[k].length < 2) return;
-          var bay = (w.state && (state.bays || []).find(function(b){ return b.id === k.split('#')[0]; })) || {};
-          g[k].forEach(function(c){ out.push({ refId:c.id, text:(bay.name || '枠') + ' に ' + g[k].length + '台入っています' }); });
-        });
-        return out;
-      } },
 
     { id:'R06', cat:'resv', level:'gray',
       title:'無くなった置き場所を指している',
@@ -569,11 +476,6 @@
         return bays.some(function(b){ return b.id === c.bayId; }) ? '' : '置き場所（' + c.bayId + '）が配置図にありません';
       } },
 
-    { id:'R07', cat:'resv', level:'gray',
-      title:'書きかけのカードが残っている',
-      why:'保存されないまま残った下書きです。数にも売上にも入りませんが、たまっていくと重くなります。',
-      fix:'開いて保存するか、消してください（時間がたてば自動でも片づきます）。増え続けるようなら教えてください。',
-      each: function(c){ return c._draft ? '書きかけのまま残っています' : ''; } },
 
     /* ── 代車 ───────────────────────────────────────────────── */
     { id:'L01', cat:'loaner', level:'red',
@@ -678,23 +580,7 @@
        本番では21台出たが、中身は「**もう車を預かっている 10台**（最長25日前）」と
        「**これから来る 11台**」がまざっていた。**急ぎ方がまるで違う**のに横一列だったので分けた。
        ⚠ 中の条件は同じ。違うのは「入庫日を過ぎたか」だけ。 */
-    { id:'S08', cat:'shaken', level:'red',
-      title:'もう預かっているのに、陸運局へ行く日が決まっていない',
-      why:'車はもう手元にあります。行く日が決まらないかぎり、預かりがそのまま延び続けます。',
-      fix:'車検予定の画面で行く日を決めてください。枠が取れないなら、お客様に見込みを伝えてください。',
-      each: function(c, ctx){
-        var r = _shakenUndecided(c, ctx);
-        return (r && r.n < 0) ? ('入庫 ' + c.reserveDate + '（' + (-r.n) + '日前）から、行く日が未定です') : '';
-      } },
 
-    { id:'S01', cat:'shaken', level:'amber',
-      title:'これから入庫する車検の、陸運局へ行く日が決まっていない',
-      why:'入庫がもうすぐです。枠が取れないと、そのまま預かりが延びます。',
-      fix:'車検予定の画面で行く日を決めてください。',
-      each: function(c, ctx){
-        var r = _shakenUndecided(c, ctx);
-        return (r && r.n >= 0) ? ('入庫 ' + c.reserveDate + '（あと' + r.n + '日）で、行く日が未定です') : '';
-      } },
 
     { id:'S02', cat:'shaken', level:'red',
       title:'陸運局が休みの日に、車検の予定が入っている',
@@ -709,29 +595,7 @@
         return off.off ? ('車検予定 ' + sc.decided + ' は「' + off.label + '」です') : '';
       } },
 
-    { id:'S03', cat:'shaken', level:'amber',
-      title:'車検の日が近いのに、行く担当が決まっていない',
-      why:'当日ボードにも前日のLINEにも担当が出ません。誰が持って行くのか分かりません。',
-      fix:'車検予定の画面で担当（回送する人）を入れてください。',
-      each: function(c, ctx){
-        if (!isLive(c) || !isShaken(c)) return '';
-        var sc = c.inspSchedule || {};
-        if (!t(sc.decided) || sc.result === 'done') return '';
-        var n = days(ctx.today, sc.decided);
-        if (n == null || n < 0 || n > 1) return '';
-        return shakenStaff(c) ? '' : ('車検予定 ' + sc.decided + '（' + (n === 0 ? '今日' : '明日') + '）の担当が空です');
-      } },
 
-    { id:'S04', cat:'shaken', level:'gray',
-      title:'車検の行き先（陸運局）が空',
-      why:'当日ボードに行き先が出ません。',
-      fix:'車検予定の画面で陸運局を選んでください。',
-      each: function(c, ctx){
-        if (!isLive(c) || !isShaken(c)) return '';
-        var sc = c.inspSchedule || {};
-        if (!t(sc.decided) || sc.result === 'done' || s(sc.decided) < ctx.today) return '';
-        return shakenOffice(c) ? '' : ('車検予定 ' + sc.decided + ' の行き先が空です');
-      } },
 
     { id:'S05', cat:'shaken', level:'amber',
       title:'車検の予定日が、入庫より前か返車より後',
@@ -746,18 +610,6 @@
         return '';
       } },
 
-    { id:'S06', cat:'shaken', level:'amber',
-      title:'再検になったまま、次に行く日が決まっていない',
-      why:'落ちてもう一度行く車です。次の日を決めないと、そのまま止まります。',
-      fix:'車検予定の画面で次の日を決めてください。',
-      each: function(c){
-        if (!isLive(c) || !isShaken(c)) return '';
-        var sc = c.inspSchedule || {};
-        if (sc.result === 'done' || t(sc.decided)) return '';
-        var h = Array.isArray(sc.history) ? sc.history : [];
-        var re = h.filter(function(x){ return x && x.result === 'recheck'; });
-        return re.length ? ('再検（' + (re[re.length - 1].date || '') + '）のあと、次の日が空です') : '';
-      } },
 
     { id:'S07', cat:'shaken', level:'red',
       title:'代車・社用車の車検が切れそう（切れている）',
@@ -848,16 +700,6 @@
         return '';
       } },
 
-    { id:'D06', cat:'data', level:'amber',
-      title:'ナンバーが空か、0だけ',
-      why:'車を特定できません。同じお名前で複数台あると取り違えます。',
-      fix:'ナンバーを入れてください。',
-      each: function(c){
-        if (!isLive(c) && !isDone(c)) return '';
-        var p = t(c.plate);
-        if (!p) return 'ナンバーが空です';
-        return /^[0０\-\s　]*$/.test(p) ? ('ナンバーが「' + p + '」です') : '';
-      } },
 
     { id:'D07', cat:'data', level:'amber',
       title:'顧客控えに同じ人がいるのに、つながっていない',
@@ -1009,17 +851,28 @@
   function marks(){ if (w.state && !state.inspectMarks) state.inspectMarks = {}; return (w.state && state.inspectMarks) || {}; }
   function mutes(){ if (w.state && !state.inspectMutes) state.inspectMutes = {}; return (w.state && state.inspectMutes) || {}; }
 
-  /* 🔴🔴 v1.172.0（ゆうた指定）**前に「これでOK」を押したもの・黙らせた規則を外す。**
-     ◎なぜここでやるか
-       ボタンだけ消して印を残すと、**戻す手立てが無いまま永久に隠れる**。
-       ＝ 画面には出ないのに直っていない、という**いちばん困る状態**になる。
-     ⚠ 1回外せば済むので、外した時だけ保存する（毎回書きに行かない）。 */
+  /* 🔴🔴 v1.172.0（ゆうた指定）**前に「これでOK」を押した札を外す。**
+     ◎なぜ
+       「これでOK」は廃止した。ボタンだけ消して印を残すと、
+       **戻す手立てが無いまま永久に隠れる**＝画面には出ないのに直っていない、という状態になる。
+     ⚠ 1回外せば済むので、外した時だけ保存する（毎回書きに行かない）。
+
+     🔴🔴 v1.172.1（ゆうた訂正 2026-08-22）**黙らせている規則（inspectMutes）は捨てない。**
+       🗣「**出さないを選択してたやつはルールからはずしていい**」
+       ＝ 出し直すのではなく、**その規則そのものを規則表から消す**、という意味だった。
+       だからこの印は「**消す予定の規則の控え**」＝ゆうたが選んだ結果そのもの。**勝手に捨てない。**
+       ⚠ 規則を消したら、その時に一緒に片づける。 */
   function sweepEscapes(){
-    var mk = marks(), mu = mutes(), n = 0;
+    var mk = marks(), n = 0;
     Object.keys(mk).forEach(function(k){ if (mk[k] && DEAD_MARKS[mk[k].v]) { delete mk[k]; n++; } });
-    Object.keys(mu).forEach(function(k){ delete mu[k]; n++; });
+    /* 🔴 v1.172.2 **消した規則に付いていた「出さない」の印は片づける。**
+       指す先の規則がもう無いので、残しても誰も読めない（生きている規則の印には触らない）。 */
+    var mu = mutes(), have = {}, dead = 0;
+    RULES.forEach(function(r){ have[r.id] = 1; });
+    Object.keys(mu).forEach(function(k){ if (!have[k]) { delete mu[k]; dead++; } });
+    n += dead;
     if (n && w.PitDB && w.PitDB.save) { try { PitDB.save(); } catch(e){} }
-    if (n) console.log('[inspect] 前に隠していた ' + n + '件を出し直しました（v1.172.0）');
+    if (n) console.log('[inspect] 片づけました（これでOKの札／消した規則の印 あわせて ' + n + '件）');
     return n;
   }
 
@@ -1047,11 +900,11 @@
 
     var ctx = { today: td, cards: all, assigns: asg, vehs: vehs, vehIds: vehIds,
                 custByTel: custByTel, custByKana: custByKana };
-    sweepEscapes();                       /* 🔴 v1.172.0 隠していたものを出し直す */
-    var mk = marks();
+    sweepEscapes();                       /* 🔴 v1.172.0 「これでOK」で隠していたものを出し直す */
+    var mk = marks(), mu = mutes();
     var byId = {}; all.forEach(function(c){ if (c && c.id) byId[c.id] = c; });
 
-    var findings = [], mutedN = 0;   /* 🔴 v1.172.0 黙らせは廃止＝ここは必ず 0 */
+    var findings = [], mutedN = 0;
 
     function push(rule, ref, text, kind, name){
       var key = rule.id + ':' + (ref == null ? '-' : ref);
@@ -1064,9 +917,13 @@
       });
     }
 
+    var mutedIds = [];
     RULES.forEach(function(rule){
-      /* 🔴 v1.172.0 **規則を黙らせる道は無くした。** 全部の規則を必ず走らせる。
-         減らしたい時は、規則そのものを直す（この車では言わない、と理由を持って書く）。 */
+      /* 🔴🔴 v1.172.1（ゆうた訂正）**「出さない」を選んでいた規則は、これから規則表から消す。**
+         消すまでの間は、選んだとおり出さない（黙って戻すと、また同じ判断をさせることになる）。
+         🔴 ただし**黙って隠さない**＝画面の上に「消す予定の規則 ◯本」と名前まで出す。
+         ⚠ 新しく黙らせる道はもう無い（ボタンは撤去済み）。ここは**残っている印を読むだけ**。 */
+      if (mu[rule.id]) { mutedN++; mutedIds.push({ id: rule.id, title: rule.title }); return; }
       try {
         if (rule.each){
           all.forEach(function(c){
@@ -1149,7 +1006,7 @@
 
     return {
       at: new Date().toISOString(), today: td,
-      cards: all.length, rules: RULES.length, muted: mutedN, marked: markedN, dropped: dropped,
+      cards: all.length, rules: RULES.length, muted: mutedN, mutedIds: mutedIds, marked: markedN, dropped: dropped,
       findings: findings, byLevel: byLevel, byCat: byCat, byRule: byRule, byScope: byScope
     };
   }

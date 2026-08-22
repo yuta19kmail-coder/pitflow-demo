@@ -156,9 +156,18 @@
           🔴 **走った時刻を出す。** 押すたびにここが変わる＝走った証拠になる。 */
        +   '<div class="ins-when">' + esc(res.today) + ' <b>' + esc(hhmm(res.at)) + '</b> にチェック'
        +     ' ／ 対象 <b>' + res.cards + '</b>台 ／ 規則 <b>' + res.rules + '</b>本'
-       /* 🔴 v1.172.0 隠しているものは1件も無い＝そう言い切る（黙らせている規則の欄は消した） */
-       +     ' ／ <b>' + res.findings.length + '</b>件（隠しているものはありません）'
+       /* 🔴 v1.172.0 隠しているものは1件も無い＝そう言い切る */
+       +     ' ／ <b>' + res.findings.length + '</b>件'
+       +     ((res.mutedIds && res.mutedIds.length) ? '' : '（隠しているものはありません）')
        +   '</div>'
+       /* 🔴🔴 v1.172.1（ゆうた訂正）**「出さない」を選んでいた規則が残っていたら、黙って隠さない。**
+          ＝ これは「規則ごと消す予定」の控え。**名前を出して、消し忘れないようにする。** */
+       +   ((res.mutedIds && res.mutedIds.length)
+            ? '<div class="ins-tobe">⚠ <b>消す予定の規則 ' + res.mutedIds.length + '本</b>'
+              + '（前に「出さない」を選んだもの。いまは出していません）：'
+              + res.mutedIds.map(function(x){ return esc(x.title); }).join('／')
+              + '</div>'
+            : '')
        +   '<div class="ins-actions">'
        +     '<button class="ins-btn" id="ins-rerun" onclick="pitInspectRerun()">もう一度チェック</button>'
        +     '<button class="ins-btn" onclick="pitInspectDownload()">書き出し</button>'

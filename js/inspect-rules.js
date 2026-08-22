@@ -272,7 +272,7 @@
         return '概算 ' + man(amountOf(c)) + ' しか入っていません';
       } },
 
-    { id:'M04', cat:'money', level:'amber',
+    { id:'M04', cat:'money', level:'amber', judge:true,
       title:'概算だけの大口',
       why:'金額が大きいのに概算しかありません。着地見込みがこの1台で大きく動きます。',
       fix:'見積を出したら見積金額を、受注したら受注金額を入れてください。',

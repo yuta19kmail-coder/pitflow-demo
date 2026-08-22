@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.172.2"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.173.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="css/topbar.css?v=6">
 <link rel="stylesheet" href="css/help.css?v=1">
 <link rel="stylesheet" href="css/mech-summary.css?v=2">
-<link rel="stylesheet" href="css/inspect.css?v=7"><!-- 🩺 データチェック（日常チェック／クォーターチェック） -->
+<link rel="stylesheet" href="css/inspect.css?v=8"><!-- 🩺 データチェック（日常チェック／クォーターチェック） -->
 <link rel="stylesheet" href="css/members.css?v=7">
 <link rel="stylesheet" href="css/news-oplog.css?v=5">
 <style id="pit-dev-style">
@@ -122,7 +122,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.172.2</div>
+    <div class="login-ver">v1.173.0</div>
   </div>
 </div>
 
@@ -136,7 +136,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.172.2</span>
+    <span class="ver">v1.173.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -843,9 +843,9 @@
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
 <script src="js/pit-share.js?v=14"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=f85dcc35"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
-<script src="js/errcode-pit.js?v=7"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
+<script src="js/errcode-pit.js?v=8"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
-<script src="js/state.js?v=73"></script>
+<script src="js/state.js?v=74"></script>
 <script src="js/coreflow-loaner-remain.js?v=608d586a"></script><!-- 🚙 代車の残り日数と色（全アプリ共通・_shared から配布）。loaner-free.js より **前** に読むこと -->
 <script src="js/loaner-free.js?v=6"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
 <script src="js/theme.js?v=5"></script>
@@ -891,9 +891,9 @@ window.PIT_DEMO = true;</script>
 <script src="js/sales.js?v=17"></script>
 <script src="js/sales-print.js?v=5"></script>
 <script src="js/mech-summary.js?v=5"></script>
-<script src="js/inspect-rules.js?v=7"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
+<script src="js/inspect-rules.js?v=8"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=2"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
-<script src="js/inspect.js?v=8"></script><!-- 🩺 v1.170.0 データチェックの画面（並べるだけ）。inspect-rules.js / inspect-fix.js より後ろ -->
+<script src="js/inspect.js?v=9"></script><!-- 🩺 v1.170.0 データチェックの画面（並べるだけ）。inspect-rules.js / inspect-fix.js より後ろ -->
 <script src="js/pit-floor.js?v=35"></script>
 <script src="js/settings.js?v=27"></script>
 <script src="js/settings-transfer.js?v=4"></script>
@@ -930,7 +930,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/mech-guard.js?v=3"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
 <script src="js/phase-popup.js?v=18"></script>
 <script src="js/return-popup.js?v=11"></script>
-<script src="js/help-content.js?v=44"></script>
+<script src="js/help-content.js?v=45"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=17"></script>
 <script src="js/main.js?v=12"></script>

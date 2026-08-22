@@ -132,6 +132,17 @@
 .cv-asub{ color:var(--text3); font-size:12px; font-weight:500; }
 .cv-amuted{ color:var(--text3); font-weight:500; }
 .cv-asect-note{ font-size:10px; color:var(--text3); font-weight:600; }
+/* 📦 v1.171.0（ゆうた指定）完了アーカイブを**管理者だけ**あとから直せる。
+   ・見出しの右端に「編集」（管理）／「🔒 管理のみ」（それ以外）＝実績カウント日と同じ形
+   ・編集中は枠をブランド色で囲って、記録を見ているだけの時と**ひと目で違う**ようにする */
+/* ⚠ 見出しを flex にするのは**この見出しだけ**（`.cv-sect` は全部の枠が使っている。
+      そちらを触ると、関係の無い枠のアイコンの並びまで動く） */
+.cv-sect-arch{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.cv-archbtn{ margin-left:auto; }
+.cv-archedit{ border:1px solid var(--brand); border-radius:11px; padding:10px 12px; }
+.cv-archnote{ font-size:11.5px; font-weight:600; color:var(--text3); background:var(--bg3);
+  border:1px solid var(--border); border-radius:8px; padding:6px 9px; margin-bottom:8px; line-height:1.6; }
+.cv-archnote b{ color:var(--text2); }
 /* 💳 入金日を分ける（売掛）コントロール v0.121.0 */
 .cv-payctl{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:8px; padding:8px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:9px; }
 .cv-paychk{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text2); cursor:pointer; }

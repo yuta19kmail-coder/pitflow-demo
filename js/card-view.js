@@ -20,6 +20,9 @@
         保存する項目は増やしていない（v1.66.0 の決めごとはそのまま）。 */
   let _retTbdOff = false;
   let _retTbdFor = '';      // どのカードに対しての印か（別のカードを開いたら忘れる）
+  /* 🆕 v1.171.0（ゆうた指定）返車済みカードの「完了アーカイブ」を編集中にしているカードのid。
+     ⚠ 画面だけで覚える（保存する項目は増やさない）。別のカードを開いたら忘れる。 */
+  let _archEditFor = '';
   /* 🆕 v1.73.0（ゆうた指定）表紙の「金額の並び」「返車日の並び」を**あとから直す**ための開閉。
      ◎困っていたこと＝工程が進むと、前の段階で入れた金額や日付が画面から消えて直せなかった。
        ・概算 金額／概算 預かり日数 … 入庫したら「予約を編集」からしか触れない
@@ -620,8 +623,23 @@
     const _csShaken = (c.workType==='shaken' || _csIds.indexOf('shaken')>=0);
     const _csCoat = (_csIds.indexOf('coat1y')>=0 || _csIds.indexOf('coat3m')>=0);
     if (c.status === 'returned'){
-      // 実績＝完TEL・支払い・洗車・お礼LINE・車販依頼などをまとめて読み取り専用のアーカイブ表示 v0.120.0
-      h += archiveHtml(c, _csShaken, _csCoat);
+      /* 実績＝完TEL・支払い・洗車・お礼LINE・車販依頼などをまとめて読み取り専用のアーカイブ表示 v0.120.0
+         🔴🔴 v1.171.0（ゆうた指定 2026-08-22）**管理者は、この記録を直せる。**
+         🗣「管理者であっても、埋め込みになってる完TELなどがアーカイブ済みなのをいじれない。
+         　　管理者はいじれるようにしてほしい」
+         ◎前まで＝返車済みになった瞬間、完TEL・支払い・洗車・お礼LINE・車販依頼は
+           **誰も直せない読み取り専用**だった（管理者でも）。
+           ＝ 返車のあとで「完TELの印を付け忘れた」「支払いが違った」と分かっても、
+           　 データチェックが指摘しても、**直す場所がどこにも無い**。
+         🔴 直せるのは**管理者だけ**。物差しは `canEditResultDate()` の1本（＝`pitIsAdmin()`）。
+            ⚠ 新しい物差しを作らない。⚠ 練習用（`!PIT_CLOUD`）は今までどおり全部さわれる。
+         🔴 **押してすぐ編集にはしない**＝「🔒 記録」＋「編集」のワンクッション（実績カウント日と同じ形）。
+            記録は毎日見る所なので、開いた勢いで触れてしまわないようにする。
+         🔴 **欄も書き込みも増やさない**＝出すのは表紙チェック・車販依頼と**同じ `pickRow`**、
+            書き込みは**同じ `cvPick`**。写しを作らない（作った日から片方だけ直る）。 */
+      h += (_archEditFor === c.id && canEditResultDate())
+        ? archiveEditHtml(c, _csShaken, _csCoat)
+        : archiveHtml(c, _csShaken, _csCoat);
     } else {
       h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=cart data-ics=16></i> 車販部門への依頼</div>';
       if (_csShaken) h += pickRow('車検ライト磨き', [['1','する'],['0','しない']], c.headlight?'1':'0', 'headlight');
@@ -797,7 +815,40 @@
     if (c.salesReq)             sales.push('車販依頼'+(c.salesReqDone?'（済）':''));
     rows += row('車販への依頼', sales.length ? esc(sales.join(' ／ ')) : '<span class="cv-amuted">なし</span>');
     if ((c.salesReqMemo||'').trim()) rows += row('依頼メモ', esc(c.salesReqMemo));
-    return '<div class="cv-sec"><div class="cv-sect"><i data-ic=box data-ics=16></i> 完了アーカイブ <span class="cv-asect-note">（返車済み・記録）</span></div><div class="cv-arch">'+rows+'</div></div>';
+    /* 🔴 v1.171.0 見出しの右に「編集」（管理だけ）。管理でない人には **🔒 管理のみ** を出す。
+       ⚠ ボタンごと消さない＝「無い」のか「触れない」のか分からなくなる（v1.170.0 と同じ決めごと）。 */
+    var head = canEditResultDate()
+      ? '<button type="button" class="cv-unlockbtn cv-archbtn" onclick="cvArchEdit()"><i data-ic=pencil data-ics=16></i> 編集</button>'
+      : '<span class="cv-adminonly cv-archbtn"><i data-ic=lock data-ics=14></i> 管理のみ</span>';
+    return '<div class="cv-sec"><div class="cv-sect cv-sect-arch"><i data-ic=box data-ics=16></i> 完了アーカイブ <span class="cv-asect-note">（返車済み・記録）</span>'+head+'</div><div class="cv-arch">'+rows+'</div></div>';
+  }
+
+  /* 🔴🔴 v1.171.0 完了アーカイブの**編集中**の姿（管理だけ・ゆうた指定）。
+     ◎ここに新しい欄を作らない。**表紙チェック／車販部門への依頼と同じ行**をそのまま出す。
+       ＝ 直す先も書き込みも 1本（`cvPick` / `cvWashNote` / `cvSalesMemo`）。
+     ⚠ 確定金額・実績カウント日・確定返車日は**この枠に入れない**。
+        あれは上のロック行（`resultDateRow` / 確定売上）で、これまで通り管理だけ。 */
+  function archiveEditHtml(c, csShaken, csCoat){
+    var pm = payMethods();
+    var cc = c.coverCall || {};
+    var h = '<div class="cv-sec cv-archedit"><div class="cv-sect cv-sect-arch"><i data-ic=box data-ics=16></i> 完了アーカイブ '
+          + '<span class="cv-asect-note">（返車済み・記録を編集中）</span>'
+          + '<button type="button" class="cv-unlockbtn cv-archbtn" onclick="cvArchDone()"><i data-ic=check data-ics=16></i> 編集を終える</button></div>';
+    h += '<div class="cv-archnote">この車は<b>返車済み</b>です。直した内容はフローと操作ログに残ります。'
+       + '確定金額・実績カウント日・確定返車日は上の欄で直してください。</div>';
+    h += pickRow('完TEL', [['done','済'],['ng','未']], cc.done?'done':'ng', 'call')
+       + (cc.done && cc.at ? '<div class="cv-callat">'+esc(cc.at)+(cc.staff?'・'+esc(cc.staff):'')+'</div>' : '');
+    h += pickRow('支払い', pm.map(function(p){return [p.id,p.label];}), c.payment, 'pay');
+    h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
+    h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
+       + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
+    h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line');
+    if (csShaken) h += pickRow('車検ライト磨き', [['1','する'],['0','しない']], c.headlight?'1':'0', 'headlight');
+    if (csCoat)   h += pickRow('コーティング受注', [['1','OK'],['0','—']], c.coatingOK?'1':'0', 'coatingok');
+    h += pickRow('車販依頼', [['1','あり'],['0','なし']], c.salesReq?'1':'0', 'salesreq');
+    h += '<div class="cv-pickrow"><span class="cv-pk">依頼メモ</span><div class="cv-chips" style="flex:1">'
+       + '<input class="cv-fixinput" type="text" value="'+esc(c.salesReqMemo||'')+'" placeholder="車販への依頼（1行・任意）" onchange="cvSalesMemo(this.value)" style="flex:1;min-width:180px"></div></div>';
+    return h + '</div>';
   }
   /* 💳 入金（売掛）のロック行＝確定売上金額・返車日と同じテイスト。入金済＝🔒確定＋日付／入金待ち＝オレンジ／分けない＝返車時。✏️で編集 v0.122.0 */
   function paymentLockRow(c){
@@ -1165,6 +1216,8 @@
     if (_retTbdFor !== (card && card.id)) { _retTbdOff = false; _retTbdFor = (card && card.id) || ''; }
     /* 🆕 v1.73.0 「編集」を開いた状態も、そのカードを見ている間だけ持つ（別のカードに変わったら閉じる）。 */
     if (_chainEditFor !== (card && card.id)) { _chainEditMoney = false; _chainEditDate = false; _chainEditFor = (card && card.id) || ''; }
+    /* 🆕 v1.171.0 完了アーカイブの「編集中」も、そのカードを見ている間だけ（別のカードに変わったら閉じる）。 */
+    if (_archEditFor && _archEditFor !== (card && card.id)) _archEditFor = '';
     _c = ensure(card);
     const box = host.closest('.modal-box');
     if(box){
@@ -1486,7 +1539,14 @@
     }
     save(); cvRefreshBg();
   };
-  window.cvWashNote = function(v){ _c.washNote = (v||'').trim(); save(); };
+  window.cvWashNote = function(v){
+    /* 🔴 v1.171.0 返車済みの記録は管理だけ（完了アーカイブの編集から来る） */
+    if (!_archGuard()) return;
+    var _f = (_c.status === 'returned') ? (_c.washNote || '') : null;
+    _c.washNote = (v||'').trim();
+    if (_f != null && _f !== _c.washNote) _archLog('洗車備考', _f, _c.washNote);
+    save();
+  };
   window.cvNoThanks = function(on){ _c.noThanksLine = !!on; save(); };
 
   // 引継ぎメモ＝この画面で直接入力（入力中はデバウンス保存・フォーカスアウトで確定保存）
@@ -1525,8 +1585,77 @@
     save();
   };
 
+  /* ===================================================================
+     📦 v1.171.0（ゆうた指定 2026-08-22）**完了アーカイブを管理者が直す**
+     -------------------------------------------------------------------
+     🗣「管理者であっても、埋め込みになってる完TELなどがアーカイブ済みなのをいじれない。
+     　　管理者はいじれるようにしてほしい」
+     ・開くのは「編集」を押した時だけ（画面だけで覚える・別のカードを開いたら閉じる）
+     ・🔴 物差しは `canEditResultDate()`（＝`pitIsAdmin()`）の1本。ここで役割を判定しない
+     ・🔴 **ボタンを消しただけにしない**＝書き込む所（`cvPick` ほか）でも同じ条件で止める
+     =================================================================== */
+  window.cvArchEdit = function(){
+    if (!_c) return;
+    if (!canEditResultDate()){ _archDeny(); return; }
+    _archEditFor = _c.id;
+    if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+  };
+  window.cvArchDone = function(){
+    _archEditFor = '';
+    if (_c && window.renderCardView) renderCardView(_c, 'md-body-modal');
+  };
+  function _archDeny(){
+    if (window.UI && UI.alert){
+      UI.alert('返車済みの記録（完TEL・支払い・洗車・お礼LINE・車販依頼）を直せるのは、設定権限（管理）のある人だけです。',
+               { title:'変更できません', code:'PF-0021' });
+    }
+  }
+  /* 🔴 返車済みカードの記録を書き換えていいか。ダメなら断りを出して false。 */
+  function _archGuard(){
+    if (!_c || _c.status !== 'returned') return true;
+    if (canEditResultDate()) return true;
+    _archDeny();
+    return false;
+  }
+  /* 表紙チェックの「いまの値」を人の言葉で（記録に残すため）。⚠ 選択肢の文字は pickRow と同じもの。 */
+  var ARCH_W = { call:'完TEL', pay:'支払い', wash:'洗車', line:'お礼LINE',
+                 headlight:'車検ライト磨き', coatingok:'コーティング受注', salesreq:'車販依頼' };
+  function _archVal(group){
+    if (!_c) return '';
+    if (group === 'call') return (_c.coverCall && _c.coverCall.done) ? '済' : '未';
+    if (group === 'pay'){
+      var o = payMethods().filter(function(x){ return x.id === _c.payment; })[0];
+      return o ? o.label : '';
+    }
+    if (group === 'wash') return _c.needWash ? '要' : '不要';
+    if (group === 'line') return _c.noThanksLine ? '不要' : '要';
+    if (group === 'headlight') return _c.headlight ? 'する' : 'しない';
+    if (group === 'coatingok') return _c.coatingOK ? 'OK' : '—';
+    if (group === 'salesreq') return _c.salesReq ? 'あり' : 'なし';
+    return '';
+  }
+  /* 返車済みカードで、記録に残す値だけ「直す前」を控える（それ以外は null＝残さない） */
+  function _archWord(group){
+    if (!_c || _c.status !== 'returned' || !ARCH_W[group]) return null;
+    return _archVal(group);
+  }
+  /* 🔴 返車済みの記録を直したら、**何をどこからどこへ**をフローと操作ログに必ず残す。
+     ＝ 終わった車をあとから触っているので、あとで「誰がいつ変えたか」が分からないと困る。 */
+  function _archLog(what, from, to){
+    if (!_c || _c.status !== 'returned') return;
+    var word = what + ' ' + (from || '（空）') + ' → ' + (to || '（空）');
+    try { if (window.logFlow) logFlow(_c, '完了アーカイブを直した：' + word); } catch(e){}
+    try {
+      if (window.pitLog) pitLog('完了アーカイブを直した', { cardId: _c.id, kind: 'result',
+        label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + word });
+    } catch(e){}
+  }
+
   // ===== 表紙チェック =====
   window.cvPick = function(group, val, el){
+    /* 🔴 v1.171.0 返車済みの記録は管理だけ（画面から消しただけにしない） */
+    if (!_archGuard()) return;
+    var _aFrom = _archWord(group);
     el.parentNode.querySelectorAll('.cv-chip').forEach(function(s){s.classList.remove('on');}); el.classList.add('on');
     if(group==='call'){ _c.coverCall.done = (val==='done'); if(_c.coverCall.done && !_c.coverCall.at){ const d=new Date(); _c.coverCall.at = (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); _c.coverCall.staff = (window.pitFlowMe?pitFlowMe():''); } }   /* 🔴 v1.55.0 ここも同じ死んだ変数を見ていて、ずっと空だった */
     else if(group==='pay'){ _c.payment = val; }
@@ -1536,9 +1665,16 @@
     else if(group==='headlight'){ _c.headlight = (val==='1'); }
     else if(group==='coatingok'){ _c.coatingOK = (val==='1'); }
     else if(group==='salesreq'){ _c.salesReq = (val==='1'); }
+    if (_aFrom != null) _archLog(ARCH_W[group], _aFrom, _archVal(group));
     save();
   };
-  window.cvSalesMemo = function(v){ _c.salesReqMemo = (v||'').trim(); save(); };
+  window.cvSalesMemo = function(v){
+    if (!_archGuard()) return;
+    var _f = (_c.status === 'returned') ? (_c.salesReqMemo || '') : null;
+    _c.salesReqMemo = (v||'').trim();
+    if (_f != null && _f !== _c.salesReqMemo) _archLog('依頼メモ', _f, _c.salesReqMemo);
+    save();
+  };
 
   // ===== 整備/バックオフィス チェック =====
   function toggleCheck(holder, i, el){

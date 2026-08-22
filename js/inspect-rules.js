@@ -108,6 +108,21 @@
        「**見た。うちのやり方ではこれで正しい**」という**現場の判断**。
      🔴 `id`（'spec'）は**変えないこと。** これは札の貼り先そのもので、
         変えると**今までに貼った札が全部はがれる**（言葉だけ直す）。 */
+  /* 🔴🔴 v1.169.0（ゆうた指摘 2026-08-21）**「終わった記録」と「いま動いている車」を分ける。**
+     ◎なぜ（本番データで分かったこと）
+       本番 377台で所見が **260件**出たが、そのうち **129件が返車の済んだ車の記録**だった。
+       ・整備担当が空 64件 → 63件が返車完了
+       ・返車予定日が入庫日より前 25件 → 全部返車完了（8月頭の一斉入力の跡）
+       ＝ **もう直しても現場は動かない**ものが、**今すぐ動かせる車を埋めていた。**
+     🔴 これは**規則の問題ではなく、車の問題**（同じ規則でも、車によって急ぎかどうかが変わる）。
+        だから規則を2つに割るのではなく、**所見に「どちらの車か」の印を付けて、画面で分ける。**
+     ⚠ 「終わった記録」を捨てるのではない。**既定で出さないだけ**（切り替えれば見える）。
+        整備ソフトとの突合や、次に来た時の検索ではこちらも効いてくる。 */
+  var SCOPES = [
+    { id:'live', label:'いま動いている車', note:'これから直せる。今週の段取りに効く' },
+    { id:'past', label:'終わった記録',     note:'返車が済んだ車・アーカイブ。直しても現場は動かない' }
+  ];
+
   var MARKS = [
     { id:'seen',  label:'見た',    note:'目は通した。まだ決めていない（次も出る）' },
     { id:'spec',  label:'これでOK', note:'見た。うちのやり方ではこれで正しい（次から出さない）' },
@@ -159,6 +174,20 @@
   }
   /* 実績になった車（売上なしは別扱い） */
   function isDone(c){ return !!c && c.status === 'returned' && !noSale(c); }
+
+  /* 🔴 v1.169.0 「車検なのに行く日が決まっていない」の中身＝S08（もう預かっている）と S01（これから）で共通。
+     ⚠ 条件を2つの規則に書き写さない（片方だけ直す事故を防ぐ）。戻り＝{ n: 入庫まであと何日 } / null */
+  function _shakenUndecided(c, ctx){
+    if (!isLive(c) || !isShaken(c)) return null;
+    var sc = c.inspSchedule || {};
+    if (sc.result === 'done' || t(sc.decided)) return null;
+    /* ⚠ 再検で戻ってきた車は「まだ決めていない」ではなく「もう一度決め直す」＝S06 が言う */
+    if ((Array.isArray(sc.history) ? sc.history : []).some(function(x){ return x && x.result === 'recheck'; })) return null;
+    if (!t(c.reserveDate)) return null;
+    var n = days(ctx.today, c.reserveDate);
+    if (n == null || n > LIM.soon) return null;   /* まだ先の車は言わない */
+    return { n: n };
+  }
 
   /* いまの工程に入ってからの日数。🔴 起点は flow-pit.js の1本（phaseAt を直接見ない） */
   function stayDays(c, td){
@@ -627,21 +656,26 @@
       } },
 
     /* ── 車検 ───────────────────────────────────────────────── */
+    /* 🔴 v1.169.0（本番データで分かったこと）**S01 を2つに割った。**
+       本番では21台出たが、中身は「**もう車を預かっている 10台**（最長25日前）」と
+       「**これから来る 11台**」がまざっていた。**急ぎ方がまるで違う**のに横一列だったので分けた。
+       ⚠ 中の条件は同じ。違うのは「入庫日を過ぎたか」だけ。 */
+    { id:'S08', cat:'shaken', level:'red',
+      title:'もう預かっているのに、陸運局へ行く日が決まっていない',
+      why:'車はもう手元にあります。行く日が決まらないかぎり、預かりがそのまま延び続けます。',
+      fix:'車検予定の画面で行く日を決めてください。枠が取れないなら、お客様に見込みを伝えてください。',
+      each: function(c, ctx){
+        var r = _shakenUndecided(c, ctx);
+        return (r && r.n < 0) ? ('入庫 ' + c.reserveDate + '（' + (-r.n) + '日前）から、行く日が未定です') : '';
+      } },
+
     { id:'S01', cat:'shaken', level:'amber',
-      title:'車検なのに、陸運局へ行く日が決まっていない',
-      why:'入庫がもうすぐ（または過ぎている）のに、行く日が未定です。枠が取れないと預かりが延びます。',
+      title:'これから入庫する車検の、陸運局へ行く日が決まっていない',
+      why:'入庫がもうすぐです。枠が取れないと、そのまま預かりが延びます。',
       fix:'車検予定の画面で行く日を決めてください。',
       each: function(c, ctx){
-        if (!isLive(c) || !isShaken(c)) return '';
-        var sc = c.inspSchedule || {};
-        if (sc.result === 'done' || t(sc.decided)) return '';
-        /* ⚠ 再検で戻ってきた車は「まだ決めていない」ではなく「もう一度決め直す」＝S06 が言う。
-              ここで二重に言わない（同じ車が2つの規則に出ると、直す所が分からなくなる）。 */
-        if ((Array.isArray(sc.history) ? sc.history : []).some(function(x){ return x && x.result === 'recheck'; })) return '';
-        if (!t(c.reserveDate)) return '';
-        var n = days(ctx.today, c.reserveDate);
-        if (n == null || n > LIM.soon) return '';
-        return '入庫 ' + c.reserveDate + (n < 0 ? '（' + (-n) + '日前）' : '（あと' + n + '日）') + ' で、行く日が未定です';
+        var r = _shakenUndecided(c, ctx);
+        return (r && r.n >= 0) ? ('入庫 ' + c.reserveDate + '（あと' + r.n + '日）で、行く日が未定です') : '';
       } },
 
     { id:'S02', cat:'shaken', level:'red',
@@ -761,6 +795,14 @@
         /* ⚠ これから来る車だけ。終わった車の「入れたほうがいい」は、もう入れようがない */
         if (!isLive(c)) return '';
         var y = misses(c).yellow;
+        /* 🔴 v1.169.0（本番データで分かったこと）**まだ来ていない車の「漢字の名前」は言わない。**
+           ◎なぜ
+             新しいお客様は**電話だけで漢字が分からない**ので、受付の時点ではカナだけが正しい形。
+             それを毎回言うと、本番では 71件のうち **36件が「漢字の名前が空」**で埋まり、
+             ほかの抜け（入庫時刻など）が見えなくなっていた。
+           🔴 **車が来れば車検証で分かる。**だから入庫した後（と返車済み）だけ言う。
+              返車済みで空のままは D03 が別に言う。 */
+        if (c.status === 'reserved') y = y.filter(function(x){ return x.key !== 'customer'; });
         return y.length ? ('空：' + y.map(function(x){ return x.label; }).join('・')) : '';
       } },
 
@@ -1028,6 +1070,8 @@
              ＝ 空欄で黙るより「決まっていない」と分かるほうが動ける。 */
           f.staff      = staffOf(c);
           f.staffColor = staffColorOf(c);
+          /* 🔴 v1.169.0 どちらの車か。返車が済んだ／片づけた車＝「終わった記録」 */
+          f.scope = (c.archived || c.status === 'returned') ? 'past' : 'live';
           /* 車検の所見だけ、回送の担当も一緒に出す（フロントとは別の人） */
           if (f.cat === 'shaken' && isShaken(c)){
             f.staff2 = w.pitShakenStaffCall ? w.pitShakenStaffCall(c) : shakenStaff(c);
@@ -1036,6 +1080,7 @@
       } else {
         var v = vehIds[f.refId];
         if (v && !f.name) f.name = (t(v.name) || v.id) + '（' + t(v.model) + '）';
+        f.scope = 'live';   /* 代車・社用車はいつでも「いま」の話 */
       }
     });
 
@@ -1050,14 +1095,16 @@
           || (num(b.amount) - num(a.amount));
     });
 
-    var byLevel = {}, byCat = {}, byRule = {}, markedN = 0;
+    var byLevel = {}, byCat = {}, byRule = {}, byScope = {}, markedN = 0;
     LEVELS.forEach(function(l){ byLevel[l.id] = { n:0, open:0 }; });
     CATS.forEach(function(c){ byCat[c.id] = { n:0, open:0 }; });
+    SCOPES.forEach(function(x){ byScope[x.id] = { n:0, open:0 }; });
     findings.forEach(function(f){
       var open = !f.mark;
       if (!open) markedN++;
       if (byLevel[f.level]) { byLevel[f.level].n++; if (open) byLevel[f.level].open++; }
       if (byCat[f.cat])     { byCat[f.cat].n++;     if (open) byCat[f.cat].open++; }
+      if (byScope[f.scope]) { byScope[f.scope].n++; if (open) byScope[f.scope].open++; }
       byRule[f.ruleId] = byRule[f.ruleId] || { n:0, open:0 };
       byRule[f.ruleId].n++; if (open) byRule[f.ruleId].open++;
     });
@@ -1070,7 +1117,7 @@
     return {
       at: new Date().toISOString(), today: td,
       cards: all.length, rules: RULES.length, muted: mutedN, marked: markedN, dropped: dropped,
-      findings: findings, byLevel: byLevel, byCat: byCat, byRule: byRule
+      findings: findings, byLevel: byLevel, byCat: byCat, byRule: byRule, byScope: byScope
     };
   }
 
@@ -1099,10 +1146,11 @@
       version: (document.querySelector('meta[name="app-version"]') || {}).content || '',
       書き出し: res.at, 今日: res.today,
       対象台数: res.cards, 規則の数: res.rules, 黙らせている規則: res.muted,
-      重さごと: res.byLevel, 分類ごと: res.byCat, 規則ごと: res.byRule,
+      重さごと: res.byLevel, 分類ごと: res.byCat, 規則ごと: res.byRule, 車のいまごと: res.byScope,
       所見: res.findings.map(function(f){
         return {
           規則: f.ruleId, 重さ: f.level, 分類: f.cat, 見出し: f.title,
+          車のいま: (f.scope === 'past' ? '終わった記録' : 'いま動いている車'),
           対象: f.kind, id: f.refId, お客様: f.name, 車: f.car || '', ナンバー: f.plate || '',
           予約番号: f.resNo || '', 状態: f.state || '', 課: f.div || '',
           担当: f.staff || '', 車検担当: f.staff2 || '', 金額: f.amount || 0,
@@ -1116,6 +1164,7 @@
     };
   }
 
+  w.PIT_INSPECT_SCOPES = SCOPES;
   w.PIT_INSPECT_CATS   = CATS;
   w.PIT_INSPECT_LEVELS = LEVELS;
   w.PIT_INSPECT_MARKS  = MARKS;

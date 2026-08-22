@@ -40,10 +40,17 @@
     return t ? t.id : 'workDone';
   }
 
+  /* 🔴🔴 v1.174.0（ゆうた指定 2026-08-22）**片方でも決まっていなければ出す。**
+     🗣「**忘れが多いから**、作業待ちから作業完了に移動した時に、点検者と作業者を入れるポップアップを出す」
+     ◎前まで＝**両方とも空の時だけ**出していた（v1.97.0 の決めごと「片方でも入っていれば出さない」）。
+       ＝ 「整備だけ入れて点検は入れ忘れた」が素通りしていた。いちばん多い忘れ方がこれ。
+     🔴 いま＝**「なし」という答えができた**ので、片方が空＝**決めていない**と言い切れる。
+        居ないなら「なし」を押す。だから**空のまま通す理由が無い**。
+     ⚠ 止めないのは今までどおり（「このまま進める」で動く）。 */
   function needed(c, to){
     if (!c || !to) return false;
     if (to !== doneColId(c)) return false;
-    return window.PitMechPick ? PitMechPick.isEmpty(c) : false;
+    return window.PitMechPick ? (PitMechPick.unsettled(c).length > 0) : false;
   }
 
   function build(){
@@ -53,12 +60,11 @@
     bd.id = 'mg-backdrop';
     bd.innerHTML =
       '<div class="modal-box pp-box mg-box">'
-      + '<div class="modal-head"><div class="modal-title">担当者が入っていません</div>'
+      + '<div class="modal-head"><div class="modal-title">点検担当者・整備担当者を入れてください</div>'
       + '<button class="modal-close" onclick="PitMechGuard.close(0)"><i data-ic=close data-ics=16></i></button></div>'
       + '<div class="modal-body">'
       + '  <div class="pp-move" id="mg-move"></div>'
-      + '  <div class="mg-warn"><i data-ic=warn data-ics=16></i> 点検担当者・整備担当者がどちらも空です。'
-      +      'ここで入れておくと、作業サマリーの取り分にそのまま反映されます。</div>'
+      + '  <div class="mg-warn" id="mg-warn"></div>'
       + '  <div id="mg-pick"></div>'
       /* 🔴 ボタンは1つ。**入れたかどうかで文言だけ変わる**（同じことをするボタンを2つ並べない）。
          やめたい時は ✕ か外側を押す＝カードは動かない。 */
@@ -80,8 +86,19 @@
     var box = el('mg-pick');
     if (box && window.PitMechPick) box.innerHTML = PitMechPick.html(c, 'mg', { liveId: 'mg-mech-live' });
     if (window.icHydrate) { try { icHydrate(box); } catch(e){} }
+    /* 🔴 v1.174.0 **どちらが決まっていないか**を名指しで言う（「どちらも空」と決め打ちしない）。
+       ＋ 居ない時の逃げ道（「なし」）をその場で案内する＝空のまま通す理由を無くす。 */
+    var un = (window.PitMechPick ? PitMechPick.unsettled(c) : []);
+    var w = el('mg-warn');
+    if (w){
+      w.innerHTML = un.length
+        ? '<i data-ic=warn data-ics=16></i> <b>' + esc(un.join('・')) + '</b>が入っていません。'
+          + 'この車に<b>居ないなら、いちばん左の「なし」</b>を押してください（忘れではない、と記録します）。'
+        : '<i data-ic=check data-ics=16></i> 決まりました。作業サマリーの取り分にそのまま反映されます。';
+      if (window.icHydrate) { try { icHydrate(w); } catch(e){} }
+    }
     var ok = el('mg-ok');
-    if (ok) ok.textContent = (window.PitMechPick && PitMechPick.isEmpty(c)) ? 'このまま進める' : '入れて作業完了へ';
+    if (ok) ok.textContent = un.length ? 'このまま進める' : '入れて作業完了へ';
   }
 
   window.PitMechGuard = {

@@ -49,6 +49,31 @@
     return { cnt: cnt, order: order };
   }
   function idKey(role){ return role === 'inspectors' ? 'inspectorIds' : 'mechanicIds'; }
+  /* 🔴🔴 v1.174.0（ゆうた指定 2026-08-22）**「なし」＝該当者が本当にいない、という答え。**
+     🗣「一番左にそれぞれ『なし』を作る。**リアルに該当者がいない場合に、忘れなのか リアルなのか
+     　　をこれで判断するように**（オイル交換なら点検者はいないし、外注板金なら作業者がいない）」
+     ◎持ち方＝`c.inspectorsNone` / `c.mechanicsNone`（true だけ）。**名前の配列には触らない。**
+     🔴 3つの状態を区別する。**空っぽと「なし」はまったく別物。**
+        ・**未入力** … 誰も入っていない／「なし」も押していない ＝ **忘れ**（データチェックが要対応で言う）
+        ・**なし**   … 人が「居ない」と決めた ＝ **正しい状態**（もう言わない）
+        ・**1人以上** … 名前が入っている
+     ⚠ 配分（％）の計算は**1文字も変えない**（居ない側の取り分は今までどおり相手へ回る）。 */
+  function noneKey(role){ return role === 'inspectors' ? 'inspectorsNone' : 'mechanicsNone'; }
+  function isNone(c, role){ return !!(c && c[noneKey(role)]); }
+  /* その役は「決まっている」か（人が入っている／なし と決めた）。空っぽだけが未入力。 */
+  function isSettled(c, role){
+    if (!c) return false;
+    if (isNone(c, role)) return true;
+    var a = Array.isArray(c[role]) ? c[role].filter(Boolean) : [];
+    return a.length > 0;
+  }
+  /* まだ決まっていない役の名前（人に見せる言葉）。空なら全部決まっている。 */
+  function unsettled(c){
+    var out = [];
+    if (!isSettled(c, 'inspectors')) out.push('点検担当');
+    if (!isSettled(c, 'mechanics'))  out.push('整備担当');
+    return out;
+  }
   function idOf(name){
     var m = (name && window.pitStaffByName) ? pitStaffByName(name) : null;
     return m ? m.id : '';
@@ -69,15 +94,27 @@
     var opts = options().slice();
     co.order.forEach(function (n){ if (opts.indexOf(n) < 0) opts.push(n); });
     var kind = (role === 'inspectors') ? 'i' : 'm';
-    var h = '<div class="cf-mech-block cf-mech-' + kind + '">'
-          + '<div class="cf-label">' + icon + ' ' + title + '<em class="cf-mech-cnt">' + (arr.length ? arr.length + '枠' : 'なし') + '</em></div>'
+    var none = isNone(c, role);
+    /* 🔴 v1.174.0 見出しの右は3通りをはっきり言い分ける（前は空っぽも「なし」と書いていて、
+       **忘れなのか居ないのかが読めなかった**。それを直すのが今回の中身）。 */
+    var cnt = arr.length ? (arr.length + '枠') : (none ? '該当者なし' : '未入力');
+    var h = '<div class="cf-mech-block cf-mech-' + kind + (none ? ' is-none' : '') + '">'
+          + '<div class="cf-label">' + icon + ' ' + title
+          +   '<em class="cf-mech-cnt' + (arr.length ? '' : (none ? ' ok' : ' miss')) + '">' + cnt + '</em></div>'
           + '<div class="cf-mech-chips">';
+    /* 🔴 いちばん左に「なし」。押すと入っている人は全部外れる（もう一度押すと未入力に戻る）。 */
+    h += '<button type="button" class="cf-mchip cf-mnone' + (none ? ' on' : '') + '"'
+      +  ' title="この車には該当者が居ません（忘れではない、と記録します）"'
+      +  ' onclick="PitMechPick.none(\'' + esc(ns) + '\',\'' + esc(c.id) + '\',\'' + role + '\')">なし</button>';
     opts.forEach(function (n){
       var k = co.cnt[n] || 0;
       var full = (arr.length >= MAX && !k);
       var call = "PitMechPick.tap('" + esc(ns) + "','" + esc(c.id) + "','" + role + "','" + esc(n) + "')";
       var offc = "event.stopPropagation();PitMechPick.off('" + esc(ns) + "','" + esc(c.id) + "','" + role + "','" + esc(n) + "')";
-      h += '<button type="button" class="cf-mchip' + (k ? ' on' : '') + (full ? ' full' : '') + '"'
+      /* 🔴 v1.174.0 人のチップには目印を付ける（`cf-mperson`）。
+         ＝ いちばん左に「なし」が入ったので、**「最初のチップ＝人」ではなくなった**。
+         　 見た目のクラス（cf-mchip）で人を拾うと、見張りも操作も1つずれる（実際に試験が落ちた）。 */
+      h += '<button type="button" class="cf-mchip cf-mperson' + (k ? ' on' : '') + (full ? ' full' : '') + '"'
         + (full ? ' disabled title="これ以上は増やせません（最大' + MAX + '枠）"' : ' onclick="' + call + '"')
         + '>' + esc(n) + (k > 1 ? '<i class="cf-mchip-x">×' + k + '</i>' : '')
         + (k ? '<span class="cf-mchip-off" title="外す" onclick="' + offc + '">✕</span>' : '')
@@ -114,6 +151,17 @@
     var A = arrsOf(c, role);
     if (A.arr.length >= MAX) return;
     A.arr.push(name); A.ids.push(idOf(name));
+    c[noneKey(role)] = false;      /* 🔴 v1.174.0 人を入れたら「なし」は下りる（両立しない） */
+    fire(ns, c);
+  }
+  /* 🔴 v1.174.0 「なし」＝該当者が居ないと決める。もう一度押すと**未入力に戻る**（決めていない状態）。
+     ⚠ 人が入っている時に押すと、その人たちは外れる（「居ない」と言い切るので当然） */
+  function none(ns, cardId, role){
+    var c = cardOf(cardId); if (!c) return;
+    var A = arrsOf(c, role);
+    var on = !isNone(c, role);
+    c[noneKey(role)] = on;
+    if (on){ A.arr.length = 0; A.ids.length = 0; }
     fire(ns, c);
   }
   /* ✕ ＝その人を全部外す（×2 でも1回で消える。押し直しの手間を作らない） */
@@ -126,7 +174,9 @@
     fire(ns, c);
   }
 
-  /* 担当者が1人も入っていないか（点検・整備どちらも空） */
+  /* 担当者が1人も入っていないか（点検・整備どちらも空）。
+     ⚠ v1.174.0 これは**人が入っていないか**だけを見る（「なし」と決めたかは見ない）。
+        入れ忘れの見分けは `isSettled` / `unsettled` のほう。 */
   function isEmpty(c){
     if (!c) return false;
     var i = Array.isArray(c.inspectors) ? c.inspectors.filter(Boolean) : [];
@@ -144,6 +194,13 @@
     idOf: idOf,
     tap: tap,
     off: off,
+    none: none,
+    isNone: isNone,
+    isSettled: isSettled,
+    unsettled: unsettled,
     isEmpty: isEmpty
   };
+  /* 🔴 v1.174.0 データチェックからも同じ物差しを借りる（あちらで条件を書き写さない） */
+  window.pitMechSettled  = function (c, role){ return isSettled(c, role); };
+  window.pitMechUnsettled = function (c){ return unsettled(c); };
 })();

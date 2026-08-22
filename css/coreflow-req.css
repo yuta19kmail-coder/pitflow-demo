@@ -1,0 +1,78 @@
+/* ========================================
+   coreflow-req.css  -  📮 予定依頼（スケジュール希望届）の見た目・全アプリ共通
+   ----------------------------------------
+   🔴 **本体はここ（_shared）だけ。** アプリ側の css\ にあるのは配られたコピー。
+      直す時は必ずここを直して `sync-shared.ps1` を走らせること。
+
+   ⚠ **すべて `.cf-req` の中に閉じてある。**
+      MHS には元から `.fld` / `.pick` / `.seg-pick` があり、PitFlow には無い。
+      どちらでも同じ見た目にするため、この中では**このファイルの指定が勝つ**ようにしてある
+      （`.cf-req .pick` の方が `.pick` より強い）。アプリ側のほかの画面には1文字も影響しない。
+
+   ⚠ 色は各アプリのテーマ変数（--bg2 / --text …）を借りる。無い時のために予備の色を書いてある。
+   ======================================== */
+
+.cf-req{
+  --rq-accent:#f59e0b;                     /* 依頼＝オレンジ（予定＝赤 と混ざらない色） */
+  font-size:14px; line-height:1.7;
+  color:var(--text, #e6edf3);
+}
+
+/* ---- 説明の文 ---- */
+.cf-req .rq-intro{
+  font-size:12px; color:var(--text3, #6b7886); line-height:1.75; margin-bottom:12px;
+}
+.cf-req .rq-intro b{ color:var(--text, #e6edf3); }
+.cf-req .rq-hint{
+  font-size:11px; color:var(--text3, #6b7886); margin-top:4px; line-height:1.6;
+}
+.cf-req .rq-sub{ font-size:11px; color:var(--text3, #6b7886); }
+
+/* ---- 🚗 車から出した依頼＝上に乗る札 ---- */
+.cf-req .rq-carbox{
+  display:flex; align-items:flex-start; gap:8px;
+  background:rgba(245,158,11,.12); border:1px solid var(--rq-accent);
+  border-radius:9px; padding:9px 12px; margin-bottom:12px;
+  font-size:12px; line-height:1.7;
+}
+.cf-req .rq-carbox b{ font-size:12.5px; color:var(--text, #e6edf3); }
+.cf-req .rq-carbox .ic{ margin-top:3px; color:var(--rq-accent); }
+
+/* ---- 欄 ---- */
+.cf-req .fld{ margin-bottom:14px; }
+.cf-req .fld>label{
+  display:block; font-size:11.5px; font-weight:700; letter-spacing:.02em;
+  color:var(--text3, #6b7886); margin-bottom:5px;
+}
+.cf-req input[type=text],
+.cf-req input[type=date],
+.cf-req textarea{
+  width:100%; box-sizing:border-box;
+  background:var(--bg3, #1d242e); border:1px solid var(--border, rgba(255,255,255,.10));
+  color:var(--text, #e6edf3); border-radius:8px; padding:9px 11px;
+  font-size:16px;                          /* 🔴 16px 未満だと iPhone が勝手に拡大する */
+  font-family:inherit;
+}
+.cf-req input[type=date]{ width:auto; }
+.cf-req textarea{ resize:vertical; min-height:62px; font-size:16px; }
+.cf-req input:focus, .cf-req textarea:focus{ outline:none; border-color:var(--rq-accent); }
+
+/* ---- チップ ---- */
+.cf-req .seg-pick{ display:flex; gap:6px; flex-wrap:wrap; }
+.cf-req .pick{
+  font-size:12.5px; padding:6px 11px; border-radius:999px;
+  border:1px solid var(--border, rgba(255,255,255,.10));
+  background:var(--bg3, #1d242e); color:var(--text2, #9aa7b4);
+  cursor:pointer; user-select:none; font-family:inherit;
+}
+.cf-req .pick:hover{ background:var(--bg4, #252e3a); }
+.cf-req .pick.on{
+  background:var(--acc, #dc2626); border-color:var(--acc, #dc2626);
+  color:#fff; font-weight:700;
+}
+
+/* ---- 狭い画面（工場からスマホで出すのが本番） ---- */
+@media (max-width:520px){
+  .cf-req .pick{ font-size:13px; padding:8px 12px; }   /* 指で押せる大きさに */
+  .cf-req .fld{ margin-bottom:16px; }
+}

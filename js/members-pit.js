@@ -443,6 +443,13 @@
     var h = src.find(function (l) { return l.id === id; });
     return h ? String(h.name || '') : '';
   }
+  /* 🔴 v1.175.0 場所マスターを**そのまま**外へ出す（予定依頼の「行き先」で全部の場所から選ぶため）。
+     ⚠ 陸運局だけに絞るのは pitRikuunList。用途が違うので混ぜない。 */
+  function pitLocList() {
+    var src = (!window.PIT_CLOUD && !_coreLocs.length) ? SAMPLE_RIKUUN : _coreLocs;
+    return (src || []).slice();
+  }
+  window.pitLocList     = pitLocList;
   window.pitIsRikuunLoc = pitIsRikuunLoc;
   window.pitRikuunList  = pitRikuunList;
   window.pitLocName     = pitLocName;

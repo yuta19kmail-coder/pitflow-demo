@@ -1169,6 +1169,10 @@
       + '<div class="cv-acts">'
       + '<button class="cv-iconbtn" title="表紙を印刷" onclick="pitPrintCover(\''+c.id+'\')"><i data-ic=printer data-ics=16></i></button>'
       + '<button class="cv-iconbtn" title="この車両に付箋を発行" onclick="cvToggleFusen(event)"><i data-ic=sticky data-ics=16></i></button>'
+      /* 📮 v1.175.0 予定依頼（ゆうた指定 2026-08-22）＝**付箋発行の隣**。
+         この車の 客名・車種・作業タイプ・担当者 が入った状態で窓が開く。
+         🔴 窓の中身は共通部品（CFReq）。MHS の「＋ 予定依頼」とまったく同じものが出る。 */
+      + '<button class="cv-iconbtn" title="この車で予定依頼を出す（日も担当も書かなくてOK）" onclick="pitReqOpen(\''+c.id+'\')"><i data-ic=send data-ics=16></i></button>'
       + '<div class="cv-optwrap"><button class="cv-iconbtn" title="オプション" onclick="cvToggleOpt(event)">⋮</button>'
       + '<div class="cv-optmenu" id="cv-optmenu">' + optMenuHtml(c) + '</div></div>'
       + '<button class="cv-iconbtn" title="閉じる" onclick="closeDetail()"><i data-ic=close data-ics=16></i></button>'

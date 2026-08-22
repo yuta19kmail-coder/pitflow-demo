@@ -7,8 +7,8 @@
      ・重さ（要対応／確認／気づき）と分類の**名前も色もあちらの表から引く**。ここで綴らない。
 
    ◎使い方（ゆうた）
-     ⓪ 上の「**いま動いている車 / 終わった記録**」で、まずどちらを見るかを決めます（既定＝いま動いている車）
-        ＝ 返車の済んだ車の記録で、今週動かせる車が埋まらないように（v1.169.0）
+     ⓪ 既定では「**いま動かせる車**」だけが出ます。返車の済んだ車の記録も見たいときは
+        右上の「**終わった記録も見る**」にチェック（v1.169.1・ボタン2つをやめてチェック1つに）
      ① 左のメニュー「点検」を開く → その場で全カードを見て、気になる所を並べます
      ② 1件ずつ、右のボタンで札を貼れます
           見た … 目は通した。まだ直していない（次も出る）
@@ -27,12 +27,10 @@
   function man(n){ var m = (+n||0)/10000; return (Math.abs(m)>=100 ? Math.round(m) : Math.round(m*10)/10).toLocaleString() + '万'; }
 
   /* 画面の覚え（絞り込みと、開いている規則）。⚠ データではないので保存しない */
-  var UI = window._insp = window._insp || { scope:'live', level:'', cat:'', done:false, open:{}, all:{}, res:null };
+  var UI = window._insp = window._insp || { level:'', cat:'', done:false, open:{}, all:{}, res:null };
   if (!UI.all) UI.all = {};
-  if (!UI.scope) UI.scope = 'live';   /* 既定＝いま動いている車（終わった記録で埋めない） */
   var ROWS_CAP = 20;   /* 1つの規則で最初に出す件数（超えたぶんは「ほか◯件」で開く） */
 
-  function scopes(){ return window.PIT_INSPECT_SCOPES || []; }
   function cats(){ return window.PIT_INSPECT_CATS || []; }
   function levels(){ return window.PIT_INSPECT_LEVELS || []; }
   function markDefs(){ return window.PIT_INSPECT_MARKS || []; }
@@ -47,9 +45,27 @@
     return UI.res;
   }
 
+  /* 🔴 v1.169.1（ゆうた報告「また点検が動かない」）**画面ごと落とさない。**
+     ◎なぜ要るか
+       点検は**全カードを読む**画面なので、1台でも思わぬ形のデータがあると、
+       そこで止まって**画面がまるごと真っ白**になる。しかも何も出ないので原因が分からない。
+     🔴 つまずいたら、**つまずいたと言う**。黙って白くしない。
+     ⚠ 規則1本ずつのつまずきは pitInspectRun 側で受け止めている。ここは**描く側**の保険。 */
   window.renderInspect = function () {
     var body = document.getElementById('inspect-body');
     if (!body) return;
+    try { _renderInspect(body); }
+    catch (e) {
+      console.error('[inspect] 画面を描く途中でつまずきました', e);
+      body.innerHTML = '<div class="ins-empty">'
+        + '<b>点検の画面を出す途中でつまずきました。</b><br>'
+        + 'いちど画面を開き直してみてください。それでも出ない時は、この文をそのまま伝えてください：<br>'
+        + '<code>' + esc(String(e && e.message ? e.message : e)) + '</code>'
+        + '</div>';
+    }
+  };
+
+  function _renderInspect(body) {
     if (!window.pitInspectRun){
       body.innerHTML = '<div class="ins-empty">点検の規則が読み込めていません。画面を開き直してください。</div>';
       return;
@@ -57,10 +73,12 @@
     var res = run();
     var mutes = (window.state && state.inspectMutes) || {};
 
-    /* ---- 🔴 v1.169.0 まず「いま動いている車 / 終わった記録」で切る ----
-       ⚠ タイル（重さ）も分類タブも、**この中だけ**を数える。
-          全部を数えると、既定で出していない車の件数が出て、押しても何も無い。 */
-    var scoped = res.findings.filter(function (f) { return (f.scope || 'live') === UI.scope; });
+    /* ---- 絞り込みを通したあとの所見 ----
+       🔴 v1.169.1（ゆうた指摘 2026-08-22）**「普通に一個がよかった」**
+          ＝「いま動いている車／終わった記録」を**2つのボタンで切り替える形はやめた**。
+            並びは**1本**のまま、**チェック1つ**で「終わった記録も混ぜる」だけにする。
+          ⚠ 既定は入っていない＝**いま動かせる車だけ**（本番 260件 → 97件）。 */
+    var scoped = res.findings.filter(function (f) { return UI.past || (f.scope || 'live') === 'live'; });
     var count = function (rows, key) {
       var o = {};
       rows.forEach(function (f) { var k = f[key]; (o[k] = o[k] || { n:0, open:0 }); o[k].n++; if (!f.mark) o[k].open++; });
@@ -68,6 +86,7 @@
     };
     var lvN = count(scoped, 'level'), ctN = count(scoped, 'cat');
     var markedN = scoped.filter(function (f) { return !!f.mark; }).length;
+    var pastN = res.findings.filter(function (f) { return f.scope === 'past' && !f.mark; }).length;
 
     var list = scoped.filter(function (f) {
       if (!UI.done && f.mark) return false;             /* 札を貼ったものは既定で隠す */
@@ -84,12 +103,6 @@
        +     (res.muted ? ' ／ 黙らせている規則 ' + res.muted + '本' : '')
        +   '</div>'
        +   '<div class="ins-actions">'
-       +     scopes().map(function (x) {
-               var v = res.byScope[x.id] || { open:0 };
-               return '<button class="ins-scope' + (UI.scope === x.id ? ' on' : '') + '" title="' + esc(x.note) + '"'
-                    +   ' onclick="pitInspectScope(\'' + x.id + '\')">' + esc(x.label)
-                    +   '<span class="ins-scope-n">' + v.open + '</span></button>';
-             }).join('')
        +     '<button class="ins-btn" onclick="renderInspect()">もう一度点検</button>'
        +     '<button class="ins-btn" onclick="pitInspectDownload()">書き出し</button>'
        +   '</div>'
@@ -123,6 +136,10 @@
          +   ' onclick="pitInspectFilter(\'cat\',\'' + c.id + '\')">' + esc(c.label)
          +   '<span class="ins-tab-n">' + v.open + '</span></button>';
     });
+    h += '<label class="ins-chk" title="返車が済んだ車の記録。いま直しても現場は動きませんが、突合や検索では効いてきます">'
+       +   '<input type="checkbox"' + (UI.past ? ' checked' : '')
+       +   ' onchange="pitInspectTogglePast(this.checked)"> 終わった記録も見る'
+       +   (pastN ? '（' + pastN + '）' : '') + '</label>';
     h += '<label class="ins-chk"><input type="checkbox"' + (UI.done ? ' checked' : '')
        +   ' onchange="pitInspectToggleDone(this.checked)"> 片づけたものも見る</label>';
     h += '</div>';
@@ -131,10 +148,7 @@
     if (!list.length){
       h += '<div class="ins-ok">'
          +   '<b>気になるところはありません。</b>'
-         +   '<span>' + (UI.level || UI.cat ? 'いまの絞り込みでは 0件です。'
-             : (UI.scope === 'live'
-                 ? 'いま動いている車に、規則にひっかかるものはありませんでした（' + res.cards + '台を見ました）。'
-                 : '終わった記録のほうにも、ひっかかるものはありませんでした。')) + '</span>'
+         +   '<span>' + (UI.level || UI.cat ? 'いまの絞り込みでは 0件です。' : 'いま見ている ' + res.cards + '台に、規則にひっかかる車はありませんでした。') + '</span>'
          + '</div>';
     } else {
       var groups = [], byRule = {};
@@ -181,7 +195,7 @@
 
     body.innerHTML = h;
     if (window.pitIcons) try { pitIcons(body); } catch(e){}
-  };
+  }
 
   /* 1件ぶんの行 */
   function row(f){
@@ -232,12 +246,8 @@
     renderInspect();
   };
   window.pitInspectToggleDone = function (on) { UI.done = !!on; renderInspect(); };
-  /* 🔴 v1.169.0 いま動いている車 ⇄ 終わった記録。⚠ 切り替えたら絞り込みは外す（0件の画面に着地しないため） */
-  window.pitInspectScope = function (id) {
-    if (UI.scope === id) return;
-    UI.scope = id; UI.level = ''; UI.cat = ''; UI.all = {};
-    renderInspect();
-  };
+  /* 🔴 v1.169.1 終わった記録（返車が済んだ車）も混ぜる。⚠ 混ぜたら絞り込みは外す（0件に着地しないため） */
+  window.pitInspectTogglePast = function (on) { UI.past = !!on; UI.level = ''; UI.cat = ''; UI.all = {}; renderInspect(); };
   window.pitInspectOpen = function (rid) { UI.open[rid] = (UI.open[rid] === false); renderInspect(); };
   window.pitInspectAll = function (rid) { UI.all[rid] = !UI.all[rid]; renderInspect(); };
 

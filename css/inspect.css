@@ -101,7 +101,7 @@
   border:1px solid var(--border); border-radius:999px; padding:1px 8px; white-space:nowrap; }
 .ins-who-st2.none{ color:var(--text3); font-weight:400; }
 
-/* 🔴 v1.169.0 いま動いている車 ⇄ 終わった記録（ゆうた指摘＝終わった記録で今週が埋まる） */
+/* 🔴 v1.169.1 切り替えはチェック1つに戻したので、下のボタンの見た目はもう使っていない（消さずに残す） */
 .ins-scope{ border:1px solid var(--border); background:var(--bg2); color:var(--text3);
   padding:6px 12px; border-radius:8px; font-size:12px; cursor:pointer;
   display:inline-flex; align-items:center; gap:6px; }

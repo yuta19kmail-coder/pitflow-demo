@@ -7,8 +7,8 @@
      ・重さ（要対応／確認／気づき）と分類の**名前も色もあちらの表から引く**。ここで綴らない。
 
    ◎使い方（ゆうた）
-     ⓪ 既定では「**いま動かせる車**」だけが出ます。返車の済んだ車の記録も見たいときは
-        右上の「**終わった記録も見る**」にチェック（v1.169.1・ボタン2つをやめてチェック1つに）
+     🔴 v1.169.2（ゆうた指定）**この画面は隠さない。全部出す。**
+        減らすなら**規則の側**で（この車では言わない、と理由を持って決める）。
      ① 左のメニュー「点検」を開く → その場で全カードを見て、気になる所を並べます
      ② 1件ずつ、右のボタンで札を貼れます
           見た … 目は通した。まだ直していない（次も出る）
@@ -25,6 +25,13 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
   function man(n){ var m = (+n||0)/10000; return (Math.abs(m)>=100 ? Math.round(m) : Math.round(m*10)/10).toLocaleString() + '万'; }
+  /* 走った時刻（時:分:秒）。⚠ 秒まで出す＝1分の間に2回押しても、変わったと分かる */
+  function hhmm(iso){
+    var d = iso ? new Date(iso) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    var p = function(n){ return (n < 10 ? '0' : '') + n; };
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
 
   /* 画面の覚え（絞り込みと、開いている規則）。⚠ データではないので保存しない */
   var UI = window._insp = window._insp || { level:'', cat:'', done:false, open:{}, all:{}, res:null };
@@ -74,21 +81,15 @@
     var mutes = (window.state && state.inspectMutes) || {};
 
     /* ---- 絞り込みを通したあとの所見 ----
-       🔴 v1.169.1（ゆうた指摘 2026-08-22）**「普通に一個がよかった」**
-          ＝「いま動いている車／終わった記録」を**2つのボタンで切り替える形はやめた**。
-            並びは**1本**のまま、**チェック1つ**で「終わった記録も混ぜる」だけにする。
-          ⚠ 既定は入っていない＝**いま動かせる車だけ**（本番 260件 → 97件）。 */
-    var scoped = res.findings.filter(function (f) { return UI.past || (f.scope || 'live') === 'live'; });
-    var count = function (rows, key) {
-      var o = {};
-      rows.forEach(function (f) { var k = f[key]; (o[k] = o[k] || { n:0, open:0 }); o[k].n++; if (!f.mark) o[k].open++; });
-      return o;
-    };
-    var lvN = count(scoped, 'level'), ctN = count(scoped, 'cat');
-    var markedN = scoped.filter(function (f) { return !!f.mark; }).length;
-    var pastN = res.findings.filter(function (f) { return f.scope === 'past' && !f.mark; }).length;
+       🔴🔴 v1.169.2（ゆうた指定 2026-08-22）**「確実に全て出して」**
+          ＝ v1.169.0 で入れた「いま動いている車／終わった記録」の**出し分けは全部やめた**。
+            ボタン2つ → チェック1つ → **そもそも分けない**、の順で戻している。
+          ⚠ 点検が**黙って何かを隠す**と、出ていないものが有るのか無いのか分からなくなる。
+             減らすなら**規則の側**でやる（この車では言わない、と理由を持って決める）。
+             画面の側で隠すのはやらない。 */
+    var lvN = res.byLevel, ctN = res.byCat, markedN = res.marked;
 
-    var list = scoped.filter(function (f) {
+    var list = res.findings.filter(function (f) {
       if (!UI.done && f.mark) return false;             /* 札を貼ったものは既定で隠す */
       if (UI.level && f.level !== UI.level) return false;
       if (UI.cat && f.cat !== UI.cat) return false;
@@ -99,11 +100,16 @@
 
     /* ===== 上の帯（いつ・何台・いくつ） ===== */
     h += '<div class="ins-head">'
-       +   '<div class="ins-when">' + esc(res.today) + ' の点検 ／ 対象 <b>' + res.cards + '</b>台 ／ 規則 <b>' + res.rules + '</b>本'
+       /* 🔴 v1.169.2（ゆうた報告）「もう一度点検を押しても動いてる感じがしない」
+          ＝ 出していたのが**日付だけ**だったので、押しても字が1つも変わらなかった。
+            中身が同じなら画面も同じ＝**本当に走ったのかどうかが分からない。**
+          🔴 **走った時刻を出す。** 押すたびにここが変わる＝走った証拠になる。 */
+       +   '<div class="ins-when">' + esc(res.today) + ' <b>' + esc(hhmm(res.at)) + '</b> に点検'
+       +     ' ／ 対象 <b>' + res.cards + '</b>台 ／ 規則 <b>' + res.rules + '</b>本'
        +     (res.muted ? ' ／ 黙らせている規則 ' + res.muted + '本' : '')
        +   '</div>'
        +   '<div class="ins-actions">'
-       +     '<button class="ins-btn" onclick="renderInspect()">もう一度点検</button>'
+       +     '<button class="ins-btn" id="ins-rerun" onclick="pitInspectRerun()">もう一度点検</button>'
        +     '<button class="ins-btn" onclick="pitInspectDownload()">書き出し</button>'
        +   '</div>'
        + '</div>';
@@ -136,10 +142,6 @@
          +   ' onclick="pitInspectFilter(\'cat\',\'' + c.id + '\')">' + esc(c.label)
          +   '<span class="ins-tab-n">' + v.open + '</span></button>';
     });
-    h += '<label class="ins-chk" title="返車が済んだ車の記録。いま直しても現場は動きませんが、突合や検索では効いてきます">'
-       +   '<input type="checkbox"' + (UI.past ? ' checked' : '')
-       +   ' onchange="pitInspectTogglePast(this.checked)"> 終わった記録も見る'
-       +   (pastN ? '（' + pastN + '）' : '') + '</label>';
     h += '<label class="ins-chk"><input type="checkbox"' + (UI.done ? ' checked' : '')
        +   ' onchange="pitInspectToggleDone(this.checked)"> 片づけたものも見る</label>';
     h += '</div>';
@@ -246,8 +248,6 @@
     renderInspect();
   };
   window.pitInspectToggleDone = function (on) { UI.done = !!on; renderInspect(); };
-  /* 🔴 v1.169.1 終わった記録（返車が済んだ車）も混ぜる。⚠ 混ぜたら絞り込みは外す（0件に着地しないため） */
-  window.pitInspectTogglePast = function (on) { UI.past = !!on; UI.level = ''; UI.cat = ''; UI.all = {}; renderInspect(); };
   window.pitInspectOpen = function (rid) { UI.open[rid] = (UI.open[rid] === false); renderInspect(); };
   window.pitInspectAll = function (rid) { UI.all[rid] = !UI.all[rid]; renderInspect(); };
 
@@ -274,6 +274,26 @@
       window.pitInspectMute(rid, true);
       renderInspect();
     });
+  };
+
+  /* 🔴 v1.169.2 「もう一度点検」＝押したことが分かるようにする。
+     ・上の時刻が変わる（走った証拠）
+     ・ボタンが一瞬「点検中…」になる
+     ・件数が変わっていなくても「変わっていない」と言い切る（黙らない）
+     ⚠ 変わっていない時にこそ、押した人は不安になる。**必ず何か言う。** */
+  window.pitInspectRerun = function () {
+    var btn = document.getElementById('ins-rerun');
+    var before = UI.res ? UI.res.findings.filter(function(f){ return !f.mark; }).length : null;
+    if (btn) { btn.textContent = '点検中…'; btn.disabled = true; }
+    setTimeout(function () {
+      renderInspect();
+      var after = UI.res ? UI.res.findings.filter(function(f){ return !f.mark; }).length : 0;
+      if (window.pitToast) {
+        pitToast(before == null || before === after
+          ? '点検しました。変わりはありません（' + after + '件）'
+          : '点検しました。' + before + '件 → ' + after + '件');
+      }
+    }, 60);   /* 「点検中…」が一瞬でも見えるように、描き直しを次の順番へ回す */
   };
 
   /* カードを開く。⚠ 開き方は card-detail.js の1本（ここで窓を作らない） */

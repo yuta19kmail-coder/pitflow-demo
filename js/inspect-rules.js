@@ -33,9 +33,9 @@
        → { at, cards, findings:[…], byLevel, byCat, byRule, muted, marked }
      所見（finding）1件 ＝
        { key, ruleId, cat, level, title, why, fix, kind:'card'|'veh', refId, name, text, mark }
-       ⚠ `key` は **規則ID + 対象ID**。これが「見た／これでOK／直した」の札を貼る先。
-     pitInspectMark(key, v) … 札を貼る（'seen' 見た / 'spec' これでOK / 'fixed' 直した / '' はがす）
-     pitInspectMute(ruleId, on) … 規則ごと黙らせる（「うちはこれで正しい」時）
+       ⚠ `key` は **規則ID + 対象ID**。これが「見た／直した」の札を貼る先。
+     pitInspectMark(key, v) … 札を貼る（'seen' 見た / 'fixed' 直した / '' はがす）
+       🔴 v1.172.0 **札を貼っても一覧からは消えない**（数をごまかさないため）
      pitInspectExport()   … ②③へ渡す JSON
 
    ⚠ 読み込みは pit-share.js / sales-count.js / return-slot.js / loaner-free.js / card-miss.js より後ろ。
@@ -102,14 +102,23 @@
   var LEVELS = [
     { id:'red',   label:'要対応', color:'#ef4444', note:'放っておくとお金か信用が減ります' },
     { id:'amber', label:'確認',   color:'#f59e0b', note:'たぶん入れ忘れ。見て決めてください' },
-    { id:'gray',  label:'気づき', color:'#94a3b8', note:'仕様かもしれません。数が多いのでまとめて' }
+    { id:'gray',  label:'気づき', color:'#94a3b8', note:'急ぎではありませんが、ここも 0 にします' }
   ];
-  /* 🔴 v1.168.1（ゆうた指摘 2026-08-21）**「これは仕様」→「これでOK」に言い換えた。**
-     🗣「仕様っていうと、なんか**仕組み的にあってる**みたいなニュアンスが強いかな」
-     ＝ ここで言いたいのは「プログラムとして正しい」ではなく
-       「**見た。うちのやり方ではこれで正しい**」という**現場の判断**。
-     🔴 `id`（'spec'）は**変えないこと。** これは札の貼り先そのもので、
-        変えると**今までに貼った札が全部はがれる**（言葉だけ直す）。 */
+  /* 🔴🔴 v1.172.0（ゆうた指定 2026-08-22）**「やらなくていい」道を全部なくした。**
+     🗣「今、非表示におれがクリックでしたものはチェックのルールから外す／
+     　　この規則を出さないボタンを無くす／
+     　　基本は0をキープし続ける感じで運用するし、売上データを確定させたり、
+     　　会社全体の履歴として基本的には100％のつもりで運用するから、
+     　　**やらなくていいよ みたいなニュアンス感をなくしてほしい。基本は全て修正する**」
+     ◎消したもの
+       ・**「これでOK」の札（'spec'）** … 1件だけ次から出さない＝**見なかったことにする道**
+       ・**「この規則は出さない」（inspectMutes）** … 規則ごと黙らせる＝**もっと太い抜け道**
+       ・すでに付いていた 'spec' の札と、黙らせていた規則は **`sweepEscapes()` で外す**
+         （残したままボタンだけ消すと、**戻す手立てが無いまま永久に隠れる**）
+     🔴 **逃げ道は「規則そのものを直す」1本だけ。**
+        「この車では言わなくていい」なら、理由を持って**規則の側**に書く（v1.169.2 の決めごとと同じ）。
+     🔴 **残した札は数をごまかさない。** 貼っても**一覧から消えない**（画面の側で見る）。
+        ＝ 出ている数が「これから直す数」。**0 になったら本当に 0。** */
   /* 🔴🔴 v1.169.0（ゆうた指摘 2026-08-21）**「終わった記録」と「いま動いている車」を分ける。**
      ◎なぜ（本番データで分かったこと）
        本番 377台で所見が **260件**出たが、そのうち **129件が返車の済んだ車の記録**だった。
@@ -125,11 +134,14 @@
     { id:'past', label:'終わった記録',     note:'返車が済んだ車・アーカイブ。直しても現場は動かない' }
   ];
 
+  /* 🔴 残す札は2つだけ。**どちらも一覧から消さない**（v1.172.0）。
+     ⚠ id は変えないこと（変えると今までに貼った札が全部はがれる）。 */
   var MARKS = [
-    { id:'seen',  label:'見た',    note:'目は通した。まだ決めていない（次も出る）' },
-    { id:'spec',  label:'これでOK', note:'見た。うちのやり方ではこれで正しい（次から出さない）' },
-    { id:'fixed', label:'直した',  note:'直した。次のチェックで消える' }
+    { id:'seen',  label:'見た',   note:'目は通した。まだ直っていないので、直るまで出ます' },
+    { id:'fixed', label:'直した', note:'直したつもり。次のチェックで消えれば、本当に直っています' }
   ];
+  /* もう使わない札（'spec'＝これでOK）。**見つけたら外す**ためだけに残してある。 */
+  var DEAD_MARKS = { spec: 1 };
 
   /* ================================================================
      3. すでにある物差しを呼ぶだけの薄い口
@@ -259,7 +271,7 @@
     { id:'M05', cat:'money', level:'amber',
       title:'金額のけたが大きすぎる',
       why:'1台で ' + man(LIM.huge) + ' を超えています。0を1つ多く打った可能性があります。',
-      fix:'金額を見直してください。本当に合っていれば「これでOK」を付けてください。',
+      fix:'金額を見直してください。打ち間違いなら直す。本当にこの金額なら、そのまま置いておけば次も出ます（消す道はありません）。',
       each: function(c){
         var f = [['amountFinal','確定金額'],['amountOrder','受注金額'],['amountQuote','見積金額']]
           .filter(function(x){ return num(c[x[0]]) >= LIM.huge; })
@@ -394,7 +406,7 @@
     { id:'F07', cat:'flow', level:'amber',
       title:'返車予定日が、ずっと先',
       why:'今日から ' + LIM.farReturn + '日より先です。年や月を打ち間違えた可能性があります。',
-      fix:'日付を見直してください。本当に先の予定なら「これでOK」を付けてください。',
+      fix:'日付を見直してください。本当にこの日でよければ、そのまま置いておけば次も出ます（消す道はありません）。',
       each: function(c, ctx){
         if (!isLive(c) || !t(c.returnDate)) return '';
         var n = days(ctx.today, c.returnDate);
@@ -441,7 +453,7 @@
       title:'未入庫のまま、まもなく自動で片づきます',
       why:'未入庫は ' + LIM.noShowAuto + '日で自動アーカイブされます。'
          + '本当は来る予定だった車なら、消える前に拾ってください。',
-      fix:'来るなら入庫日を入れ直してください。来ないならそのままで大丈夫です。',
+      fix:'来るなら入庫日を入れ直す。来ないなら予約キャンセル（または未入庫）にしてください。',
       each: function(c, ctx){
         if (c.status !== 'cancelled' || c.cancelled || c.archived) return '';
         var from = t(c.cancelledAt) || t(c.noShowAt);
@@ -560,7 +572,7 @@
     { id:'R07', cat:'resv', level:'gray',
       title:'書きかけのカードが残っている',
       why:'保存されないまま残った下書きです。数にも売上にも入りませんが、たまっていくと重くなります。',
-      fix:'そのままで大丈夫です（自動で片づきます）。増え続けるようなら教えてください。',
+      fix:'開いて保存するか、消してください（時間がたてば自動でも片づきます）。増え続けるようなら教えてください。',
       each: function(c){ return c._draft ? '書きかけのまま残っています' : ''; } },
 
     /* ── 代車 ───────────────────────────────────────────────── */
@@ -784,8 +796,7 @@
       title:'終わった車で、必須の項目が空',
       why:'返車が済んだ車です。いま直しても現場は動きませんが、'
          + '整備ソフトとの突合や、次に来た時の検索でつまずきます。',
-      fix:'まとめて直すか、そのままでも大丈夫です。件数が多い時は「この規則は出さない」で、'
-         + 'これから出さないようにできます。',
+      fix:'「ここを直す」で1件ずつ埋めてください。数が多くても、ここも 0 にします（会社の履歴として残るデータです）。',
       each: function(c){
         if (isLive(c) || c._draft) return '';
         if (!isDone(c) && !c.archived) return '';
@@ -796,7 +807,7 @@
     { id:'D02', cat:'data', level:'gray',
       title:'入れたほうがいい項目が、空のまま',
       why:'無くても動きますが、あとで探す時・整備ソフトと突き合わせる時に困ります。',
-      fix:'分かるものだけで大丈夫です。',
+      fix:'分かるところから埋めてください。',
       each: function(c){
         /* ⚠ これから来る車だけ。終わった車の「入れたほうがいい」は、もう入れようがない */
         if (!isLive(c)) return '';
@@ -937,7 +948,7 @@
     { id:'T06', cat:'state', level:'amber',
       title:'アーカイブ済みなのに、作業中の状態のまま',
       why:'片づいたはずなのに、状態はタスクボードの作業中のままです。あとで戻した時に行き先が分かりません。',
-      fix:'そのままで大丈夫ですが、戻す時は状態を選び直してください。',
+      fix:'カードを開いて、いまの状態に合うところへ直してください（戻す時に行き先が分からなくなります）。',
       each: function(c){
         if (!c.archived) return '';
         return (['check','estim','contact','parts','work','workDone'].indexOf(s(c.status)) >= 0)
@@ -957,7 +968,7 @@
     { id:'T08', cat:'state', level:'gray',
       title:'課と、フロント担当の課が食い違う',
       why:'課ごとの売上と、人ごとの売上が合わなくなります。',
-      fix:'どちらかを直してください（応援で入ったならこのままで大丈夫です）。',
+      fix:'どちらかを直してください。応援で入ったのなら、そう分かるように課か担当を直してください。',
       each: function(c){
         if (!isLive(c) && !isDone(c)) return '';
         var who = t(c.frontStaff) || t(c.staff);
@@ -998,6 +1009,20 @@
   function marks(){ if (w.state && !state.inspectMarks) state.inspectMarks = {}; return (w.state && state.inspectMarks) || {}; }
   function mutes(){ if (w.state && !state.inspectMutes) state.inspectMutes = {}; return (w.state && state.inspectMutes) || {}; }
 
+  /* 🔴🔴 v1.172.0（ゆうた指定）**前に「これでOK」を押したもの・黙らせた規則を外す。**
+     ◎なぜここでやるか
+       ボタンだけ消して印を残すと、**戻す手立てが無いまま永久に隠れる**。
+       ＝ 画面には出ないのに直っていない、という**いちばん困る状態**になる。
+     ⚠ 1回外せば済むので、外した時だけ保存する（毎回書きに行かない）。 */
+  function sweepEscapes(){
+    var mk = marks(), mu = mutes(), n = 0;
+    Object.keys(mk).forEach(function(k){ if (mk[k] && DEAD_MARKS[mk[k].v]) { delete mk[k]; n++; } });
+    Object.keys(mu).forEach(function(k){ delete mu[k]; n++; });
+    if (n && w.PitDB && w.PitDB.save) { try { PitDB.save(); } catch(e){} }
+    if (n) console.log('[inspect] 前に隠していた ' + n + '件を出し直しました（v1.172.0）');
+    return n;
+  }
+
   function pitInspectRun(opt){
     opt = opt || {};
     var td    = opt.today || today();
@@ -1022,10 +1047,11 @@
 
     var ctx = { today: td, cards: all, assigns: asg, vehs: vehs, vehIds: vehIds,
                 custByTel: custByTel, custByKana: custByKana };
-    var mk = marks(), mu = mutes();
+    sweepEscapes();                       /* 🔴 v1.172.0 隠していたものを出し直す */
+    var mk = marks();
     var byId = {}; all.forEach(function(c){ if (c && c.id) byId[c.id] = c; });
 
-    var findings = [], mutedN = 0;
+    var findings = [], mutedN = 0;   /* 🔴 v1.172.0 黙らせは廃止＝ここは必ず 0 */
 
     function push(rule, ref, text, kind, name){
       var key = rule.id + ':' + (ref == null ? '-' : ref);
@@ -1039,7 +1065,8 @@
     }
 
     RULES.forEach(function(rule){
-      if (mu[rule.id]) { mutedN++; return; }
+      /* 🔴 v1.172.0 **規則を黙らせる道は無くした。** 全部の規則を必ず走らせる。
+         減らしたい時は、規則そのものを直す（この車では言わない、と理由を持って書く）。 */
       try {
         if (rule.each){
           all.forEach(function(c){
@@ -1137,11 +1164,11 @@
     if (w.PitDB && w.PitDB.save) PitDB.save();
   }
 
-  /* 規則ごと黙らせる（「うちはこれで正しい」時）。⚠ もう一度押せば戻る */
-  function pitInspectMute(ruleId, on){
-    var mu = mutes();
-    if (on) mu[ruleId] = 1; else delete mu[ruleId];
-    if (w.PitDB && w.PitDB.save) PitDB.save();
+  /* 🔴🔴 v1.172.0（ゆうた指定）**規則ごと黙らせる道は無くした。**
+     ◎残してある理由＝古い画面や書き置きから呼ばれても落ちないように。**何もしない。**
+     ⚠ 新しく呼ばないこと。減らしたい時は**規則そのものを直す**。 */
+  function pitInspectMute(){
+    console.warn('[inspect] 「この規則は出さない」は v1.172.0 で廃止しました（規則の側で直してください）');
   }
 
   /* ②突合・③AI判断へ渡す形。🔴 ここが三段ロケットの受け渡し口 */

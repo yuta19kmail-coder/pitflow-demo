@@ -18,20 +18,27 @@
        ・日常チェック …… いまの規則表（PitFlow の中だけで分かる矛盾）。お金はかからない
        ・クォーターチェック … ②売上チェックリストPDFの突合 ＋ ③AIチェック（およそ週1）
 
+   ◎🔴🔴 v1.172.0（ゆうた指定 2026-08-22）**「やらなくていい」道は無い。全部直す。**
+     🗣「今、非表示におれがクリックでしたものはチェックのルールから外す／
+     　　この規則を出さないボタンを無くす／
+     　　基本は0をキープし続ける感じで運用するし、売上データを確定させたり、
+     　　会社全体の履歴として基本的には100％のつもりで運用するから、
+     　　**やらなくていいよ みたいなニュアンス感をなくしてほしい。基本は全て修正する**」
+     ・**「これでOK」** … 廃止。前に押したものも `sweepEscapes()` で**出し直す**
+     ・**「この規則は出さない」** … 廃止。黙らせていた規則も**全部出す**
+     ・**札を貼っても一覧から消えない** … 隠す道が1つも無い＝**出ている数がそのまま「直す数」**
+     🔴 **ここに出ている数を 0 にするのが運用。0 になったら本当に 0。**
+     🔴 逃げ道は**規則そのものを直す**1本だけ（この車では言わない、と理由を持って書く）。
+
    ◎使い方（ゆうた）
-     🔴 v1.169.2（ゆうた指定）**この画面は隠さない。全部出す。**
-        減らすなら**規則の側**で（この車では言わない、と理由を持って決める）。
      ① 左のメニュー「データチェック」を開く → その場で全カードを見て、気になる所を並べます
-     ② 1件ずつ、右のボタンで札を貼れます
-          見た … 目は通した。まだ直していない（次も出る）
-          これでOK … 見た。うちのやり方ではこれで正しい（次から**この1件だけ**出さない）
-                       ⚠ v1.168.1 で「これは仕様」から言い換えた（ゆうた指摘＝仕組みの話に聞こえる）
-          直した … 直した（次のチェックで自然に消える）
-     ③ **ここを直す** … 🔴 v1.170.0 **指摘された欄だけ**を小窓で直す
+     ② **ここを直す** … 🔴 v1.170.0 **指摘された欄だけ**を小窓で直す
           ＝ **アーカイブ済みの車でも誰でも直せる**（ゆうた指定）。ほかの欄は開きません。
           ⚠ **確定金額と確定日だけは、これまで通り管理者だけ**（見えるが直せない）。
-     ④ 「この規則は出さない」＝その**規則まるごと**黙らせる（あとで戻せます）
-     ⑤ 「書き出し」＝②の突合・③のAI判断へ渡す JSON を落とします
+     ③ 札は2つだけ。**どちらも行を消しません**（作業中の目印）
+          見た … 目は通した。まだ直っていないので、直るまで出ます
+          直した … 直したつもり。次のチェックで消えれば、本当に直っています
+     ④ 「書き出し」＝②の突合・③のAI判断へ渡す JSON を落とします
 
    ⚠ 規則そのものは**1文字も書き換えません**（読んで、数えて、並べるだけ）。
       書き換えが起きるのは、人が「ここを直す」を押して保存した時だけ。
@@ -56,7 +63,8 @@
   ];
 
   /* 画面の覚え（絞り込みと、開いている規則）。⚠ データではないので保存しない */
-  var UI = window._insp = window._insp || { mode:'daily', level:'', cat:'', done:false, open:{}, all:{}, res:null };
+  /* ⚠ v1.172.0 `done`（片づけたものも見る）は使わなくなった。古い覚えが残っていても害は無い。 */
+  var UI = window._insp = window._insp || { mode:'daily', level:'', cat:'', open:{}, all:{}, res:null };
   if (!UI.all) UI.all = {};
   if (!UI.mode) UI.mode = 'daily';
   var ROWS_CAP = 20;   /* 1つの規則で最初に出す件数（超えたぶんは「ほか◯件」で開く） */
@@ -116,7 +124,6 @@
     if (UI.mode === 'quarter'){ body.innerHTML = modeBar() + quarterHtml(); if (window.pitIcons) try { pitIcons(body); } catch(e){} return; }
 
     var res = run();
-    var mutes = (window.state && state.inspectMutes) || {};
 
     /* ---- 絞り込みを通したあとの所見 ----
        🔴🔴 v1.169.2（ゆうた指定 2026-08-22）**「確実に全て出して」**
@@ -125,10 +132,15 @@
           ⚠ データチェックが**黙って何かを隠す**と、出ていないものが有るのか無いのか分からなくなる。
              減らすなら**規則の側**でやる（この車では言わない、と理由を持って決める）。
              画面の側で隠すのはやらない。 */
-    var lvN = res.byLevel, ctN = res.byCat, markedN = res.marked;
+    var lvN = res.byLevel, ctN = res.byCat;
 
+    /* 🔴🔴 v1.172.0（ゆうた指定）**札で隠さない。**
+       ◎前まで＝「見た／これでOK／直した」を押すと、その行は一覧から消えていた。
+         ＝ **直っていないのに 0 件に見える**道が3つ空いていた。
+       🔴 いま出ているものは**全部これから直すもの**。押しても消えない。
+          本当に直れば、次のチェックで**規則の側から**消える。それが答え。
+       ⚠ 絞り込み（重さ・分類）は今までどおり＝**人が見る順番を変えるだけ**で、数は隠さない。 */
     var list = res.findings.filter(function (f) {
-      if (!UI.done && f.mark) return false;             /* 札を貼ったものは既定で隠す */
       if (UI.level && f.level !== UI.level) return false;
       if (UI.cat && f.cat !== UI.cat) return false;
       return true;
@@ -144,7 +156,8 @@
           🔴 **走った時刻を出す。** 押すたびにここが変わる＝走った証拠になる。 */
        +   '<div class="ins-when">' + esc(res.today) + ' <b>' + esc(hhmm(res.at)) + '</b> にチェック'
        +     ' ／ 対象 <b>' + res.cards + '</b>台 ／ 規則 <b>' + res.rules + '</b>本'
-       +     (res.muted ? ' ／ 黙らせている規則 ' + res.muted + '本' : '')
+       /* 🔴 v1.172.0 隠しているものは1件も無い＝そう言い切る（黙らせている規則の欄は消した） */
+       +     ' ／ <b>' + res.findings.length + '</b>件（隠しているものはありません）'
        +   '</div>'
        +   '<div class="ins-actions">'
        +     '<button class="ins-btn" id="ins-rerun" onclick="pitInspectRerun()">もう一度チェック</button>'
@@ -156,39 +169,46 @@
     h += '<div class="ins-tiles">';
     levels().forEach(function (l) {
       var v = lvN[l.id] || { n:0, open:0 };
+      /* 🔴 v1.172.0 出す数は **n（全部）**。前は open（札を貼っていない数）だったので、
+         札を貼るほど数字が減った＝**直っていないのに減る**。数字が嘘をつかないようにした。 */
       h += '<button class="ins-tile' + (UI.level === l.id ? ' on' : '') + '"'
          +   ' style="--ins-c:' + l.color + '" onclick="pitInspectFilter(\'level\',\'' + l.id + '\')">'
-         +   '<span class="ins-tile-n">' + v.open + '</span>'
+         +   '<span class="ins-tile-n">' + v.n + '</span>'
          +   '<span class="ins-tile-l">' + esc(l.label) + '</span>'
          +   '<span class="ins-tile-note">' + esc(l.note) + '</span>'
          + '</button>';
     });
-    /* 🔴 v1.168.1 札の言葉は**表から並べる**（ここで綴ると、言い換えた時に片方だけ古くなる。
-       実際 v1.168.1 でボタンを「これでOK」にした時、ここだけ「仕様」のまま残っていた）。 */
-    h += '<div class="ins-tile-sum">'
-       +   '片づけた（' + markDefs().map(function(m){ return esc(m.label); }).join('・') + '）'
-       +   '<b>' + markedN + '</b>件'
+    /* 🔴🔴 v1.172.0（ゆうた指定）**「片づけた◯件」はやめた。**
+       ＝ 札を貼った数を誇らしく出すと「札を貼れば片づく」に見える。片づくのは**直した時だけ**。
+       　 代わりに**この画面の運用そのもの**を1行で言う。 */
+    h += '<div class="ins-goal">'
+       +   (res.findings.length
+             ? '<b>' + res.findings.length + '件</b>を直すと 0 になります。'
+             : '<b>0件</b>です。この状態を保ちます。')
+       +   '<span>売上を確定させ、会社の履歴として残すデータです。<b>基本は全部直します。</b></span>'
        + '</div>';
     h += '</div>';
 
-    /* ===== 分類のタブ ＋ 片づけたものも見る ===== */
+    /* ===== 分類のタブ ===== */
     h += '<div class="ins-bar">'
        +   '<button class="ins-tab' + (UI.cat === '' ? ' on' : '') + '" onclick="pitInspectFilter(\'cat\',\'\')">すべて</button>';
     cats().forEach(function (c) {
       var v = ctN[c.id] || { n:0, open:0 };
       h += '<button class="ins-tab' + (UI.cat === c.id ? ' on' : '') + '" title="' + esc(c.note) + '"'
          +   ' onclick="pitInspectFilter(\'cat\',\'' + c.id + '\')">' + esc(c.label)
-         +   '<span class="ins-tab-n">' + v.open + '</span></button>';
+         +   '<span class="ins-tab-n">' + v.n + '</span></button>';
     });
-    h += '<label class="ins-chk"><input type="checkbox"' + (UI.done ? ' checked' : '')
-       +   ' onchange="pitInspectToggleDone(this.checked)"> 片づけたものも見る</label>';
+    /* 🔴 v1.172.0 「片づけたものも見る」は**要らなくなった**（隠しているものが1件も無い） */
     h += '</div>';
 
     /* ===== 中身（規則ごとにまとめる） ===== */
     if (!list.length){
+      /* 🔴 v1.172.0 0件は**保つもの**。「気にしなくていい」ではなく「この状態を保つ」と言う。 */
       h += '<div class="ins-ok">'
-         +   '<b>気になるところはありません。</b>'
-         +   '<span>' + (UI.level || UI.cat ? 'いまの絞り込みでは 0件です。' : 'いま見ている ' + res.cards + '台に、規則にひっかかる車はありませんでした。') + '</span>'
+         +   '<b>0件です。</b>'
+         +   '<span>' + (UI.level || UI.cat
+                 ? 'いまの絞り込みでは 0件です。ほかの絞り込みも見てください。'
+                 : res.cards + '台ぜんぶ、規則にひっかかる所はありません。この状態を保ちます。') + '</span>'
          + '</div>';
     } else {
       var groups = [], byRule = {};
@@ -208,11 +228,12 @@
            +     '<span class="ins-g-x">' + (open ? '▾' : '▸') + '</span>'
            +   '</div>';
         if (open){
+          /* 🔴🔴 v1.172.0（ゆうた指定）**「この規則は出さない」ボタンは撤去した。**
+             ＝ 規則まるごと黙らせる＝**いちばん太い「やらなくていい」道**だった。
+             　 うちのやり方に合っていないなら、**規則そのものを直す**（そのほうが全員に効く）。 */
           h += '<div class="ins-g-why">'
              +   '<div><b>なぜ出したか</b>' + esc(r0.why) + '</div>'
              +   '<div><b>どうする</b>' + esc(r0.fix) + '</div>'
-             +   '<button class="ins-mute" onclick="pitInspectMuteUI(\'' + rid + '\')">'
-             +     (mutes[rid] ? 'この規則をまた出す' : 'この規則は出さない（うちのやり方ではこれで正しい）') + '</button>'
              + '</div>';
           /* 🔴 1つの規則で何百件も出ることがある（古いデータの抜けなど）。
              全部そのまま並べると**画面が使えなくなり、ほかの規則が見えなくなる**ので、
@@ -352,7 +373,9 @@
     else UI.cat = v;
     renderInspect();
   };
-  window.pitInspectToggleDone = function (on) { UI.done = !!on; renderInspect(); };
+  /* 🔴 v1.172.0 「片づけたものも見る」は廃止（隠しているものが1件も無い）。
+     ⚠ 古い呼び出しから来ても落ちないように、口だけ残して**何もしない**。 */
+  window.pitInspectToggleDone = function () { renderInspect(); };
   window.pitInspectOpen = function (rid) { UI.open[rid] = (UI.open[rid] === false); renderInspect(); };
   window.pitInspectAll = function (rid) { UI.all[rid] = !UI.all[rid]; renderInspect(); };
 
@@ -362,23 +385,10 @@
     renderInspect();
   };
 
-  window.pitInspectMuteUI = function (rid) {
-    var on = !!((window.state && state.inspectMutes) || {})[rid];
-    if (on) { window.pitInspectMute(rid, false); renderInspect(); return; }
-    var r = ruleById(rid);
-    var ask = window.pitAsk ? pitAsk : function (m, o) { return Promise.resolve(true); };
-    ask('この規則を出さないようにしますか？', {
-      title: r.title || '規則を黙らせる',
-      detail: '「' + (r.title || rid) + '」を、これからデータチェックで出さなくなります。\n'
-            + '1件ずつ「これでOK」を押すのが大変なくらい出ている＝\n'
-            + 'うちのやり方ではこれで正しい、という時に使ってください。\n\n'
-            + '⚠ あとから同じ場所の「この規則をまた出す」で戻せます。',
-      ok: '出さないようにする', cancel: 'やめる'
-    }).then(function (yes) {
-      if (!yes) return;
-      window.pitInspectMute(rid, true);
-      renderInspect();
-    });
+  /* 🔴🔴 v1.172.0（ゆうた指定）**「この規則は出さない」は廃止。**
+     ボタンも窓も消した。口だけ残してあるのは、古い画面から呼ばれても落ちないため。 */
+  window.pitInspectMuteUI = function () {
+    if (window.pitToast) pitToast('「この規則は出さない」はやめました。直すか、規則そのものを見直してください');
   };
 
   /* 🔴 v1.169.2 「もう一度チェック」＝押したことが分かるようにする。
@@ -388,11 +398,12 @@
      ⚠ 変わっていない時にこそ、押した人は不安になる。**必ず何か言う。** */
   window.pitInspectRerun = function () {
     var btn = document.getElementById('ins-rerun');
-    var before = UI.res ? UI.res.findings.filter(function(f){ return !f.mark; }).length : null;
+    /* 🔴 v1.172.0 数えるのは**全部**（札で減らさない） */
+    var before = UI.res ? UI.res.findings.length : null;
     if (btn) { btn.textContent = 'チェック中…'; btn.disabled = true; }
     setTimeout(function () {
       renderInspect();
-      var after = UI.res ? UI.res.findings.filter(function(f){ return !f.mark; }).length : 0;
+      var after = UI.res ? UI.res.findings.length : 0;
       if (window.pitToast) {
         pitToast(before == null || before === after
           ? 'チェックしました。変わりはありません（' + after + '件）'

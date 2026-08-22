@@ -128,19 +128,19 @@
       .filter(function(k){ return k !== 'loanerId' && BY_ID[k]; });
   }
 
+  /* ⚠ v1.172.2（ゆうた指定）**規則表から13本消した**ので、その行もここから消した
+     （M05 / M10 / F01 / S01 / S06 / S08 / D06。ほかの6本はもともとここに載せていない）。
+     🔴 **規則を消したら、この表からも消す**（表が指す規則が実在することを見張りが見ている）。 */
   var RULE_FIX = {
     /* お金 */
     M01: ['amountOrder'],
     M02: ['amountFinal'],
     M03: ['amountOrder', 'amountQuote'],
     M04: ['amountQuote', 'amountOrder'],
-    M05: ['amountFinal', 'amountOrder', 'amountQuote'],
     M06: ['amountFinal'],
     M07: ['amountFinal', 'amountQuote'],
     M08: ['amountFinal', 'amountOrder', 'amountQuote'],
-    M10: ['paymentDate'],
     /* 日付・進行 */
-    F01: ['returnDate'],
     F03: ['returnDate', 'returnTime'],
     F04: ['completedAt'],
     F05: ['reserveDate', 'returnDate'],
@@ -153,11 +153,8 @@
     R03: ['resNo'],
     R04: ['reserveDate', 'returnDate'],
     /* 車検 */
-    S01: ['shakenDecided'],
     S02: ['shakenDecided'],
     S05: ['shakenDecided'],
-    S06: ['shakenDecided'],
-    S08: ['shakenDecided'],
     /* データの抜け（抜けている欄そのものを出す） */
     D01: function(c){ return missKeys(c, 'red'); },
     D09: function(c){ return missKeys(c, 'red'); },
@@ -165,7 +162,6 @@
     D03: ['customer'],
     D04: ['tel'],
     D05: ['tel'],
-    D06: ['plate'],
     D08: ['customer', 'kana'],
     /* 状態の矛盾 */
     T04: ['frontStaff'],

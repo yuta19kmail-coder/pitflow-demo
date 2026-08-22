@@ -452,7 +452,7 @@ function renderCardForm(c){
 
   /* === 顧客呼び出し（入力補助・整備ソフトとは別の控え） === */
   h += '<div class="cf-recall">';
-  h += '<input id="cf-recall-input"class="cf-input"placeholder="過去の顧客・ナンバーから呼び出し（名前/ナンバー）"oninput="custSuggest(this.value)"autocomplete="off">';
+  h += '<input id="cf-recall-input"class="cf-input"placeholder="過去の顧客・ナンバーから呼び出し（名前/ナンバー）"oninput="custSuggestSoon(this.value,event)"autocomplete="off">';
   h += '<div id="cf-recall-list" class="cf-recall-list" style="display:none"></div>';
   h += '</div>';
 

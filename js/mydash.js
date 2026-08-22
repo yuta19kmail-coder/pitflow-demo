@@ -993,7 +993,7 @@
     if (!$('mydash-pinned')) {
       host.innerHTML =
         '<div id="mydash-pinned">' +
-        '<div id="mydash-search-wrap"class="md-search"><input id="mydash-search-input"type="search"autocomplete="off"placeholder="検索（顧客・名前・車・ナンバー・予約番号・代車・日付…）"onfocus="pitSearchBind(\'mydash-search-wrap\',\'mydash-search-input\',\'mydash-search-results\')"oninput="pitSearchInput(this.value)"><div id="mydash-search-results"class="pit-search-results"></div></div>'+
+        '<div id="mydash-search-wrap"class="md-search"><input id="mydash-search-input"type="search"autocomplete="off"placeholder="検索（顧客・名前・車・ナンバー・予約番号・代車・日付…）"onfocus="pitSearchBind(\'mydash-search-wrap\',\'mydash-search-input\',\'mydash-search-results\')"oninput="pitSearchSoon(this.value,event)"><div id="mydash-search-results"class="pit-search-results"></div></div>'+
         '  <div id="mydash-notes-area"></div>' +
         '</div>' +
         '<div class="md-flow" id="mydash-flow"></div>' +

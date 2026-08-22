@@ -34,8 +34,12 @@
 .ins-tile-n{ font-size:22px; font-weight:800; color:var(--ins-c); line-height:1.1; }
 .ins-tile-l{ font-size:13px; font-weight:700; color:var(--text); }
 .ins-tile-note{ font-size:10px; color:var(--text3); }
-.ins-tile-sum{ align-self:center; font-size:12px; color:var(--text3); margin-left:4px; }
-.ins-tile-sum b{ color:var(--text2); }
+/* 🔴 v1.172.0（ゆうた指定）タイルの右＝**この画面の運用そのもの**を1行で。
+   （前の「片づけた◯件」は廃止＝札を貼った数を成果のように見せない） */
+.ins-goal{ align-self:center; margin-left:4px; font-size:12px; color:var(--text3);
+  display:flex; flex-direction:column; gap:2px; line-height:1.6; }
+.ins-goal b{ color:var(--text2); }
+.ins-goal span{ font-size:11px; }
 
 /* ── 分類のタブ ── */
 .ins-bar{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:0 2px 14px; }
@@ -44,7 +48,7 @@
 .ins-tab:hover{ background:var(--bg3); }
 .ins-tab.on{ background:var(--bg3); color:var(--text); border-color:var(--brand,#1f7a4d); font-weight:700; }
 .ins-tab-n{ font-size:10px; color:var(--text3); background:var(--bg); border-radius:999px; padding:0 6px; }
-.ins-chk{ margin-left:auto; font-size:12px; color:var(--text3); display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+/* ⚠ v1.172.0 「片づけたものも見る」（.ins-chk）は廃止した＝隠しているものが1件も無い */
 
 /* ── 何も無い時 ── */
 .ins-ok{ border:1px solid var(--border); border-radius:12px; background:var(--bg2); padding:28px;
@@ -68,9 +72,7 @@
 .ins-g-why{ padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--bg);
   font-size:11px; color:var(--text3); line-height:1.7; display:flex; flex-direction:column; gap:2px; }
 .ins-g-why b{ color:var(--text2); margin-right:6px; }
-.ins-mute{ align-self:flex-start; margin-top:5px; border:1px solid var(--border); background:var(--bg2);
-  color:var(--text3); padding:3px 10px; border-radius:8px; font-size:11px; cursor:pointer; }
-.ins-mute:hover{ color:var(--text); border-color:var(--text3); }
+/* ⚠ v1.172.0 「この規則は出さない」（.ins-mute）は廃止した＝いちばん太い抜け道だった */
 
 /* ── 1件ぶんの行 ── */
 .ins-rows{ border-top:1px solid var(--border); }

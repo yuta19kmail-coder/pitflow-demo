@@ -165,6 +165,27 @@
     }).catch(function () { return []; });
   }
 
+  /* 🧹 v2.0.0（ゆうた指定 2026-08-23）**残してある結果を消す。**
+     🗣「あと一回入れたQのデータをクリアするボタンもほしい」
+     ＝ 練習でくり返し走らせたぶんを、本番の前にきれいにできるように。
+     🔴 消すのは **その期間の書類と、一覧のその行だけ**。
+        ⚠ 「伝票を直した」の印（`qmarks`）は**消さない**。あれは
+           「整備ソフト側を直した」という**人が決めた事実**で、走らせた回数とは別の記録。
+     ⚠ 戻せないので、聞くのは呼ぶ側（画面）の仕事。ここは言われたとおり消すだけ。 */
+  function deleteRun(from, to){
+    var c = co();
+    if (!cloud() || !c) return Promise.reject(new Error('練習用サイトでは消せません（本番の PitFlow で使ってください）'));
+    var id = runId(from, to);
+    return c.collection('pitSettings').doc(id).delete().then(function () {
+      var ref = c.collection('pitSettings').doc('qruns');
+      return ref.get().then(function (snap) {
+        var list = (snap.exists && snap.data() && snap.data().一覧) || [];
+        list = list.filter(function (x) { return x && x.id !== id; });
+        return ref.set({ 一覧: list });
+      });
+    });
+  }
+
   function loadRun(id){
     var c = co();
     if (!cloud() || !c) return Promise.resolve(null);
@@ -201,5 +222,6 @@
   w.pitQSaveRun   = saveRun;
   w.pitQLoadList  = loadList;
   w.pitQLoadRun   = loadRun;
+  w.pitQDeleteRun = deleteRun;   /* 🧹 v2.0.0 その期間の結果を消す（印は消さない） */
   w.pitQMonthPlan = monthPlan;
 })(window);

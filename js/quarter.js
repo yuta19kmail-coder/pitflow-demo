@@ -43,7 +43,9 @@
                    /* 🛠 v2.0.0 その場で直すため。
                       soft ＝ 読み終わった伝票（**PDFを読み直さずに数え直す**ために抱えておく）
                       marks ＝「伝票側を直した」の印（読み込みは1回だけ） */
-                   soft:null, marks:null, marksBusy:false, saveTimer:0 };
+                   soft:null, marks:null, marksBusy:false, saveTimer:0,
+                   /* 🗓 v2.0.0 PDF の期間をクォーターごとに割ったもの。gi＝いま見ている組 */
+                   groups:null, gi:0, term:null, termSrc:'' };
     if (!U.q.from){
       /* 既定＝いまのクォーター。⚠ 区切りは sales.js の1本から借りる */
       var q = w.pitQuarterOf ? w.pitQuarterOf() : null;
@@ -83,7 +85,7 @@
 
     /* ---- 期間 ---- */
     h += '<div class="q-range">'
-       +   '<span class="q-l">期間</span>'
+       +   '<span class="q-l">期間 <small>PDFを入れると自動で入ります</small></span>'
        +   '<input class="q-in" type="date" id="q-from" value="' + esc(U.from) + '" onchange="pitQSetRange(this.value, null)">'
        +   '<span class="q-tilde">〜</span>'
        +   '<input class="q-in" type="date" id="q-to" value="' + esc(U.to) + '" onchange="pitQSetRange(null, this.value)">'
@@ -114,7 +116,13 @@
        +   '</label>'
        +   (U.pdf ? '<span class="q-fname">' + esc(U.pdf) + '</span>' : '')
        +   (U.busy ? '<span class="q-busy">' + esc(U.busy) + '</span>' : '')
+       /* 🧹 v2.0.0（ゆうた指定）**入れたPDFを片づける。** 残してある結果には触らない。 */
+       +   ((U.pdf || U.res || U.err)
+             ? '<button class="q-clear" onclick="pitQClearScreen()">別のPDFを入れ直す</button>' : '')
        + '</div>';
+
+    /* 🗓 v2.0.0 PDF が言っている期間と、クォーターの割り振り */
+    h += termRow(U);
 
     if (U.err){
       h += '<div class="q-ng"><b>読み取りに失敗しました。</b>'
@@ -224,6 +232,50 @@
      🔴 区切りは `pitQuarterOf` 1本（quarter-store.js の `pitQMonthPlan` が借りている）。
      ⚠ 済んだものは押すと**残してある結果**が開く（PDFは要らない）。
      ================================================================ */
+  /* ================================================================
+     🗓 v2.0.0 PDF が言っている期間と、クォーターの割り振り（ゆうた指定）
+     ----------------------------------------------------------------
+     🗣「入れたPDFに対して日付で自動でQ割り振りできないかな？」
+     🗣「多少日付がズレても、その分も別Qとしてチェックを一部入れる みたいな感じであれば楽」
+     🔴 割り方は quarter-match.js の1本（`pitQSplit`）。ここで 1-7／8-15 と書かない。
+     ⚠ 「一部」の組は **そのQを見終わっていない**ので、はっきりそう書く＆済にしない。
+     ================================================================ */
+  function termRow(U){
+    if (!U.groups || !U.groups.length) return '';
+    var h = '<div class="q-term">'
+          + '<span class="q-term-h">このPDFは <b>' + esc(U.term ? (U.term.from + ' 〜 ' + U.term.to) : '?') + '</b> ぶん'
+          + (U.termSrc === 'PDF' ? '（PDFの「対象期間」から）' : '（伝票の日付から。PDFに対象期間が見つかりませんでした）')
+          + '</span>';
+    if (U.groups.length === 1){
+      var g0 = U.groups[0];
+      h += '<span class="q-term-1">' + esc(g0.label) + (g0.全部 ? '' : ' <b class="q-part">の一部</b>')
+         + '（' + g0.soft.length + '枚）</span>';
+      if (!g0.全部){
+        h += '<div class="q-term-n">⚠ このクォーターの日が<b>ぜんぶは入っていません</b>'
+           + '（' + esc(g0.from) + '〜' + esc(g0.to) + ' だけ）。'
+           + '<b>「済」にはしません。</b>そのQをまるごと見るときは、Qの日ぜんぶで出し直してください。</div>';
+      }
+      return h + '</div>';
+    }
+    h += '<div class="q-gs">';
+    U.groups.forEach(function (g, i) {
+      var d = g.res ? g.res.差.金額 : 0;
+      h += '<button class="q-g' + (U.gi === i ? ' on' : '') + (g.全部 ? '' : ' part') + '"'
+         + ' onclick="pitQPickGroup(' + i + ')">'
+         +   '<span class="q-g-t">' + esc(g.label) + (g.全部 ? '' : '<i>の一部</i>') + '</span>'
+         +   '<span class="q-g-d">' + esc(g.from.slice(5)) + '〜' + esc(g.to.slice(5)) + '・' + g.soft.length + '枚</span>'
+         +   '<span class="q-g-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span>'
+         + '</button>';
+    });
+    h += '</div>';
+    var part = U.groups.filter(function (g) { return !g.全部; });
+    h += '<div class="q-term-n">クォーターごとに分けました。押すと切り替わります。'
+       + '<b>「まるごと」入っているQだけ結果を残しました</b>'
+       + (part.length ? '（<b class="q-part">の一部</b>と書いてあるQは、日がぜんぶ入っていないので残していません）' : '')
+       + '。</div>';
+    return h + '</div>';
+  }
+
   function planRow(U){
     if (!w.pitQMonthPlan) return '';
     if (!w.PIT_CLOUD){
@@ -245,14 +297,19 @@
     plan.forEach(function (x) {
       var r = x.run;
       var cls = r ? (r.検算 ? ' done' : ' ng') : '';
-      h += '<button class="q-pq' + cls + '" onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
-         +   '<span class="q-pq-t">Q' + x.no + '</span>'
-         +   '<span class="q-pq-d">' + esc(x.from.slice(5)) + '〜' + esc(x.to.slice(5)) + '</span>'
-         +   (r
-              ? '<span class="q-pq-v">' + (r.差金額 > 0 ? '+' : '') + yen(r.差金額) + '円</span>'
-                + '<span class="q-pq-s">直す ' + r.直す件数 + '件</span>'
-              : '<span class="q-pq-n">まだ</span>')
-         + '</button>';
+      h += '<div class="q-pqwrap">'
+         +   '<button class="q-pq' + cls + '" onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
+         +     '<span class="q-pq-t">Q' + x.no + '</span>'
+         +     '<span class="q-pq-d">' + esc(x.from.slice(5)) + '〜' + esc(x.to.slice(5)) + '</span>'
+         +     (r
+                ? '<span class="q-pq-v">' + (r.差金額 > 0 ? '+' : '') + yen(r.差金額) + '円</span>'
+                  + '<span class="q-pq-s">直す ' + r.直す件数 + '件</span>'
+                : '<span class="q-pq-n">まだ</span>')
+         +   '</button>'
+         /* 🧹 v2.0.0（ゆうた指定）済んだQを「まだ」に戻す。練習のぶんを片づけるため。 */
+         +   (r ? '<button class="q-pq-x" title="この結果を消して「まだ」に戻す"'
+                  + ' onclick="pitQDropRun(\'' + x.from + '\',\'' + x.to + '\')">×</button>' : '')
+         + '</div>';
     });
     return h + '</div></div>';
   }
@@ -607,19 +664,42 @@
         return { 売上日:x.売上日, 伝票:x.伝票, ナンバー:x.ナンバー, 顧客名:x.顧客名,
                  車種:x.車種, 金額:x.比べる金額, 受付担当:x.受付担当 };
       });
-      var pit = w.pitQCollect({ from: U.from, to: U.to }).明細;
-      /* 🛠 v2.0.0 伝票を抱えておく＝直したあと**PDFを読み直さずに数え直せる**。
-         ⚠ ここを消すと、1件直すたびにPDFを入れ直すことになる（＝誰も使わなくなる）。 */
-      U.soft = soft;
-      U.res = w.pitQMatch(soft, pit, { from: U.from, to: U.to });
+      /* 🗓 v2.0.0（ゆうた指定）**PDF が言っている期間から、クォーターを自動で割り振る。**
+         🔴 割り方は quarter-match.js の1本。ここで 1-7／8-15 と書かない。 */
+      var sp = w.pitQSplit ? w.pitQSplit(r.期間, soft) : { 組: [], 期間: r.期間, 期間の出どころ: 'PDF' };
+      U.term = sp.期間; U.termSrc = sp.期間の出どころ;
+      U.groups = (sp.組 || []).map(function (g) {
+        return { no:g.no, label:g.label, from:g.from, to:g.to, 全部:g.全部,
+                 soft: g.伝票, res: null };
+      });
+      /* 全部の組を先に数えておく（PDFはもう読み終わっているので安い）。
+         ＝ どのQに何件あるかが**押す前に**見える。 */
+      U.groups.forEach(function (g) {
+        var pit = w.pitQCollect({ from: g.from, to: g.to }).明細;
+        g.res = w.pitQMatch(g.soft, pit, { from: g.from, to: g.to });
+      });
+      /* 🔴 はじめに選ぶのは「**まるごとで、いちばん枚数が多い**」組。
+         ＝ ふだんは1つしか無いので今までどおり。ズレて出た端っこの数枚を先に見せない。 */
+      U.gi = 0;
+      var best = -1;
+      U.groups.forEach(function (g, i) {
+        var sc = g.soft.length + (g.全部 ? 10000 : 0);
+        if (sc > best){ best = sc; U.gi = i; }
+      });
+      applyGroup(U);
       U.tab = 'lump';
       if (w.renderInspect) renderInspect();
-      if (w.pitToast) pitToast(r.伝票.length + '枚を読みました（総合計・枚数とも一致）');
+      if (w.pitToast){
+        var g0 = U.groups[U.gi];
+        pitToast(r.伝票.length + '枚を読みました'
+               + (g0 ? '／' + g0.label + (g0.全部 ? '' : ' の一部') : '')
+               + (U.groups.length > 1 ? '（' + U.groups.length + 'クォーターに分かれています）' : ''));
+      }
       /* 🗄 v1.184.0（ゆうた指定）**結果を残す。**
          🔴 同じ期間をもう一度走らせたら**上書き**＝練習でくり返してもゴミが積み上がらない。
          🔴 検算が合っていない結果は残さない（合わない数字を、あとで本当の数字だと思わせないため）。
          ⚠ 残せなかった時も黙らない（練習用サイト・通信できない時など）。 */
-      saveRun(U);
+      saveAllGroups(U);
     }).catch(function (e) {
       U.busy = '';
       U.err = s(e && e.message ? e.message : e);
@@ -652,6 +732,8 @@
     if (!U.soft || !w.pitQMatch || !w.pitQCollect) return;
     var pit = w.pitQCollect({ from: U.from, to: U.to }).明細;
     U.res = w.pitQMatch(U.soft, pit, { from: U.from, to: U.to });
+    /* 🗓 v2.0.0 いま見ている組にも書き戻す（別のQに切り替えて戻ってきた時に、直したぶんが消えないように） */
+    if (U.groups && U.groups[U.gi]) U.groups[U.gi].res = U.res;
     if (U.saveTimer) clearTimeout(U.saveTimer);
     U.saveTimer = setTimeout(function () { U.saveTimer = 0; saveRun(Q()); }, 2500);
     if (w.renderInspect) renderInspect();
@@ -678,14 +760,86 @@
     });
   };
 
+  /* 🗓 v2.0.0 いま選んでいる組を、画面の期間と結果に反映する（写しを1か所に集める） */
+  function applyGroup(U){
+    var g = (U.groups || [])[U.gi];
+    if (!g) return;
+    U.from = g.from; U.to = g.to;
+    U.soft = g.soft;
+    U.res  = g.res;
+    U.saved = null; U.savedId = '';
+  }
+  w.pitQPickGroup = function (i){
+    var U = Q();
+    if (!U.groups || !U.groups[+i]) return;
+    U.gi = +i; applyGroup(U); U.tab = 'lump';
+    if (w.renderInspect) renderInspect();
+  };
+
+  /* 🔴 残すのは「**まるごと**」の組だけ。
+     一部の組（端っこの数日）を残すと、Q1〜Q4 の印が「済」になってしまう。
+     ＝ そのQをまだ見終わっていないのに済になるのが、いちばん困る。 */
+  function saveAllGroups(U){
+    (U.groups || []).forEach(function (g) {
+      if (!g.全部 || !g.res) return;
+      saveRun({ res: g.res, pdf: U.pdf, list: U.list,
+                _apply: function (d) {
+                  U.savedAt = s(d && d.at).slice(11, 16);
+                  U.list = (U.list || []).filter(function (x) { return x && x.id !== d.id; });
+                  U.list.unshift(d);
+                } });
+    });
+  }
+
+  /* 🧹 v2.0.0（ゆうた指定）**入れたPDFを片づける／残した結果を消す。**
+     🗣「あと一回入れたQのデータをクリアするボタンもほしい」
+     ⚠ 2つは別物。取り違えると事故になるので、言い方も分ける。 */
+  w.pitQClearScreen = function (){
+    var U = Q();
+    U.pdf = null; U.err = ''; U.busy = '';
+    U.res = null; U.soft = null; U.groups = null; U.gi = 0; U.term = null; U.termSrc = '';
+    U.saved = null; U.savedId = ''; U.savedAt = '';
+    if (w.renderInspect) renderInspect();
+    if (w.pitToast) pitToast('画面を空にしました（残してある結果はそのままです）');
+  };
+  w.pitQDropRun = function (from, to){
+    var U = Q();
+    if (!w.pitQDeleteRun) return;
+    var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
+    var d = (U.list || []).filter(function (x) { return x && x.id === id; })[0] || null;
+    var det = ['・' + from + ' 〜 ' + to + ' の残してある結果を消します',
+               (d ? '・いま残っているのは ' + s(d.at).slice(0, 16).replace('T', ' ')
+                    + (d.by ? '・' + d.by : '') + ' に走らせたぶんです' : ''),
+               '・Q1〜Q4 の印が「まだ」に戻ります',
+               '🟢 「伝票を直した」の印は消しません（整備ソフト側を直したという別の記録なので）',
+               '⚠ 消したら戻せません。もう一度PDFを入れれば作り直せます。'].filter(Boolean).join('\n');
+    pitAsk(from + '〜' + to + ' の結果を消しますか？', { detail: det, danger: true, ok: '消して「まだ」に戻す' })
+      .then(function (yes) {
+        if (!yes) return;
+        w.pitQDeleteRun(from, to).then(function () {
+          U.list = (U.list || []).filter(function (x) { return x && x.id !== id; });
+          if (U.savedId === id){ U.saved = null; U.savedId = ''; }
+          if (w.pitLog) pitLog('突き合わせの結果を消した', { kind:'inspect', label: from + '〜' + to });
+          if (w.renderInspect) renderInspect();
+          if (w.pitToast) pitToast(from + '〜' + to + ' の結果を消しました');
+        }).catch(function (e) {
+          if (w.pitToast) pitToast('消せませんでした：' + s(e && e.message ? e.message : e));
+        });
+      });
+  };
+
   function saveRun(U){
     if (!w.pitQSaveRun || !U.res) return;
     if (!w.PIT_CLOUD) return;                     /* 練習用サイトでは残さない（画面にもそう書いてある） */
     w.pitQSaveRun(U.res, { pdf: U.pdf }).then(function (d) {
-      U.savedAt = s(d && d.at).slice(11, 16);
-      /* 一覧も足しておく（読み直さずに Q1〜4 の印がすぐ変わる） */
-      U.list = (U.list || []).filter(function (x) { return x && x.id !== d.id; });
-      U.list.unshift(d);
+      /* ⚠ 組ごとに呼ばれる時は、画面の覚えを触るのは呼んだ側（_apply）に任せる */
+      if (U._apply){ U._apply(d); }
+      else {
+        U.savedAt = s(d && d.at).slice(11, 16);
+        /* 一覧も足しておく（読み直さずに Q1〜4 の印がすぐ変わる） */
+        U.list = (U.list || []).filter(function (x) { return x && x.id !== d.id; });
+        U.list.unshift(d);
+      }
       if (w.pitLog) pitLog('売上チェックリストと突き合わせた', { kind:'inspect',
         label: d.from + '〜' + d.to + '　差 ' + (d.差金額 > 0 ? '+' : '') + yen(d.差金額) + '円／直す ' + d.直す件数 + '件' });
       if (w.renderInspect) renderInspect();

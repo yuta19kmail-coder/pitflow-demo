@@ -204,10 +204,28 @@
   var RE_CLOSE = /作業計\s*\/\s*原価計/;
   var RE_GRAND = /合計枚数/;
 
+  /* ================================================================
+     🗓 v2.0.0（ゆうた指定 2026-08-23）**PDF が「自分は何の期間か」を言っている。**
+     ----------------------------------------------------------------
+     🗣「入れたPDFに対して日付で自動でQ割り振りできないかな？」
+     ◎全ページの頭に、こう印刷されている（実物で確かめた）
+        `対象期間：令和 8年 8月 1日 ～ 令和 8年 8月 7日`
+        `日付区分：売上日`
+     🔴 **伝票の日付から min〜max を推し量らない。** PDF が書いてあるほうが正しい
+        （その期間に1枚も伝票が無い日があっても、期間は期間だから）。
+     🔴🔴 **日付区分が「売上日」でなければ、数字を1つも出さない。**
+        入金日などで出したPDFは、日付の列そのものが別物なので、
+        突き合わせの答えが**全部まちがう**（しかも総合計の検算は通ってしまう＝いちばん危ない形）。
+     ⚠ ページごとに同じ字が出るので、**最初に見つけたものだけ**を採る。
+     ================================================================ */
+  var RE_TERM = /対象期間\s*[:：]?\s*(令和|平成|昭和)\s*(\d{1,2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[～~〜]\s*(令和|平成|昭和)?\s*(\d{1,2})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+  var RE_KBN  = /日付区分\s*[:：]?\s*(\S+)/;
+
   function parse(lines){
     var slips = [], cur = null, warn = [], cols = null;
     var total = null, sheets = null;
     var pending = 0;      /* 頭のあと、伝票番号・車種名を拾うために見る行数 */
+    var term = null, kbn = '';
 
     function close(){
       if (!cur) return;
@@ -233,7 +251,22 @@
         close();
         return;
       }
-      if (RE_SKIP.test(x)) return;
+      /* 🗓 v2.0.0 ページの頭の字から「対象期間」と「日付区分」を採る（最初の1回だけ）。
+         ⚠ そのあと今までどおり読み飛ばす（伝票の頭と間違えないため）。 */
+      if (RE_SKIP.test(x)){
+        if (!term){
+          var tm2 = x.match(RE_TERM);
+          if (tm2){
+            term = { from: wareki(tm2[1], tm2[2], tm2[3], tm2[4]),
+                     to:   wareki(tm2[5] || tm2[1], tm2[6], tm2[7], tm2[8]) };
+          }
+        }
+        if (!kbn){
+          var km = x.match(RE_KBN);
+          if (km) kbn = s(km[1]).replace(/[：:].*$/, '');
+        }
+        return;
+      }
 
       var h = x.match(RE_HEAD);
       if (h){
@@ -299,13 +332,25 @@
     var sumSlip = slips.reduce(function (a, r) { return a + r.伝票計; }, 0);
     var okTotal = (total != null) && (sumSlip === total);
     var okSheet = (sheets != null) && (slips.length === sheets);
+    /* 🔴🔴 v2.0.0 日付区分が「売上日」でなければ通さない。
+       ＝ 入金日などで出したPDFは、日付の列が別物なので突き合わせの答えが全部まちがう。
+         しかも総合計の検算は通ってしまうので、**ここで止めないと嘘が出る**。 */
+    var okKbn = (kbn === '' || kbn === '売上日');
+    if (!okKbn){
+      warn.push('このPDFは「日付区分：' + kbn + '」で出ています。'
+              + '突き合わせに使えるのは「売上日」で出したものだけです。整備ソフトで出し直してください');
+    }
+    if (!term) warn.push('PDF の中に「対象期間」が見つかりませんでした（期間は手で入れてください）');
     if (total == null)  warn.push('PDF の中に「総合計」が見つかりませんでした');
     if (sheets == null) warn.push('PDF の中に「合計枚数」が見つかりませんでした');
     if (total != null && !okTotal)  warn.push('伝票を足した額（' + sumSlip.toLocaleString() + '）が、PDF の総合計（' + total.toLocaleString() + '）と合いません');
     if (sheets != null && !okSheet) warn.push('読み取れた枚数（' + slips.length + '）が、PDF の合計枚数（' + sheets + '）と合いません');
 
     return {
-      ok: !!(okTotal && okSheet),
+      ok: !!(okTotal && okSheet && okKbn),
+      /* 🗓 v2.0.0 PDF 自身が言っている期間と日付区分（無ければ null／''） */
+      期間: term,
+      日付区分: kbn,
       伝票: slips,
       合計: {
         枚数: slips.length,
@@ -314,7 +359,8 @@
         非課税: slips.reduce(function (a, r) { return a + r.非課税; }, 0),
         比べる金額: slips.reduce(function (a, r) { return a + r.比べる金額; }, 0)
       },
-      検証: { 総合計: total, 合計枚数: sheets, 総合計が合う: okTotal, 枚数が合う: okSheet, 言い分: warn }
+      検証: { 総合計: total, 合計枚数: sheets, 総合計が合う: okTotal, 枚数が合う: okSheet,
+              日付区分が売上日: okKbn, 言い分: warn }
     };
   }
 

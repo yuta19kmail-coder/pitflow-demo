@@ -65,6 +65,36 @@
   function canFinal(){ return w.pitCanEditFinal ? !!w.pitCanEditFinal() : false; }
 
   /* ================================================================
+     0. 🔢 1行ごとの番号（v2.0.0・ゆうた指定 2026-08-23）
+     ----------------------------------------------------------------
+     🗣「**こちも1件ずつにナンバーを入れて**」
+        ＝ データチェックと同じ。**番号ひとつで「どの行の話か」が決まる**ようにする。
+          「◯◯番、実績日を押しといて」で通じる。電話でもLINEでも。
+
+     🔴 **作り方はデータチェックの1本（`pitInspectNo`）をそのまま借りる。**
+        ここで別のハッシュを書かない。＝ 番号の作り方が2つに割れない。
+     🔴 元にするのは **売上日｜伝票番号｜カードid** だけ。
+        日付・件数・並び順・ログインしている人など**変わるものを1つも混ぜない**
+        （混ぜた瞬間に「毎回おなじ」が壊れる。v1.178.0 の決めごと）。
+
+     ◎頭の2文字で、どこの行かが分かる
+       `Q-######`  … 結びついた行（伝票とカードが1対1で結ばれたもの）
+       `QS-######` … 整備ソフトだけ（PitFlow に実績が無い伝票）
+       `QP-######` … PitFlow だけ（PDF に載っていない実績）
+     ⚠ データチェックの番号（`F05-483102`）とは**頭がちがう**ので混ざらない。
+     ⚠ エラー番号（`PF-0412`）とも別物。
+     ================================================================ */
+  function rowNo(prefix, soft, cardId){
+    var k = t(prefix) + ':' + [t(soft && soft.売上日), t(soft && soft.伝票), t(cardId)].join('|');
+    return w.pitInspectNo ? w.pitInspectNo(k) : '';
+  }
+  function pairNo(p){
+    return rowNo('Q', p && p.soft, t(p && p.pit && p.pit.生 && p.pit.生.id));
+  }
+  function softOnlyNo(r){ return rowNo('QS', r && r.soft, t(r && r.カード && r.カード.生 && r.カード.生.id)); }
+  function pitOnlyNo(r){ return rowNo('QP', { 売上日: t(r && r.数える日), 伝票: '' }, t(r && r.生 && r.生.id)); }
+
+  /* ================================================================
      1. 印（伝票を直したから、このままでよい）
      ================================================================ */
   function markKey(kind, soft, cardId){
@@ -274,6 +304,9 @@
 
   w.pitQMarkKey   = markKey;
   w.pitQRowLeft   = rowLeft;
+  w.pitQRowNo     = pairNo;
+  w.pitQSoftNo    = softOnlyNo;
+  w.pitQPitNo     = pitOnlyNo;
   w.pitQMarkOf    = markOf;
   w.pitQLoadMarks = loadMarks;
   w.pitQMark      = mark;

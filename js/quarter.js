@@ -382,6 +382,9 @@
           +   '🔴 <span style="color:#ef4444">赤いボタン</span>は<b>売上の数字が動きます</b>（実績日・金額）。'
           +     '押す前に、何がいくら動くかを出して確かめます。</div>'
           + '<table class="q-t"><thead><tr>'
+          /* 🔢 v2.0.0（ゆうた指定）**1行ごとの番号。** 番号ひとつで「どの行の話か」が決まる。
+             ⚠ 作り方は quarter-fix.js（＝データチェックの1本を借りている）。ここで作らない。 */
+          + '<th>番号</th>'
           + '<th>ナンバー／お客様</th><th>整備ソフト<br>売上日</th><th>PitFlow<br>数える日</th>'
           + '<th>日付</th><th class="n">整備ソフト</th><th class="n">PitFlow</th><th class="n">差</th>'
           + '<th>受付担当<br>フロント</th><th>結び方</th><th>直す／済</th></tr></thead><tbody>';
@@ -395,6 +398,7 @@
     rows.forEach(function (p) {
       var cls = p.日付.kind === 'crossMonth' ? 'bad' : (p.日付.kind === 'crossQ' ? 'warn' : (p.日付.kind === 'sameQ' ? 'ok' : ''));
       h += '<tr>'
+         + noCell(w.pitQRowNo ? w.pitQRowNo(p) : '')
          + '<td>' + esc(p.soft.ナンバー) + '<span class="q-s">' + esc(p.soft.顧客名) + '</span></td>'
          + '<td>' + esc(p.soft.売上日) + '<span class="q-s">伝票 ' + esc(p.soft.伝票) + '</span></td>'
          /* 💴 v1.185.0 カードが売上日を持っていたら、数える日の下に添える（2軸をその場で見くらべる）。
@@ -430,6 +434,15 @@
      ⚠ 出す順番も向こうが決めている（**安いもの＝動く数字が小さいものから**）。
         ここで並べ替えないこと（勢いで重いほうを押させないための順番）。
      ================================================================ */
+  /* 🔢 v2.0.0 番号のマス。
+     🔴 押すとコピー＝**部品はデータチェックと同じ 1本**（`pitInspectCopyNo` → `CFErr.copy`）。
+     ⚠ `q-s` の失敗をくり返さない＝**マスに display を直に付けない**。中の <button> だけ飾る。 */
+  function noCell(no){
+    if (!no) return '<td class="q-no"></td>';
+    return '<td class="q-no"><button class="ins-no" title="押すと番号をコピーします"'
+         + ' onclick="pitInspectCopyNo(\'' + esc(no) + '\')">' + esc(no) + '</button></td>';
+  }
+
   function fixCell(p){
     if (!w.pitQFixKinds) return '<td class="q-act"></td>';
     var kinds = w.pitQFixKinds(p);
@@ -465,11 +478,12 @@
     if (!list.length) return '<div class="q-none">0件です。</div>';
     var h = '<div class="q-note">整備ソフトで売上が立っているのに、PitFlow の実績に無いものです。'
           + '<b>カードは有る</b>＝まだ返車済みにしていないだけ。</div>'
-          + '<table class="q-t"><thead><tr><th>売上日</th><th>伝票</th><th>ナンバー</th><th>お客様</th>'
+          + '<table class="q-t"><thead><tr><th>番号</th><th>売上日</th><th>伝票</th><th>ナンバー</th><th>お客様</th>'
           + '<th class="n">金額</th><th>受付担当</th><th>PitFlow 側</th></tr></thead><tbody>';
     list.forEach(function (r) {
       var c = r.カード;
       h += '<tr>'
+         + noCell(w.pitQSoftNo ? w.pitQSoftNo(r) : '')
          + '<td>' + esc(r.soft.売上日) + '</td><td>' + esc(r.soft.伝票) + '</td>'
          + '<td>' + esc(r.soft.ナンバー) + '</td><td>' + esc(r.soft.顧客名) + '</td>'
          + '<td class="n">' + yen(r.soft.金額) + '</td><td>' + esc(r.soft.受付担当) + '</td>'
@@ -486,10 +500,11 @@
     if (!list.length) return '<div class="q-none">0件です。</div>';
     var h = '<div class="q-note">PitFlow に実績があるのに、PDF に載っていないものです。'
           + '🔴 <b>整備ソフトは PitFlow から直せません。</b>印刷して、整備ソフト側で直してください。</div>'
-          + '<table class="q-t"><thead><tr><th>数える日</th><th>予約番号</th><th>ナンバー</th><th>お客様</th>'
+          + '<table class="q-t"><thead><tr><th>番号</th><th>数える日</th><th>予約番号</th><th>ナンバー</th><th>お客様</th>'
           + '<th class="n">確定金額</th><th>フロント</th><th></th></tr></thead><tbody>';
     list.forEach(function (r) {
-      h += '<tr><td>' + esc(r.数える日) + '</td><td>' + esc(r.予約番号) + '</td>'
+      h += '<tr>' + noCell(w.pitQPitNo ? w.pitQPitNo(r) : '')
+         + '<td>' + esc(r.数える日) + '</td><td>' + esc(r.予約番号) + '</td>'
          + '<td>' + esc(r.ナンバー) + '</td><td>' + esc(r.顧客名) + '</td>'
          + '<td class="n">' + yen(r.確定金額) + '</td><td>' + esc(r.フロント担当) + '</td>'
          + '<td>' + (r.生 && r.生.id ? '<button class="q-open" onclick="pitInspectGo(\'' + esc(r.生.id) + '\')">開く</button>' : '') + '</td></tr>';

@@ -39,7 +39,11 @@
     U.q = U.q || { from:'', to:'', res:null, pdf:null, tab:'lump', busy:'', err:'',
                    /* 🗄 v1.184.0 残した結果まわり（画面の覚え。データではないので保存しない） */
                    list:null, listBusy:false, saved:null, savedId:'', savedTab:'期間の外',
-                   ym:'', savedAt:'' };
+                   ym:'', savedAt:'',
+                   /* 🛠 v2.0.0 その場で直すため。
+                      soft ＝ 読み終わった伝票（**PDFを読み直さずに数え直す**ために抱えておく）
+                      marks ＝「伝票側を直した」の印（読み込みは1回だけ） */
+                   soft:null, marks:null, marksBusy:false, saveTimer:0 };
     if (!U.q.from){
       /* 既定＝いまのクォーター。⚠ 区切りは sales.js の1本から借りる */
       var q = w.pitQuarterOf ? w.pitQuarterOf() : null;
@@ -91,6 +95,8 @@
          + esc(n === 0 ? 'いまのQ' : (n === 1 ? '1つ前' : '2つ前')) + '<span>' + esc(q.label) + '</span></button>';
     });
     h += '</span></div>';
+
+    ensureMarks();      /* 🛠 v2.0.0 「伝票を直した」の印（読むのは1回だけ） */
 
     /* ---- 🗄 v1.184.0 その月の Q1〜Q4（ルーティンの形） ---- */
     h += planRow(U);
@@ -177,14 +183,23 @@
     }
 
     /* ---- タブ ---- */
+    /* 🛠 v2.0.0 タブの数字＝**まだ片づいていない行**。
+       ・「直す」を押した行 … カードが変わるので、数え直した時点でズレ自体が消える
+       ・「伝票を直した」の印が付いた行 … カードは変えていないのでズレは残るが、**片づいたもの**として数えない
+       🔴 **印では合計・差・内訳・検算を動かさない。** PDF が言っている数字は「事実」であって、
+          印は「人がもう手を打った」という別の話。ここを混ぜると検算が意味を失う。 */
+    var left = function (rows) {
+      if (!w.pitQRowLeft) return (rows || []).length;
+      return (rows || []).filter(function (p) { return w.pitQRowLeft(p) > 0; }).length;
+    };
     var TABS = [
-      { id:'lump',   label:'期間の外',        n: R.内訳.期間の外.台数 },
-      { id:'amt',    label:'金額ちがい',      n: R.金額ちがい.length },
-      { id:'month',  label:'月またぎ',        n: R.月またぎ.length },
-      { id:'qq',     label:'Qまたぎ',         n: R.Qまたぎ.length },
+      { id:'lump',   label:'期間の外',        n: left(R.結びついた.filter(function (p) { return p.期間の外; })) },
+      { id:'amt',    label:'金額ちがい',      n: left(R.金額ちがい) },
+      { id:'month',  label:'月またぎ',        n: left(R.月またぎ) },
+      { id:'qq',     label:'Qまたぎ',         n: left(R.Qまたぎ) },
       /* 💴 v1.185.0 カードの売上日が伝票の日とちがう。**お金は動かない**（直すのは日付だけ）ので、
          金額ちがいとは別の欄にする。⚠ 売上日を持っていないカードはここに出ない。 */
-      { id:'sdate',  label:'売上日ちがい',    n: (R.売上日ちがい || []).length },
+      { id:'sdate',  label:'売上日ちがい',    n: left(R.売上日ちがい || []) },
       { id:'soft',   label:'整備ソフトだけ',  n: R.整備ソフトだけ.length },
       { id:'pit',    label:'PitFlowだけ',     n: R.PitFlowだけ.length },
       { id:'all',    label:'結びついた全件',  n: R.結びついた.length }
@@ -212,7 +227,7 @@
   function planRow(U){
     if (!w.pitQMonthPlan) return '';
     if (!w.PIT_CLOUD){
-      return '<div class="q-plan-off">練習用サイトでは、結果は残りません（本番の PitFlow では残ります）。</div>';
+      return '<div class="q-plan-off">練習用サイトでは、結果も「伝票を直した」の印も残りません（本番の PitFlow では残ります）。</div>';
     }
     if (U.list == null){
       if (!U.listBusy){ U.listBusy = true; ensureList(); }
@@ -353,13 +368,30 @@
     if (!rows.length) return '<div class="q-none">0件です。</div>';
     var h = (tab === 'sdate'
           ? '<div class="q-note">カードに入っている<b>売上日</b>が、伝票の日付とちがうものです。'
-            + '🔴 <b>売上の金額は1円も動きません。</b>直すのは日付だけ（誰でも直せます）。'
-            + '伝票のほうが正しければ、カードを開いて売上日を直してください。</div>'
+            + '🔴 <b>売上の金額は1円も動きません。</b>直すのは日付だけです。</div>'
           : '')
+          /* 🛠 v2.0.0 ゆうた指定「**修正 or 伝票側を直したからそのまま** の2択がほしい」。
+             ⚠ 説明は**表の上に1回だけ**（行ごとに書くと表が読めなくなる）。 */
+          + '<div class="q-2way">右端で<b>1行ずつ片づけます。答えは2つだけです。</b><br>'
+          +   '・<b>直す</b>＝PitFlow を伝票に合わせます。押すとカードが書き換わり、'
+          +     '<b>上の差もその場で縮みます</b>（PDF は入れ直さなくて大丈夫です）<br>'
+          +   '・<b>伝票を直した</b>＝整備ソフト側を直したので、PitFlow はこのまま。<b>済</b>が付きます。'
+          +     'PitFlow は変えていないので<b>上の数字は動きません</b>。'
+          +     'あの数字は<b>いま手元の PDF が言っていること</b>なので、'
+          +     '直したぶんは<b>次に PDF を出し直した時</b>に合います<br>'
+          +   '🔴 <span style="color:#ef4444">赤いボタン</span>は<b>売上の数字が動きます</b>（実績日・金額）。'
+          +     '押す前に、何がいくら動くかを出して確かめます。</div>'
           + '<table class="q-t"><thead><tr>'
           + '<th>ナンバー／お客様</th><th>整備ソフト<br>売上日</th><th>PitFlow<br>数える日</th>'
           + '<th>日付</th><th class="n">整備ソフト</th><th class="n">PitFlow</th><th class="n">差</th>'
-          + '<th>受付担当<br>フロント</th><th>結び方</th></tr></thead><tbody>';
+          + '<th>受付担当<br>フロント</th><th>結び方</th><th>直す／済</th></tr></thead><tbody>';
+    /* 🛠 v2.0.0 **まだ片づいていない行を先に**。押した行は下へ落ちていく＝進んだのが見える。
+       ⚠ 並べ替えるだけで、行を消さない（消すと「押しまちがえた」を戻せない）。 */
+    rows = rows.slice().sort(function (a, b) {
+      var la = w.pitQRowLeft ? (w.pitQRowLeft(a) > 0 ? 0 : 1) : 0;
+      var lb = w.pitQRowLeft ? (w.pitQRowLeft(b) > 0 ? 0 : 1) : 0;
+      return la - lb;
+    });
     rows.forEach(function (p) {
       var cls = p.日付.kind === 'crossMonth' ? 'bad' : (p.日付.kind === 'crossQ' ? 'warn' : (p.日付.kind === 'sameQ' ? 'ok' : ''));
       h += '<tr>'
@@ -383,9 +415,50 @@
             ＝ 添え字の見た目だけが欲しいので、**マス用のクラスを別に立てる**。
             ⚠ `q-s` は今までどおり `<span>` の中でだけ使うこと。 */
          + '<td class="q-how">' + esc(p.結び方) + '</td>'
+         + fixCell(p)
          + '</tr>';
     });
     return h + '</tbody></table>';
+  }
+
+  /* ================================================================
+     🛠 v2.0.0 1行ぶんの「直す／済」（ゆうた指定＝**答えは2つだけ**）
+     ----------------------------------------------------------------
+     ① **直す** …… PitFlow を伝票に合わせる（押すとカードが書き換わる）
+     ② **伝票を直した** … 整備ソフト側を直したので、PitFlow はこのままでよい＝印を付ける
+     🔴 「ズレがあるか」「誰が押せるか」の判断は **quarter-fix.js の1本**。ここで綴らない。
+     ⚠ 出す順番も向こうが決めている（**安いもの＝動く数字が小さいものから**）。
+        ここで並べ替えないこと（勢いで重いほうを押させないための順番）。
+     ================================================================ */
+  function fixCell(p){
+    if (!w.pitQFixKinds) return '<td class="q-act"></td>';
+    var kinds = w.pitQFixKinds(p);
+    if (!kinds.length) return '<td class="q-act"><span class="q-act-ok">—</span></td>';
+    var id = s(p.pit && p.pit.生 && p.pit.生.id);
+    var i = p.soft.i;
+    var h = '<td class="q-act">';
+    kinds.forEach(function (k) {
+      var mk = w.pitQMarkOf ? w.pitQMarkOf(k.kind, p.soft, id) : null;
+      h += '<div class="q-fx' + (mk ? ' is-done' : '') + '">';
+      h += '<b class="q-fx-k">' + esc(k.kind) + '</b>';
+      if (mk){
+        /* 🔴 押しても**消さない**。誰がいつ決めたかを残す（データチェックの「確認した」と同じ作法）。 */
+        h += '<span class="q-fx-done">伝票を直した'
+           + (mk.by ? '<i>' + esc(mk.by) + '</i>' : '')
+           + (mk.at ? '<i>' + esc(s(mk.at).slice(5, 10).replace('-', '/')) + '</i>' : '')
+           + '</span>'
+           + '<button class="q-fx-un" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',0)">戻す</button>';
+      } else if (!k.can){
+        h += '<span class="q-fx-lock" title="' + esc(k.why) + '"><i data-ic=lock data-ics=14></i> 管理のみ</span>'
+           + '<button class="q-fx-mk" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">伝票を直した</button>';
+      } else {
+        h += '<button class="q-fx-go' + (k.重い ? ' is-heavy' : '') + '" title="' + esc(k.why) + '"'
+           + ' onclick="pitQDo(\'' + esc(k.kind) + '\',' + i + ')">' + esc(k.label) + '</button>'
+           + '<button class="q-fx-mk" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">伝票を直した</button>';
+      }
+      h += '</div>';
+    });
+    return h + '</td>';
   }
 
   function softTable(list){
@@ -520,6 +593,9 @@
                  車種:x.車種, 金額:x.比べる金額, 受付担当:x.受付担当 };
       });
       var pit = w.pitQCollect({ from: U.from, to: U.to }).明細;
+      /* 🛠 v2.0.0 伝票を抱えておく＝直したあと**PDFを読み直さずに数え直せる**。
+         ⚠ ここを消すと、1件直すたびにPDFを入れ直すことになる（＝誰も使わなくなる）。 */
+      U.soft = soft;
       U.res = w.pitQMatch(soft, pit, { from: U.from, to: U.to });
       U.tab = 'lump';
       if (w.renderInspect) renderInspect();
@@ -535,6 +611,57 @@
       if (w.renderInspect) renderInspect();
     });
   }
+
+  /* ================================================================
+     🛠 v2.0.0 その場で直す（ゆうた指定 2026-08-23）
+     ----------------------------------------------------------------
+     🗣「付け合わせしてズレているものはそのままそこで修正できなきゃ意味ないもんね」
+     🗣「基本的には **修正 or 伝票側を直したからそのまま** の2択がほしい」
+     🔴 判定も書き込みも **quarter-fix.js**。ここは**押した先を呼ぶだけ**。
+     ================================================================ */
+  function ensureMarks(){
+    var U = Q();
+    if (U.marks != null || U.marksBusy || !w.pitQLoadMarks) return;
+    U.marksBusy = true;
+    w.pitQLoadMarks().then(function (list) {
+      U.marks = list || []; U.marksBusy = false;
+      if (w.renderInspect) renderInspect();
+    }).catch(function () { U.marks = []; U.marksBusy = false; });
+  }
+
+  /* 直したあとに数え直す。
+     🔴 **PDFは読み直さない**（抱えてある伝票をそのまま使う）＝1件直すごとに数字が動くのが見える。
+     ⚠ 残す（保存）は**まとめて1回**にする。1クリック1回だと書き込みが増えすぎる。 */
+  function reMatch(){
+    var U = Q();
+    if (!U.soft || !w.pitQMatch || !w.pitQCollect) return;
+    var pit = w.pitQCollect({ from: U.from, to: U.to }).明細;
+    U.res = w.pitQMatch(U.soft, pit, { from: U.from, to: U.to });
+    if (U.saveTimer) clearTimeout(U.saveTimer);
+    U.saveTimer = setTimeout(function () { U.saveTimer = 0; saveRun(Q()); }, 2500);
+    if (w.renderInspect) renderInspect();
+  }
+
+  /* いま画面に出ている結果から、その1行を探す。
+     ⚠ 目印は**伝票の並び順（soft.i）**。伝票番号は月がかわると同じ番号が出るので使わない。 */
+  function pairOf(i){
+    var R = Q().res; if (!R) return null;
+    return (R.結びついた || []).filter(function (p) { return p.soft.i === +i; })[0] || null;
+  }
+
+  w.pitQDo = function (kind, i){
+    var p = pairOf(i); if (!p || !w.pitQFixApply) return;
+    w.pitQFixApply(kind, p).then(function (done) { if (done) reMatch(); });
+  };
+  w.pitQMk = function (kind, i, on){
+    var p = pairOf(i); if (!p || !w.pitQMark) return;
+    w.pitQMark(kind, p.soft, p.pit, on !== 0 && on !== '0').then(function () {
+      Q().marks = w._pitQMarks || [];
+      if (w.renderInspect) renderInspect();
+    }).catch(function (e) {
+      if (w.pitToast) pitToast(s(e && e.message ? e.message : e));
+    });
+  };
 
   function saveRun(U){
     if (!w.pitQSaveRun || !U.res) return;

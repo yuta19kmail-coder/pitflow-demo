@@ -318,8 +318,17 @@
       <p>予約詳細カードに<strong>「売上日」</strong>の行があります。<strong>整備ソフトの伝票が立った日</strong>です。</p>
       <ul>
         <li>🔴 <strong>実績カウント日とは別物です。</strong>
-            <strong>実績カウント日</strong>＝売上を<strong>どの月に数えるか</strong>（動かすと締めた月の数字が動く・<strong>管理者だけ</strong>）。
-            <strong>売上日</strong>＝<strong>伝票が立った日</strong>（<strong>売上の数字は1円も動きません</strong>・<strong>誰でも直せます</strong>）。</li>
+            <strong>実績カウント日</strong>＝売上を<strong>どの月に数えるか</strong>（動かすと締めた月の数字が動く）。
+            <strong>売上日</strong>＝<strong>伝票が立った日</strong>（<strong>売上の数字は1円も動きません</strong>）。</li>
+        <li>🔒 <strong>直せる人（v2.0.0）</strong>
+            <ul>
+              <li>返車済み（アーカイブ）になる<strong>前</strong>＝<strong>どなたでも</strong>（返車日と同じ扱い）</li>
+              <li>返車済みになった<strong>後</strong>＝カードからは<strong>管理者だけ</strong></li>
+              <li>🔴 <strong>ただし特例</strong>＝<strong>データチェックの「ここを直す」</strong>と
+                  <strong>クォーターチェックの直すボタン</strong>からなら、<strong>どなたでも</strong>直せます。
+                  どちらも「出ている数を 0 にする」ための画面で、<strong>売上の数字が1円も動かない</strong>ためです。
+                  ⚠ 確定金額・実績カウント日はこの特例に入りません（今までどおり管理者だけ）。</li>
+            </ul></li>
         <li><strong>完TELの窓（完TEL依頼／完TEL済／実績化）で、確定金額と一緒に入ります。</strong>初めは完TELした日が入っているので、
             <strong>伝票の日付とちがったらその場で直してください</strong>。あとから予約詳細カードで直すこともできます。</li>
         <li>まだ売上日を入れていない車は、<strong>完TELした日</strong>を出しています（「完TELの日から出しています」と書いてあります）。</li>
@@ -327,6 +336,28 @@
             クォーターがちがうだけの時は、参考として書いてあるだけで、注意にはなりません。</li>
         <li>クォーターチェックの突合も、この売上日を見て伝票と結びつけます。カードの売上日が伝票とちがう車は
             <strong>「売上日ちがい」</strong>の欄にまとまります（<strong>お金の話ではありません</strong>。直すのは日付だけです）。</li>
+      </ul>
+      <h3>🛠 突き合わせたズレを、その場で直す（v2.0.0）</h3>
+      <p>クォーターチェックの一覧の<strong>右端</strong>で、1行ずつ片づけます。<strong>答えは2つだけ</strong>です。</p>
+      <ul>
+        <li><strong>直す</strong>＝PitFlow を伝票に合わせます。押すとカードが書き換わり、
+            <strong>上の差もその場で縮みます</strong>（PDFは入れ直さなくて大丈夫です）。</li>
+        <li><strong>伝票を直した</strong>＝整備ソフト側を直したので、PitFlow はこのまま。<strong>済</strong>が付き、
+            次に同じ期間を見た時は片づいたものとして出ます。<strong>誰がいつ決めたかが残ります。</strong>
+            押しまちがえたら<strong>「戻す」</strong>で戻せます。</li>
+      </ul>
+      <p>直せるのは<strong>3つ</strong>です。</p>
+      <ul>
+        <li><strong>売上日</strong>を伝票の日にする … <strong>どなたでも</strong>。🟢 売上の数字は1円も動きません</li>
+        <li><strong>実績日</strong>を伝票の日にする … <strong>管理者だけ</strong>。🔴 締めた月の数字が動きます（返車日も揃います）</li>
+        <li><strong>確定金額</strong>を伝票の金額にする … <strong>管理者だけ</strong>。🔴 売上の金額が動きます</li>
+      </ul>
+      <p>🔴 <strong>赤いボタンは数字が動きます。</strong>押す前に「何月がいくら動くか」を出して確かめます。
+         「期間の外」に出ているまとめ返車の車は、<strong>実績日を伝票の日にする</strong>を押すだけで正しいクォーターに戻ります。</p>
+      <p>⚠ <strong>上の合計が動くのは「直す」を押した時だけ</strong>です。
+         「伝票を直した」は PitFlow を変えていないので数字は動きません
+         （あの数字は<strong>いま手元の PDF が言っていること</strong>だからです。直したぶんは次にPDFを出し直した時に合います）。</p>
+      <ul>
       </ul>
       <h3>フロー（進捗ログ）＝ 足すのは詳細／直すのは編集（v1.43.0）</h3>
       <ul>

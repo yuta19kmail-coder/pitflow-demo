@@ -1,0 +1,142 @@
+/* ================================================================================
+   quarter.css  -  🧾 クォーターチェック（②突合 ＋ ③AIチェック）  PitFlow v1.181.0
+   ⚠ 色は変数から。ここで直の色を増やさない（棚卸しの「色 102」を太らせない）。
+   ⚠ 幅の広い表は**中だけ横スクロール**させる。画面ごと横に伸ばさない。
+   ================================================================================ */
+
+/* ── 見出し ── */
+.q-head{ margin:2px 0 10px; }
+.q-title{ font-size:14px; font-weight:800; color:var(--text); display:flex; align-items:center; gap:7px; }
+.q-sub{ font-size:11.5px; color:var(--text3); line-height:1.8; margin-top:3px; }
+
+/* ── 期間 ── */
+.q-range{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 10px; }
+.q-l{ font-size:11.5px; color:var(--text3); }
+.q-in{ background:var(--bg); border:1px solid var(--border); color:var(--text);
+  border-radius:8px; padding:5px 8px; font-size:12px; }
+.q-tilde{ color:var(--text3); }
+.q-quick{ display:inline-flex; gap:6px; flex-wrap:wrap; margin-left:4px; }
+.q-qb{ border:1px solid var(--border); background:var(--bg3); color:var(--text2);
+  border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; line-height:1.4; text-align:left; }
+.q-qb span{ display:block; font-size:9.5px; color:var(--text3); }
+.q-qb.on{ border-color:var(--brand,#1f7a4d); color:var(--text); font-weight:700; }
+
+/* ── PDF を選ぶ ── */
+.q-pick{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; }
+.q-file input{ display:none; }
+.q-file span{ display:inline-flex; align-items:center; gap:7px; cursor:pointer;
+  border:1px dashed var(--border); background:var(--bg2); color:var(--text);
+  border-radius:10px; padding:9px 16px; font-size:12.5px; font-weight:700; }
+.q-file span:hover{ border-color:var(--brand,#1f7a4d); }
+.q-fname{ font-size:11.5px; color:var(--text2); }
+.q-busy{ font-size:11.5px; color:var(--text3); }
+
+.q-empty{ font-size:12px; color:var(--text2); line-height:1.9; border:1px solid var(--border);
+  border-radius:10px; background:var(--bg2); padding:14px 16px; }
+.q-empty span{ font-size:11px; color:var(--text3); }
+
+/* ── 🔴 読み取りに失敗した（数字を出さない） ── */
+.q-ng{ border:1px solid rgba(239,68,68,.55); background:rgba(239,68,68,.08);
+  border-radius:10px; padding:12px 14px; font-size:12.5px; color:var(--text); line-height:1.8; }
+.q-ng-why{ font-size:11.5px; color:var(--text2); margin-top:4px; }
+.q-ng-note{ font-size:11px; color:var(--text3); margin-top:7px; line-height:1.8; }
+
+/* ── 合計 ── */
+.q-sum{ display:flex; gap:10px; flex-wrap:wrap; margin:0 0 10px; }
+.q-card{ flex:1 1 150px; border:1px solid var(--border); border-radius:10px; background:var(--bg2);
+  padding:10px 13px; display:flex; align-items:baseline; gap:8px; }
+.q-k{ font-size:10.5px; color:var(--text3); }
+.q-card b{ font-size:19px; font-weight:800; color:var(--text); }
+.q-y{ font-size:11.5px; color:var(--text2); margin-left:auto; }
+.q-diff b{ color:var(--ins-c,#f59e0b); }
+
+/* ── 検算 ── */
+.q-audit{ border:1px solid var(--border); border-radius:10px; padding:10px 13px; margin:0 0 12px;
+  font-size:12px; color:var(--text); line-height:1.8; }
+.q-audit.ok{ border-color:rgba(29,185,122,.45); background:rgba(29,185,122,.07); }
+.q-audit.ng{ border-color:rgba(239,68,68,.55); background:rgba(239,68,68,.08); }
+.q-audit span{ font-size:11px; color:var(--text3); margin-left:6px; }
+.q-parts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.q-part{ border:1px solid var(--border); border-radius:8px; background:var(--bg); padding:6px 10px;
+  font-size:11px; color:var(--text3); display:flex; align-items:baseline; gap:7px; }
+.q-part b{ font-size:12.5px; color:var(--text); }
+.q-part i{ font-style:normal; font-size:10px; color:var(--text3); }
+
+/* ── まとめて返車済みにした日（本命） ── */
+.q-lump{ border:1px solid rgba(245,158,11,.55); background:rgba(245,158,11,.08);
+  border-radius:10px; padding:11px 14px; margin:0 0 12px; font-size:12.5px; color:var(--text); }
+/* ⚠ 見出しだけを行にする。中の <b>（台数・金額）まで行にすると、文が途中で折れる */
+.q-lump > b:first-child{ display:flex; align-items:center; gap:7px; margin-bottom:2px; }
+.q-lump-r{ font-size:12px; color:var(--text2); margin-top:5px; }
+.q-lump-n{ font-size:11px; color:var(--text3); line-height:1.8; margin-top:6px; }
+
+/* ── タブ ── */
+.q-tabs{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin:0 0 8px; }
+.q-tab{ border:1px solid var(--border); background:transparent; color:var(--text3);
+  border-radius:8px; padding:5px 11px; font-size:11.5px; cursor:pointer; white-space:nowrap; }
+.q-tab span{ margin-left:6px; font-weight:800; color:var(--text2); }
+.q-tab.on{ background:var(--bg3); color:var(--text); border-color:var(--brand,#1f7a4d); font-weight:700; }
+.q-print{ margin-left:auto; border:1px solid var(--border); background:var(--bg3); color:var(--text);
+  border-radius:8px; padding:5px 13px; font-size:11.5px; cursor:pointer; }
+
+/* ── 一覧 ── */
+.q-body{ overflow-x:auto; }
+.q-note{ font-size:11px; color:var(--text3); line-height:1.8; margin:0 0 6px; }
+.q-none{ font-size:12px; color:var(--text3); padding:14px 4px; }
+.q-t{ width:100%; border-collapse:collapse; font-size:11.5px; }
+.q-t th{ text-align:left; font-weight:700; color:var(--text3); font-size:10.5px;
+  border-bottom:1px solid var(--border); padding:6px 8px; white-space:nowrap; }
+.q-t td{ border-bottom:1px solid var(--border2,#232c34); padding:6px 8px; color:var(--text2); vertical-align:top; }
+.q-t td.n, .q-t th.n{ text-align:right; font-variant-numeric:tabular-nums; }
+.q-s{ display:block; font-size:10px; color:var(--text3); }
+.q-t td.ok{ color:#1db97a; }
+.q-t td.warn{ color:#f59e0b; }
+.q-t td.bad{ color:#ef4444; font-weight:700; }
+.q-open{ border:1px solid var(--border); background:var(--bg3); color:var(--text);
+  border-radius:7px; padding:2px 9px; font-size:10.5px; cursor:pointer; white-space:nowrap; }
+
+/* ================================================================
+   🤖 ③ AIチェック
+   ================================================================ */
+.ai-sub{ font-size:11.5px; color:var(--text3); line-height:1.8; margin:2px 0 9px; }
+.ai-mat{ border:1px solid var(--border); border-radius:10px; background:var(--bg2);
+  padding:10px 14px; font-size:11.5px; color:var(--text2); }
+.ai-mat b{ color:var(--text); }
+.ai-mat ul{ margin:6px 0 0; padding-left:18px; line-height:1.9; }
+.ai-mat-n{ font-size:10.5px; color:var(--text3); margin-top:7px; display:flex; align-items:center; gap:10px; }
+.ai-b2{ border:1px solid var(--border); background:var(--bg3); color:var(--text2);
+  border-radius:7px; padding:3px 10px; font-size:10.5px; cursor:pointer; }
+.ai-run{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:11px 0 0; }
+.ai-b{ border:1px solid var(--brand,#1f7a4d); background:var(--bg3); color:var(--text);
+  border-radius:10px; padding:9px 18px; font-size:12.5px; font-weight:700; cursor:pointer; }
+.ai-b[disabled]{ opacity:.6; cursor:default; }
+.ai-cost{ font-size:10.5px; color:var(--text3); }
+.ai-note{ font-size:11.5px; color:var(--text3); line-height:1.8; margin-top:10px; }
+.ai-note span{ display:block; font-size:10.5px; }
+.ai-ng{ border:1px solid rgba(239,68,68,.55); background:rgba(239,68,68,.08); border-radius:10px;
+  padding:10px 13px; margin-top:10px; font-size:12px; color:var(--text); }
+.ai-ng span{ display:block; font-size:11px; color:var(--text2); margin-top:3px; }
+.ai-out{ border:1px solid var(--border); border-radius:10px; background:var(--bg2); margin-top:11px; overflow:hidden; }
+.ai-out-h{ display:flex; align-items:baseline; gap:10px; padding:8px 13px; border-bottom:1px solid var(--border);
+  font-size:12px; font-weight:800; color:var(--text); }
+.ai-out-h span{ font-size:10px; font-weight:400; color:var(--text3); margin-left:auto; }
+.ai-out-b{ padding:11px 14px; font-size:12.5px; color:var(--text2); line-height:1.95; }
+.ai-out-n{ padding:0 14px 10px; font-size:10.5px; color:var(--text3); }
+.ai-prev{ border:1px dashed var(--border); border-radius:10px; padding:10px 13px; margin-top:11px;
+  font-size:11.5px; color:var(--text3); }
+.ai-prev b{ color:var(--text2); }
+
+/* ── 器（②③を縦に並べる） ── */
+.ins-q-steps.ins-q-wide{ display:block; }
+.ins-q-step.ins-q-live{ border:1px solid var(--border); border-radius:12px; background:var(--bg);
+  padding:14px 16px; margin:0 0 14px; }
+
+@media (max-width: 860px){
+  .q-sum{ flex-direction:column; }
+  .q-tabs{ gap:4px; }
+  .q-print{ margin-left:0; }
+}
+@media print{
+  .q-range, .q-pick, .q-tabs, .ai-run, .ai-mat-n{ display:none !important; }
+  .q-body{ overflow:visible; }
+}

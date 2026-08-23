@@ -309,29 +309,24 @@
        +     'およそ週に1度、まとめて見直すための単位です。</div>'
        + '</div>';
 
-    h += '<div class="ins-q-steps">';
+    /* ================================================================
+       🔴 v1.181.0 ②の中身は **quarter.js（画面）＋ quarter-match.js（物差し）＋
+          quarter-pdf.js（読み取り）** に移した。ここは器だけ。
+       ⚠ ここに突き合わせの判定を書き戻さないこと。
+       ================================================================ */
+    h += '<div class="ins-q-steps ins-q-wide">';
 
-    h += '<section class="ins-q-step">'
+    h += '<section class="ins-q-step ins-q-live">'
        +   '<div class="ins-q-st"><span class="ins-q-no">②</span>売上チェックリストPDFとの突合</div>'
-       +   '<div class="ins-q-sd">整備ソフトから出した売上チェックリストPDFと、PitFlow の実績を1台ずつ突き合わせます。'
-       +     '<b>PitFlow にしか無い車・整備ソフトにしか無い車・金額の違う車</b>を出します。</div>'
-       +   '<div class="ins-q-todo"><b>動かすのに要るもの</b>'
-       +     '<ul><li>その期間の売上チェックリストPDF（整備ソフトから）</li>'
-       +     '<li>下の「書き出し」で落とした、PitFlow 側のデータ</li></ul></div>'
-       +   '<div class="ins-q-soon">いまは手作業でお預かりして突き合わせています。画面の中で回せるようになったら、ここに出ます。</div>'
+       +   (window.pitQuarterHtml ? pitQuarterHtml()
+            : '<div class="ins-q-soon">突き合わせの部品が読み込めていません。画面を開き直してください。</div>')
        + '</section>';
 
-    h += '<section class="ins-q-step">'
+    /* ③ AIチェック */
+    h += '<section class="ins-q-step ins-q-live">'
        +   '<div class="ins-q-st"><span class="ins-q-no">③</span>AIチェック</div>'
-       +   '<div class="ins-q-sd">日常チェックと②の結果をまとめてAIに読ませ、'
-       +     '<b>規則では拾えない粗さ</b>（同じ人・同じ工程でくり返し起きている抜け、'
-       +     '入力が後回しになっている車）を出します。</div>'
-       +   '<div class="ins-q-todo"><b>いまはまだ足りないもの</b>'
-       +     '<ul><li><b>母数</b>＝担当ごとの担当台数（何台のうち何件かが分からないと、人を比べられません）</li>'
-       +     '<li><b>車の中身</b>＝フローとメモ（文章が無いと「なぜ止まったか」が読めません）</li>'
-       +     '<li><b>前回の書き出し</b>（1回だけの出来事と、くり返しているクセを見分けるため）</li></ul></div>'
-       +   '<div class="ins-q-soon">⚠ 3つがそろうまでは、AIは「一度きりの出来事」を「クセ」と読み違えます。'
-       +     'そろえてから動かします。</div>'
+       +   (window.pitAiHtml ? pitAiHtml()
+            : '<div class="ins-q-soon">AIチェックの部品が読み込めていません。画面を開き直してください。</div>')
        + '</section>';
 
     h += '</div>';

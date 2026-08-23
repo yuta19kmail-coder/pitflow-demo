@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="1.181.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="1.182.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v1.181.0</div>
+    <div class="login-ver">v1.182.0</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v1.181.0</span>
+    <span class="ver">v1.182.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -897,7 +897,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/inspect-rules.js?v=13"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=3"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
 <script src="js/quarter-match.js?v=1"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
-<script src="js/quarter-pdf.js?v=1"></script><!-- 🧾 v1.181.0 売上チェックリストPDFの読み取り（自己検証つき） -->
+<script src="js/quarter-pdf.js?v=2"></script><!-- 🧾 v1.181.0 売上チェックリストPDFの読み取り（自己検証つき） -->
 <script src="js/quarter.js?v=1"></script><!-- 🧾 v1.181.0 クォーターチェック②の画面。quarter-match / quarter-pdf より後ろ、inspect.js より前 -->
 <script src="js/ai-check.js?v=1"></script><!-- 🤖 v1.181.0 クォーターチェック③AIチェック。quarter.js より後ろ、inspect.js より前 -->
 <script src="js/inspect.js?v=12"></script><!-- 🩺 v1.170.0 データチェックの画面（並べるだけ）。inspect-rules.js / inspect-fix.js / quarter*.js より後ろ -->

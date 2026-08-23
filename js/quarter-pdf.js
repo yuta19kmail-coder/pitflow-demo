@@ -59,23 +59,35 @@
      ⚠ ふだんの画面を1バイトも重くしないため、**押した時に**読み込む。
      ⚠ 取りに行けなかったら、黙らずに理由を返す（社内のネットが塞いでいることがある）。
      ================================================================ */
-  var PDFJS_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-  var WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  /* 🔴🔴 2026-08-23 決めごと ── **道具はネットから取りに行かない。アプリと一緒に配る。**
+     ◎なぜ
+       最初は CDN から取りに行く作りにしていたが、**会社のネットが外を塞いでいると、
+       その場で使えなくなる**。毎週回す業務のものなので、外に寄りかからない形にした。
+       （実際、こちらの箱からも cdnjs は塞がれていて取りに行けなかった）
+     ⚠ 合わせて 1.8MB ある。**PDFを選んだ時に初めて読み込む**ので、ふだんの画面は重くならない。
+     ⚠ 置き場所＝`js\vendor\`（中身は書き換えない。直す用があれば新しい版にまるごと入れ替える）。 */
+  var LIB_URL    = 'js/vendor/pdf.min.mjs';
+  var WORKER_URL = 'js/vendor/pdf.worker.min.mjs';
   var _libP = null;
+  function abs(u){
+    try { return new URL(u, document.baseURI).href; } catch (e) { return u; }
+  }
   function lib(){
-    if (w.pdfjsLib) { try { w.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL; } catch (e) {} return Promise.resolve(w.pdfjsLib); }
     if (_libP) return _libP;
-    _libP = new Promise(function (ok, ng) {
-      var el = document.createElement('script');
-      el.src = PDFJS_URL;
-      el.onload = function () {
-        if (!w.pdfjsLib) { ng(new Error('PDFを読む道具が入りませんでした')); return; }
-        try { w.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL; } catch (e) {}
-        ok(w.pdfjsLib);
-      };
-      el.onerror = function () { ng(new Error('PDFを読む道具を取りに行けませんでした（ネットにつながっていないか、社内で塞がれています）')); };
-      (document.head || document.documentElement).appendChild(el);
-    });
+    _libP = Promise.resolve()
+      .then(function () { return import(abs(LIB_URL)); })
+      .then(function (m) {
+        var lb = (m && m.getDocument) ? m : (m && m.default) ? m.default : null;
+        if (!lb || !lb.getDocument) throw new Error('PDFを読む道具の形が違います（' + LIB_URL + '）');
+        try { lb.GlobalWorkerOptions.workerSrc = abs(WORKER_URL); } catch (e) {}
+        w.pdfjsLib = lb;          /* 見張りや調べもの用に、名前も出しておく */
+        return lb;
+      })
+      .catch(function (e) {
+        _libP = null;             /* 次にもう一度ためせるように */
+        throw new Error('PDFを読む道具が読み込めませんでした（' + LIB_URL + '）。'
+                      + '本番に配られていない可能性があります：' + s(e && e.message ? e.message : e));
+      });
     return _libP;
   }
 
@@ -84,22 +96,35 @@
      ----------------------------------------------------------------
      PDF の中身は「文字のかたまり＋置いてある座標」でしかない。
      🔴 **同じ高さに並んでいるものを1行**とみなし、左から並べ直す。
+
+     🔴🔴 2026-08-23 実物で分かったこと ── **この帳票は横向き（90度回転）で刷ってある。**
+        文字ひとつひとつが**寝かせて置いてある**ので、そのままの座標で高さを見ると
+        **紙の「縦の列」が1行になってしまい、まるで読めない**（実際そうなっていた）。
+        👉 **紙に見えているとおりの位置**（viewport を通した座標）で並べ直す。
+        ＝ `Util.transform(viewport.transform, item.transform)`。
+        ⚠ こうしておけば、**縦向きの帳票に変わっても同じコードで読める**。
      ⚠ 高さがぴったり同じとは限らないので、少し（2ポイント）の幅で丸める。
-     ⚠ 横に離れている時は空白を入れる＝`令和 8年` と `江東 300 せ 8134` が
-        くっついて読めなくなるのを防ぐ。
+     ⚠ 横に離れている時は空白を入れる（`令和 8年` と `江東 300 せ 8134` がくっつかないように）。
+     🔴 **1文字ずつの位置（cells）も一緒に返す。** 見出しの行から**列の位置**を測って、
+        「どこからどこまでが顧客名か」を決めるのに使う（下の colsOf）。
      ================================================================ */
-  function linesOf(items){
+  function linesOf(items, vp, pdfjs){
     var rows = {};
     items.forEach(function (it) {
       var str = s(it.str);
       if (!str.replace(/\s/g, '')) return;
       var tr = it.transform || [1, 0, 0, 1, 0, 0];
-      var x = tr[4], y = Math.round(tr[5] / 2) * 2;
+      var m = tr;
+      if (vp && pdfjs && pdfjs.Util && pdfjs.Util.transform){
+        try { m = pdfjs.Util.transform(vp.transform, tr); } catch (e) { m = tr; }
+      }
+      var x = m[4], y = Math.round(m[5] / 2) * 2;
       (rows[y] = rows[y] || []).push({ x: x, w: it.width || 0, s: str });
     });
     return Object.keys(rows)
       .map(function (k) { return { y: +k, cells: rows[k].sort(function (a, b) { return a.x - b.x; }) }; })
-      .sort(function (a, b) { return b.y - a.y; })      /* PDF の y は下が0＝上から読むには降順 */
+      /* 🔴 viewport を通した座標は**下に行くほど大きい**（紙の読む順）。昇順で並べる */
+      .sort(function (a, b) { return a.y - b.y; })
       .map(function (r) {
         var out = '', prevEnd = null;
         r.cells.forEach(function (c) {
@@ -110,6 +135,42 @@
         return { y: r.y, text: out.replace(/\s+/g, ' ').trim(), cells: r.cells };
       })
       .filter(function (r) { return r.text; });
+  }
+
+  /* ================================================================
+     2-2. 見出しの行から「列の位置」を測る
+     ----------------------------------------------------------------
+     🔴 **どこからどこまでが顧客名か**を、字面ではなく**位置**で決める。
+        ＝ 見出しの行（`売上日 登録番号 個人・法人区分 顧客コード 顧客名 受付担当者`）が
+          ページごとに必ず出てくるので、そこで**列の左端**を測っておく。
+     ⚠ 字面で切ろうとすると「藤井 義博 椎名 祐太」を**どこで割るか決められない**
+        （お名前も担当者も「姓 名」で、間はどちらも空白）。実際それで割れなかった。
+     ================================================================ */
+  var COL_KEYS = ['売上日', '登録番号', '個人・法人区分', '顧客コード', '顧客名', '受付担当者'];
+  function colsOf(line){
+    if (!line || !line.cells) return null;
+    var got = {}, n = 0;
+    line.cells.forEach(function (c) {
+      var k = t(c.s);
+      if (COL_KEYS.indexOf(k) >= 0 && got[k] == null) { got[k] = c.x; n++; }
+    });
+    if (n < 4) return null;                    /* 見出しの行ではない */
+    var cols = COL_KEYS.filter(function (k) { return got[k] != null; })
+      .map(function (k) { return { key: k, x: got[k] }; })
+      .sort(function (a, b) { return a.x - b.x; });
+    return cols;
+  }
+  /* その行の、その列に入っている字を集める（列の左端 − 3 から、次の列の左端 − 3 まで） */
+  function pick(line, cols, key){
+    if (!line || !line.cells || !cols) return '';
+    var i = -1;
+    for (var k = 0; k < cols.length; k++) if (cols[k].key === key) i = k;
+    if (i < 0) return '';
+    var from = cols[i].x - 3;
+    var to = (i + 1 < cols.length) ? (cols[i + 1].x - 3) : Infinity;
+    var out = [];
+    line.cells.forEach(function (c) { if (c.x >= from && c.x < to) out.push(t(c.s)); });
+    return out.join('').replace(/\s+/g, ' ').trim();
   }
 
   /* ================================================================
@@ -134,62 +195,97 @@
     return out;
   }
 
+  /* ページのくり返し（どの伝票にも属さない行）。⚠ ここを外さないと**毎ページ伝票が始まる**
+     （`対象期間：令和 8年 8月 1日 ～ …` が「令和◯年◯月◯日」に当たってしまう） */
+  var RE_SKIP = /対象期間|作成日付|日付区分|請求計上組織|ページ：|売上チェックリスト|\[伝票番号\]/;
+  /* 締めの行＝`… 作業計/原価計 … 部品計/原価計 …`。
+     ⚠ 実物では**2つの書き方**があった（label が一緒の行に来る時と、次の行にずれる時）。
+        だから **`伝票計` という字ではなく、この並びで見分ける**。 */
+  var RE_CLOSE = /作業計\s*\/\s*原価計/;
+  var RE_GRAND = /合計枚数/;
+
   function parse(lines){
-    var slips = [], cur = null, warn = [];
+    var slips = [], cur = null, warn = [], cols = null;
     var total = null, sheets = null;
+    var pending = 0;      /* 頭のあと、伝票番号・車種名を拾うために見る行数 */
 
     function close(){
       if (!cur) return;
       /* 🔴 PitFlow と比べる額＝伝票計 − 消費税 − 非課税 */
       cur.比べる金額 = cur.伝票計 - cur.消費税 - cur.非課税;
-      slips.push(cur); cur = null;
+      slips.push(cur); cur = null; pending = 0;
     }
 
-    lines.forEach(function (ln, idx) {
-      var x = ln.text;
+    lines.forEach(function (ln) {
+      var x = s(ln && ln.text);
+      if (!x) return;
 
-      /* 最後のページ＝総合計と合計枚数 */
-      if (/総合計/.test(x)){ var mm = moneys(x); if (mm.length) total = mm[mm.length - 1]; }
-      if (/合計枚数/.test(x)){ var sm = x.match(/合計枚数\D*(\d+)/); if (sm) sheets = +sm[1]; }
+      /* 見出しの行が来たら、そこで**列の位置**を測り直す（ページごとに出てくる） */
+      var c = colsOf(ln);
+      if (c) { cols = c; return; }
+
+      /* 🔴 いちばん最後＝組織計／総合計の行。**合計枚数が一緒に載っている** */
+      if (RE_GRAND.test(x)){
+        var gm = moneys(x);
+        if (gm.length) total = gm[0];                    /* 行の先頭の数＝その計 */
+        var sm = x.match(/合計枚数\D*(\d+)/);
+        if (sm) sheets = +sm[1];
+        close();
+        return;
+      }
+      if (RE_SKIP.test(x)) return;
 
       var h = x.match(RE_HEAD);
       if (h){
         close();
-        var p = x.match(RE_PLATE);
+        /* ナンバーは**日付を外してから**探す（「8年 8月 1日」を拾わないように） */
+        var rest = x.slice(x.indexOf(h[0]) + h[0].length);
+        var p = rest.match(RE_PLATE);
         cur = {
           売上日: wareki(h[1], h[2], h[3], h[4]),
-          ナンバー: p ? (p[1] + ' ' + p[2] + ' ' + p[3] + ' ' + p[4]) : '',
-          顧客名: '', 受付担当: '', 伝票: '', 車種: '',
+          ナンバー: '', 顧客名: '', 受付担当: '', 伝票: '', 車種: '',
           伝票計: 0, 消費税: 0, 非課税: 0, 比べる金額: 0,
-          _頭: x, _行: [x]
+          _頭: x
         };
-        /* 顧客名と受付担当者は、頭の行の**ナンバーより後ろ**にある。
-           ⚠ 顧客コード（数字）を挟むので、数字を落としてから前後に分ける。 */
-        var tail = p ? x.slice(x.indexOf(p[0]) + p[0].length) : x.replace(RE_HEAD, '');
-        var parts = tail.replace(/[0-9,]+/g, ' ').split(/\s+/).filter(function (v) {
-          return v && !/^(個人|法人|事業所)$/.test(v);
-        });
-        if (parts.length >= 2){ cur.受付担当 = parts[parts.length - 1]; cur.顧客名 = parts.slice(0, -1).join(''); }
-        else if (parts.length === 1){ cur.顧客名 = parts[0]; }
+        /* 🔴 まず**列の位置**で切る（これが本筋）。列が測れていない時だけ、字面で拾う。 */
+        var byCol = cols ? {
+          plate: pick(ln, cols, '登録番号'),
+          name:  pick(ln, cols, '顧客名'),
+          staff: pick(ln, cols, '受付担当者')
+        } : null;
+        cur.ナンバー = (byCol && byCol.plate) || (p ? (p[1] + ' ' + p[2] + ' ' + p[3] + ' ' + p[4]) : '');
+        cur.顧客名   = (byCol && byCol.name) || '';
+        cur.受付担当 = (byCol && byCol.staff) || '';
+        if (!cur.顧客名 && !cur.受付担当){
+          /* 逃げ道＝ナンバーの後ろを、数字と区分を落として拾う。
+             ⚠ お名前と担当者を**割れない**ので、まとめて顧客名に入れる（誤って割るよりまし）。 */
+          var tail = p ? rest.slice(rest.indexOf(p[0]) + p[0].length) : rest;
+          cur.顧客名 = tail.replace(/[0-9,]+/g, ' ').replace(/個人|法人|事業所/g, ' ').replace(/\s+/g, '').trim();
+        }
+        pending = 3;
         return;
       }
       if (!cur) return;
-      cur._行.push(x);
 
-      /* 2行目＝伝票番号（頭の次の行の、いちばん左の数字） */
-      if (!cur.伝票){
-        var d = x.match(/^\s*([0-9]{2,6})\b/);
-        if (d) cur.伝票 = d[1];
-      }
-      /* 3行目あたり＝車種名（「システム」より前で、数字だけではない行） */
-      if (!cur.車種 && !/システム|整備|部品|車販/.test(x)){
-        var only = x.replace(/[0-9,\s\-]/g, '');
-        if (only.length >= 2 && !/^[A-Z]+$/.test(only) && cur._行.length <= 4) cur.車種 = only;
+      /* 頭のすぐ後ろ2行＝伝票番号（売上日の列）と車種名（登録番号の列） */
+      if (pending > 0){
+        pending--;
+        if (!cur.伝票){
+          var d = (cols ? pick(ln, cols, '売上日') : x).match(/^\s*([0-9]{2,6})\b/);
+          if (d) cur.伝票 = d[1];
+        }
+        if (!cur.車種){
+          var car = cols ? pick(ln, cols, '登録番号') : '';
+          /* 車台番号（英数字だけ）は車種名ではない */
+          if (car && !/^[A-Z0-9\-]+$/i.test(car)) cur.車種 = car;
+        }
       }
 
       if (/非課税/.test(x)){ var nm = moneys(x); if (nm.length) cur.非課税 += nm[nm.length - 1]; }
       if (/一般消費税/.test(x)){ var cm = moneys(x); if (cm.length) cur.消費税 += cm[cm.length - 1]; }
-      if (/伝票計/.test(x)){
+      /* 🔴 締め＝`作業計/原価計` の並び。行の**先頭の数**が伝票計
+         （`伝票計 588,654 作業計/原価計 …` でも `957,022 作業計/原価計 …` でも同じ所） */
+      if (RE_CLOSE.test(x)){
         var tm = moneys(x);
         if (tm.length) cur.伝票計 = tm[0];
         close();
@@ -227,7 +323,9 @@
      ================================================================ */
   function read(file, onProgress){
     if (!file) return Promise.reject(new Error('PDF が選ばれていません'));
+    var _lb = null;
     return lib().then(function (pdfjs) {
+      _lb = pdfjs;
       return file.arrayBuffer().then(function (buf) {
         return pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
       });
@@ -236,9 +334,14 @@
       for (var i = 1; i <= n; i++){
         (function (pi) {
           chain = chain.then(function () {
-            return doc.getPage(pi).then(function (pg) { return pg.getTextContent(); })
+            var _pg = null;
+            return doc.getPage(pi)
+              .then(function (pg) { _pg = pg; return pg.getTextContent(); })
               .then(function (tc) {
-                linesOf(tc.items || []).forEach(function (r) { lines.push(r); });
+                /* 🔴 紙に見えているとおりの位置で並べ直す（この帳票は横向きに刷ってある） */
+                var vp = null;
+                try { vp = _pg.getViewport({ scale: 1 }); } catch (e) {}
+                linesOf(tc.items || [], vp, _lb).forEach(function (r) { lines.push(r); });
                 if (onProgress) { try { onProgress(pi, n); } catch (e) {} }
               });
           });

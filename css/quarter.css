@@ -247,3 +247,72 @@
 .q-pq-x{ position:absolute; top:-6px; right:-6px; width:20px; height:20px; line-height:1; font-size:12px; font-weight:800;
          color:var(--text3); background:var(--bg1); border:1px solid var(--border2); border-radius:50%; cursor:pointer; padding:0; }
 .q-pq-x:hover{ color:#fff; background:#ef4444; border-color:#ef4444; }
+
+/* ================================================================
+   🧹 v2.1.0 箱を減らした（ゆうた「UIがかなりごちゃごちゃしてる」）
+   上＝PDFと期間とQ1〜Q4（q-top）／下＝合計と検算（q-nums）の2箱だけ
+   ================================================================ */
+.q-top{ background:var(--bg1); border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:10px; }
+.q-top > .q-pick{ margin:0; }
+.q-top > .q-term{ margin:10px 0 0; background:transparent; border:none; border-top:1px solid var(--border); border-radius:0; padding:10px 0 0; }
+.q-top > .q-plan{ margin:10px 0 0; background:transparent; border:none; border-top:1px solid var(--border); border-radius:0; padding:10px 0 0; }
+.q-pick.done{ padding:7px 11px; }
+.q-pick.done .q-file span small{ display:none; }
+.q-pick-n{ font-size:11.5px; color:var(--text3); line-height:1.6; }
+.q-pick-n b{ color:var(--text2); }
+.q-nums{ background:var(--bg1); border:1px solid var(--border); border-radius:12px; padding:11px 13px; margin-bottom:10px; }
+.q-nums.bad{ border-color:rgba(239,68,68,.55); }
+.q-nums > .q-sum{ margin:0; }
+.q-nums > .q-audit{ margin:10px 0 0; border:none; border-top:1px solid var(--border); border-radius:0; padding:10px 0 0; background:transparent; }
+.q-saved{ font-size:11.5px; color:var(--text3); margin:-4px 0 10px; padding:0 3px; }
+.q-plan-h span{ font-size:11px; font-weight:600; color:var(--text3); margin-left:8px; }
+
+/* ================================================================
+   🃏 v2.1.0 一覧を「表」から「カード」へ
+   （ゆうた「字がかなり小さい／ワイドはスクロールになると確認しずらい／
+     ハイト方向にひろげる／客名をはっきり／PitとソフトのZれは同一列で」）
+   🔴 横スクロールは1つも出さない。狭い端末では縦に積むだけ。
+   ================================================================ */
+.q-cards{ display:flex; flex-direction:column; gap:9px; }
+.q-c{ background:var(--bg1); border:1px solid var(--border); border-left:3px solid var(--border2);
+      border-radius:11px; padding:11px 13px; }
+.q-c.out{ border-left-color:#f59e0b; }
+.q-c.is-done{ opacity:.55; }
+.q-c-h{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:5px; }
+.q-c-how{ font-size:10.5px; font-weight:700; color:var(--text3); }
+.q-c-out{ font-size:10.5px; font-weight:800; color:#f59e0b; background:rgba(245,158,11,.13);
+          border:1px solid rgba(245,158,11,.45); border-radius:6px; padding:1px 8px; }
+/* 🔴 お客様の名前がいちばん大きい */
+.q-c-who{ font-size:16px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.35; }
+.q-c-plate{ display:block; font-size:12.5px; font-weight:600; color:var(--text2); margin-top:1px; }
+/* 🔴 整備ソフトと PitFlow を上下に並べる＝日付も金額も同じ位置で見くらべる */
+.q-c-cmp{ margin-top:8px; border-top:1px solid var(--border); padding-top:8px; }
+.q-c-r{ display:grid; grid-template-columns:84px 132px 1fr auto; gap:8px; align-items:baseline; padding:3px 0; }
+.q-c-src{ font-size:11px; font-weight:800; color:var(--text3); }
+.q-c-d{ font-size:14px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums; }
+.q-c-d i{ font-style:normal; font-size:10px; font-weight:600; color:var(--text3); margin-left:5px; }
+.q-c-a{ font-size:15px; font-weight:800; color:var(--text); text-align:right; font-variant-numeric:tabular-nums; }
+.q-c-a i{ font-style:normal; font-size:10.5px; font-weight:600; color:var(--text3); margin-left:2px; }
+.q-c-p{ font-size:11px; color:var(--text3); text-align:right; white-space:nowrap; }
+.q-c-p em{ font-style:normal; display:block; }
+.q-c-p em.bad{ color:#ef4444; font-weight:700; }
+/* 差は、比べた2行のすぐ下（左右に目を振らない） */
+.q-c-gap{ display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; padding-left:84px; }
+.q-c-g{ font-size:12px; font-weight:700; color:var(--text2); background:var(--bg3);
+        border-radius:7px; padding:2px 9px; }
+.q-c-g.ok{ color:var(--green); background:rgba(29,185,122,.12); }
+.q-c-g.warn{ color:#f59e0b; background:rgba(245,158,11,.12); }
+.q-c-g.bad{ color:#ef4444; background:rgba(239,68,68,.12); font-weight:800; }
+.q-c-st{ font-size:12px; color:var(--text2); margin-top:7px; }
+.q-c-st b{ color:var(--text); }
+.q-c-st span{ color:var(--text3); margin:0 5px; }
+.q-c-st.bad em{ font-style:normal; font-size:11px; font-weight:800; color:#ef4444; margin-left:7px; }
+.q-c-act{ margin-top:8px; border-top:1px dashed var(--border); padding-top:7px; }
+.q-c-act .q-fx{ padding:3px 0; }
+.q-c-act .q-fx-k{ min-width:52px; font-size:11px; }
+.q-c-act .q-fx-go, .q-c-act .q-fx-mk{ font-size:12px; padding:3px 11px; }
+@media (max-width:700px){
+  .q-c-r{ grid-template-columns:70px 1fr; gap:2px 8px; }
+  .q-c-a, .q-c-p{ text-align:left; grid-column:2; }
+  .q-c-gap{ padding-left:0; }
+}

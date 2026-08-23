@@ -72,7 +72,7 @@
 
   /* 画面の覚え（絞り込みと、開いている規則）。⚠ データではないので保存しない */
   /* ⚠ v1.172.0 `done`（片づけたものも見る）は使わなくなった。古い覚えが残っていても害は無い。 */
-  var UI = window._insp = window._insp || { mode:'daily', level:'', cat:'', open:{}, all:{}, res:null };
+  var UI = window._insp = window._insp || { mode:'daily', level:'', cat:'', open:{}, all:{}, res:null, ym:'' };
   if (!UI.all) UI.all = {};
   if (!UI.mode) UI.mode = 'daily';
   var ROWS_CAP = 20;   /* 1つの規則で最初に出す件数（超えたぶんは「ほか◯件」で開く） */
@@ -111,6 +111,52 @@
     }
   };
 
+  /* ================================================================
+     🗓 v2.1.0（ゆうた指定 2026-08-23）**いちばん上は「月」。まず月次で大分する。**
+     ----------------------------------------------------------------
+     🗣「TOPのデータチェックの下に月を置いて まず月次で大分する その下に日常orクォーターで選ぶ」
+
+     🔴🔴 **「大分する」＝分けて並べる。隠すのではない。**
+        v1.169.2 の決めごと「**データチェックは黙って何かを隠さない**」は生きている。
+        隠すと「出ていないものが有るのか無いのか分からない」＝いちばん困る形になる。
+        ＝ 選んだ月のぶんを**先に**出し、ほかの月は**下にまとめて件数付きで**出す。**1件も消さない。**
+     ⚠ クォーターチェックのほうは、もともと期間の話なので**その月のQ1〜Q4**に素直に効く。
+     ================================================================ */
+  function ymNow(){
+    var d = new Date();
+    return d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+  }
+  function ym(){ if (!UI.ym) UI.ym = ymNow(); return UI.ym; }
+  function ymLabel(v){
+    var p = String(v || '').split('-');
+    return (p.length === 2) ? (p[0] + '年 ' + (+p[1]) + '月') : '';
+  }
+  function monthBar(){
+    var v = ym(), isNow = (v === ymNow());
+    return '<div class="ins-month">'
+         +   '<button class="ins-m-mv" onclick="pitInspectMonth(-1)" title="前の月">‹</button>'
+         +   '<span class="ins-m-now">' + esc(ymLabel(v)) + '</span>'
+         +   '<button class="ins-m-mv" onclick="pitInspectMonth(1)" title="次の月">›</button>'
+         +   (isNow ? '' : '<button class="ins-m-back" onclick="pitInspectMonth(0)">今月へ</button>')
+         +   '<span class="ins-m-note">'
+         +     (UI.mode === 'quarter'
+                ? 'この月の Q1〜Q4 を突き合わせます'
+                : 'この月の車を先に出します。<b>ほかの月も下に全部出ます</b>（隠しません）')
+         +   '</span>'
+         + '</div>';
+  }
+  window.pitInspectMonth = function (n){
+    if (!+n){ UI.ym = ymNow(); }
+    else {
+      var p = ym().split('-');
+      var d = new Date(+p[0], (+p[1]) - 1 + (+n), 1);
+      UI.ym = d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+    }
+    /* クォーターチェックの画面も同じ月を見る（覚えは1つ） */
+    if (UI.q) { UI.q.ym = UI.ym; UI.q.saved = null; UI.q.savedId = ''; }
+    renderInspect();
+  };
+
   /* いちばん上の切り替え（日常／クォーター） */
   function modeBar(){
     var h = '<div class="ins-mode">';
@@ -129,7 +175,9 @@
       body.innerHTML = '<div class="ins-empty">データチェックの規則が読み込めていません。画面を開き直してください。</div>';
       return;
     }
-    if (UI.mode === 'quarter'){ body.innerHTML = modeBar() + quarterHtml(); if (window.pitIcons) try { pitIcons(body); } catch(e){} return; }
+    /* 🗓 v2.1.0 月はクォーターチェックの画面とも1つの覚えを分け合う */
+    if (UI.q && UI.q.ym !== ym()) UI.q.ym = ym();
+    if (UI.mode === 'quarter'){ body.innerHTML = monthBar() + modeBar() + quarterHtml(); if (window.pitIcons) try { pitIcons(body); } catch(e){} return; }
 
     var res = run();
 
@@ -158,7 +206,7 @@
     var list = res.findings.filter(function (f) { return pass(f) && f.mark !== 'ok'; });
     var okList = res.findings.filter(function (f) { return pass(f) && f.mark === 'ok'; });
 
-    var h = modeBar();
+    var h = monthBar() + modeBar();
 
     /* ===== 上の帯（いつ・何台・いくつ） ===== */
     h += '<div class="ins-head">'
@@ -236,6 +284,37 @@
                  : res.cards + '台ぜんぶ、規則にひっかかる所はありません。この状態を保ちます。') + '</span>'
          + '</div>';
     } else {
+      /* 🗓 v2.1.0（ゆうた指定）**選んだ月のぶんを先に、ほかの月は下にまとめる。**
+         🔴 **1件も隠さない**（v1.169.2 の決めごと）。分けて並べるだけ。
+         ⚠ 月を持たない所見（代車・社用車）は、いつでも「この月」の側に出す
+            （どの月のものでもないので、下に落とすと永久に見られなくなる）。 */
+      var _ym = ym();
+      var thisM = list.filter(function (f) { return !f.ym || f.ym === _ym; });
+      var otherM = list.filter(function (f) { return f.ym && f.ym !== _ym; });
+      h += renderGroups(thisM, res);
+      if (otherM.length){
+        var oOpen = (UI.open['@other'] !== false);
+        h += '<section class="ins-other' + (oOpen ? '' : ' shut') + '">'
+           +   '<div class="ins-other-h" onclick="pitInspectOpen(\'@other\')">'
+           +     '<span class="ins-other-t">ほかの月の車</span>'
+           +     '<span class="ins-other-n">' + otherM.length + '件</span>'
+           +     '<span class="ins-other-s">' + esc(ymLabel(_ym)) + ' 以外です。'
+           +       '<b>隠していません。</b>ここも 0 にします</span>'
+           +     '<span class="ins-other-x">' + (oOpen ? '閉じる' : '開く') + '</span>'
+           +   '</div>'
+           +   '<div class="ins-other-b">' + renderGroups(otherM, res) + '</div>'
+           + '</section>';
+      }
+    }
+    h += okSection(okList);      /* 🔴 v1.173.0 確認したものは消さずに下へ */
+    body.innerHTML = h;
+    if (window.pitIcons) try { pitIcons(body); } catch(e){}
+  }
+
+  /* 規則ごとにまとめて並べる（v2.1.0 で「この月／ほかの月」の両方から呼ぶので切り出した） */
+  function renderGroups(list, res){
+    var h = '';
+    {
       var groups = [], byRule = {};
       list.forEach(function (f) {
         if (!byRule[f.ruleId]) { byRule[f.ruleId] = []; groups.push(f.ruleId); }
@@ -281,10 +360,7 @@
         h += '</section>';
       });
     }
-    h += okSection(okList);      /* 🔴 v1.173.0 確認したものは消さずに下へ */
-
-    body.innerHTML = h;
-    if (window.pitIcons) try { pitIcons(body); } catch(e){}
+    return h;
   }
 
   /* ================================================================

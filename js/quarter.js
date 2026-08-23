@@ -54,20 +54,7 @@
     return U.q;
   }
 
-  /* ================================================================
-     期間のボタン（いま／1つ前／2つ前）
-     ⚠ 区切りの計算は pitQuarterOf に任せる。ここで 1-7／8-15 と書かない。
-     ================================================================ */
-  function qBack(n){
-    var q = w.pitQuarterOf ? w.pitQuarterOf() : null;
-    if (!q) return null;
-    var cur = q;
-    for (var i = 0; i < n; i++){
-      var prev = shift(cur.s, -1);            /* 1つ前のQの最終日 */
-      cur = w.pitQuarterOf(prev);
-    }
-    return cur;
-  }
+
 
   /* ================================================================
      画面
@@ -76,53 +63,53 @@
     var U = Q();
     var h = '';
 
-    /* ⚠ 見出し（「② 売上チェックリストPDFとの突合」）は器（inspect.js）が出している。
-       ここで**もう一度出さない**（同じ字が2つ並ぶ）。 */
-    h += '<div class="q-head">'
-       +   '<div class="q-sub">整備ソフトから出した <b>売上チェックリストPDF</b> と、PitFlow の実績を1台ずつ突き合わせます。'
-       +     '<b>PDF はこのパソコンの中だけで読みます</b>（どこにも送りません）。</div>'
-       + '</div>';
+    /* ================================================================
+       🧹 v2.1.0（ゆうた指定 2026-08-23）**箱を減らして、すっきりさせた。**
+       🗣「いまUIがかなりごちゃごちゃしてる」
+       🗣「PDF自動になったわけだから、そのあたりの選択部分はぜんぶ取っ払って」
+       🗣「PDFのクォーター、とか台数とか同じようなBOXが並んでるから、まとめられそうならまとめて」
 
-    /* ---- 期間 ---- */
-    h += '<div class="q-range">'
-       +   '<span class="q-l">期間 <small>PDFを入れると自動で入ります</small></span>'
-       +   '<input class="q-in" type="date" id="q-from" value="' + esc(U.from) + '" onchange="pitQSetRange(this.value, null)">'
-       +   '<span class="q-tilde">〜</span>'
-       +   '<input class="q-in" type="date" id="q-to" value="' + esc(U.to) + '" onchange="pitQSetRange(null, this.value)">'
-       +   '<span class="q-quick">';
-    [0,1,2].forEach(function (n) {
-      var q = qBack(n); if (!q) return;
-      var on = (U.from === q.s && U.to === q.e);
-      h += '<button class="q-qb' + (on ? ' on' : '') + '" onclick="pitQSetRange(\'' + q.s + '\',\'' + q.e + '\')">'
-         + esc(n === 0 ? 'いまのQ' : (n === 1 ? '1つ前' : '2つ前')) + '<span>' + esc(q.label) + '</span></button>';
-    });
-    h += '</span></div>';
-
+       ◎撤去したもの
+         ・**期間の入力欄と「いまのQ／1つ前／2つ前」** … PDFが自分で期間を言うので要らない（v2.0.0）
+         ・**月送りボタン** … いちばん上の月バー（inspect.js）に移した
+         ・見出しの長い説明 … 1行にした
+       ◎まとめたもの
+         ・**PDF ＋ 読んだ期間 ＋ Q1〜Q4の印** ＝ 上の1箱（`q-top`）
+         ・**合計 ＋ 差 ＋ 検算 ＋ 内訳**       ＝ 下の1箱（`q-nums`）
+       ＝ 箱が 5つ → **2つ**。
+       ================================================================ */
     ensureMarks();      /* 🛠 v2.0.0 「伝票を直した」の印（読むのは1回だけ） */
 
-    /* ---- 🗄 v1.184.0 その月の Q1〜Q4（ルーティンの形） ---- */
-    h += planRow(U);
+    h += '<div class="q-top">';
 
     /* ---- PDF を選ぶ／放り込む ----
        🔴 v1.184.0（ゆうた指定）**ドラッグで入れられるようにする。**
-       ⚠ 押して選ぶ道は残す（ドラッグが苦手な人・スマホのため）。 */
-    h += '<div class="q-pick" id="q-drop"'
+       ⚠ 押して選ぶ道は残す（ドラッグが苦手な人・スマホのため）。
+       ⚠ v2.1.0 読み終わったあとは**小さい1行**にする（大きな箱を出しっぱなしにしない）。 */
+    var _loaded = !!(U.pdf || U.res || U.err);
+    h += '<div class="q-pick' + (_loaded ? ' done' : '') + '" id="q-drop"'
        +   ' ondragover="pitQDrag(event,1)" ondragenter="pitQDrag(event,1)"'
        +   ' ondragleave="pitQDrag(event,0)" ondrop="pitQDrop(event)">'
        +   '<label class="q-file">'
        +     '<input type="file" accept="application/pdf,.pdf" onchange="pitQPickFile(this)">'
-       +     '<span><i data-ic=box data-ics=16></i> 売上チェックリストPDF を選ぶ'
-       +       '<small>（ここに<b>ドラッグ</b>しても入ります）</small></span>'
+       +     '<span><i data-ic=box data-ics=16></i> 売上チェックリストPDF'
+       +       (_loaded ? '' : ' を選ぶ<small>（ここに<b>ドラッグ</b>しても入ります）</small>')
+       +     '</span>'
        +   '</label>'
+       +   (_loaded ? '' : '<span class="q-pick-n">期間は選ばなくて大丈夫です。'
+                        + 'PDFに書いてある期間を読んで、<b>クォーターに自動で振り分けます</b>。'
+                        + '<b>PDFはこのパソコンの中だけで読みます</b>（どこにも送りません）。</span>')
        +   (U.pdf ? '<span class="q-fname">' + esc(U.pdf) + '</span>' : '')
        +   (U.busy ? '<span class="q-busy">' + esc(U.busy) + '</span>' : '')
        /* 🧹 v2.0.0（ゆうた指定）**入れたPDFを片づける。** 残してある結果には触らない。 */
-       +   ((U.pdf || U.res || U.err)
-             ? '<button class="q-clear" onclick="pitQClearScreen()">別のPDFを入れ直す</button>' : '')
+       +   (_loaded ? '<button class="q-clear" onclick="pitQClearScreen()">別のPDFを入れ直す</button>' : '')
        + '</div>';
 
     /* 🗓 v2.0.0 PDF が言っている期間と、クォーターの割り振り */
     h += termRow(U);
+    /* ---- 🗄 v1.184.0 その月の Q1〜Q4（ルーティンの形） ---- */
+    h += planRow(U);
+    h += '</div>';
 
     if (U.err){
       h += '<div class="q-ng"><b>読み取りに失敗しました。</b>'
@@ -144,39 +131,42 @@
     }
 
     var R = U.res;
-    /* ---- 合計 ---- */
+    /* ================================================================
+       🧹 v2.1.0 **合計・差・検算・内訳を1つの箱にまとめた**（前は3つに分かれていた）。
+       ⚠ 数字の意味は1つも変えていない。並べ方だけ。
+       ================================================================ */
     var ok = R.検算.合う;
-    h += '<div class="q-sum' + (ok ? '' : ' bad') + '">'
-       +   '<div class="q-card"><span class="q-k">整備ソフト</span>'
-       +     '<b>' + R.整備ソフト.枚数 + '</b>台<span class="q-y">' + yen(R.整備ソフト.金額) + '円</span></div>'
-       +   '<div class="q-card"><span class="q-k">PitFlow</span>'
-       +     '<b>' + R.PitFlow.台数 + '</b>台<span class="q-y">' + yen(R.PitFlow.金額) + '円</span></div>'
-       +   '<div class="q-card q-diff"><span class="q-k">差</span>'
-       +     '<b>' + (R.差.台数 > 0 ? '+' : '') + R.差.台数 + '</b>台'
-       +     '<span class="q-y">' + (R.差.金額 > 0 ? '+' : '') + yen(R.差.金額) + '円</span></div>'
-       + '</div>';
-
+    h += '<div class="q-nums' + (ok ? '' : ' bad') + '">';
+    h +=   '<div class="q-sum' + (ok ? '' : ' bad') + '">'
+       +     '<div class="q-card"><span class="q-k">整備ソフト</span>'
+       +       '<b>' + R.整備ソフト.枚数 + '</b>台<span class="q-y">' + yen(R.整備ソフト.金額) + '円</span></div>'
+       +     '<div class="q-card"><span class="q-k">PitFlow</span>'
+       +       '<b>' + R.PitFlow.台数 + '</b>台<span class="q-y">' + yen(R.PitFlow.金額) + '円</span></div>'
+       +     '<div class="q-card q-diff"><span class="q-k">差</span>'
+       +       '<b>' + (R.差.台数 > 0 ? '+' : '') + R.差.台数 + '</b>台'
+       +       '<span class="q-y">' + (R.差.金額 > 0 ? '+' : '') + yen(R.差.金額) + '円</span></div>'
+       +   '</div>';
     /* ---- 検算（🔴 合わなければ、そう言う） ---- */
-    h += '<div class="q-audit' + (ok ? ' ok' : ' ng') + '">'
-       +   (ok
-            ? '<b>差額の内訳が、実際の差とぴったり合いました。</b><span>取りこぼしはありません。</span>'
-            : '<b>差額の内訳が、実際の差と合いません（' + yen(R.検算.ずれ) + '円ぶん）。</b>'
-              + '<span>どこかを取りこぼしています。この画面の数字は当てにしないでください。</span>')
-       +   '<div class="q-parts">'
-       +     part('整備ソフトだけにある', R.内訳.整備ソフトだけ)
-       +     part('PitFlow だけにある',   R.内訳.PitFlowだけ)
-       +     part('期間の外に立っている', R.内訳.期間の外)
-       +     part('金額そのもののちがい', R.内訳.金額ちがい)
-       +   '</div>'
-       + '</div>';
+    h +=   '<div class="q-audit' + (ok ? ' ok' : ' ng') + '">'
+       +     (ok
+              ? '<b>差額の内訳が、実際の差とぴったり合いました。</b><span>取りこぼしはありません。</span>'
+              : '<b>差額の内訳が、実際の差と合いません（' + yen(R.検算.ずれ) + '円ぶん）。</b>'
+                + '<span>どこかを取りこぼしています。この画面の数字は当てにしないでください。</span>')
+       +     '<div class="q-parts">'
+       +       part('整備ソフトだけにある', R.内訳.整備ソフトだけ)
+       +       part('PitFlow だけにある',   R.内訳.PitFlowだけ)
+       +       part('期間の外に立っている', R.内訳.期間の外)
+       +       part('金額そのもののちがい', R.内訳.金額ちがい)
+       +     '</div>'
+       +   '</div>';
+    h += '</div>';
 
     /* ---- 🗄 v1.184.0 残したかどうかを、黙らずに言う ---- */
     if (w.PIT_CLOUD){
       h += '<div class="q-saved">'
          +   (U.savedAt
-              ? '<b>この結果を残しました</b>（' + esc(U.savedAt) + '）。上の Q' + 'の印からいつでも見返せます。'
-                + '<span>同じ期間をもう一度やると、新しい方に置きかわります。</span>'
-              : '<span>結果を残しています…</span>')
+              ? '<b>この結果を残しました</b>（' + esc(U.savedAt) + '）／同じ期間をもう一度やると置きかわります'
+              : '結果を残しています…')
          + '</div>';
     }
 
@@ -208,6 +198,9 @@
       /* 💴 v1.185.0 カードの売上日が伝票の日とちがう。**お金は動かない**（直すのは日付だけ）ので、
          金額ちがいとは別の欄にする。⚠ 売上日を持っていないカードはここに出ない。 */
       { id:'sdate',  label:'売上日ちがい',    n: left(R.売上日ちがい || []) },
+      /* 👤 v2.1.0（ゆうた指定）「PDFと担当者のズレは別途追加チェックして」
+         ⚠ 売上の**合計は動かない**（動くのはフロント別の内訳だけ）ので、金額とは別の欄にする。 */
+      { id:'staff',  label:'担当ちがい',      n: left(R.担当ちがい || []) },
       { id:'soft',   label:'整備ソフトだけ',  n: R.整備ソフトだけ.length },
       { id:'pit',    label:'PitFlowだけ',     n: R.PitFlowだけ.length },
       { id:'all',    label:'結びついた全件',  n: R.結びついた.length }
@@ -288,11 +281,10 @@
     var ym = t(U.ym) || (t(U.from).slice(0, 7));
     var plan = w.pitQMonthPlan(ym, U.list);
     var head = ym ? (ym.split('-')[0] + '年 ' + (+ym.split('-')[1]) + '月') : '今月';
+    /* ⚠ v2.1.0 月送りのボタンは**撤去した**（いちばん上の月バーが送る＝送る所を2つ持たない）。 */
     var h = '<div class="q-plan">'
-          + '<div class="q-plan-h">'
-          +   '<button class="q-mv" onclick="pitQMonth(-1)">‹</button>'
-          +   '<b>' + esc(head) + ' の突き合わせ</b>'
-          +   '<button class="q-mv" onclick="pitQMonth(1)">›</button>'
+          + '<div class="q-plan-h"><b>' + esc(head) + ' の突き合わせ</b>'
+          +   '<span>済んだQは押すと開けます。× で「まだ」に戻せます</span>'
           + '</div><div class="q-plan-b">';
     plan.forEach(function (x) {
       var r = x.run;
@@ -368,7 +360,7 @@
     }
     /* ⚠ v1.185.0 『売上日ちがい』を足した。**この並びは残してある中身の名前と1文字も同じにすること**
        （quarter-store.js の `直すもの` の見出しをそのまま開く作りなので、綴りが違うと空になる）。 */
-    var keys = ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '売上日ちがい', '整備ソフトだけ', 'PitFlowだけ'];
+    var keys = ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '売上日ちがい', '担当ちがい', '整備ソフトだけ', 'PitFlowだけ'];
     h += '<div class="q-tabs">';
     keys.forEach(function (k) {
       var n = ((R.直すもの || {})[k] || []).length;
@@ -420,31 +412,42 @@
              : tab === 'month' ? R.月またぎ
              : tab === 'qq'    ? R.Qまたぎ
              : tab === 'sdate' ? (R.売上日ちがい || [])
+             : tab === 'staff' ? (R.担当ちがい || [])
              : tab === 'lump'  ? R.結びついた.filter(function (p) { return p.期間の外; })
              : R.結びついた;
     if (!rows.length) return '<div class="q-none">0件です。</div>';
+    /* ================================================================
+       🃏 v2.1.0（ゆうた指定 2026-08-23）**表をやめて、カードにした。**
+       🗣「個別のデータの字がかなり小さい」
+       🗣「ワイドはスクロールになると確認しずらくなると思うから、ハイト方向にひろげるなら広げて、
+       　　もう少し大きなテキストで客名とかもはっきりさせたい」
+       🗣「またPitと整備ソフトの差とかは同一列を見るとか見やすくしたい」
+
+       ◎やめたこと … **9列の表**（横スクロールが出る／字が10〜11px になる）
+       ◎これから  … **1件＝1枚のカード**
+         ・お客様の名前を**いちばん大きく**（15px）。ナンバーもすぐ下に大きめで
+         ・整備ソフトと PitFlow を**上下2行に並べて、日付も金額も同じ位置**で見くらべる
+         ・差は**その真下**にまとめる（左右に目を振らない）
+         ・番号は右上。直すボタンは下
+       🔴 横スクロールは**1つも出ない**（幅の狭い端末でも縦に積むだけ）。
+       ================================================================ */
     var h = (tab === 'sdate'
           ? '<div class="q-note">カードに入っている<b>売上日</b>が、伝票の日付とちがうものです。'
             + '🔴 <b>売上の金額は1円も動きません。</b>直すのは日付だけです。</div>'
           : '')
-          /* 🛠 v2.0.0 ゆうた指定「**修正 or 伝票側を直したからそのまま** の2択がほしい」。
-             ⚠ 説明は**表の上に1回だけ**（行ごとに書くと表が読めなくなる）。 */
+          + (tab === 'staff'
+          ? '<div class="q-note">伝票の<b>受付担当</b>と、PitFlow の<b>フロント担当</b>がちがうものです。'
+            + '🔴 <b>売上の合計は動きません。</b>動くのは<b>フロント別の内訳</b>だけです。</div>'
+          : '')
+          /* 🛠 v2.0.0 ゆうた指定「**修正 or 伝票側を直したからそのまま** の2択がほしい」。 */
           + '<div class="q-2way">右端で<b>1行ずつ片づけます。答えは2つだけです。</b><br>'
           +   '・<b>直す</b>＝PitFlow を伝票に合わせます。押すとカードが書き換わり、'
           +     '<b>上の差もその場で縮みます</b>（PDF は入れ直さなくて大丈夫です）<br>'
           +   '・<b>伝票を直した</b>＝整備ソフト側を直したので、PitFlow はこのまま。<b>済</b>が付きます。'
           +     'PitFlow は変えていないので<b>上の数字は動きません</b>。'
-          +     'あの数字は<b>いま手元の PDF が言っていること</b>なので、'
           +     '直したぶんは<b>次に PDF を出し直した時</b>に合います<br>'
           +   '🔴 <span style="color:#ef4444">赤いボタン</span>は<b>売上の数字が動きます</b>（実績日・金額）。'
-          +     '押す前に、何がいくら動くかを出して確かめます。</div>'
-          + '<table class="q-t"><thead><tr>'
-          /* 🔢 v2.0.0（ゆうた指定）**1行ごとの番号。** 番号ひとつで「どの行の話か」が決まる。
-             ⚠ 作り方は quarter-fix.js（＝データチェックの1本を借りている）。ここで作らない。 */
-          + '<th>番号</th>'
-          + '<th>ナンバー／お客様</th><th>整備ソフト<br>売上日</th><th>PitFlow<br>数える日</th>'
-          + '<th>日付</th><th class="n">整備ソフト</th><th class="n">PitFlow</th><th class="n">差</th>'
-          + '<th>受付担当<br>フロント</th><th>結び方</th><th>直す／済</th></tr></thead><tbody>';
+          +     '押す前に、何がいくら動くかを出して確かめます。</div>';
     /* 🛠 v2.0.0 **まだ片づいていない行を先に**。押した行は下へ落ちていく＝進んだのが見える。
        ⚠ 並べ替えるだけで、行を消さない（消すと「押しまちがえた」を戻せない）。 */
     rows = rows.slice().sort(function (a, b) {
@@ -452,34 +455,50 @@
       var lb = w.pitQRowLeft ? (w.pitQRowLeft(b) > 0 ? 0 : 1) : 0;
       return la - lb;
     });
+    h += '<div class="q-cards">';
     rows.forEach(function (p) {
-      var cls = p.日付.kind === 'crossMonth' ? 'bad' : (p.日付.kind === 'crossQ' ? 'warn' : (p.日付.kind === 'sameQ' ? 'ok' : ''));
-      h += '<tr>'
-         + noCell(w.pitQRowNo ? w.pitQRowNo(p) : '')
-         + '<td>' + esc(p.soft.ナンバー) + '<span class="q-s">' + esc(p.soft.顧客名) + '</span></td>'
-         + '<td>' + esc(p.soft.売上日) + '<span class="q-s">伝票 ' + esc(p.soft.伝票) + '</span></td>'
-         /* 💴 v1.185.0 カードが売上日を持っていたら、数える日の下に添える（2軸をその場で見くらべる）。
-            ⚠ `q-s` は `<span>` の中でだけ使う（v1.184.0 の決めごと）。 */
-         + '<td>' + esc(p.pit.数える日) + '<span class="q-s">' + esc(p.pit.予約番号) + '</span>'
-         +   (p.pit.売上日
-                ? '<span class="q-s' + (p.売上日ちがい ? ' bad' : '') + '">売上 ' + esc(p.pit.売上日) + '</span>'
-                : '')
-         + '</td>'
-         + '<td class="' + cls + '">' + esc(p.日付.label) + '</td>'
-         + '<td class="n">' + yen(p.soft.金額) + '</td>'
-         + '<td class="n">' + yen(p.pit.確定金額) + '</td>'
-         + '<td class="n ' + (p.金額一致 ? 'ok' : 'bad') + '">' + (p.差 > 0 ? '+' : '') + yen(p.差) + '</td>'
-         + '<td>' + esc(p.soft.受付担当) + '<span class="q-s">' + esc(p.pit.フロント担当) + '</span></td>'
-         /* 🔴 v1.184.0（ゆうた報告「一番右の部分の描写が半行ぐらいズレてる」）
-            ここは `q-s` を**マスに直接**付けていた。`q-s` は「下に小さく添える行」用で
-            `display:block` なので、**マスが表の行から外れて半行ズレて**いた。
-            ＝ 添え字の見た目だけが欲しいので、**マス用のクラスを別に立てる**。
-            ⚠ `q-s` は今までどおり `<span>` の中でだけ使うこと。 */
-         + '<td class="q-how">' + esc(p.結び方) + '</td>'
-         + fixCell(p)
-         + '</tr>';
+      var left = w.pitQRowLeft ? w.pitQRowLeft(p) : 1;
+      var dk = p.日付.kind;
+      var dcls = dk === 'crossMonth' ? 'bad' : (dk === 'crossQ' ? 'warn' : (dk === 'sameQ' ? 'ok' : ''));
+      var amtOk = p.金額一致;
+      h += '<div class="q-c' + (left ? '' : ' is-done') + (p.期間の外 ? ' out' : '') + '">'
+        /* 頭＝番号・結び方・期間の外の印 */
+        + '<div class="q-c-h">'
+        +   noBtn(w.pitQRowNo ? w.pitQRowNo(p) : '')
+        +   '<span class="q-c-how">' + esc(p.結び方) + '</span>'
+        +   (p.期間の外 ? '<span class="q-c-out">この期間の外</span>' : '')
+        + '</div>'
+        /* お客様＝いちばん大きく */
+        + '<div class="q-c-who">' + esc(p.soft.顧客名 || '（名前なし）')
+        +   '<span class="q-c-plate">' + esc(p.soft.ナンバー || 'ナンバーなし') + '</span></div>'
+        /* 🔴 整備ソフトと PitFlow を上下に並べる＝日付も金額も**同じ位置**で見くらべる */
+        + '<div class="q-c-cmp">'
+        +   '<div class="q-c-r"><span class="q-c-src">整備ソフト</span>'
+        +     '<span class="q-c-d">' + esc(p.soft.売上日) + '<i>売上日</i></span>'
+        +     '<span class="q-c-a">' + yen(p.soft.金額) + '<i>円</i></span>'
+        +     '<span class="q-c-p">伝票 ' + esc(p.soft.伝票) + '</span></div>'
+        +   '<div class="q-c-r"><span class="q-c-src">PitFlow</span>'
+        +     '<span class="q-c-d">' + esc(p.pit.数える日) + '<i>実績日</i></span>'
+        +     '<span class="q-c-a">' + yen(p.pit.確定金額) + '<i>円</i></span>'
+        +     '<span class="q-c-p">' + esc(p.pit.予約番号)
+        +       (p.pit.売上日 ? '<em' + (p.売上日ちがい ? ' class="bad"' : '') + '>売上日 ' + esc(p.pit.売上日) + '</em>' : '')
+        +     '</span></div>'
+        /* 差＝そのすぐ下（左右に目を振らない） */
+        +   '<div class="q-c-gap">'
+        +     '<span class="q-c-g ' + dcls + '">' + esc(p.日付.label || '—') + '</span>'
+        +     '<span class="q-c-g ' + (amtOk ? 'ok' : 'bad') + '">'
+        +       (p.差 === 0 ? '金額はぴったり' : ('金額 ' + (p.差 > 0 ? '+' : '') + yen(p.差) + '円')) + '</span>'
+        +   '</div>'
+        + '</div>'
+        /* 担当 */
+        + '<div class="q-c-st' + (p.担当一致 ? '' : ' bad') + '">受付 <b>' + esc(p.soft.受付担当 || '—') + '</b>'
+        +   '<span>／</span>フロント <b>' + esc(p.pit.フロント担当 || '—') + '</b>'
+        +   (p.担当一致 ? '' : '<em>ちがいます</em>') + '</div>'
+        /* 直す／済 */
+        + fixBox(p)
+        + '</div>';
     });
-    return h + '</tbody></table>';
+    return h + '</div>';
   }
 
   /* ================================================================
@@ -496,17 +515,25 @@
      ⚠ `q-s` の失敗をくり返さない＝**マスに display を直に付けない**。中の <button> だけ飾る。 */
   function noCell(no){
     if (!no) return '<td class="q-no"></td>';
-    return '<td class="q-no"><button class="ins-no" title="押すと番号をコピーします"'
-         + ' onclick="pitInspectCopyNo(\'' + esc(no) + '\')">' + esc(no) + '</button></td>';
+    return '<td class="q-no">' + noBtn(no) + '</td>';
+  }
+  /* 🃏 v2.1.0 カードの中でも同じ番号のボタンを使う（見た目を2つ持たない） */
+  function noBtn(no){
+    if (!no) return '';
+    return '<button class="ins-no" title="押すと番号をコピーします"'
+         + ' onclick="pitInspectCopyNo(\'' + esc(no) + '\')">' + esc(no) + '</button>';
   }
 
-  function fixCell(p){
-    if (!w.pitQFixKinds) return '<td class="q-act"></td>';
+  function fixCell(p){ return '<td class="q-act">' + fixInner(p) + '</td>'; }
+  /* 🃏 v2.1.0 カードの下に出す「直す／済」 */
+  function fixBox(p){ return '<div class="q-act q-c-act">' + fixInner(p) + '</div>'; }
+  function fixInner(p){
+    if (!w.pitQFixKinds) return '';
     var kinds = w.pitQFixKinds(p);
-    if (!kinds.length) return '<td class="q-act"><span class="q-act-ok">—</span></td>';
+    if (!kinds.length) return '<span class="q-act-ok">✓ 直すところはありません</span>';
     var id = s(p.pit && p.pit.生 && p.pit.生.id);
     var i = p.soft.i;
-    var h = '<td class="q-act">';
+    var h = '';
     kinds.forEach(function (k) {
       var mk = w.pitQMarkOf ? w.pitQMarkOf(k.kind, p.soft, id) : null;
       h += '<div class="q-fx' + (mk ? ' is-done' : '') + '">';
@@ -528,7 +555,7 @@
       }
       h += '</div>';
     });
-    return h + '</td>';
+    return h;
   }
 
   function softTable(list){
@@ -583,15 +610,7 @@
   w.pitQSavedTab = function (id){ Q().savedTab = id; if (w.renderInspect) renderInspect(); };
   w.pitQCloseSaved = function (){ var U = Q(); U.saved = null; U.savedId = ''; if (w.renderInspect) renderInspect(); };
 
-  /* 🗄 月を送る（ルーティンの一覧） */
-  w.pitQMonth = function (n){
-    var U = Q();
-    var ym = t(U.ym) || t(U.from).slice(0, 7);
-    var p = ym.split('-');
-    var d = new Date((+p[0]) || 2026, ((+p[1]) || 1) - 1 + (+n || 0), 1);
-    U.ym = d.getFullYear() + '-' + pad(d.getMonth() + 1);
-    if (w.renderInspect) renderInspect();
-  };
+
 
   /* 🗄 Q1〜Q4 のどれかを押した＝その期間に合わせる。残してあれば、それを開く */
   w.pitQOpenPlan = function (from, to){

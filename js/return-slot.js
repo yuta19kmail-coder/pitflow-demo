@@ -302,6 +302,14 @@
   function pitReturnSetDateTime(c, date, time){
     if (!c) return null;
     var before = pitReturnPlace(c);
+    /* ☎ v1.185.0（ゆうた指定 2026-08-23）**「完TEL待ちの欄から返車日を入れた」も完TELの記録に残す。**
+       🗣「また依頼の欄から返車日を入力したのもログに入れたい」
+       ◎なぜここか＝完TEL待ち（依頼ぶん）の車に日付や時間が入るのは、
+         **お客様に電話がつながって返車日が決まった**という、ただ1つの出来事。
+         その出口は下の2か所（324行・344行）しかないので、**入口であるここで印を取る**。
+       ⚠ ここを通る道は5本ある（マウスオーバー入力・予約詳細・ドラッグ・当日ビュー・完TELポップアップ）。
+          どれか1本に書くと、残り4本から入れた時だけ記録が落ちる。**必ずこの1本に置くこと。** */
+    var _wasCallWait = (c.returnStage === 'callWait');
 
     if (date !== undefined){
       c.returnDate = date || '';
@@ -345,8 +353,25 @@
 
     c.returnTbd = false;   // 旧フラグは使わない（returnStage / 日付 に一本化）
 
+    /* ☎ v1.185.0 完TEL待ち → 返車待ち に上がった＝**電話がつながって返車日が決まった**。
+       🔴 完TEL日（ログ）の記録は sales-date.js の1本（上書きしない）。ここで日付を組み立てない。
+       ⚠ 空にした時（取り消し）は上がらないので、ここも通らない＝**戻す道を塞がない**。 */
+    var _markedCall = false;
+    if (_wasCallWait && c.returnStage === 'returnWait'){
+      var _cAt = window.pitMarkCompleteCall ? pitMarkCompleteCall(c) : '';
+      if (window.logFlow){
+        logFlow(c, '完TEL済（完TEL待ちの欄から返車の予定を入力）'
+          + (c.returnDate ? '／返車 ' + c.returnDate + (c.returnTime ? ' ' + c.returnTime : '') : '')
+          + (_cAt ? '／完TEL日 ' + _cAt : ''));
+      }
+      _markedCall = true;
+    }
+
     var after = pitReturnPlace(c);
-    return { before: before, after: after, moved: (before !== after) };
+    /* ⚠ `完TEL` を返すのは、下の `pitReturnCommit` に**同じことを2度書かせない**ため。
+       あちらの「返車の予定を更新 → …」と、上の1行は同じ操作の話なので、
+       両方出すとフローが同じ内容で2行に増える（読む人がいちばん嫌がる形）。 */
+    return { before: before, after: after, moved: (before !== after), 完TEL: _markedCall };
   }
   window.pitReturnSetDateTime = pitReturnSetDateTime;
 
@@ -354,7 +379,8 @@
      🔴 ここを通さないと「入れたのに画面が変わらない（＝移動しないように見える）」が起きる。 */
   function pitReturnCommit(c, res, opt){
     opt = opt || {};
-    if (window.logFlow && res && res.moved && res.after){
+    /* ⚠ v1.185.0 完TELの記録を上で書いた時は、ここは書かない（同じ操作が2行になるため）。 */
+    if (window.logFlow && res && res.moved && res.after && !res.完TEL){
       logFlow(c, '返車の予定を更新 → ' + pitReturnPlaceLabel(res.after)
               + (c.returnDate ? '（' + c.returnDate + (c.returnTime ? ' ' + c.returnTime : '') + '）' : ''));
     }

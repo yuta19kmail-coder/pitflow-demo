@@ -82,6 +82,13 @@
     { id:'returnDate',  label:'返車予定日',    type:'date' },
     { id:'returnTime',  label:'返車時間',      type:'time' },
     { id:'paymentDate', label:'入金予定日',    type:'date' },
+    /* 💴 v1.185.0 売上日＝整備ソフトの伝票が立った日。
+       🔴 **管理者だけにしない**（ゆうた指定「1でいい」）＝売上の数字は1円も動かないため。
+       🔴 書き込みは sales-date.js の1本を通す（ここで `c.salesDate = …` と書かない）。 */
+    { id:'salesDate',   label:'売上日',        type:'date',
+      hint:'整備ソフトの伝票の日付。売上を数える日（実績カウント日）は動きません',
+      get: function(c){ return w.pitSalesDate ? t(w.pitSalesDate(c)) : t(c.salesDate); },
+      set: function(c, v){ if (w.pitSetSalesDate) w.pitSetSalesDate(c, v); else c.salesDate = v; } },
     { id:'outsourceDue',label:'外注の戻り予定日', type:'date' },
     { id:'outsourceTo', label:'外注先',        type:'text' },
     { id:'loanerFrom',  label:'貸出から',      type:'date' },
@@ -140,6 +147,9 @@
     M06: ['amountFinal'],
     M07: ['amountFinal', 'amountQuote'],
     M08: ['amountFinal', 'amountOrder', 'amountQuote'],
+    /* 💴 v1.185.0 並びは**先に「売上日」**。誰でも直せて、売上の数字が動かないほうを先に出す。
+       実績カウント日は管理者だけ＆締めた月が動くので、後ろに置く（勢いで押させない）。 */
+    M11: ['salesDate', 'completedAt'],
     /* 日付・進行 */
     F03: ['returnDate', 'returnTime'],
     F04: ['completedAt'],

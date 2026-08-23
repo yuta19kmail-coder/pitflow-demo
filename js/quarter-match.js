@@ -152,6 +152,9 @@
     var wFrom = shift(from, -padDays), wTo = shift(to, padDays);
     var cards = opt.cards || (w.state && w.state.cards) || [];
     var countDate = w.pitSalesCountDate || function (c) { return s(c.completedAt || c.returnDateFinal || c.returnDate); };
+    /* 💴 v1.185.0 カードが持っている「売上日」（伝票が立った日）。🔴 物差しは sales-date.js の1本。
+       ⚠ ここで `c.salesDate || c.completeCallAt` と書き写さないこと。 */
+    var salesDate = w.pitSalesDate || function (c) { return s(c.salesDate || c.completeCallAt); };
     var noSale = function (c) { return !!(w.pitCardNoSale && w.pitCardNoSale(c)); };
     var nameOf = function (c) { return s(w.pitCustName ? w.pitCustName(c) : c.customer); };
 
@@ -169,6 +172,7 @@
         状態: s(c.status),
         売上なし: noSale(c),
         数える日: cd,
+        売上日: s(salesDate(c)),          /* 💴 v1.185.0 伝票が立った日（PDF側の売上日と直接くらべる相手） */
         実績カウント日: s(c.completedAt),
         確定返車日: s(c.returnDateFinal),
         返車日: s(c.returnDate),
@@ -223,6 +227,7 @@
       return {
         i: i, 生: r,
         数える日: t(r.数える日),
+        売上日: t(r.売上日),               /* 💴 v1.185.0 カード側の売上日。無い材料（古い書き出し）なら空 */
         ナンバー: t(r.ナンバー),
         顧客名: t(r.顧客名),
         確定金額: num(r.確定金額),
@@ -252,13 +257,26 @@
         差: diff,
         金額一致: Math.abs(diff) <= 1,          /* ②±1円は一致とみなす（表示の話） */
         担当一致: (staffName(sr.受付担当) === staffName(pr.フロント担当)),
-        期間の外: !pr.対象期間内
+        期間の外: !pr.対象期間内,
+        /* 💴 v1.185.0 カードが自分の売上日を持っていて、それが伝票の日とちがう。
+           🔴 **お金は1円も動かない**（金額の話ではない）ので、**検算の足し算には入れない。**
+           ⚠ 売上日を持っていないカードは「ちがう」と言わない（無いものを間違い扱いしない）。 */
+        売上日ちがい: !!(pr.売上日 && pr.売上日 !== sr.売上日)
       });
     }
 
-    /* ① ナンバー＋売上日 */
+    /* ①-a ナンバー＋**カードの売上日**（💴 v1.185.0）
+       🔴 ここがいちばん確か＝**同じ「売上日」どうし**をくらべている。
+       ⚠ 売上日を持っていないカード（この仕組みより前に返した車）は空なので、ここには当たらない。
+          その車は下の ①-b（数える日）と ② が今までどおり拾う＝**取りこぼしは増えない。** */
     softRows.forEach(function (sr) {
-      if (!sr._plate) return;
+      if (!sr._plate || !sr.売上日) return;
+      var hit = act.filter(function (p) { return !p._used && p._plate === sr._plate && p.売上日 && p.売上日 === sr.売上日; })[0];
+      if (hit) take(sr, hit, 'ナンバー＋売上日');
+    });
+    /* ①-b ナンバー＋数える日（返車日）。v1.181.0 からの道。**そのまま残す。** */
+    softRows.forEach(function (sr) {
+      if (!sr._plate || pairs.some(function (p) { return p.soft.i === sr.i; })) return;
       var hit = act.filter(function (p) { return !p._used && p._plate === sr._plate && p.数える日 === sr.売上日; })[0];
       if (hit) take(sr, hit, 'ナンバー＋日付');
     });
@@ -267,8 +285,12 @@
       if (!sr._plate || pairs.some(function (p) { return p.soft.i === sr.i; })) return;
       var cand = act.filter(function (p) { return !p._used && p._plate === sr._plate; });
       if (!cand.length) return;
+      /* 💴 v1.185.0 「いちばん日が近い」の測り方＝**カードの売上日があればそちら**で測る。
+         ＝ 同じナンバーの車が窓の中に2台いる時、返車日ではなく売上日で近いほうを選ぶ。 */
       cand.sort(function (a, b) {
-        return Math.abs(daysBetween(sr.売上日, a.数える日) || 999) - Math.abs(daysBetween(sr.売上日, b.数える日) || 999);
+        var da = daysBetween(sr.売上日, a.売上日 || a.数える日);
+        var db = daysBetween(sr.売上日, b.売上日 || b.数える日);
+        return Math.abs(da == null ? 999 : da) - Math.abs(db == null ? 999 : db);
       });
       take(sr, cand[0], 'ナンバー');
     });
@@ -343,6 +365,7 @@
     var crossM = pairs.filter(function (p) { return p.日付.kind === 'crossMonth'; });
     var amtNg  = pairs.filter(function (p) { return !p.金額一致; });
     var staffNg = pairs.filter(function (p) { return !p.担当一致 && t(p.soft.受付担当) && t(p.pit.フロント担当); });
+    var sdNg    = pairs.filter(function (p) { return p.売上日ちがい; });   /* 💴 v1.185.0 */
 
     return {
       期間: { from: from, to: to },
@@ -362,6 +385,7 @@
       Qまたぎ: crossQ,
       月またぎ: crossM,
       担当ちがい: staffNg,
+      売上日ちがい: sdNg,          /* 💴 v1.185.0 カードの売上日が伝票とちがう（お金は動かない・直すのは日付だけ） */
       整備ソフトだけ: softOnly,
       PitFlowだけ: pitOnly,
       まとめ返車: lump

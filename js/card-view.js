@@ -634,6 +634,7 @@
           + '<input class="cv-fixinput" type="text" value="'+esc(c.returnTime||'')+'" placeholder="時間 未定" onchange="cvReturnTime(this)" style="width:150px;margin-left:8px">'
         + '</span></div></div>';
       h += resultDateRow(c);
+      h += salesDateRow(c);          /* 💴 v1.185.0 実績カウント日のすぐ下に「売上日」（2軸を並べて見せる） */
       h += '</div>';
     } else if (cvCanFixReturn(c)){
       /* 🔴 v1.66.0（ゆうた指定）**確定返車日（C）と返車時間は「作業完了」に入ってからしか出さない。**
@@ -655,8 +656,11 @@
         + (window.pitTimeGuideHtml
             ? pitTimeGuideHtml(c.returnTime || '', { list: window.PIT_RETURN_TIME_QUICK, cls: 'cv-timeguide' })
             : '<input class="cv-fixinput" type="text" value="'+esc(c.returnTime||'')+'" placeholder="未定" onchange="cvReturnTime(this)" style="width:210px">')
-        + '</span></div></div></div>';
+        + '</span></div></div>';
+      h += salesDateRow(c);          /* 💴 v1.185.0 完TELを通った車は、返車前でも売上日を出す（直せる） */
+      h += '</div>';
     } else {
+      h += salesDateRow(c);          /* 💴 v1.185.0 完TEL待ちの車もここに来る。売上日があるなら出す */
       h += '</div>';
     }
     // 💳 入金（売掛）＝実績カードは確定売上金額・返車日と同じロック行テイストで表示（入金済＝🔒確定・入金待ち＝オレンジ）v0.122.0
@@ -811,6 +815,63 @@
     }
     return h + '</div></div>';
   }
+  /* ===================================================================
+     💴 v1.185.0（ゆうた指定 2026-08-23）**売上日**＝整備ソフトの伝票が立った日。
+     -------------------------------------------------------------------
+     🗣「予約詳細カードに1行 売上日が足されて、完TEL時のポップアップに金額と共に出るイメージ」
+     🗣「またログの完TEL日とはあくまで分けてね。日付の数字としては引っ張るけどってイメージ」
+
+     ◎実績カウント日との違い（🔴 取り違えないこと）
+       ・実績カウント日 … **売上をどの月に数えるか**。動かすと締めた月の数字が動く。**管理だけ**。
+       ・売上日 　　　　… **伝票が立った日**。参考の軸。数字は1ミリも動かない。**誰でも直せる**。
+     🔴 ゆうた指定「1でいい」＝**誰でも直せる**。
+        理由＝間違えても売上は1円も変わらないので、月末に気づいた人がその場で直せるほうが早い。
+
+     ◎出す相手
+       返車済み／完TELを通った車（returnStage あり）／すでに売上日がある車 だけ。
+       ⚠ まだ完TELも通っていない車に出すと、**伝票が無いのに日付を入れられる**。
+     ◎ズレの言い方は sales-date.js → quarter-match.js の1本を借りる（ここで「月またぎ」と綴らない）。
+     ⚠ 比べるのは**実績になった車だけ**。返車前の車は相手が「返車“予定”日」なので、
+        ちがって当たり前＝言わない。
+     =================================================================== */
+  function salesDateRow(c){
+    if (!c || !window.pitSalesDate) return '';
+    var cur = pitSalesDate(c);
+    var show = !!cur || c.status === 'returned' || !!c.returnStage;
+    if (!show) return '';
+    var own = window.pitSalesDateOwn ? pitSalesDateOwn(c) : cur;
+    var note = '', cls = '';
+    if (c.status === 'returned' && cur){
+      var g = window.pitSalesDateGap ? pitSalesDateGap(c) : { kind:'', label:'' };
+      if (g.kind === 'crossMonth'){ note = '⚠ 実績日と月がちがいます（' + g.label + '）'; cls = ' is-warn'; }
+      else if (g.kind === 'crossQ'){ note = '実績日とクォーターがちがいます（' + g.label + '）'; cls = ' is-soft'; }
+      else if (g.kind === 'same'){ note = '実績日と同じ日'; }
+      else if (g.label){ note = '実績日とは ' + g.label; }
+    }
+    if (!own && cur) note = (note ? note + '／' : '') + '完TELの日から出しています';
+    if (!cur) note = 'まだ入っていません（伝票の日付を入れてください）';
+    return '<div class="cv-fixrow cv-salesdate"><div class="cv-frt">売上日 <small>（整備ソフトの伝票が立った日）</small></div>'
+         + '<div class="cv-frb">'
+         + '<input class="cv-fixinput" type="date" id="cv-salesdate" value="' + esc(cur) + '" onchange="cvSetSalesDate(this.value)">'
+         + (note ? '<span class="cv-sdnote' + cls + '">' + esc(note) + '</span>' : '')
+         + '</div></div>';
+  }
+  /* 🔴 書き込みは sales-date.js の1本を通す。ここで `c.salesDate = …` と書かない。
+     ⚠ 売上を数える日（実績カウント日・返車日）には**指1本触れない**。触れたら締めた月が動く。 */
+  window.cvSetSalesDate = function(v){
+    if (!_c || !window.pitSetSalesDate) return;
+    var before = window.pitSalesDate ? pitSalesDate(_c) : '';
+    if (!pitSetSalesDate(_c, v)) return;               /* 変わっていなければ何もしない */
+    var after = _c.salesDate || '';
+    try { if (window.logFlow) logFlow(_c, '売上日を ' + (before || '（なし）') + ' → ' + (after || '（なし）') + ' にした'); } catch(e){}
+    try {
+      if (window.pitLog) pitLog('売上日を変更', { cardId: _c.id, kind: 'result',
+        label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '')
+             + '　' + (before || '（なし）') + ' → ' + (after || '（なし）') });
+    } catch(e){}
+    save(); cvRefreshBg();
+    if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+  };
   window.cvUnlockResult = function(){
     var v = document.getElementById('cv-reslock'), e = document.getElementById('cv-resedit');
     if (v) v.style.display = 'none';
@@ -2144,6 +2205,9 @@
     c.returnDate     = '';   c.returnTime = '';
     c.returnDateFinal = null; c.returnTbd = false;
     c.completedAt    = '';   c.completeCallAt = null;
+    /* 💴 v1.185.0 入庫そのものを取り消す＝伝票も無かったことになる。売上日も一緒に消す。
+       ⚠ 完TEL日を消しているのに売上日だけ残すと、**消したはずの日が借り物として復活して見える**。 */
+    c.salesDate      = '';
     c.amountFinal    = null;                      /* 確定売上＝返した時に決まるもの。入庫を取り消したら無い */
     c.bayId = null; c.baySlot = null; c.testDrive = false;
     c.noSale = false; delete c.noSaleAt; delete c.noSaleBy;

@@ -155,6 +155,8 @@
 .pp-field{ display:flex; flex-direction:column; gap:5px; }
 .pp-lb{ font-size:12.5px; font-weight:700; color:var(--text); }
 .pp-ref{ font-size:11px; color:var(--text3); }
+/* 💴 v1.185.0 見出しに添える小さい字（「（伝票の日付）」）。何の日かを取り違えないための一言。 */
+.pp-lb small{ font-size:10.5px; font-weight:600; color:var(--text3); margin-left:2px; }
 .pp-moneywrap{ display:flex; align-items:center; gap:6px; justify-content:flex-start; }
 .pp-yen{ font-size:16px; font-weight:800; color:var(--text2); }
 .pp-money{ flex:0 0 auto; width:150px; max-width:62vw; font-size:17px; font-weight:800; text-align:right; padding:7px 9px; border:1px solid var(--border2); border-radius:8px; background:var(--bg3); color:var(--text); }

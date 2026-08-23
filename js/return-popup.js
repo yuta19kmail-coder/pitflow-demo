@@ -51,6 +51,20 @@
       /* 🧾 v1.65.1 打つたびに税込を出す（確認用）。物差しは state.js の pitTaxHint 1本。 */
       + '    <div class="pt-tax" id="rp-tax"></div>'
       + '  </div>'
+      /* 💴 v1.185.0（ゆうた指定 2026-08-23）**売上日を、金額と一緒にここで入れる。**
+         🗣「完TEL時のポップアップに金額と共に出るイメージ」
+         ◎なぜここか＝**伝票を見ながら打つ場所**だから、いちばん正確な日が入る。
+           実データ（8/1〜8/7・55台）で確かめたとおり、伝票は「作業完了 → 伝票 → 完TEL」の順で立つ。
+           ＝ この画面を開いている時、伝票はもう手元にある。
+         🔴 初期値は sales-date.js の1本（自分の売上日 → 完TEL日 → 今日）。ここで組み立てない。
+         ⚠ 返車予定日とは**別物**。あちらは「いつ返すか」、こちらは「いつ売上が立ったか」。 */
+      + '  <div class="pp-field">'
+      /* ⚠ 見た目は**この窓にもとからある部品を借りる**（`pp-lb` / `pp-date` / `pp-ref`）。
+         新しい見た目を作らない＝金額の欄と1ミリもズレない。 */
+      + '    <label class="pp-lb">売上日 <small>（伝票の日付）</small></label>'
+      + '    <input class="pp-date" id="rp-sales" type="date">'
+      + '    <div class="pp-ref" id="rp-sales-note"></div>'
+      + '  </div>'
       /* 🔴 v1.60.0（ゆうた指定）返車予定日の横に「返車日未定」のチェック。
          ⚠ 新しい項目は増やさない。**チェックが入っている＝日付が空**、それだけ。
             別に持つと、片方だけ直って必ず食い違う。 */
@@ -134,6 +148,24 @@
     var amt = [card.amountFinal, card.amountOrder, card.amountQuote, card.estAmount].find(function(v){ return v!=null && v!==''; });
     el('rp-amt').value = (amt!=null && amt!=='') ? Number(amt).toLocaleString() : '';
     if (window.pitTaxHintSync) pitTaxHintSync(el('rp-amt'), el('rp-tax'));   /* 🧾 開いた時点のぶんも出す */
+
+    /* 💴 v1.185.0 売上日＝初期値は sales-date.js の1本。
+       ⚠ 「借り物（完TEL日から引っ張っただけ）」なのか「もう決まっている」のかを、一言で出す。
+          黙って日付だけ置くと、確かめずにOKを押されて**間違った日が確定してしまう**。
+
+       ⚠⚠ 分かっていて、そのままにしていること（v1.185.0・記録）
+          v1.57.0 の「**もう渡し終わった車を、過去の日付であとから登録する**」道を通ると、
+          売上日の初期値は**今日**なのに、実績日は**過去**になる（＝伝票より実績が後、が逆さになる）。
+          🔴 ここで賢く直そうとしないこと。**返車予定日から売上日を機械が書き換える**と、
+             人が入れた日を勝手に動かすことになり、そちらのほうが怖い。
+          ＝ そのまま入っても、月がちがえば**データチェック（M11）が必ず拾う**。
+            黙って辻褄を合わせず、**見つけて人が直す**形に寄せる。 */
+    if (el('rp-sales')){
+      el('rp-sales').value = window.pitSalesDateSeed ? pitSalesDateSeed(card) : '';
+      var _own = window.pitSalesDateOwn ? pitSalesDateOwn(card) : '';
+      el('rp-sales-note').textContent = _own ? '入っている売上日です。ちがったら直してください'
+                                             : '伝票の日付とちがったら直してください';
+    }
 
     // 日付・時間（完TEL済のみ／実績化では出さない）
     el('rp-date-field').style.display = showDate ? '' : 'none';
@@ -295,6 +327,22 @@
       // お礼LINE（要/不要）。要=on → noThanksLine=false
       c.noThanksLine = !(el('rp-line-1') && el('rp-line-1').classList.contains('on'));
 
+      /* 💴 v1.185.0 売上日＝**3つの道（実績化／完TEL済／完TEL依頼）すべてで同じように入れる。**
+         🔴 書き込みは sales-date.js の1本を通す。ここで `c.salesDate = …` と書かない。
+         ⚠ 変わった時だけフローに残す（毎回書くとログが埋まって、本当の変更が見えなくなる）。 */
+      var _sdBefore = window.pitSalesDate ? pitSalesDate(c) : '';
+      if (window.pitSetSalesDate && el('rp-sales')){
+        if (pitSetSalesDate(c, el('rp-sales').value) && window.logFlow){
+          logFlow(c, '売上日を ' + (_sdBefore || '（なし）') + ' → ' + (c.salesDate || '（なし）') + ' にした');
+        }
+      }
+      /* ☎ v1.185.0（ゆうた指定）**完TEL依頼でも、完TELのログを残す。**
+         🗣「完TEL依頼ログも残して」
+         ◎前まで＝「完TEL済」と「実績化」だけが日付を残していて、**依頼だけ何も残らなかった**。
+           ＝ 依頼のまま返車まで行った車は、完TELをいつ通ったのか永久に分からなかった。
+         🔴 記録は sales-date.js の1本（`pitMarkCompleteCall`）。**上書きしない**（最初に通った日が残る）。 */
+      if (window.pitMarkCompleteCall) pitMarkCompleteCall(c);
+
       // 作業は完了扱いに（盤面からは returnStage で外れる）。PIT枠も外す。
       c.status = 'workDone';
       c.testDrive = false;
@@ -317,7 +365,7 @@
         if (window.pitReturnSetDateTime) pitReturnSetDateTime(c, rd, t);
         else { c.returnDate = rd; c.returnTime = t || ''; }
         c.returnDateFinal = rd;
-        c.completeCallAt = c.completeCallAt || todayISO();
+        /* ☎ 完TEL日（ログ）は上の1本ですでに記録済み。ここで書き写さない（v1.185.0） */
         if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd0=new Date(); c.coverCall.at=(dd0.getMonth()+1)+'/'+dd0.getDate(); } }
         c.status = 'returned';
         c.completedAt = rd;
@@ -337,13 +385,15 @@
         if (window.pitReturnSetDateTime) pitReturnSetDateTime(c, d, t);
         else { c.returnDate = d || ''; c.returnTime = t || ''; }
         c.returnDateFinal = d || c.returnDateFinal || null;
-        c.completeCallAt = c.completeCallAt || todayISO();
+        /* ☎ 完TEL日（ログ）は上の1本ですでに記録済み。ここで書き写さない（v1.185.0） */
         if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd=new Date(); c.coverCall.at=(dd.getMonth()+1)+'/'+dd.getDate(); } }
         if (window.logFlow) logFlow(c, '完TEL済 → ' + ((window.pitReturnPlaceLabel ? pitReturnPlaceLabel(pitReturnPlace(c)) : '') || '返車未定')
                                       + (d ? '（' + d + (t ? ' ' + t : '') + '）' : ''));
       } else {
         c.returnStage = 'callWait';
-        if (window.logFlow) logFlow(c, '完TEL依頼（金額入力・完TEL待ちへ）');
+        /* ☎ v1.185.0 依頼も「完TELの流れを通った」記録として日付ごと残す（ゆうた指定）。 */
+        if (window.logFlow) logFlow(c, '完TEL依頼（金額入力・完TEL待ちへ）'
+          + (c.completeCallAt ? '／完TEL日 ' + c.completeCallAt : ''));
       }
 
       if (window.PitDB) PitDB.save();

@@ -57,6 +57,7 @@
       ナンバー: s(p.soft && p.soft.ナンバー), お客様: s(p.soft && p.soft.顧客名),
       伝票: s(p.soft && p.soft.伝票), 売上日: s(p.soft && p.soft.売上日),
       数える日: s(p.pit && p.pit.数える日), 予約番号: s(p.pit && p.pit.予約番号),
+      カード売上日: s(p.pit && p.pit.売上日), 売上日ちがい: !!p.売上日ちがい,   /* 💴 v1.185.0 */
       カードid: s(p.pit && p.pit.生 && p.pit.生.id),
       日付: s(p.日付 && p.日付.label), 日付の種類: s(p.日付 && p.日付.kind),
       整備ソフト: (p.soft && p.soft.金額) || 0, PitFlow: (p.pit && p.pit.確定金額) || 0,
@@ -97,8 +98,12 @@
       整備ソフト金額: res.整備ソフト.金額, PitFlow金額: res.PitFlow.金額,
       差台数: res.差.台数, 差金額: res.差.金額,
       検算: !!(res.検算 && res.検算.合う),
+      /* ⚠ v1.185.0 「売上日ちがい」は**ここに足さない**。
+         直す件数＝**お金がズレている件数**という意味なので、日付だけの直しを混ぜると
+         Q1〜4 の一覧で「まだ◯件ズレている」の読み方が変わってしまう。 */
       直す件数: (res.整備ソフトだけ.length + res.PitFlowだけ.length
-               + res.金額ちがい.length + res.内訳.期間の外.台数)
+               + res.金額ちがい.length + res.内訳.期間の外.台数),
+      売上日ちがい件数: (res.売上日ちがい || []).length
     };
   }
 
@@ -123,6 +128,7 @@
         金額ちがい:   cut(res.金額ちがい, slimPair),
         月またぎ:     cut(res.月またぎ, slimPair),
         Qまたぎ:      cut(res.Qまたぎ, slimPair),
+        売上日ちがい:  cut(res.売上日ちがい || [], slimPair),   /* 💴 v1.185.0 日付だけの直し（金額は動かない） */
         整備ソフトだけ: cut(res.整備ソフトだけ, slimSoftOnly),
         PitFlowだけ:   cut(res.PitFlowだけ, slimPitOnly)
       }

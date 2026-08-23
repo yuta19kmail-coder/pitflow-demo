@@ -374,8 +374,12 @@ window.pitUndComplete = function(id){
     if (!d) return;
     c.returnDate = String(d).trim();
     c.returnTbd = false;
-    c.completeCallAt = ymd(new Date());
-    if (window.logFlow) logFlow(c, '完TEL → 返車日設定');
+    /* ☎ v1.185.0 完TEL日（ログ）の記録は sales-date.js の1本を通す（上書きしない）。
+       ⚠ 前はここで直に今日を入れていたので、**すでに依頼で通っていた日が消えていた**。 */
+    if (window.pitMarkCompleteCall) pitMarkCompleteCall(c);
+    else c.completeCallAt = c.completeCallAt || ymd(new Date());
+    if (window.logFlow) logFlow(c, '完TEL → 返車日設定'
+      + (c.completeCallAt ? '／完TEL日 ' + c.completeCallAt : ''));
     if (window.PitDB) PitDB.save();
     renderReturnTbd();
     if (window.pitToast) pitToast(''+ c.returnDate + 'の返車予定に入れました');

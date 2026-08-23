@@ -231,6 +231,10 @@
 
     var h = '<div class="ins-fix-bg" onclick="pitFixClose()"></div><div class="ins-fix-win" role="dialog" aria-modal="true">'
           + '<div class="ins-fix-h">'
+          /* 🔢 v1.178.0 開いた小窓にも、その所見の番号を出す（押すとコピー）。
+             ⚠ 番号は所見が持っているものをそのまま出す。**ここで作り直さない。** */
+          +   (f.no ? '<button class="ins-no" title="押すと番号をコピーします"'
+                    + ' onclick="pitInspectCopyNo(\'' + esc(f.no) + '\')">' + esc(f.no) + '</button>' : '')
           +   '<div class="ins-fix-t">' + esc(f.title) + '</div>'
           +   '<button class="ins-fix-x" onclick="pitFixClose()" aria-label="閉じる">✕</button>'
           + '</div>'

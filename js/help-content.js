@@ -338,7 +338,12 @@
             <strong>「売上日ちがい」</strong>の欄にまとまります（<strong>お金の話ではありません</strong>。直すのは日付だけです）。</li>
       </ul>
       <h3>🛠 突き合わせたズレを、その場で直す（v2.0.0）</h3>
-      <p>クォーターチェックの一覧の<strong>右端</strong>で、1行ずつ片づけます。<strong>答えは2つだけ</strong>です。</p>
+      <p>一覧の<strong>いちばん左に番号</strong>が出ます（<strong>Q-816626</strong> の形）。<strong>押すとコピー</strong>できます。
+         「<strong>Q-816626 の実績日を押しといて</strong>」で、どの車のどの話かが1つに決まります。
+         🔴 <strong>いつ・誰が見ても同じ番号</strong>です。頭の字で場所が分かります
+         （<strong>Q</strong>＝結びついた行／<strong>QS</strong>＝整備ソフトだけ／<strong>QP</strong>＝PitFlowだけ）。
+         ⚠ データチェックの番号（<strong>F05-483102</strong>）とは頭がちがうので混ざりません。</p>
+      <p>そして一覧の<strong>右端</strong>で、1行ずつ片づけます。<strong>答えは2つだけ</strong>です。</p>
       <ul>
         <li><strong>直す</strong>＝PitFlow を伝票に合わせます。押すとカードが書き換わり、
             <strong>上の差もその場で縮みます</strong>（PDFは入れ直さなくて大丈夫です）。</li>

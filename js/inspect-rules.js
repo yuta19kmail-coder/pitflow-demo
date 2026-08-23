@@ -1082,11 +1082,27 @@
 
     var findings = [], mutedN = 0;
 
+    /* 🗓 v2.1.0（ゆうた指定 2026-08-23）**その所見は「どの月の話か」。**
+       🗣「TOPのデータチェックの下に月を置いて、まず月次で大分する」
+       ◎どの日で決めるか
+         ・返車済みの車 … **数える日**（＝売上を数えた月。月次の話と揃う）
+         ・まだ動いている車 … **入庫日**（いつ来た車か）
+         ・車両（代車・社用車）の所見 … **月を持たない**（'' ＝いつの月でも出す）
+       🔴 日付の物差しは借りるだけ（`pitSalesCountDate`）。ここで組み立てない。
+       ⚠ これは**並べ替えのための印**であって、**隠すためのものではない**（v1.169.2 の決めごと）。 */
+    function ymOf(ref, kind){
+      if (kind === 'veh') return '';
+      var c = byId[ref];
+      if (!c) return '';
+      var d = t(countDate(c)) || t(c.reserveDate) || t(c.completedAt);
+      return d ? d.slice(0, 7) : '';
+    }
     function push(rule, ref, text, kind, name){
       var key = rule.id + ':' + (ref == null ? '-' : ref);
       var m = mk[key];
       findings.push({
         key: key, no: inspectNo(key),            /* 🔢 v1.178.0 1件ごとの番号（毎回おなじ） */
+        ym: ymOf(ref, kind),                     /* 🗓 v2.1.0 どの月の話か（隠すためではなく、分けるため） */
         ruleId: rule.id, cat: rule.cat, level: rule.level,
         judge: !!rule.judge,                    /* 🔴 v1.173.0 見て決める規則か */
         title: rule.title, why: rule.why, fix: rule.fix,

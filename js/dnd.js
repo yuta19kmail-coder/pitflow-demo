@@ -41,11 +41,29 @@
     if (window.PitPip && PitPip.isOpen && PitPip.isOpen()) PitPip.refresh();
   }
 
-  /* 🔴 v1.140.1（ゆうた指定）**落とした場所に入れる。**
-     　 列の本体（カードの無い余白）に落とした時、v1.140.0 は必ず「いちばん下」に入れていた。
-     ⚠ カードの上に落とした時は今までどおり `reorder`（そのカードの手前）＝ここは通らない。
+  /* 🔴🔴 v2.0.1（ゆうた報告 2026-08-23）**「並び順を変えようとしても元の位置に戻される」**
+     ----------------------------------------------------------------
+     ◎正体＝**カードの上に落とすと、必ずその「手前（上）」に入れていた。**
+       ＝ 下へ動かしたい時は、落とした先のカードの**上**＝**元の位置**に戻る。
+       実際に確かめた（A B C D の列で）：
+         A を B に落とす（1つ下げたい）… **ABCD のまま。動かない**  ← 報告そのもの
+         A を C に落とす（2つ下げたい）… BACD（1つしか下がらない）
+         A を D に落とす（最下段に）  … BCAD（最下段にならない）
+         D を B に落とす（**上げる**）… ADBC ✅ 効く
+       ＝ **上げる方向だけ効く**ので「たまに動く」ように見えていた。
+
+     🔴 これから＝**落とした「高さ」で決める。**
+        カードの**上半分**に落とした → そのカードの手前
+        カードの**下半分**に落とした → そのカードの後ろ
+        どのカードよりも下 → 列のいちばん下
+     ⚠ この決め方は `anchorFromPoint` が元から持っていた（列の余白に落とした時だけ使っていた）。
+        **カードの上に落とした時にも同じ道を通す**＝決め方を2つに割らない。
      ⚠ 覚えるのは**その1回のドロップのあいだだけ**。使ったらすぐ捨てる（次のドロップに持ち越さない）。 */
   var _dropBefore = null;   /* 「このカードの手前に入れる」カードID。null＝いちばん下 */
+  /* 🔴 v2.0.1 **`_dropBefore` が null なのは「いちばん下」という答え**であって、
+     「読めなかった」ではない。読めたかどうかは、こちらの旗で見分ける。
+     ⚠ ここを一緒くたにすると、**いちばん下へ落としたのに1つ上に入る**（実際に踏んだ）。 */
+  var _dropInBoard = false;
   function anchorFromPoint(body, y, dragId) {
     var kids = Array.prototype.filter.call(body.children, function (el) {
       return el.hasAttribute && el.hasAttribute('data-card-id');
@@ -72,6 +90,11 @@
     if (kind === 'status') {
       var _fromStatus = c.status;
       var _changed = (c.status !== val);
+      /* 🔴🔴 v2.0.1 **目印は「いま」つかまえる。**
+         ⚠ 下の `_commitStatus` は、工程のポップアップを挟むと**あとから**走る。
+            その時にはドロップの後始末で `_dropBefore` が null に戻っているので、
+            **ポップアップが出る列へドラッグすると必ずいちばん下に入っていた**（v1.140.1 の取り残し）。 */
+      var _anchorS = _dropBefore ? state.cards.find(function (x) { return x.id === _dropBefore; }) : null;
       // 移動の本処理（ポップアップ確定後 or ポップアップ不要時に実行）
       var _commitStatus = function(){
         c.status = val;
@@ -79,8 +102,8 @@
         /* 🔴 v1.140.1 **落とした場所に入れる**（board-order.js）。余白の下の方に落とせば今までどおり末尾。
            ⚠ 番号を書くのは board-order.js だけ。ここで boardOrder を直接いじらない。 */
         if (window.PitBoardOrder){
-          var _bf = _dropBefore ? state.cards.find(function (x) { return x.id === _dropBefore; }) : null;
-          PitBoardOrder.insertAt(c, (_bf && _bf.status === val && _bf.boardId === c.boardId) ? _bf : null);
+          var _bf = _anchorS;
+          PitBoardOrder.insertAt(c, (_bf && _bf !== c && _bf.status === val && _bf.boardId === c.boardId) ? _bf : null);
         }
         if (_changed){
           if (window.logPhaseMove) logPhaseMove(c, _fromStatus, val);
@@ -114,19 +137,34 @@
       // 別フェーズのカードに落とした時はそのフェーズへ移動＋位置差し込み（必要ならポップアップ）。
       var t = state.cards.find(function (x) { return x.id === val; });
       if (!t || t === c) return;
+      /* 🔴🔴 v2.0.1 **入れる場所は「落とした高さ」で決める。**
+         ⚠ `t`（落とした先のカード）は**行き先の列を決めるためだけ**に使う。
+            位置を `t` で決めると、下へ動かした時に必ず元の位置へ戻る（上のコメント参照）。
+         ⚠ 高さが読めなかった時（部品が無い・列の外）は、今までどおり `t` の手前に入れる。 */
+      var _anchor = _dropBefore ? state.cards.find(function (x) { return x.id === _dropBefore; }) : null;
+      var _hadAnchor = _dropInBoard;   /* 🔴 v2.0.1 null＝いちばん下、なので旗で見分ける */
       var _fromR = c.status;
       var _changedR = (c.status !== t.status);
       var _doReorder = function () {
         c.status = t.status;
         c.testDrive = !!t.testDrive;
+        /* 落とし先の列に合う目印だけ使う（列をまたいだ時に、よその列のカードを目印にしない） */
+        var _bf = (_anchor && _anchor !== c && _anchor.status === c.status && _anchor.boardId === c.boardId)
+                ? _anchor : null;
         var ci = state.cards.indexOf(c); if (ci >= 0) state.cards.splice(ci, 1);
-        var ti = state.cards.indexOf(t); if (ti < 0) ti = state.cards.length;
+        var _tt = _bf || (_hadAnchor ? null : t);
+        var ti = _tt ? state.cards.indexOf(_tt) : -1;
+        if (ti < 0) ti = state.cards.length;
         state.cards.splice(ti, 0, c);
         /* 🔴 v1.140.0 **ここが「人が動かした順」＝マスター並び**。
            ⚠ 上の splice は配列の中を入れ替えるだけで、**どこにも保存されない**（v1.139.0 までの穴）。
               並び番号（boardOrder）を振り直して初めて、開き直しても・他の人の画面でも同じ順になる。
            ⚠ 番号を書くのは board-order.js だけ。ここで boardOrder を直接いじらない。 */
-        if (window.PitBoardOrder) PitBoardOrder.moveBefore(c, t);
+        if (window.PitBoardOrder){
+          /* 高さが読めた＝その目印の手前（目印が無い＝いちばん下）。読めなかった＝今までどおり t の手前。 */
+          if (_hadAnchor) PitBoardOrder.insertAt(c, _bf);
+          else PitBoardOrder.moveBefore(c, t);
+        }
         if (_changedR && window.logPhaseMove) logPhaseMove(c, _fromR, c.status);
         if (window.PitDB) PitDB.save();
         if (state.currentView) showView(state.currentView);
@@ -281,12 +319,15 @@
     if (!zone) return;
     e.preventDefault();
     zone.classList.remove('dnd-over');
-    /* 🔴 v1.140.1 看板の列の余白に落とした時は「どのカードの手前か」を先に読む（applyCardDrop が使う） */
-    _dropBefore = null;
-    const body = zone.closest('.kanban-col-body[data-drop="status"]');
-    if (body && zone.dataset.drop === 'status') _dropBefore = anchorFromPoint(body, e.clientY, id);
+    /* 🔴 v2.0.1 **看板の中に落としたら、いつでも「どのカードの手前か」を高さから読む。**
+       ⚠ v1.140.1 は `data-drop="status"`（列の余白）に落ちた時だけ読んでいた。
+          カードの上に落ちた時は読まずに「そのカードの手前」で固定 → 下へ動かせなかった。
+       ⚠ 試運転の箱（kanban-td2-box）も同じ道を通す（あちらもカードが並ぶので）。 */
+    _dropBefore = null; _dropInBoard = false;
+    const body = zone.closest('.kanban-col-body[data-drop="status"], .kanban-td2-box');
+    if (body){ _dropInBoard = true; _dropBefore = anchorFromPoint(body, e.clientY, id); }
     if (id) applyCardDrop(id, zone.dataset.drop, zone.dataset.dropVal || '');
-    _dropBefore = null;   /* 次のドロップに持ち越さない */
+    _dropBefore = null; _dropInBoard = false;   /* 次のドロップに持ち越さない */
   });
 
 })();

@@ -61,7 +61,8 @@
       カードid: s(p.pit && p.pit.生 && p.pit.生.id),
       日付: s(p.日付 && p.日付.label), 日付の種類: s(p.日付 && p.日付.kind),
       整備ソフト: (p.soft && p.soft.金額) || 0, PitFlow: (p.pit && p.pit.確定金額) || 0,
-      差: p.差 || 0, 結び方: s(p.結び方)
+      差: p.差 || 0, 結び方: s(p.結び方),
+      受付担当: s(p.soft && p.soft.受付担当), フロント: s(p.pit && p.pit.フロント担当)   /* 👤 v2.1.0 */
     };
   }
   function slimSoftOnly(r){
@@ -129,6 +130,7 @@
         月またぎ:     cut(res.月またぎ, slimPair),
         Qまたぎ:      cut(res.Qまたぎ, slimPair),
         売上日ちがい:  cut(res.売上日ちがい || [], slimPair),   /* 💴 v1.185.0 日付だけの直し（金額は動かない） */
+        担当ちがい:    cut(res.担当ちがい || [], slimPair),     /* 👤 v2.1.0 合計は動かない（内訳だけ動く） */
         整備ソフトだけ: cut(res.整備ソフトだけ, slimSoftOnly),
         PitFlowだけ:   cut(res.PitFlowだけ, slimPitOnly)
       }

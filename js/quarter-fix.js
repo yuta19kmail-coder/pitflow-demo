@@ -198,7 +198,32 @@
         重い: true
       });
     }
-    /* ③ 金額（🔴 売上の金額が動く・管理者だけ） */
+    /* ③ 担当（🟡 売上の合計は動かない。動くのは**フロント別の内訳**だけ・誰でも）
+       ----------------------------------------------------------------
+       🗣 ゆうた「**またPDFと担当者のズレは別途追加チェックして**」（2026-08-23）
+       🔴 名前は **quarter-match.js の名寄せ表（`pitQStaffName`）**を通してから比べる／入れる。
+          伝票側は「専務」「チーフ」のように**役職で書かれる**ので、そのまま入れると別人になる。
+       🔴 **PitFlow のメンバー名簿にある名前だけ**入れる。無い名前は入れられない
+          （フロント別の売上が、名簿に無い人の所へ消える）。その時はボタンを出さず、印だけ出す。
+       ⚠ 「金額」より後ろに置く＝押した時に動くものが小さい順（売上日→実績日→金額→担当）ではない。
+          担当は**合計が動かない**ので、本当は売上日の次に軽い。ただし
+          **フロントの評価に効く**ので、金額の後ろに置いて「ついでに押す」を避ける。 */
+    if (!p.担当一致 && t(p.soft.受付担当) && t(p.pit.フロント担当)){
+      var want = w.pitQStaffName ? w.pitQStaffName(p.soft.受付担当) : t(p.soft.受付担当);
+      var known = ((w.state && w.state.staff) || []).filter(function (x) {
+        return x && (w.pitQStaffName ? w.pitQStaffName(x.name) : t(x.name)) === want;
+      })[0];
+      out.push({
+        kind: '担当',
+        now: t(p.pit.フロント担当),
+        to: known ? t(known.name) : want,
+        label: known ? ('フロント担当を ' + t(known.name) + ' にする') : ('名簿に「' + want + '」がいません'),
+        why: '伝票の受付担当は ' + t(p.soft.受付担当) + '（＝' + want + '）です',
+        can: !!known,
+        重い: false
+      });
+    }
+    /* ④ 金額（🔴 売上の金額が動く・管理者だけ） */
     if (!p.金額一致){
       out.push({
         kind: '金額',
@@ -266,6 +291,29 @@
           if (w.pitToast) pitToast('実績日を ' + to + ' にしました');
           return true;
         });
+    }
+
+    if (kind === '担当'){
+      var want2 = w.pitQStaffName ? w.pitQStaffName(p.soft.受付担当) : t(p.soft.受付担当);
+      var known2 = ((w.state && w.state.staff) || []).filter(function (x) {
+        return x && (w.pitQStaffName ? w.pitQStaffName(x.name) : t(x.name)) === want2;
+      })[0];
+      if (!known2){
+        if (w.pitAlert) pitAlert('PitFlow のメンバーに「' + want2 + '」がいません。\n'
+                               + '先にメンバーを登録するか、整備ソフト側の受付担当を直してください。',
+                                 { title: '入れられません' });
+        return Promise.resolve(false);
+      }
+      var b4 = t(c.frontStaff || c.staff), to4 = t(known2.name);
+      if (b4 === to4) return Promise.resolve(false);
+      c.frontStaff = to4;
+      if (w.logFlow) logFlow(c, 'フロント担当を ' + (b4 || '（なし）') + ' → ' + to4
+                              + ' に変更（伝票の受付担当に合わせた／突き合わせの画面から）');
+      if (w.pitLog) pitLog('突き合わせ：フロント担当を直した', { cardId: c.id, kind: 'inspect',
+        label: t(p.soft.顧客名) + '　' + (b4 || '（なし）') + ' → ' + to4 });
+      if (w.PitDB) PitDB.save();
+      if (w.pitToast) pitToast('フロント担当を ' + to4 + ' にしました（売上の合計は動いていません）');
+      return Promise.resolve(true);
     }
 
     if (kind === '金額'){

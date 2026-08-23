@@ -182,6 +182,9 @@
       { id:'amt',    label:'金額ちがい',      n: R.金額ちがい.length },
       { id:'month',  label:'月またぎ',        n: R.月またぎ.length },
       { id:'qq',     label:'Qまたぎ',         n: R.Qまたぎ.length },
+      /* 💴 v1.185.0 カードの売上日が伝票の日とちがう。**お金は動かない**（直すのは日付だけ）ので、
+         金額ちがいとは別の欄にする。⚠ 売上日を持っていないカードはここに出ない。 */
+      { id:'sdate',  label:'売上日ちがい',    n: (R.売上日ちがい || []).length },
       { id:'soft',   label:'整備ソフトだけ',  n: R.整備ソフトだけ.length },
       { id:'pit',    label:'PitFlowだけ',     n: R.PitFlowだけ.length },
       { id:'all',    label:'結びついた全件',  n: R.結びついた.length }
@@ -291,7 +294,9 @@
       });
       h += '</div>';
     }
-    var keys = ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '整備ソフトだけ', 'PitFlowだけ'];
+    /* ⚠ v1.185.0 『売上日ちがい』を足した。**この並びは残してある中身の名前と1文字も同じにすること**
+       （quarter-store.js の `直すもの` の見出しをそのまま開く作りなので、綴りが違うと空になる）。 */
+    var keys = ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '売上日ちがい', '整備ソフトだけ', 'PitFlowだけ'];
     h += '<div class="q-tabs">';
     keys.forEach(function (k) {
       var n = ((R.直すもの || {})[k] || []).length;
@@ -342,10 +347,16 @@
     var rows = tab === 'amt'   ? R.金額ちがい
              : tab === 'month' ? R.月またぎ
              : tab === 'qq'    ? R.Qまたぎ
+             : tab === 'sdate' ? (R.売上日ちがい || [])
              : tab === 'lump'  ? R.結びついた.filter(function (p) { return p.期間の外; })
              : R.結びついた;
     if (!rows.length) return '<div class="q-none">0件です。</div>';
-    var h = '<table class="q-t"><thead><tr>'
+    var h = (tab === 'sdate'
+          ? '<div class="q-note">カードに入っている<b>売上日</b>が、伝票の日付とちがうものです。'
+            + '🔴 <b>売上の金額は1円も動きません。</b>直すのは日付だけ（誰でも直せます）。'
+            + '伝票のほうが正しければ、カードを開いて売上日を直してください。</div>'
+          : '')
+          + '<table class="q-t"><thead><tr>'
           + '<th>ナンバー／お客様</th><th>整備ソフト<br>売上日</th><th>PitFlow<br>数える日</th>'
           + '<th>日付</th><th class="n">整備ソフト</th><th class="n">PitFlow</th><th class="n">差</th>'
           + '<th>受付担当<br>フロント</th><th>結び方</th></tr></thead><tbody>';
@@ -354,7 +365,13 @@
       h += '<tr>'
          + '<td>' + esc(p.soft.ナンバー) + '<span class="q-s">' + esc(p.soft.顧客名) + '</span></td>'
          + '<td>' + esc(p.soft.売上日) + '<span class="q-s">伝票 ' + esc(p.soft.伝票) + '</span></td>'
-         + '<td>' + esc(p.pit.数える日) + '<span class="q-s">' + esc(p.pit.予約番号) + '</span></td>'
+         /* 💴 v1.185.0 カードが売上日を持っていたら、数える日の下に添える（2軸をその場で見くらべる）。
+            ⚠ `q-s` は `<span>` の中でだけ使う（v1.184.0 の決めごと）。 */
+         + '<td>' + esc(p.pit.数える日) + '<span class="q-s">' + esc(p.pit.予約番号) + '</span>'
+         +   (p.pit.売上日
+                ? '<span class="q-s' + (p.売上日ちがい ? ' bad' : '') + '">売上 ' + esc(p.pit.売上日) + '</span>'
+                : '')
+         + '</td>'
          + '<td class="' + cls + '">' + esc(p.日付.label) + '</td>'
          + '<td class="n">' + yen(p.soft.金額) + '</td>'
          + '<td class="n">' + yen(p.pit.確定金額) + '</td>'

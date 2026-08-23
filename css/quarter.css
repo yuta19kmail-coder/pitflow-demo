@@ -128,6 +128,8 @@
 .q-t td.ok{ color:#1db97a; }
 .q-t td.warn{ color:#f59e0b; }
 .q-t td.bad{ color:#ef4444; font-weight:700; }
+/* 💴 v1.185.0 マスの下に添える小さい字も、ちがう時は赤くする（`td.bad` は<td>にしか効かないため） */
+.q-t .q-s.bad{ color:#ef4444; font-weight:700; }
 .q-open{ border:1px solid var(--border); background:var(--bg3); color:var(--text);
   border-radius:7px; padding:2px 9px; font-size:10.5px; cursor:pointer; white-space:nowrap; }
 

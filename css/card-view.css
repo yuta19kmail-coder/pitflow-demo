@@ -120,6 +120,12 @@
 .cv-adminonly{ display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:1px 8px; margin-left:6px; }
 .cv-fixrow.cv-resdate .cv-frt small{ font-size:10.5px; font-weight:600; color:var(--text3); margin-left:2px; }
 .cv-resnote{ font-size:11px; font-weight:700; color:var(--text3); margin-left:10px; }
+/* 💴 v1.185.0 売上日（伝票の日付）＝実績カウント日と同じ形の1行。ただし**鍵はかけない**（ゆうた指定＝誰でも直せる）。
+   ⚠ 実績カウント日と見た目が同じだと取り違えるので、ラベルの小さい字で「伝票の日付」と必ず添える。 */
+.cv-fixrow.cv-salesdate .cv-frt small{ font-size:10.5px; font-weight:600; color:var(--text3); margin-left:2px; }
+.cv-sdnote{ font-size:11px; font-weight:700; color:var(--text3); margin-left:10px; }
+.cv-sdnote.is-warn{ color:#ef4444; }      /* 月がちがう＝月次の実績とズレる。ここだけ赤 */
+.cv-sdnote.is-soft{ color:#f59e0b; }      /* クォーターだけちがう＝参考（ゆうた指定で注意にはしない） */
 .cv-unlockwrap{ display:inline-flex; align-items:center; gap:4px; flex-wrap:wrap; }
 /* 実績カードの「完了アーカイブ」＝読み取り専用の記録リスト v0.120.0 */
 .cv-arch{ display:flex; flex-direction:column; }

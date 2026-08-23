@@ -178,3 +178,35 @@
   .q-range, .q-pick, .q-tabs, .ai-run, .ai-mat-n{ display:none !important; }
   .q-body{ overflow:visible; }
 }
+
+/* ================================================================
+   🛠 v2.0.0 一覧の右端「直す／済」（ゆうた指定＝答えは2つだけ）
+   ----------------------------------------------------------------
+   🔴 `q-s` と同じ失敗をしない＝**マスに display を直に付けない**（v1.184.0 の半行ズレ）。
+      並べるのは <td> の**中**の箱（.q-fx）だけ。
+   ⚠ ボタンは小さく、でも押しやすく。1行に「何を」「直す」「伝票を直した」の3つ。
+   ================================================================ */
+.q-t td.q-act{ white-space:nowrap; }
+.q-fx{ display:flex; align-items:center; gap:5px; padding:2px 0; }
+.q-fx + .q-fx{ border-top:1px dashed var(--border); }
+.q-fx-k{ font-size:10px; font-weight:800; color:var(--text3); min-width:40px; }
+.q-fx-go{ font-size:11px; font-weight:700; color:#fff; background:var(--brand); border:1px solid var(--brand);
+          border-radius:6px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
+.q-fx-go:hover{ filter:brightness(1.08); }
+/* 🔴 重いもの（実績日・金額＝締めた月の数字が動く）は色を変える。押す前に「あ、これは重い」と分かるように */
+.q-fx-go.is-heavy{ color:#ef4444; background:transparent; border-color:#ef4444; }
+.q-fx-go.is-heavy:hover{ color:#fff; background:#ef4444; }
+.q-fx-mk{ font-size:11px; font-weight:700; color:var(--text2); background:transparent; border:1px solid var(--border2);
+          border-radius:6px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
+.q-fx-mk:hover{ background:var(--bg3); }
+.q-fx-lock{ display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700;
+            color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:1px 7px; }
+.q-fx.is-done{ opacity:.62; }
+.q-fx-done{ font-size:10.5px; font-weight:800; color:var(--green); background:rgba(29,185,122,.14);
+            border:1px solid rgba(29,185,122,.45); border-radius:6px; padding:1px 7px; }
+.q-fx-done i{ font-style:normal; font-weight:600; color:var(--text3); margin-left:4px; }
+.q-fx-un{ font-size:10.5px; color:var(--text3); background:transparent; border:none; text-decoration:underline; cursor:pointer; }
+.q-act-ok{ font-size:11px; color:var(--text3); }
+/* 一覧の頭に出す「2択の説明」 */
+.q-2way{ font-size:11.5px; color:var(--text2); background:var(--bg3); border-radius:8px; padding:8px 11px; margin-bottom:8px; line-height:1.6; }
+.q-2way b{ color:var(--text); }

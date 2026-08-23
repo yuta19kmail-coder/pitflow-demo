@@ -850,16 +850,56 @@
     }
     if (!own && cur) note = (note ? note + '／' : '') + '完TELの日から出しています';
     if (!cur) note = 'まだ入っていません（伝票の日付を入れてください）';
-    return '<div class="cv-fixrow cv-salesdate"><div class="cv-frt">売上日 <small>（整備ソフトの伝票が立った日）</small></div>'
-         + '<div class="cv-frb">'
-         + '<input class="cv-fixinput" type="date" id="cv-salesdate" value="' + esc(cur) + '" onchange="cvSetSalesDate(this.value)">'
-         + (note ? '<span class="cv-sdnote' + cls + '">' + esc(note) + '</span>' : '')
-         + '</div></div>';
+    var noteHtml = note ? '<span class="cv-sdnote' + cls + '">' + esc(note) + '</span>' : '';
+
+    /* 🔒 v2.0.0（ゆうた指定 2026-08-23）**アーカイブ（返車済み）になったら管理者だけ。**
+       🗣「売上日も同様に基本はアーカイブはロック管理者のみ修正可能、
+       　　データチェックからはそこだけ修正できる特例権限って扱いにして」
+       ⚠ アーカイブ前は今までどおり誰でも（返車日と同じ扱い）。
+       ⚠ 鍵は sales-date.js の `pitCanEditSalesDateOnCard` 1本。ここで status と役割を並べない。
+       🔴 **データチェック／クォーターチェックからは、この鍵を通らない**（わざとの特例）。
+          あちらは「出ている数を 0 にする」画面なので、管理者待ちで止めない。 */
+    var locked = (c.status === 'returned');
+    if (!locked){
+      return '<div class="cv-fixrow cv-salesdate"><div class="cv-frt">売上日 <small>（整備ソフトの伝票が立った日）</small></div>'
+           + '<div class="cv-frb">'
+           + '<input class="cv-fixinput" type="date" id="cv-salesdate" value="' + esc(cur) + '" onchange="cvSetSalesDate(this.value)">'
+           + noteHtml
+           + '</div></div>';
+    }
+    var canSd = window.pitCanEditSalesDateOnCard ? pitCanEditSalesDateOnCard(c) : false;
+    var h2 = '<div class="cv-fixrow cv-fixlocked cv-salesdate"><div class="cv-frt">売上日 <small>（整備ソフトの伝票が立った日）</small>'
+           + ' <span class="cv-locktag"><i data-ic=lock data-ics=16></i> 記録</span>'
+           + (canSd
+               ? ' <button type="button" class="cv-unlockbtn" onclick="cvUnlockSalesDate()"><i data-ic=pencil data-ics=16></i> 編集</button>'
+               : ' <span class="cv-adminonly"><i data-ic=lock data-ics=14></i> 管理のみ</span>')
+           + '</div><div class="cv-frb">'
+           + '<span class="cv-fixval" id="cv-sdlock">' + esc(cur ? fmtMD(cur) : '—') + '</span>'
+           + noteHtml;
+    if (canSd){
+      h2 += '<span class="cv-unlockwrap" id="cv-sdedit" style="display:none">'
+          + '<input class="cv-fixinput" type="date" id="cv-salesdate" value="' + esc(cur) + '" onchange="cvSetSalesDate(this.value)">'
+          + '<span class="cv-resnote">売上の数字は動きません</span>'
+          + '</span>';
+    }
+    return h2 + '</div></div>';
   }
+  window.cvUnlockSalesDate = function(){
+    var v = document.getElementById('cv-sdlock'), e = document.getElementById('cv-sdedit');
+    if (v) v.style.display = 'none';
+    if (e) e.style.display = '';
+  };
   /* 🔴 書き込みは sales-date.js の1本を通す。ここで `c.salesDate = …` と書かない。
      ⚠ 売上を数える日（実績カウント日・返車日）には**指1本触れない**。触れたら締めた月が動く。 */
   window.cvSetSalesDate = function(v){
     if (!_c || !window.pitSetSalesDate) return;
+    /* 🔒 v2.0.0 ボタンを消しただけにしない＝**書き込む所でも見る**（外から呼ばれても止まる）。
+       ⚠ ここは「予約詳細カードから直す道」。データチェック／クォーターチェックは
+          わざとこの関数を通らない（特例）。 */
+    if (window.pitCanEditSalesDateOnCard && !pitCanEditSalesDateOnCard(_c)){
+      if (window.UI && UI.alert) UI.alert('返車済み（アーカイブ）の売上日をここで直せるのは、設定権限（管理）のある人だけです。\nデータチェック・クォーターチェックの画面からなら、どなたでも直せます。', { title: '変更できません' });
+      return;
+    }
     var before = window.pitSalesDate ? pitSalesDate(_c) : '';
     if (!pitSetSalesDate(_c, v)) return;               /* 変わっていなければ何もしない */
     var after = _c.salesDate || '';

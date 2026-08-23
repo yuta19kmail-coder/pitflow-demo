@@ -140,6 +140,60 @@
   }
 
   /* ================================================================
+     2-2. 🗓 PDF の期間を、クォーターごとに割る（v2.0.0・ゆうた指定 2026-08-23）
+     ----------------------------------------------------------------
+     🗣「**入れたPDFに対して日付で自動でQ割り振りできないかな？**」
+     🗣「リアルな運用で言えばQごとにチェックを入れたいからQごとのデータにはなる。
+     　　ただ**多少日付がズレても、その分も別Qとしてチェックを一部入れる**みたいな感じであれば楽だな」
+
+     ◎やること＝**PDFが言っている期間**を、クォーターの窓で切り分ける。
+       ・8/1〜8/7 なら … 8月Q1 が1つだけ（**まるごと**）
+       ・8/1〜8/8 なら … 8月Q1（まるごと）＋ 8月Q2 の**一部**（8/8 だけ）
+       ・8/1〜8/31 なら … Q1〜Q4 が4つとも（全部まるごと）
+
+     🔴🔴 いちばん大事な決めごと ── **「一部」は「まるごと」と同じ顔をさせない。**
+        一部のQは、そのQの日をぜんぶ含んでいない。
+        なのに**そのQの窓（8/8〜8/15）で PitFlow 側を集めると、
+        PDF に載っていない日の実績が丸ごと「PitFlowだけ」に化ける**。
+        ＝ だから一部のQは、**PDFに入っている日の範囲だけ**を期間にする。
+        ＝ そして **「済」にしない**（そのQを見終わっていないから）。呼ぶ側が `全部` を見て決める。
+
+     🔴 区切りは **sales.js の `pitQuarterOf` 1本**。ここで 1-7／8-15 と書かない。
+     ⚠ 期間が読めなかった時は、**伝票の日付の いちばん古い〜新しい** で代わりに切る
+        （それしか手がかりが無いので。呼ぶ側に `期間の出どころ` で正直に伝える）。
+
+     戻り＝[{ label, no, q, from, to, 全部, 伝票 }]（古い順）
+     ================================================================ */
+  function splitByQuarter(term, slips){
+    slips = slips || [];
+    var from = t(term && term.from), to = t(term && term.to), src = 'PDF';
+    if (!from || !to){
+      var ds = slips.map(function (r) { return t(r.売上日); }).filter(Boolean).sort();
+      if (!ds.length) return { 期間: null, 期間の出どころ: 'なし', 組: [] };
+      from = ds[0]; to = ds[ds.length - 1]; src = '伝票の日付';
+    }
+    if (from > to){ var sw = from; from = to; to = sw; }
+
+    var out = [], cur = from, guard = 0;
+    while (cur <= to && guard++ < 200){
+      var q = qOf(cur);
+      if (!q) break;
+      var gs = (q.s > from ? q.s : from);          /* 窓とPDFの重なり */
+      var ge = (q.e < to   ? q.e : to);
+      var rows = slips.filter(function (r) { var d = t(r.売上日); return d && d >= gs && d <= ge; });
+      out.push({
+        no: q.no, q: q, label: q.label,
+        from: gs, to: ge,
+        /* 🔴 そのQの窓をまるごと含んでいるか。ここが「済にしてよいか」の唯一の判断 */
+        全部: (gs === q.s && ge === q.e),
+        伝票: rows
+      });
+      cur = shift(q.e, 1);
+    }
+    return { 期間: { from: from, to: to }, 期間の出どころ: src, 組: out };
+  }
+
+  /* ================================================================
      3. PitFlow 側の材料を集める（**読むだけ・1バイトも書き換えない**）
      ----------------------------------------------------------------
      🔴 期間の判定・数える日・確度は **PitFlow の物差しをそのまま借りる**（写しを作らない）。
@@ -397,6 +451,7 @@
   w.pitQStaffName = staffName;
   w.pitQDateGap   = dateGap;
   w.pitQCollect   = collect;
+  w.pitQSplit     = splitByQuarter;   /* 🗓 v2.0.0 PDF の期間をクォーターごとに割る */
   w.pitQMatch     = match;
   w.PIT_Q_STAFF_ALIAS = STAFF_ALIAS;
 })(window);

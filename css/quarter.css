@@ -28,6 +28,9 @@
 .q-mv{ border:1px solid var(--border); background:var(--bg3); color:var(--text2);
   border-radius:7px; width:24px; height:22px; font-size:12px; cursor:pointer; line-height:1; }
 .q-plan-b{ display:flex; gap:7px; flex-wrap:wrap; }
+/* ⚠ v2.0.0 「×」を右上に置くため、ボタンを箱で包んだ。**幅の伸び方は箱側に移す**（.q-pq は中で伸びる） */
+.q-plan-b > .q-pqwrap{ flex:1 1 130px; }
+.q-plan-b > .q-pqwrap > .q-pq{ flex:1 1 auto; width:100%; }
 .q-pq{ flex:1 1 130px; border:1px solid var(--border); background:var(--bg); color:var(--text2);
   border-radius:9px; padding:7px 10px; cursor:pointer; text-align:left; line-height:1.5; }
 .q-pq:hover{ border-color:var(--text3); }
@@ -215,3 +218,32 @@
    🔴 見た目はデータチェックの `.ins-no` をそのまま借りる（等幅・押すとコピー）。ここで作り直さない。 */
 .q-t td.q-no{ white-space:nowrap; }
 .q-t td.q-no .ins-no{ font-size:10.5px; }
+
+/* ================================================================
+   🗓 v2.0.0 PDF の期間とクォーターの割り振り／🧹 片づけボタン
+   ================================================================ */
+.q-term{ background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:10px 13px; margin-bottom:10px; }
+.q-term-h{ font-size:12.5px; color:var(--text2); }
+.q-term-h b{ color:var(--text); }
+.q-term-1{ display:inline-block; margin-left:10px; font-size:12.5px; font-weight:800; color:var(--text); }
+.q-term-n{ font-size:11.5px; color:var(--text3); margin-top:6px; line-height:1.6; }
+.q-part{ color:#f59e0b; }
+.q-gs{ display:flex; gap:7px; flex-wrap:wrap; margin-top:8px; }
+.q-g{ display:flex; flex-direction:column; gap:1px; text-align:left; background:var(--bg3);
+      border:1px solid var(--border2); border-radius:9px; padding:6px 11px; cursor:pointer; }
+.q-g:hover{ border-color:var(--text3); }
+.q-g.on{ border-color:var(--brand); background:var(--bg2); box-shadow:0 0 0 1px var(--brand) inset; }
+.q-g.part{ border-style:dashed; }
+.q-g-t{ font-size:12px; font-weight:800; color:var(--text); }
+.q-g-t i{ font-style:normal; font-size:10.5px; font-weight:700; color:#f59e0b; margin-left:3px; }
+.q-g-d{ font-size:10px; color:var(--text3); }
+.q-g-v{ font-size:11px; font-weight:800; color:var(--text2); font-variant-numeric:tabular-nums; }
+/* 入れたPDFを片づける */
+.q-clear{ font-size:11.5px; font-weight:700; color:var(--text2); background:transparent;
+          border:1px solid var(--border2); border-radius:7px; padding:3px 10px; margin-left:auto; cursor:pointer; }
+.q-clear:hover{ background:var(--bg3); color:var(--text); }
+/* Q1〜Q4 の「×」＝その結果を消して「まだ」に戻す */
+.q-pqwrap{ position:relative; display:flex; }
+.q-pq-x{ position:absolute; top:-6px; right:-6px; width:20px; height:20px; line-height:1; font-size:12px; font-weight:800;
+         color:var(--text3); background:var(--bg1); border:1px solid var(--border2); border-radius:50%; cursor:pointer; padding:0; }
+.q-pq-x:hover{ color:#fff; background:#ef4444; border-color:#ef4444; }

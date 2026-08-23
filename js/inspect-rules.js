@@ -32,8 +32,11 @@
      pitInspectRun(opt)   … チェックして所見の一覧を返す
        → { at, cards, findings:[…], byLevel, byCat, byRule, muted, marked }
      所見（finding）1件 ＝
-       { key, ruleId, cat, level, title, why, fix, kind:'card'|'veh', refId, name, text, mark }
+       { key, no, ruleId, cat, level, title, why, fix, kind:'card'|'veh', refId, name, text, mark }
        ⚠ `key` は **規則ID + 対象ID**。これが「見た／直した」の札を貼る先。
+       🔢 `no` は **人に見せる番号**（`F05-483102`）。key から作るので**いつ誰が見ても同じ**。
+          物差しは `pitInspectNo()` 1本（下の「所見1件ごとの番号」を読むこと）。
+     pitInspectNo(key)      … その所見の番号を作る（🔴 写しを作らない・ここ1本）
      pitInspectMark(key, v) … 札を貼る（'seen' 見た / 'fixed' 直した / '' はがす）
        🔴 v1.172.0 **札を貼っても一覧からは消えない**（数をごまかさないため）
      pitInspectExport()   … ②③へ渡す JSON
@@ -67,6 +70,44 @@
   function shift(v, n){ var d = toD(v); if (!d) return ''; d.setDate(d.getDate() + n); return ymd(d); }
   function yen(n){ return num(n).toLocaleString() + '円'; }
   function man(n){ var m = num(n) / 10000; return (Math.abs(m) >= 100 ? Math.round(m) : Math.round(m * 10) / 10).toLocaleString() + '万'; }
+
+  /* ================================================================
+     🔢 所見1件ごとの番号（v1.178.0・ゆうた指定 2026-08-23）
+     ----------------------------------------------------------------
+     🗣「**データチェックの不良箇所に個別に番号を搭載したい**」
+        ＝ 現場で「◯◯番、直しといて」と**番号ひとつで指せる**ようにする。
+          いまは「誰々さんの車の、返車予定のやつ」としか言えず、
+          同じ規則で何十件も出ている時は、どれの話か分からない。
+
+     ◎形　`F05-483102` ＝ **規則の記号（F05）＋ 6桁**
+
+     🔴🔴 いちばん大事な決めごと ── **いつ・誰が見ても同じ番号。**
+        走らせ直しても、絞り込んでも、並べ替えても、別の端末で見ても**変わらない**。
+        ＝ 画面の並び順の通し番号（1・2・3…）には**絶対にしないこと**。
+          走らせるたびに中身が入れ替わるので、電話で「12番」と言っても
+          相手の画面では**別の車**を指してしまう。
+     🔴 番号の元は **所見の `key`（規則ID ＋ 対象ID）だけ**。
+        日付・件数・並び順・ログインしている人など、**変わるものを1つも混ぜない**。
+        （混ぜた瞬間に「毎回おなじ」が壊れる。ここを触ると番号が全部変わる）
+     🔴 直って消えた所見が、あとで**また出た時も同じ番号に戻る**（key が同じだから）。
+        ＝ 過去のやり取り・メモがそのまま読める。
+
+     ⚠ **エラー番号（`PF-0412`）とは別物。** 頭がアプリ2文字ではないので混ざらない。
+        ＝ `errcode-pit.js` の台帳には**足さない**（あちらは「通らなかった時」の番号）。
+     ⚠ ばらけ具合＝6桁（90万通り）。1つの規則に数百件出ても、
+        同じ番号が2つ並ぶことはまず起きない（見張りが数えている）。
+     ================================================================ */
+  function inspectNo(key){
+    var str = s(key);
+    /* FNV-1a（32bit）＝短い文字列でもよく散る。⚠ ここを変えると番号が全部変わる */
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++){
+      h ^= str.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    var rid = str.split(':')[0] || '?';
+    return rid + '-' + (100000 + (h % 900000));   /* 先頭が0にならないよう10万を足す */
+  }
 
   /* ================================================================
      1. しきい値（🔴 数字はここだけ。規則の中に書かない）
@@ -961,7 +1002,8 @@
       var key = rule.id + ':' + (ref == null ? '-' : ref);
       var m = mk[key];
       findings.push({
-        key: key, ruleId: rule.id, cat: rule.cat, level: rule.level,
+        key: key, no: inspectNo(key),            /* 🔢 v1.178.0 1件ごとの番号（毎回おなじ） */
+        ruleId: rule.id, cat: rule.cat, level: rule.level,
         judge: !!rule.judge,                    /* 🔴 v1.173.0 見て決める規則か */
         title: rule.title, why: rule.why, fix: rule.fix,
         kind: kind || 'card', refId: ref, name: name || '', text: text,
@@ -1106,6 +1148,9 @@
       重さごと: res.byLevel, 分類ごと: res.byCat, 規則ごと: res.byRule, 車のいまごと: res.byScope,
       所見: res.findings.map(function(f){
         return {
+          /* 🔢 v1.178.0 いちばん頭に番号。②突合・③AIチェックも**この番号で話せる**
+             （毎回おなじ番号なので、前回の書き出しと突き合わせられる） */
+          番号: f.no || '',
           規則: f.ruleId, 重さ: f.level, 分類: f.cat, 見出し: f.title,
           種類: (f.judge ? '要判断（見て決める）' : '抜け・矛盾（直す）'),
           車のいま: (f.scope === 'past' ? '終わった記録' : 'いま動いている車'),
@@ -1129,6 +1174,8 @@
   w.PIT_INSPECT_LIMITS = LIM;
   w.PIT_INSPECT_RULES  = RULES;
   w.pitInspectRun      = pitInspectRun;
+  /* 🔢 v1.178.0 番号の物差しは**この1本**。画面・書き出し・見張りはここを呼ぶ（写しを作らない） */
+  w.pitInspectNo       = inspectNo;
   w.pitInspectMark     = pitInspectMark;
   w.pitInspectMute     = pitInspectMute;
   w.pitInspectExport   = pitInspectExport;

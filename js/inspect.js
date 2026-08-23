@@ -40,6 +40,14 @@
           直した … 直したつもり。次のチェックで消えれば、本当に直っています
      ④ 「書き出し」＝②の突合・③のAI判断へ渡す JSON を落とします
 
+   ◎🔢 v1.178.0（ゆうた指定 2026-08-23）**1件ごとに番号が付いている。**
+     🗣「データチェックの不良箇所に個別に番号を搭載したい」
+     ・形は `F05-483102`（規則の記号＋6桁）。**行の左端**に出る。**押すとコピー**
+     🔴 **いつ・誰が見ても同じ番号。** 走らせ直しても、絞り込んでも、別の端末でも変わらない
+        ＝「F05-483102 直しといて」が電話でもLINEでもそのまま通る
+     🔴 番号を**この画面で組み立てない**。作るのは `pitInspectNo()`（規則の側）1本。
+        ここで作り直すと、書き出しの番号と食い違う日が来る
+
    ⚠ 規則そのものは**1文字も書き換えません**（読んで、数えて、並べるだけ）。
       書き換えが起きるのは、人が「ここを直す」を押して保存した時だけ。
    ======================================== */
@@ -239,6 +247,9 @@
         h += '<section class="ins-g' + (open ? '' : ' shut') + '" style="--ins-c:' + lv.color + '">'
            +   '<div class="ins-g-h" onclick="pitInspectOpen(\'' + rid + '\')">'
            +     '<span class="ins-g-lv">' + esc(lv.label) + '</span>'
+           /* 🔢 v1.178.0 規則の記号。1件ごとの番号の**頭と同じ字**なので、
+              「F05-483102 の話だな」と規則までたどり着ける。 */
+           +     '<span class="ins-g-id">' + esc(rid) + '</span>'
            +     '<span class="ins-g-t">' + esc(r0.title) + '</span>'
            +     '<span class="ins-g-cat">' + esc(ct.label) + '</span>'
            +     '<span class="ins-g-n">' + fs.length + '件</span>'
@@ -382,7 +393,20 @@
     var jb = f.judge ? '<span class="ins-judge">見て決める</span>' : '';
     var okby = (f.mark === 'ok' && (f.markAt || f.markBy))
       ? '<span class="ins-okby">' + esc([f.markBy, f.markAt].filter(Boolean).join('・')) + '</span>' : '';
+    /* 🔢🔢 v1.178.0（ゆうた指定 2026-08-23）**1件ごとの番号。**
+       🗣「データチェックの不良箇所に個別に番号を搭載したい」
+       ・**いつ・誰が見ても同じ番号**（走らせ直しても、絞り込んでも変わらない）
+         ＝ 電話やLINEで「F05-483102 直しといて」がそのまま通る
+       ・**押すとコピー**できる（エラー番号と同じ作法。コピーの部品も同じものを借りる）
+       🔴 番号を**ここで組み立てないこと**。物差しは規則の側の1本（`pitInspectNo`）。
+          画面で作り直すと、書き出しの番号と食い違う日が来る。 */
+    var noBtn = f.no
+      ? '<button class="ins-no" title="押すと番号をコピーします"'
+        + ' onclick="pitInspectCopyNo(\'' + esc(f.no) + '\')">' + esc(f.no) + '</button>'
+      : '';
+
     var h = '<div class="ins-row' + (f.mark ? ' done' : '') + '">'
+          +   noBtn
           +   '<div class="ins-row-m">'
           +     '<div class="ins-row-who">' + who + badge + jb
           +       (mk ? '<span class="ins-badge">' + esc(mk.label) + '</span>' : '') + okby + '</div>'
@@ -481,6 +505,16 @@
 
   /* カードを開く。⚠ 開き方は card-detail.js の1本（ここで窓を作らない） */
   window.pitInspectGo = function (id) { if (window.openDetail) openDetail(id); };
+
+  /* 🔢 v1.178.0 番号をコピーする。
+     ⚠ コピーの仕掛け（クリップボード＋「コピーしました」の一言）は
+        **エラー番号の部品をそのまま借りる**（`CFErr.copy`）。ここで書き写さない。
+     ⚠ 借りられない時（部品が読めていない）は、黙って終わらずトーストで番号を出す。 */
+  window.pitInspectCopyNo = function (no) {
+    if (!no) return;
+    if (window.CFErr && CFErr.copy) { CFErr.copy(no); return; }
+    if (window.pitToast) pitToast(no);
+  };
 
   /* ②突合・③AI判断へ渡す JSON を落とす */
   window.pitInspectDownload = function () {

@@ -21,8 +21,40 @@
 .q-qb span{ display:block; font-size:9.5px; color:var(--text3); }
 .q-qb.on{ border-color:var(--brand,#1f7a4d); color:var(--text); font-weight:700; }
 
-/* ── PDF を選ぶ ── */
-.q-pick{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; }
+/* ── 🗄 その月の Q1〜Q4（ルーティン） ── */
+.q-plan{ border:1px solid var(--border); border-radius:10px; background:var(--bg2); padding:9px 12px; margin:0 0 10px; }
+.q-plan-h{ display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text2); margin-bottom:7px; }
+.q-plan-h b{ color:var(--text); }
+.q-mv{ border:1px solid var(--border); background:var(--bg3); color:var(--text2);
+  border-radius:7px; width:24px; height:22px; font-size:12px; cursor:pointer; line-height:1; }
+.q-plan-b{ display:flex; gap:7px; flex-wrap:wrap; }
+.q-pq{ flex:1 1 130px; border:1px solid var(--border); background:var(--bg); color:var(--text2);
+  border-radius:9px; padding:7px 10px; cursor:pointer; text-align:left; line-height:1.5; }
+.q-pq:hover{ border-color:var(--text3); }
+.q-pq.done{ border-color:rgba(29,185,122,.5); }
+.q-pq.ng{ border-color:rgba(239,68,68,.55); }
+.q-pq-t{ display:block; font-size:11px; font-weight:800; color:var(--text); }
+.q-pq-d{ display:block; font-size:9.5px; color:var(--text3); }
+.q-pq-v{ display:block; font-size:12.5px; font-weight:800; color:var(--text); margin-top:2px; }
+.q-pq-s{ display:block; font-size:9.5px; color:var(--text3); }
+.q-pq-n{ display:block; font-size:11px; color:var(--text3); margin-top:2px; }
+.q-plan-off{ font-size:11px; color:var(--text3); margin:0 0 10px; }
+
+/* 残した／残してある結果 */
+.q-saved{ font-size:11.5px; color:var(--text2); border:1px dashed var(--border); border-radius:9px;
+  padding:7px 11px; margin:0 0 10px; line-height:1.8; }
+.q-saved span{ display:block; font-size:10.5px; color:var(--text3); }
+.q-savedbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 10px;
+  border:1px solid var(--border); border-radius:9px; background:var(--bg2); padding:8px 12px; font-size:12px; color:var(--text); }
+.q-savedbar span{ font-size:10.5px; color:var(--text3); }
+.q-savedbar .q-open{ margin-left:auto; }
+
+/* ── PDF を選ぶ／放り込む ── */
+.q-pick{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px;
+  border-radius:12px; padding:2px; transition:background .15s, box-shadow .15s; }
+/* 🔴 ドラッグで持ってきている間は、受け取れることが分かるように光らせる */
+.q-pick.over{ background:rgba(29,185,122,.10); box-shadow:0 0 0 2px rgba(29,185,122,.45) inset; }
+.q-file small{ display:block; font-size:10px; font-weight:400; color:var(--text3); margin-top:1px; }
 .q-file input{ display:none; }
 .q-file span{ display:inline-flex; align-items:center; gap:7px; cursor:pointer;
   border:1px dashed var(--border); background:var(--bg2); color:var(--text);
@@ -88,7 +120,11 @@
   border-bottom:1px solid var(--border); padding:6px 8px; white-space:nowrap; }
 .q-t td{ border-bottom:1px solid var(--border2,#232c34); padding:6px 8px; color:var(--text2); vertical-align:top; }
 .q-t td.n, .q-t th.n{ text-align:right; font-variant-numeric:tabular-nums; }
+/* 🔴 `q-s`＝**行の下に小さく添える字**（`<span>` の中でだけ使う。`display:block` なので
+   マス（td）に直接付けると、そのマスが表の行から外れて**半行ズレる**。2026-08-23 に実際にズレていた）。 */
 .q-s{ display:block; font-size:10px; color:var(--text3); }
+/* マスそのものを小さい字にしたい時はこちら（表の並びを崩さない） */
+.q-how{ font-size:10px; color:var(--text3); white-space:nowrap; }
 .q-t td.ok{ color:#1db97a; }
 .q-t td.warn{ color:#f59e0b; }
 .q-t td.bad{ color:#ef4444; font-weight:700; }

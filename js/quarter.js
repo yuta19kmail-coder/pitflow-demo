@@ -36,7 +36,10 @@
   /* 画面の覚え（データではないので保存しない） */
   function Q(){
     var U = w._insp = w._insp || {};
-    U.q = U.q || { from:'', to:'', res:null, pdf:null, tab:'lump', busy:'', err:'' };
+    U.q = U.q || { from:'', to:'', res:null, pdf:null, tab:'lump', busy:'', err:'',
+                   /* 🗄 v1.184.0 残した結果まわり（画面の覚え。データではないので保存しない） */
+                   list:null, listBusy:false, saved:null, savedId:'', savedTab:'期間の外',
+                   ym:'', savedAt:'' };
     if (!U.q.from){
       /* 既定＝いまのクォーター。⚠ 区切りは sales.js の1本から借りる */
       var q = w.pitQuarterOf ? w.pitQuarterOf() : null;
@@ -89,11 +92,19 @@
     });
     h += '</span></div>';
 
-    /* ---- PDF を選ぶ ---- */
-    h += '<div class="q-pick">'
+    /* ---- 🗄 v1.184.0 その月の Q1〜Q4（ルーティンの形） ---- */
+    h += planRow(U);
+
+    /* ---- PDF を選ぶ／放り込む ----
+       🔴 v1.184.0（ゆうた指定）**ドラッグで入れられるようにする。**
+       ⚠ 押して選ぶ道は残す（ドラッグが苦手な人・スマホのため）。 */
+    h += '<div class="q-pick" id="q-drop"'
+       +   ' ondragover="pitQDrag(event,1)" ondragenter="pitQDrag(event,1)"'
+       +   ' ondragleave="pitQDrag(event,0)" ondrop="pitQDrop(event)">'
        +   '<label class="q-file">'
        +     '<input type="file" accept="application/pdf,.pdf" onchange="pitQPickFile(this)">'
-       +     '<span><i data-ic=box data-ics=16></i> 売上チェックリストPDF を選ぶ</span>'
+       +     '<span><i data-ic=box data-ics=16></i> 売上チェックリストPDF を選ぶ'
+       +       '<small>（ここに<b>ドラッグ</b>しても入ります）</small></span>'
        +   '</label>'
        +   (U.pdf ? '<span class="q-fname">' + esc(U.pdf) + '</span>' : '')
        +   (U.busy ? '<span class="q-busy">' + esc(U.busy) + '</span>' : '')
@@ -108,8 +119,11 @@
          + '</div>';
       return h;
     }
+    /* 🗄 v1.184.0 残してあった結果を開いている時（PDFを読まずに見返している） */
+    if (!U.res && U.saved) return h + savedHtml(U);
+
     if (!U.res) {
-      h += '<div class="q-empty">PDF を選ぶと、ここに突き合わせの結果が出ます。<br>'
+      h += '<div class="q-empty">PDF を選ぶ（またはドラッグで放り込む）と、ここに突き合わせの結果が出ます。<br>'
          +   '<span>読み取れた枚数と総合計が PDF と合っているかを、まず自分で確かめます。'
          +   '合わなければ数字は出しません。</span></div>';
       return h;
@@ -141,6 +155,16 @@
        +     part('金額そのもののちがい', R.内訳.金額ちがい)
        +   '</div>'
        + '</div>';
+
+    /* ---- 🗄 v1.184.0 残したかどうかを、黙らずに言う ---- */
+    if (w.PIT_CLOUD){
+      h += '<div class="q-saved">'
+         +   (U.savedAt
+              ? '<b>この結果を残しました</b>（' + esc(U.savedAt) + '）。上の Q' + 'の印からいつでも見返せます。'
+                + '<span>同じ期間をもう一度やると、新しい方に置きかわります。</span>'
+              : '<span>結果を残しています…</span>')
+         + '</div>';
+    }
 
     /* ---- 🔴 まとめて返車済みにした日（本命） ---- */
     if (R.まとめ返車 && R.まとめ返車.length){
@@ -174,7 +198,135 @@
     return h;
   };
 
+  /* ================================================================
+     🗄 その月の Q1〜Q4（ルーティンの形・v1.184.0）
+     ----------------------------------------------------------------
+     🗣「落ち着いてきたら 月始まり → Q1〜4 でそれぞれ付け合わせ、みたいなルーティン化する予定」
+     🔴 **どれが済んでいて、どれがまだか**を、いちばん上で見えるようにする。
+     🔴 区切りは `pitQuarterOf` 1本（quarter-store.js の `pitQMonthPlan` が借りている）。
+     ⚠ 済んだものは押すと**残してある結果**が開く（PDFは要らない）。
+     ================================================================ */
+  function planRow(U){
+    if (!w.pitQMonthPlan) return '';
+    if (!w.PIT_CLOUD){
+      return '<div class="q-plan-off">練習用サイトでは、結果は残りません（本番の PitFlow では残ります）。</div>';
+    }
+    if (U.list == null){
+      if (!U.listBusy){ U.listBusy = true; ensureList(); }
+      return '<div class="q-plan-off">これまでの突き合わせを読んでいます…</div>';
+    }
+    var ym = t(U.ym) || (t(U.from).slice(0, 7));
+    var plan = w.pitQMonthPlan(ym, U.list);
+    var head = ym ? (ym.split('-')[0] + '年 ' + (+ym.split('-')[1]) + '月') : '今月';
+    var h = '<div class="q-plan">'
+          + '<div class="q-plan-h">'
+          +   '<button class="q-mv" onclick="pitQMonth(-1)">‹</button>'
+          +   '<b>' + esc(head) + ' の突き合わせ</b>'
+          +   '<button class="q-mv" onclick="pitQMonth(1)">›</button>'
+          + '</div><div class="q-plan-b">';
+    plan.forEach(function (x) {
+      var r = x.run;
+      var cls = r ? (r.検算 ? ' done' : ' ng') : '';
+      h += '<button class="q-pq' + cls + '" onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
+         +   '<span class="q-pq-t">Q' + x.no + '</span>'
+         +   '<span class="q-pq-d">' + esc(x.from.slice(5)) + '〜' + esc(x.to.slice(5)) + '</span>'
+         +   (r
+              ? '<span class="q-pq-v">' + (r.差金額 > 0 ? '+' : '') + yen(r.差金額) + '円</span>'
+                + '<span class="q-pq-s">直す ' + r.直す件数 + '件</span>'
+              : '<span class="q-pq-n">まだ</span>')
+         + '</button>';
+    });
+    return h + '</div></div>';
+  }
+
+  function ensureList(){
+    if (!w.pitQLoadList) { Q().list = []; return; }
+    w.pitQLoadList().then(function (list) {
+      var U = Q(); U.list = list || []; U.listBusy = false;
+      if (w.renderInspect) renderInspect();
+    }).catch(function () {
+      var U = Q(); U.list = []; U.listBusy = false;
+      if (w.renderInspect) renderInspect();
+    });
+  }
+
+  /* ================================================================
+     🗄 残してある結果を見る（PDFを読み直さない）
+     ⚠ 残してあるのは**これから直すものの行だけ**（OKだった行は残していない）。
+        そのことを画面にも書く＝「全部あると思って見る」のを防ぐ。
+     ================================================================ */
+  function savedHtml(U){
+    var R = U.saved;
+    var ok = !!(R.検算 && R.検算.合う);
+    var h = '<div class="q-savedbar">'
+          +   '<b>残してある結果</b>'
+          +   '<span>' + esc(s(R.走らせた日時).slice(0, 16).replace('T', ' '))
+          +     (R.走らせた人 ? '・' + esc(R.走らせた人) : '')
+          +     (R.PDF ? '・' + esc(R.PDF) : '') + '</span>'
+          +   '<button class="q-open" onclick="pitQCloseSaved()">閉じる</button>'
+          + '</div>';
+    h += '<div class="q-sum">'
+       +   '<div class="q-card"><span class="q-k">整備ソフト</span><b>' + (R.整備ソフト ? R.整備ソフト.枚数 : 0)
+       +     '</b>台<span class="q-y">' + yen(R.整備ソフト ? R.整備ソフト.金額 : 0) + '円</span></div>'
+       +   '<div class="q-card"><span class="q-k">PitFlow</span><b>' + (R.PitFlow ? R.PitFlow.台数 : 0)
+       +     '</b>台<span class="q-y">' + yen(R.PitFlow ? R.PitFlow.金額 : 0) + '円</span></div>'
+       +   '<div class="q-card q-diff"><span class="q-k">差</span><b>' + ((R.差 && R.差.台数 > 0) ? '+' : '')
+       +     (R.差 ? R.差.台数 : 0) + '</b>台<span class="q-y">' + ((R.差 && R.差.金額 > 0) ? '+' : '')
+       +     yen(R.差 ? R.差.金額 : 0) + '円</span></div>'
+       + '</div>';
+    h += '<div class="q-audit' + (ok ? ' ok' : ' ng') + '">'
+       +   (ok ? '<b>差額の内訳が、実際の差とぴったり合っていました。</b>'
+             : '<b>この結果は検算が合っていません。</b>')
+       +   '<div class="q-parts">'
+       +     part('整備ソフトだけにある', R.内訳.整備ソフトだけ)
+       +     part('PitFlow だけにある',   R.内訳.PitFlowだけ)
+       +     part('期間の外に立っている', R.内訳.期間の外)
+       +     part('金額そのもののちがい', R.内訳.金額ちがい)
+       +   '</div>'
+       + '</div>';
+    if (R.まとめ返車 && R.まとめ返車.length){
+      h += '<div class="q-lump"><b><i data-ic=warn data-ics=16></i> まとめて返車済みにした日</b>';
+      R.まとめ返車.forEach(function (x) {
+        h += '<div class="q-lump-r">' + esc(x.日) + ' に <b>' + x.台数 + '台</b>（' + yen(x.金額) + '円）</div>';
+      });
+      h += '</div>';
+    }
+    var keys = ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '整備ソフトだけ', 'PitFlowだけ'];
+    h += '<div class="q-tabs">';
+    keys.forEach(function (k) {
+      var n = ((R.直すもの || {})[k] || []).length;
+      h += '<button class="q-tab' + (U.savedTab === k ? ' on' : '') + '"'
+         + ' onclick="pitQSavedTab(\'' + k + '\')">' + esc(k) + '<span>' + n + '</span></button>';
+    });
+    h += '<button class="q-print" onclick="window.print()">印刷</button></div>';
+    h += '<div class="q-note">残してあるのは<b>これから直すものだけ</b>です'
+       +   '（合っていた行は残していません）。' + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</div>';
+    h += '<div class="q-body">' + savedTable(((R.直すもの || {})[U.savedTab]) || []) + '</div>';
+    return h;
+  }
+
+  /* 残してある行は「そのまま並べる」（中の作りに寄りかからない＝あとで読めなくならない） */
+  function savedTable(rows){
+    if (!rows.length) return '<div class="q-none">0件です。</div>';
+    var cols = Object.keys(rows[0]).filter(function (k) { return k !== 'カードid'; });
+    var h = '<table class="q-t"><thead><tr>';
+    cols.forEach(function (k) { h += '<th' + (/金額|差|整備ソフト$|PitFlow$/.test(k) ? ' class="n"' : '') + '>' + esc(k) + '</th>'; });
+    h += '<th></th></tr></thead><tbody>';
+    rows.forEach(function (r) {
+      h += '<tr>';
+      cols.forEach(function (k) {
+        var v = r[k];
+        var num = (typeof v === 'number');
+        h += '<td' + (num ? ' class="n"' : '') + '>' + esc(num ? yen(v) : s(v)) + '</td>';
+      });
+      h += '<td>' + (r.カードid ? '<button class="q-open" onclick="pitInspectGo(\'' + esc(r.カードid) + '\')">開く</button>' : '') + '</td>';
+      h += '</tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
   function part(label, v){
+    v = v || { 台数:0, 金額:0 };
     return '<div class="q-part"><span>' + esc(label) + '</span><b>' + (v.金額 > 0 ? '+' : '') + yen(v.金額) + '</b>'
          + '<i>' + v.台数 + '台</i></div>';
   }
@@ -208,7 +360,12 @@
          + '<td class="n">' + yen(p.pit.確定金額) + '</td>'
          + '<td class="n ' + (p.金額一致 ? 'ok' : 'bad') + '">' + (p.差 > 0 ? '+' : '') + yen(p.差) + '</td>'
          + '<td>' + esc(p.soft.受付担当) + '<span class="q-s">' + esc(p.pit.フロント担当) + '</span></td>'
-         + '<td class="q-s">' + esc(p.結び方) + '</td>'
+         /* 🔴 v1.184.0（ゆうた報告「一番右の部分の描写が半行ぐらいズレてる」）
+            ここは `q-s` を**マスに直接**付けていた。`q-s` は「下に小さく添える行」用で
+            `display:block` なので、**マスが表の行から外れて半行ズレて**いた。
+            ＝ 添え字の見た目だけが欲しいので、**マス用のクラスを別に立てる**。
+            ⚠ `q-s` は今までどおり `<span>` の中でだけ使うこと。 */
+         + '<td class="q-how">' + esc(p.結び方) + '</td>'
          + '</tr>';
     });
     return h + '</tbody></table>';
@@ -257,16 +414,77 @@
     var U = Q();
     if (from) U.from = from;
     if (to) U.to = to;
-    U.res = null;                       /* 期間が変わったら結果は捨てる（古い数字を残さない） */
+    U.res = null; U.saved = null; U.savedId = ''; U.savedAt = '';   /* 期間が変わったら結果は捨てる（古い数字を残さない） */
     if (w.renderInspect) renderInspect();
   };
   w.pitQTab = function (id){ Q().tab = id; if (w.renderInspect) renderInspect(); };
+  w.pitQSavedTab = function (id){ Q().savedTab = id; if (w.renderInspect) renderInspect(); };
+  w.pitQCloseSaved = function (){ var U = Q(); U.saved = null; U.savedId = ''; if (w.renderInspect) renderInspect(); };
+
+  /* 🗄 月を送る（ルーティンの一覧） */
+  w.pitQMonth = function (n){
+    var U = Q();
+    var ym = t(U.ym) || t(U.from).slice(0, 7);
+    var p = ym.split('-');
+    var d = new Date((+p[0]) || 2026, ((+p[1]) || 1) - 1 + (+n || 0), 1);
+    U.ym = d.getFullYear() + '-' + pad(d.getMonth() + 1);
+    if (w.renderInspect) renderInspect();
+  };
+
+  /* 🗄 Q1〜Q4 のどれかを押した＝その期間に合わせる。残してあれば、それを開く */
+  w.pitQOpenPlan = function (from, to){
+    var U = Q();
+    U.from = from; U.to = to; U.res = null; U.saved = null; U.savedId = '';
+    var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
+    var has = (U.list || []).some(function (x) { return x && x.id === id; });
+    if (!has || !w.pitQLoadRun){ if (w.renderInspect) renderInspect(); return; }
+    U.busy = '残してある結果を読んでいます…';
+    if (w.renderInspect) renderInspect();
+    w.pitQLoadRun(id).then(function (r) {
+      U.busy = ''; U.saved = r || null; U.savedId = id; U.savedTab = '期間の外';
+      if (w.renderInspect) renderInspect();
+    }).catch(function () {
+      U.busy = ''; if (w.renderInspect) renderInspect();
+    });
+  };
+
+  /* ================================================================
+     📥 ドラッグで放り込む（v1.184.0・ゆうた指定）
+     ⚠ 受け取るのは **PDF 1つだけ**。ほかのものを落とされたら、黙らずにそう言う。
+     ⚠ 画面のどこに落としても開いてしまわないよう、**この枠の上でだけ**受け取る。
+     ================================================================ */
+  w.pitQDrag = function (ev, on){
+    if (ev && ev.preventDefault) ev.preventDefault();
+    var el = document.getElementById('q-drop');
+    if (el) el.classList[on ? 'add' : 'remove']('over');
+  };
+  w.pitQDrop = function (ev){
+    if (ev && ev.preventDefault) ev.preventDefault();
+    var el = document.getElementById('q-drop');
+    if (el) el.classList.remove('over');
+    var dt = ev && ev.dataTransfer;
+    var f = (dt && dt.files && dt.files[0]) || null;
+    if (!f){ if (w.pitToast) pitToast('ファイルが受け取れませんでした'); return; }
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'){
+      var U0 = Q();
+      U0.err = '「' + f.name + '」は PDF ではありません。整備ソフトから出した売上チェックリストPDFを入れてください。';
+      U0.res = null; U0.saved = null;
+      if (w.renderInspect) renderInspect();
+      return;
+    }
+    readFile(f);
+  };
 
   w.pitQPickFile = function (el){
-    var U = Q();
     var f = el && el.files && el.files[0];
-    if (!f) return;
-    U.pdf = f.name; U.err = ''; U.res = null; U.busy = '読んでいます…';
+    if (f) readFile(f);
+  };
+
+  /* 押して選んでも、ドラッグで落としても**同じ道**を通る（写しを作らない） */
+  function readFile(f){
+    var U = Q();
+    U.pdf = f.name; U.err = ''; U.res = null; U.saved = null; U.savedId = ''; U.savedAt = '';
+    U.busy = '読んでいます…';
     if (w.renderInspect) renderInspect();
 
     w.pitQPdfRead(f, function (i, n) {
@@ -289,10 +507,32 @@
       U.tab = 'lump';
       if (w.renderInspect) renderInspect();
       if (w.pitToast) pitToast(r.伝票.length + '枚を読みました（総合計・枚数とも一致）');
+      /* 🗄 v1.184.0（ゆうた指定）**結果を残す。**
+         🔴 同じ期間をもう一度走らせたら**上書き**＝練習でくり返してもゴミが積み上がらない。
+         🔴 検算が合っていない結果は残さない（合わない数字を、あとで本当の数字だと思わせないため）。
+         ⚠ 残せなかった時も黙らない（練習用サイト・通信できない時など）。 */
+      saveRun(U);
     }).catch(function (e) {
       U.busy = '';
       U.err = s(e && e.message ? e.message : e);
       if (w.renderInspect) renderInspect();
     });
-  };
+  }
+
+  function saveRun(U){
+    if (!w.pitQSaveRun || !U.res) return;
+    if (!w.PIT_CLOUD) return;                     /* 練習用サイトでは残さない（画面にもそう書いてある） */
+    w.pitQSaveRun(U.res, { pdf: U.pdf }).then(function (d) {
+      U.savedAt = s(d && d.at).slice(11, 16);
+      /* 一覧も足しておく（読み直さずに Q1〜4 の印がすぐ変わる） */
+      U.list = (U.list || []).filter(function (x) { return x && x.id !== d.id; });
+      U.list.unshift(d);
+      if (w.pitLog) pitLog('売上チェックリストと突き合わせた', { kind:'inspect',
+        label: d.from + '〜' + d.to + '　差 ' + (d.差金額 > 0 ? '+' : '') + yen(d.差金額) + '円／直す ' + d.直す件数 + '件' });
+      if (w.renderInspect) renderInspect();
+    }).catch(function (e) {
+      U.savedAt = '';
+      if (w.pitToast) pitToast('結果は残せませんでした：' + s(e && e.message ? e.message : e));
+    });
+  }
 })(window);

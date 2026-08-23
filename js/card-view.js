@@ -278,6 +278,48 @@
       + '</div>';
   }
 
+  /* ================================================================
+     ✍ 書いてある内容に合わせて、入力欄を伸ばす（v1.183.0・ゆうた指定 2026-08-23）
+     ----------------------------------------------------------------
+     🗣「**予約詳細カードのコメント部分を、書いてある内容に応じて、全部見える状態で開いてほしい。
+     　　今はデフォルトのハイトが決まってる感じ**」
+     ◎なにが困っていたか
+       引継ぎ・伝達の欄は**高さが決め打ち**だったので、3行を超えると
+       **中でスクロールしないと読めない**。開いた瞬間に全部読めないと、引き継ぎの意味が薄い。
+     🔴 これから＝**中身の高さぴったりに伸ばす。**（開いた時も、打っている間も）
+     ⚠ **上限は付けない。** 長いメモは長いまま出す（外の枠がスクロールする）。
+        ここで「◯行まで」と決めると、また同じ「途中までしか見えない」に戻る。
+     ⚠ 枠（border）のぶんを足すこと。足さないと**1行ぶん足りずにスクロールが残る**。
+     ⚠ つまんで縮められるのは今までどおり。次に打った時、また中身の高さに戻る。
+     ⚠ 隠れているタブの中では高さが測れない（0になる）ので、**タブを開いた時にも測り直す**。
+     🔴 伸ばしたい欄には **`cv-grow`** を付ける（付けた欄だけが伸びる）。
+     ================================================================ */
+  function grow(el){
+    if (!el || !el.style) return;
+    el.style.height = 'auto';
+    var frame = (el.offsetHeight - el.clientHeight) || 0;   /* 枠のぶん */
+    var h = el.scrollHeight + frame;
+    if (h > 0) el.style.height = h + 'px';
+  }
+  function growAll(root){
+    try {
+      var list = (root || document).querySelectorAll('textarea.cv-grow');
+      Array.prototype.forEach.call(list, grow);
+    } catch (e) {}
+  }
+  /* 🔴🔴 描いた**その瞬間**は、窓がまだ開ききっていないことがある。
+     隠れている間は高さが 0 にしか測れないので、**開いたあとにもう一度測り直す**。
+     ⚠ これを入れないと、カードを開いた時だけ**元の小さい高さのまま**になる
+        （実際そうなっていた。試験では見えている所で描いていたので気づけなかった）。
+     ⚠ 何度測っても中身が同じなら結果も同じ＝**余計に動いて見えることはない**。 */
+  function growSoon(root){
+    growAll(root);
+    try { requestAnimationFrame(function(){ growAll(root); }); } catch (e) {}
+    setTimeout(function(){ growAll(root); }, 60);
+    setTimeout(function(){ growAll(root); }, 260);
+  }
+  window.cvGrow = function(el){ grow(el); };
+
   function memoLines(text){
     return String(text||'').split('\n').map(function(l){return l.trim();}).filter(Boolean)
       .map(function(l){return '<div class="cv-wl">'+esc(l)+'</div>';}).join('') || '<div class="cv-wl cv-muted">（なし）</div>';
@@ -301,7 +343,9 @@
     h += '<div class="cv-wsec"><div class="cv-gt">予約時内容</div>'+memoLines(c.menu||c.memo)+'</div>';
     // 引継ぎメモはこの画面から直接入力＝自動保存（予約時内容は新規予約で入れるので編集ボタンのまま）
     h += '<div class="cv-wsec"><div class="cv-gt">引継ぎ・伝達 <small>（入庫後・ここに直接入力できます）</small></div>'
-       + '<textarea class="cv-hoinput" placeholder="引継ぎ・伝達を入力（自動で保存されます）" oninput="cvHandoff(this.value)" onchange="cvHandoffSave(this.value)">'+esc(c.handoffMemo||'')+'</textarea></div>';
+       + '<textarea class="cv-hoinput cv-grow" placeholder="引継ぎ・伝達を入力（自動で保存されます）"'
+       +   ' oninput="cvGrow(this);cvHandoff(this.value)" onchange="cvHandoffSave(this.value)">'
+       +   esc(c.handoffMemo||'')+'</textarea></div>';
     return h + '</div>';
   }
 
@@ -1241,6 +1285,9 @@
       + '</div>';
     cvBuildCal();
     cvBindTimeGuide();
+    /* 🔴 v1.183.0 書いてある内容に合わせて、入力欄を中身の高さに伸ばす（開いた瞬間から全部見える）
+       ⚠ 窓が開ききってからもう一度測る（開く前は高さが測れない） */
+    growSoon(host);
   };
 
   /* 返車時間の入力ガイドを配線（打ち込み／ピッカー／ショートカット）。
@@ -1348,6 +1395,8 @@
     document.querySelectorAll('.cv-tab').forEach(function(x){x.classList.remove('on');}); btn.classList.add('on');
     document.querySelectorAll('.cv-panel').forEach(function(p){p.classList.remove('on');});
     const el = document.getElementById('cv-p-'+btn.dataset.p); if(el) el.classList.add('on');
+    /* 🔴 v1.183.0 隠れている間は高さが測れない（0になる）ので、開いた時に測り直す */
+    growSoon(el || document);
   };
 
   // ===== 金額（概算/見積もり/受注・kind = est|quote|order） =====

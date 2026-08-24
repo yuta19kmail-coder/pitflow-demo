@@ -75,6 +75,8 @@ window.state = {
   },
 
   resultMonth: new Date(),
+  /* 🔢 v2.6.0 実績ビューの段（'count'＝売上に数える実績／'nocount'＝社内車両・売上なし）。保存しない */
+  resultMode: 'count',
 
   loaners: [
     { id: 'L01', name: '代車1',  model: 'タント',     plate: '○○ 0001', shakenDate: '2026-09-14', tenkenDate: '2026-07-10' },
@@ -266,6 +268,11 @@ window.state = {
     { id: 'bp',      label: 'B.P',            color: '#3b82f6', combinable: true },
     { id: 'coat1y',  label: '1Y', color: '#8b5cf6', combinable: true },
     { id: 'coat3m',  label: '3M', color: '#a855f7', combinable: true },
+    /* 🚗 v2.6.0（ゆうた指定）車販作業＝納車前のルームクリーニング等。1Y/3M と同じ**併用可**。
+       ◎これが付いた車は 車販作業ビューの「コーティング・その他依頼／予定」に拾い上げられる
+         （car-sales.js の `_csHasCoat`）。**実際に何をやるかは「依頼事項」に直接書く**
+         （例：ルームクリーニング）＝作業タイプを細かく増やさないため、ここは拾う合図だけ。 */
+    { id: 'carsale', label: '車販', color: '#06b6d4', combinable: true },
   ],
 
   dropTypes: [
@@ -295,6 +302,10 @@ window.PIT_WORK_TYPES = window.state.workTypes.map(function (w) {
 window.PIT_WORK_SPECIALS = [
   { id: 'warranty',  label: '保証' },
   { id: 'insurance', label: '保険' },
+  /* 👤 v2.6.0（ゆうた指定）社員＝社員販売・社員整備。値引きや原価で社割が効くので、
+     金額の「肌感」チェック（M04/M06/M07）から外すためだけの印。
+     🔴 売上・実績・完TEL は**通常どおり**。売上なしにはしない。 */
+  { id: 'employee', label: '社員' },
 ];
 window.pitSpecialLabel = function (id) {
   var m = (window.PIT_WORK_SPECIALS || []).find(function (x) { return x.id === id; });

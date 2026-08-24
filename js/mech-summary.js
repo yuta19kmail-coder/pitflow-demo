@@ -213,6 +213,31 @@
     return h;
   }
 
+
+  /* ===================================================================
+     🏢 v2.6.0（ゆうた指定）**参考：数えていない台数**
+     -------------------------------------------------------------------
+     🗣「中古車の整備があったから（売上ちょっと行かなかった）って理由付け」
+     ＝ 数字が届かなかった月に、**その裏付けをすぐ脇に置く**ためのもの。
+     🔴 台数だけ。**金額は1円も混ぜない**（混ぜると分母がずれて読み間違いを生む）。
+     ⚠ 拾う集合は実績ビューの「数えない側」と同じ＝実績日がこの月／作業完了 or 返車済み／
+        `pitCardNoSale`（社内車両＋手で売上なしにした車）。
+     =================================================================== */
+  function _refNoCount(moS, moE){
+    return (state.cards || []).filter(function (c) {
+      if (!c || !c.completedAt) return false;
+      if (c.completedAt < moS || c.completedAt > moE) return false;
+      if (c.status !== 'workDone' && c.status !== 'returned') return false;
+      return !!(window.pitCardNoSale && pitCardNoSale(c));
+    });
+  }
+  function _refNoCountHtml(moS, moE){
+    var txt = window.pitInternCountText ? pitInternCountText(_refNoCount(moS, moE)) : '';
+    if (!txt) return '';
+    return '<div class="sv-refnc"><i data-ic=info data-ics=14></i> ' + txt
+         + '<span>作業サマリーの配分には入っていません（実績ビューの「数えない側」で見られます）</span></div>';
+  }
+
   function renderMonth(wrap){
     var ym = window._wsYM;
     var moS = ymdL(new Date(ym.y, ym.m, 1));
@@ -228,6 +253,8 @@
        + '<div class="sv-hero-num">'+d.people+'<span>人</span></div>'
        + '<div class="sv-hero-sub">割当済み台数 '+veh(d.totalVeh)+' 台</div></div>';
     h += '</div></div>';
+
+    h += _refNoCountHtml(moS, moE);   /* 🏢 v2.6.0 参考：数えていない台数（社内車両・売上なし） */
 
     h += '<div class="sv-card"><div class="sv-card-h"><span><i data-ic=chart data-ics=16></i> メカニック別 作業額（点検＝水色／整備＝緑）</span></div>';
     h += (d.rows.length ? barChart(d.rows) : '<div class="sv-empty">この月の割当データはまだありません。</div>');

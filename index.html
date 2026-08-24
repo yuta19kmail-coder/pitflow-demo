@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.5.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.6.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=9">
 <link rel="stylesheet" href="css/views.css?v=54">
-<link rel="stylesheet" href="css/polish.css?v=213">
+<link rel="stylesheet" href="css/polish.css?v=214">
 <link rel="stylesheet" href="css/floor.css?v=23">
 <link rel="stylesheet" href="css/board-notes.css?v=2">
 <link rel="stylesheet" href="css/coreflow-note-reply.css?v=b5c2b3fb"><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.css より後ろに読む -->
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.5.0</div>
+    <div class="login-ver">v2.6.0</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.5.0</span>
+    <span class="ver">v2.6.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -387,6 +387,8 @@
           <button class="vh-btn" onclick="prevMonth()"><i data-ic=chevLeft data-ics=16></i></button>
           <span id="result-month-label" style="font-size:14px;font-weight:600;min-width:90px;text-align:center"></span>
           <button class="vh-btn" onclick="nextMonth()"><i data-ic=chevRight data-ics=16></i></button>
+          <!-- 🔢 v2.6.0 実績は2段。数える側（今までどおり）／数えない側（社内車両・売上なし） -->
+          <button class="vh-btn" id="result-mode-btn" onclick="pitResultToggleMode()">数えない側へ</button>
           <button class="vh-btn" onclick="closeMonth()">この月を締める</button>
         </div>
       </div>
@@ -844,11 +846,12 @@
 <!-- ===== JS ===== -->
 <script src="js/coreflow-icons.js?v=4ad44b4e"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
-<script src="js/pit-share.js?v=14"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
+<script src="js/pit-share.js?v=15"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=f85dcc35"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
 <script src="js/errcode-pit.js?v=9"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
-<script src="js/state.js?v=75"></script>
+<script src="js/state.js?v=76"></script>
+<script src="js/intern-pit.js?v=1"></script><!-- 🏢 v2.6.0 社内車両（中古・代車・内部）の物差し1本（区分マスター・実績化・参考の台数）。**card-detail.js / card-miss.js より前** -->
 <script src="js/sales-date.js?v=2"></script><!-- 💴 v1.185.0 「売上日」（整備ソフトの伝票が立った日）の物差し1本。完TEL日（ログ）とは別物・数字だけ引っ張る。state.js より後ろ、使う側（return-slot / card-view / return-popup / inspect-rules / quarter-match）より前 -->
 <script src="js/coreflow-loaner-remain.js?v=608d586a"></script><!-- 🚙 代車の残り日数と色（全アプリ共通・_shared から配布）。loaner-free.js より **前** に読むこと -->
 <script src="js/loaner-free.js?v=6"></script><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
@@ -869,13 +872,13 @@ window.PIT_DEMO = true;</script>
 <script src="js/return-slot.js?v=14"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
 <script src="js/overdue-pit.js?v=3"></script><!-- 🔴 v1.101.0 当日を過ぎた予約・返車を自動で正しい箱へ移す。return-slot.js より後ろ、views.js（showView から呼ぶ）より前 -->
 <script src="js/approval-pit.js?v=2"></script><!-- 🔵 v1.74.0 新規予約の「承認」制度（承認待ちの印・承認する・入庫前に1回聞く）。印を出す側（reserve / card-hover / loaner / card-view / undetermined）より前に読む -->
-<script src="js/views.js?v=53"></script>
+<script src="js/views.js?v=54"></script>
 <script src="js/work-content.js?v=13"></script>
-<script src="js/card-miss.js?v=1"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
-<script src="js/card-detail.js?v=138"></script>
+<script src="js/card-miss.js?v=2"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
+<script src="js/card-detail.js?v=139"></script>
 <script src="js/flow-pit.js?v=4"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=2"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=79"></script>
+<script src="js/card-view.js?v=80"></script>
 <script src="js/cover-print.js?v=15"></script>
 <script src="js/avail.js?v=7"></script>
 <script src="js/card-tabs.js?v=14"></script>
@@ -892,10 +895,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/search.js?v=18"></script>
 <script src="js/sales-count.js?v=6"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=5"></script>
-<script src="js/sales.js?v=17"></script>
+<script src="js/sales.js?v=18"></script>
 <script src="js/sales-print.js?v=5"></script>
-<script src="js/mech-summary.js?v=5"></script>
-<script src="js/inspect-rules.js?v=15"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
+<script src="js/mech-summary.js?v=6"></script>
+<script src="js/inspect-rules.js?v=16"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=5"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
 <script src="js/quarter-match.js?v=5"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
 <script src="js/quarter-store.js?v=4"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->
@@ -917,10 +920,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/undetermined.js?v=20"></script>
 <script src="js/reserve.js?v=75"></script>
 <script src="js/return.js?v=28"></script>
-<script src="js/car-sales.js?v=7"></script>
+<script src="js/car-sales.js?v=8"></script>
 <script src="js/task.js?v=24"></script>
 <script src="js/work.js?v=14"></script>
-<script src="js/result.js?v=14"></script>
+<script src="js/result.js?v=15"></script>
 <script src="js/shaken.js?v=31"></script>
 <script src="js/shaken-log.js?v=7"></script>
 <script src="js/outsource.js?v=5"></script>
@@ -934,17 +937,17 @@ window.PIT_DEMO = true;</script>
 <script src="js/holidays.js?v=1c79064f"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>
 <script src="js/cal-pit.js?v=a3f77ecd"></script><!-- 🚫 会社の営業日カレンダー（MHSが基準）。state.js より後ろ。営業日判定はすべて PitCal を通す -->
-<script src="js/dnd.js?v=22"></script>
+<script src="js/dnd.js?v=23"></script>
 <script src="js/board-order.js?v=2"></script><!-- 🔴 v1.140.0 タスクボードのマスター並び（task.js / dnd.js から呼ばれる） -->
 <script src="js/board-sort.js?v=3"></script><!-- 🔴 v1.140.0 タスクボードの一時並び替え（task.js / board-line.js / dnd.js から呼ばれる） -->
 <script src="js/board-line.js?v=9"></script><!-- タスクボードの区切りライン（task.js / ctxmenu-pit.js から呼ばれる） -->
 <script src="js/myonly-pit.js?v=8"></script><!-- タスクボードの「担当車両」スイッチ（task.js から呼ばれる・views.js より後ろ） -->
 <script src="js/pit-pip.js?v=9"></script>
-<script src="js/card-hover.js?v=40"></script>
+<script src="js/card-hover.js?v=41"></script>
 <script src="js/mech-guard.js?v=4"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
-<script src="js/phase-popup.js?v=18"></script>
+<script src="js/phase-popup.js?v=19"></script>
 <script src="js/return-popup.js?v=12"></script>
-<script src="js/help-content.js?v=58"></script>
+<script src="js/help-content.js?v=59"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=18"></script>
 <script src="js/main.js?v=12"></script>

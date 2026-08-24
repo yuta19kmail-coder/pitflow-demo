@@ -224,7 +224,16 @@
       if (window.PitMechGuard && PitMechGuard.needed(card, to)){
         go = function(){ PitMechGuard.open(card, commit); };
       }
+      /* 🏢🏢 v2.6.0（ゆうた指定）**社内車両（中古・代車・内部）は金額を聞かない。**
+         　「通常の予約からの流れはいいが、タスクボード上では金額や返車予定日は聞かない」
+         ⚠ **外注の窓（外注先・完了予定日）は出す。** 社内の車を板金に出すことはあるし、お金の話ではない。
+         ⚠ 担当者の確認（PitMechGuard）は**そのまま生かす**＝作業担当者と点検者は通常どおり入れてもらう。 */
+      var _intern = !!(window.pitCardIntern && pitCardIntern(card));
       var mode = null;
+      if (_intern && to !== 'outsource'){
+        if (go !== commit){ go(); return true; }
+        return false;
+      }
       if (from === 'estim'   && to === 'contact') mode = 'estimate';
       else if (from === 'contact' && to === 'parts') mode = 'order';
       // 作業完了(workDone)への移動は確定金額プロンプトを出さず単純移動（v0.99.34）。確定金額は完TELポップアップで入れる。

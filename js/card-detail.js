@@ -533,9 +533,12 @@ function renderCardForm(c){
   h += '<div class="cf-row" style="flex-wrap:nowrap;align-items:flex-start">';
   h += '<div class="cf-field" style="flex:0 1 auto;min-width:0"><div class="cf-label">作業タイプ</div>' + workTypeChips(c) + '</div>';
   h += '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">併用可</div>' + workTypeComboChips(c) + '</div>';
-  h += '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">特殊</div>' + workTypeSpecialChips(c) + '</div>';
+  /* 🔧 v2.6.0 「特殊」→「**その他**」。バッジを並べるのをやめて、押すと開く引き出しにした。
+     　　ふだんあまり使わない印（保証・保険・社員／中古・代車・内部）をここにまとめる。 */
+  h += '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">その他</div>' + workTypeOtherBtn(c) + '</div>';
   h += '<div class="cf-field" style="flex:0 0 auto;margin-left:auto"><div class="cf-label">課</div>' + chips(c, 'division', state.divisions, true) + '</div>';
   h += '</div>';
+  h += otherPanelHtml(c);
   /* 2行目：受付タイプ（待/当/預）の右隣に「相談」を□っぽい別ボタンで配置（区切り線で違いを演出）＋担当を1行に詰める */
   h += '<div class="cf-row">';
   h += field('受付タイプ', '<div class="cf-recv">' + dropChips(c)
@@ -545,14 +548,22 @@ function renderCardForm(c){
   h += field('フロント担当', staffSelect(c, 'frontStaff'));
   h += field('予約担当',     staffSelect(c, 'reserveStaff'));
   h += '</div>';
-  /* 3行目：概算 */
+  /* 3行目：概算。🔧 v2.6.0 社内車両（中古・代車・内部）はお金のやり取りが無いので入れられない。 */
+  if (_internOn(c)){
+    h += '<div class="cf-row">';
+    h += field('概算 預かり日数', _offBox('—'));
+    h += field('概算 金額（円）', _offBox('—'));
+    h += '</div>';
+    h += '<div class="cf-hint" style="margin-top:0">※ ' + _internName(c) + 'は売上のやり取りが無いので、概算の日数・金額は入れません。</div>';
+  } else {
   h += '<div class="cf-row">';
   h += field('概算 預かり日数', numIn(c, 'estHoldDays', 'placeholder="例 5（当日仕上げは0）"'));
   h += field('概算 金額（円）', numIn(c, 'estAmount', 'placeholder="作業タイプから自動"'));
   h += '</div>';
   h += '<div class="cf-hint" style="margin-top:0">※ 日数・金額とも作業タイプを選ぶと平均値が自動で入る概算。診断・見積もりで後から直せばOK。</div>';
+  }
   /* 車検を選んだ時だけ：入庫時持ち物（概算の下・代車の上に出す・v0.35.4） */
-  if (c.workType === 'shaken'){
+  if (c.workType === 'shaken' && !_internOn(c)){
     h += '<div class="cf-subhead"><i data-ic=clipboard data-ics=16></i> 入庫時持ち物（車検）</div>';
     h += '<div class="cf-mochi"><div class="cf-mochi-lead"><i data-ic=megaphone data-ics=16></i> お客様にご案内ください（当日ご持参いただくもの）</div>'
        + '<div class="cf-mochi-items"><span class="cf-mochi-i"><i data-ic=car data-ics=16></i> 車検証</span><span class="cf-mochi-i"><i data-ic=receipt data-ics=16></i> 納税証明書</span><span class="cf-mochi-i"><i data-ic=file data-ics=16></i> 自賠責</span></div></div>';
@@ -565,6 +576,11 @@ function renderCardForm(c){
   }
   /* 代車：スイッチ＋使用代車＋車種固定を1行（中央揃え＝スイッチが上下にブレない）。貸出/条件/メモは下に展開（v0.38.9） */
   h += '<div class="cf-subhead"><i data-ic=van data-ics=16></i> 代車</div>';
+  /* 🔧 v2.6.0 社内車両にはお客様が居ないので、代車は貸さない＝ここは触れない。 */
+  if (_internOn(c)){
+    h += '<div class="cf-row"><div class="cf-field" style="flex:1">' + _offBox('代車なし（' + _internName(c) + '）') + '</div></div>';
+    h += secEnd();
+  } else {
   h += '<div class="cf-row cf-loaner-switchrow">';
   h += '<div class="cf-field" style="flex:0 0 auto">' + toggle(c, 'needLoaner', '必要', '不要') + '</div>';
   if (_prevIntakeLoaner(c)) h += '<span class="cf-prevloaner"><i data-ic=warn data-ics=16></i> 前回入庫時 代車あり</span>';
@@ -589,6 +605,7 @@ function renderCardForm(c){
     h += '</div>';
   }
   h += secEnd();
+  }
 
   /* === 内容（旧「整備内容（自由記入）」を独立セクション化＋テンプレ挿入・v0.35.2） === */
   h += sec('内容', '<i data-ic=wrench data-ics=16></i>');
@@ -1723,17 +1740,45 @@ function dropChips(c){
 
 /* 作業タイプのチップ＝基本（単一選択＝c.workType）＋ 併用可タイプ（追加トグル＝c.workAddons[]）。
    設定で「併用可」にした作業（例：3M/1Y）は、基本の作業を選んでいても重ねて選べる。 */
-function _wtChipBtn(it, active){
+function _wtChipBtn(it, active, off, why){
   let style = '';
-  if (active && it.color) style = 'style="background:' + it.color + ';color:#fff;border-color:' + it.color + ';"';
-  else if (it.color)      style = 'style="border-color:' + it.color + ';color:' + it.color + ';"';
-  return '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + it.id + '" ' + style + '>' + it.label + '</button>';
+  if (active && it.color) style = 'background:' + it.color + ';color:#fff;border-color:' + it.color + ';';
+  else if (it.color)      style = 'border-color:' + it.color + ';color:' + it.color + ';';
+  if (off) style += 'opacity:.35;';
+  return '<button type="button" class="cf-chip' + (active ? ' active' : '') + (off ? ' cf-chip-off' : '') + '"'
+       + ' data-val="' + it.id + '"' + (off ? ' disabled' : '') + (off && why ? ' title="' + why + '"' : '')
+       + ' style="' + style + '">' + it.label + '</button>';
 }
+
+/* ===================================================================
+   🔧 v2.6.0 社内車両（中古・代車・内部）の時の「押せる／押せない」
+   -------------------------------------------------------------------
+   🔴 判定は intern-pit.js の1本に聞く。ここで c.internKind を直に見ない。
+      ・中古／内部 … 作業タイプは1つも押せない（単独で立つ）
+      ・代車       … 車検／12点／一般／B.P のどれか **1つだけ** 押せる（相方）
+   =================================================================== */
+function _internOn(c){ return !!(window.pitCardIntern && pitCardIntern(c)); }
+function _internName(c){ return (window.pitInternLabel ? pitInternLabel(c) : '') || '社内車両'; }
+/* その作業タイプを押せるか（社内車両でない時はいつでも押せる） */
+function _wtAllowed(id, c){
+  var k = window.pitInternKind ? pitInternKind(c) : '';
+  if (!k) return true;
+  if (k !== 'loanercar') return false;
+  return (window.PIT_LOANER_MATES || []).indexOf(id) >= 0;
+}
+function _wtWhy(c){
+  var k = window.pitInternKind ? pitInternKind(c) : '';
+  if (k === 'loanercar') return '代車は 車検・12点・一般・B.P のどれか1つとセットです';
+  return _internName(c) + 'を選んでいる間は、作業タイプは選びません';
+}
+/* 入れられない欄のグレーの箱（見た目だけ・値は持たない） */
+function _offBox(txt){ return '<div class="cf-offbox">' + txt + '</div>'; }
 // v0.94.0 基本（単独選択）チップだけ。併用可は workTypeComboChips に分離＝同じ1行に横並びにする。
 function workTypeChips(c){
   const base = (state.workTypes || []).filter(w => !w.combinable);
+  const why  = _wtWhy(c);
   let h = '<div class="cf-chips" data-key="workType">';
-  base.forEach(it => { h += _wtChipBtn(it, c.workType === it.id); });
+  base.forEach(it => { h += _wtChipBtn(it, c.workType === it.id, !_wtAllowed(it.id, c), why); });
   h += '</div>';
   return h;
 }
@@ -1741,31 +1786,98 @@ function workTypeChips(c){
 function workTypeComboChips(c){
   const combo = (state.workTypes || []).filter(w => w.combinable);
   const adds = Array.isArray(c.workAddons) ? c.workAddons : [];
+  const why  = _wtWhy(c);
   let h = '<div class="cf-chips" data-key="workAddons" data-combo="1">';
-  combo.forEach(it => { h += _wtChipBtn(it, adds.indexOf(it.id) >= 0); });
+  combo.forEach(it => { h += _wtChipBtn(it, adds.indexOf(it.id) >= 0, !_wtAllowed(it.id, c), why); });
   h += '</div>';
   return h;
 }
-// v0.116.0 特殊チップ（保証/保険）＝複数選択＝c.workSpecials。単体では選べず、作業タイプ（基本 or 併用可）がある時だけ有効。
-//   色はグレー。作業タイプ未選択のうちは薄く（押しても弾く）。予約カード自体には出さず、予約詳細/ホバー/印刷にのみ表示。
-function workTypeSpecialChips(c){
-  const specials = window.PIT_WORK_SPECIALS || [];
-  const arr = Array.isArray(c.workSpecials) ? c.workSpecials : [];
-  const hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
-  const GREY = '#6b7280';
-  let h = '<div class="cf-chips" data-key="workSpecials" data-special="1">';
-  specials.forEach(it => {
-    const active = arr.indexOf(it.id) >= 0;
-    let style = active ? ('background:' + GREY + ';color:#fff;border-color:' + GREY + ';')
-                       : ('border-color:' + GREY + ';color:' + GREY + ';');
-    if (!hasWork) style += 'opacity:.4;';
-    const title = hasWork ? '' : ' title="作業タイプを選ぶと押せます（単体では選べません）"';
-    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + it.id + '"' + title + ' style="' + style + '">' + it.label + '</button>';
+/* ===================================================================
+   🗄 v2.6.0 「その他」＝ふだんあまり使わない印をまとめた引き出し（旧「特殊」）
+   -------------------------------------------------------------------
+   🗣 ゆうた「特殊→保証 の部分を『その他』に。これはバッジではなく詳細が展開するという意味。
+   　　通常あまり使用しないバッジが入ってるという感じ」
+   中身は2段。
+     ① **付加**（複数可・売上も実績も通常どおり）… 保証 / 保険 / 社員
+     ② **社内区分**（1つだけ・売上が立たない）… 中古 / 代車 / 内部
+   🔴 社内区分を選んでいる間は、①も作業タイプも押せない
+      （代車だけ「車検・12点・一般・B.P のどれか1つ」を相方に選ぶ）。
+   ⚠ 引き出しの開け閉めは画面の都合なので **カードには保存しない**（下の `_cfOtherOpen`）。
+   =================================================================== */
+var _cfOtherOpen = false;
+
+/* いま「その他」に何が入っているかの短い言葉（閉じていても分かるようにボタンへ出す） */
+function _otherSummary(c){
+  var out = [];
+  (Array.isArray(c.workSpecials) ? c.workSpecials : []).forEach(function (id) {
+    var lb = window.pitSpecialLabel ? pitSpecialLabel(id) : '';
+    if (lb) out.push(lb);
+  });
+  if (_internOn(c)) out.push(_internName(c));
+  return out;
+}
+function workTypeOtherBtn(c){
+  var sum = _otherSummary(c);
+  var lb  = sum.length ? ('その他：' + sum.join('・')) : 'その他';
+  return '<div class="cf-chips" data-other="1"><button type="button" id="cf-other-btn" class="cf-chip cf-other-btn'
+       + (sum.length ? ' active' : '') + '" title="保証・保険・社員／中古・代車・内部">'
+       + lb + ' <span class="cf-other-caret">' + (_cfOtherOpen ? '▲' : '▼') + '</span></button></div>';
+}
+function otherPanelHtml(c){
+  if (!_cfOtherOpen) return '';
+  var GREY = '#6b7280';
+  var arr  = Array.isArray(c.workSpecials) ? c.workSpecials : [];
+  var kind = window.pitInternKind ? pitInternKind(c) : '';
+  var hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
+  var addOff  = !!kind || !hasWork;
+  var addWhy  = kind ? (_internName(c) + 'を選んでいる間は付けられません')
+                     : '作業タイプを選ぶと押せます（単体では選べません）';
+
+  var h = '<div class="cf-other-panel">';
+
+  /* ① 付加 */
+  h += '<div class="cf-other-sec">';
+  h += '<div class="cf-other-lb">付加<span>作業タイプとセットで付ける印。売上・実績は通常どおり</span></div>';
+  h += '<div class="cf-chips" data-key="workSpecials" data-special="1">';
+  (window.PIT_WORK_SPECIALS || []).forEach(function (it) {
+    var active = arr.indexOf(it.id) >= 0;
+    var style  = active ? ('background:' + GREY + ';color:#fff;border-color:' + GREY + ';')
+                        : ('border-color:' + GREY + ';color:' + GREY + ';');
+    if (addOff) style += 'opacity:.35;';
+    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + (addOff ? ' cf-chip-off' : '') + '"'
+       + ' data-val="' + it.id + '"' + (addOff ? ' disabled title="' + addWhy + '"' : '')
+       + ' style="' + style + '">' + it.label + '</button>';
+  });
+  h += '</div></div>';
+
+  /* ② 社内区分 */
+  h += '<div class="cf-other-sec">';
+  h += '<div class="cf-other-lb">社内区分<span>自社の車。売上には数えません（実績には残ります）</span></div>';
+  h += '<div class="cf-chips" data-key="internKind" data-intern="1">';
+  (window.PIT_INTERN_KINDS || []).forEach(function (it) {
+    var active = (kind === it.id);
+    var style  = active ? ('background:#0f766e;color:#fff;border-color:#0f766e;')
+                        : ('border-color:#0f766e;color:#0f766e;');
+    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '"'
+       + ' data-val="' + it.id + '" title="' + it.note + '" style="' + style + '">' + it.label + '</button>';
   });
   h += '</div>';
+  if (kind === 'loanercar'){
+    var mate = window.pitInternMate ? pitInternMate(c) : '';
+    h += '<div class="cf-other-note' + (mate ? '' : ' warn') + '">'
+       + (mate ? ('この車は「' + _internName(c) + '」として扱います。')
+               : '🔴 上の作業タイプから <b>車検・12点・一般・B.P</b> のどれか1つを選んでください（代車はセットで押します）。')
+       + '</div>';
+  } else if (kind){
+    h += '<div class="cf-other-note">この車は「' + _internName(c) + '」として扱います。'
+       + '金額・完TEL・洗車・伝票はありません。実績にはなりますが、売上には数えません。</div>';
+  }
+  h += '</div>';
+
+  h += '</div>';
   return h;
 }
-/* 作業タイプ（基本 or 併用可）が1つも無くなったら、特殊（保証/保険）は自動で外す＝単体で残さない。 */
+/* 作業タイプ（基本 or 併用可）が1つも無くなったら、付加（保証/保険/社員）は自動で外す＝単体で残さない。 */
 function _clearSpecialsIfNoWork(c){
   const hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
   if (!hasWork && Array.isArray(c.workSpecials) && c.workSpecials.length) c.workSpecials = [];
@@ -2448,7 +2560,9 @@ function bindCardFormEvents(root){
   });
 
   // チップ（単一選択）
-  root.querySelectorAll('.cf-chips:not([data-multi]):not([data-combo]):not([data-special]):not(.cf-dual)').forEach(group => {
+  /* ⚠ v2.6.0 `[data-intern]`（社内区分）と `[data-other]`（その他のボタン）は**ここで拾わない**。
+     　　拾うと汎用のハンドラと専用のハンドラが二重に走り、押しても元に戻ってしまう。 */
+  root.querySelectorAll('.cf-chips:not([data-multi]):not([data-combo]):not([data-special]):not([data-intern]):not([data-other]):not(.cf-dual)').forEach(group => {
     const key = group.dataset.key;
     group.querySelectorAll('.cf-chip').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2470,7 +2584,11 @@ function bindCardFormEvents(root){
           // 作業タイプ未選択のうちは概算 預かり日数は空欄（選んだら自動で入る）
           if (window.pitEstHold)   c.estHoldDays = c.workType ? pitEstHold(c.workType, c.dropType, pitTeamKey(c)) : '';
           if (window.pitEstAmount && (key === 'workType' || key === 'boardId') && c.workType) c.estAmount = pitEstAmount(c.workType, pitTeamKey(c));
-          if (key === 'workType'){ _syncWorkTypes(c); _clearSpecialsIfNoWork(c); }   // 表示用バッジ列を同期＋特殊の整合（v0.116.0）
+          if (key === 'workType'){
+            /* 🚙 v2.6.0 代車は相方1つだけ＝基本を選んだら併用可はおろす */
+            if (window.pitInternKind && pitInternKind(c) === 'loanercar') c.workAddons = [];
+            _syncWorkTypes(c); _clearSpecialsIfNoWork(c);   // 表示用バッジ列を同期＋付加の整合（v0.116.0）
+          }
         }
         renderCardForm(c);
       });
@@ -2486,9 +2604,13 @@ function bindCardFormEvents(root){
         const v = btn.dataset.val;
         const idx = c[key].indexOf(v);
         if (idx >= 0) c[key].splice(idx, 1);
-        else c[key].push(v);
+        else {
+          /* 🚙 v2.6.0 代車は相方1つだけ＝ほかを全部おろしてから付ける */
+          if (window.pitInternKind && pitInternKind(c) === 'loanercar'){ c[key] = []; c.workType = null; }
+          c[key].push(v);
+        }
         _syncWorkTypes(c);
-        _clearSpecialsIfNoWork(c);   // v0.116.0 併用可も無く基本も無ければ特殊を外す
+        _clearSpecialsIfNoWork(c);   // v0.116.0 併用可も無く基本も無ければ付加を外す
         // v0.94.1 併用可は単独利用も可：主作業(workType)が無く併用可だけの時は、その先頭で概算を自動入力
         if (!c.workType){
           const eff = (c.workAddons || [])[0] || '';
@@ -2518,6 +2640,29 @@ function bindCardFormEvents(root){
           }
           c[key].push(v);
         }
+        if (window.PitDB) PitDB.save();
+        renderCardForm(c);
+      });
+    });
+  });
+
+  /* 🗄 v2.6.0 「その他」の引き出しを開け閉め（カードには保存しない＝画面の都合だけ） */
+  {
+    const ob = root.querySelector('#cf-other-btn');
+    if (ob) ob.addEventListener('click', () => { _cfOtherOpen = !_cfOtherOpen; renderCardForm(c); });
+  }
+
+  /* 🏢 v2.6.0 社内区分チップ（中古／代車／内部）＝1つだけ。もう一度押すと外れる。
+     ⚠ 付け替えの後始末（作業タイプ・付加・概算・代車を落とす）は
+        **intern-pit.js の `pitInternSet` 1本**。ここに書き写さないこと。 */
+  root.querySelectorAll('.cf-chips[data-intern]').forEach(group => {
+    group.querySelectorAll('.cf-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v   = btn.dataset.val;
+        const now = window.pitInternKind ? pitInternKind(c) : '';
+        if (window.pitInternSet) pitInternSet(c, now === v ? '' : v);
+        _syncWorkTypes(c);
+        _cfOtherOpen = true;
         if (window.PitDB) PitDB.save();
         renderCardForm(c);
       });

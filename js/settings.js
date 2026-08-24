@@ -118,16 +118,26 @@
     h += '</div>';
     h += '</div>';
 
-    /* ===== 作業タイプ（増減できる・v0.27.0） ===== */
+    /* ===== 作業タイプ（**見るだけ**・v2.5.0／2026-08-24 ゆうた指定） =====
+       🔴 ここからは足せない・消せない・名前も色も変えられない。正は state.js の PIT_WORK_TYPES。
+          理由＝作業タイプの id には挙動（諸費用の必須・車検予定・洗車/コーティング・
+          データチェックの見張り・MHS への出し方）が結びついていて、
+          名前と色だけ足しても、その挙動は1つも付いてこないため。 */
     h += '<div class="ps-card">';
-    h += '<div class="ps-h" style="display:flex;align-items:center;gap:10px"><i data-ic=wrench data-ics=16></i> 作業タイプ（メニュー）<button class="vh-btn" style="margin-left:auto" onclick="pitWtAdd()">＋ タイプを追加</button></div>';
-    h += '<div class="ps-desc">入庫カードの「作業タイプ」に出る選択肢。名前・色を変更でき、追加・削除も可能（削除しても過去カードのデータは消えません）。<br><b>「併用可」</b>にチェックすると、その作業は<b>他の作業を選んでいても“追加で”選べます</b>（例：車検＋3M）。コーティング等のセット作業向け。</div>';
-    (state.workTypes || []).forEach(function (w, i) {
-      h += '<div class="ps-wt-row">'
-         + '<input type="color" class="ps-wt-color" value="' + esc(w.color || '#64748b') + '" onchange="pitWtEdit(' + i + ',\'color\',this.value)">'
-         + '<input type="text" class="ps-in" style="width:170px" value="' + esc(w.label) + '" onchange="pitWtEdit(' + i + ',\'label\',this.value)">'
-         + '<label class="ps-wt-combo" title="ONにすると他の作業を選んでいても追加で選べます（例：車検＋3M）"><input type="checkbox" ' + (w.combinable ? 'checked' : '') + ' onchange="pitWtToggleCombo(' + i + ')"> 併用可</label>'
-         + '<button class="rl-del" title="削除" onclick="pitWtDel(' + i + ')"><i data-ic=trash data-ics=16></i></button>'
+    h += '<div class="ps-h"><i data-ic=wrench data-ics=16></i> 作業タイプ（メニュー）<span class="ps-ro-tag">見るだけ</span></div>';
+    h += '<div class="ps-desc">入庫カードの「作業タイプ」に出る選択肢です。<b>ここからは増やせません・変えられません。</b><br>'
+       + '作業タイプは、諸費用の必須・車検予定への載り方・洗車やコーティングの段取り・データチェックの見張り・MHSへの出し方まで、'
+       + 'アプリのあちこちに挙動が結びついています。名前と色だけ足しても、その挙動は付いてきません。'
+       + '<b>足したい／名前や色を変えたいときは開発（Claude）に言ってください。</b>'
+       + '<br><b>「併用可」</b>＝他の作業を選んでいても“追加で”選べる作業（例：車検＋3M）。'
+       + '<br><b>「旧」</b>＝いまのアプリには無い、昔ここから足された型。過去カードのために残してあります。</div>';
+    (state.workTypes || []).forEach(function (w) {
+      h += '<div class="ps-wt-row ps-wt-ro">'
+         + '<span class="ps-wt-dot" style="background:' + esc(w.color || '#64748b') + '"></span>'
+         + '<span class="ps-wt-name">' + esc(w.label) + '</span>'
+         + (w.combinable ? '<span class="ps-wt-tag">併用可</span>' : '')
+         + (w.legacy ? '<span class="ps-wt-tag ps-wt-old">旧</span>' : '')
+         + '<span class="ps-wt-id">' + esc(w.id) + '</span>'
          + '</div>';
     });
     h += '</div>';
@@ -292,41 +302,12 @@
     pitSettingsFlash('✓ 保存しました');
   };
 
-  /* ===== 🔧 作業タイプの増減（v0.27.0）＝state.workTypes を編集し settings.workTypes に保存 ===== */
-  function _wtSave() {
-    state.settings.workTypes = state.workTypes;
-    if (window.PitDB) PitDB.save(true);
-    renderSettings();   // 日数・金額の表も追従
-    pitSettingsFlash('✓ 保存しました');
-  }
-  window.pitWtAdd = function () {
-    state.workTypes.push({ id: 'w' + Date.now(), label: '新タイプ', color: '#64748b' });
-    _wtSave();
-  };
-  window.pitWtEdit = function (i, field, val) {
-    const w = state.workTypes[i];
-    if (!w) return;
-    if (field === 'label' && !String(val).trim()) return;
-    w[field] = val;
-    _wtSave();
-  };
-  window.pitWtDel = function (i) {
-    const w = state.workTypes[i];
-    if (!w) return;
-    pitAsk('作業タイプ「' + w.label + '」を削除しますか？', { danger:true, ok:'削除する',
-            detail:'過去のカードのデータは消えません。選択肢から消えるだけです。' }).then(function (yes) {
-      if (!yes) return;
-      state.workTypes.splice(i, 1);
-      _wtSave();
-    });
-  };
-  /* 併用可（重複チェックOK）＝他の作業を選んでいても追加で選べる作業（例：3M/1Y コーティング） */
-  window.pitWtToggleCombo = function (i) {
-    const w = state.workTypes[i];
-    if (!w) return;
-    w.combinable = !w.combinable;
-    _wtSave();
-  };
+  /* ===== 🔧 作業タイプ＝**設定からは触れない**（v2.5.0・2026-08-24 ゆうた指定） =====
+     🔴 v0.27.0〜v2.4.0 にあった `pitWtAdd` / `pitWtEdit` / `pitWtDel` / `pitWtToggleCombo` は**廃止した**。
+        作業タイプの正は `state.js` の `PIT_WORK_TYPES` 1本。増やす・変えるのはそこに書く（挙動も一緒に）。
+     ⚠ **この4つを復活させないこと。** 復活させると「名前と色だけの型」がまた作れてしまい、
+        データチェック・車検予定・洗車・MHS のどれにも乗らない型が現場に出る。
+     ⚠ 概算預かり日数・概算金額の表（作業タイプ別）は今までどおり設定から直せる（下の方にある）。 */
 
   /* ===== 🏭 外注先の増減（v0.79.0）＝state.settings.outsourcePartners を編集 ===== */
   function _osSave() {

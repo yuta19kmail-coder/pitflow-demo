@@ -9,7 +9,7 @@
 
    ◎持っていくもの（＝設定・ルール・図面）
      ・設定（予約枠・預かり日数・金額・時間・定休・置き場 など）
-     ・作業タイプ／外注先
+     ・外注先
      ・PIT配置図（枠・建物・通路）
      ・入庫ルールの判定（AIの上書き）
      ・付箋の色ラベル
@@ -18,6 +18,9 @@
    ◎持っていかないもの（わざと）
      ・予約カード・顧客・代車・自社車両・貸出・実績
        → 本番は空から始める、というゆうたの決定どおり。
+     ・作業タイプ（v2.5.0〜）
+       → 正が state.js（PIT_WORK_TYPES）に移った＝**どのサイトでも同じコードを見ている**ので、
+         引っ越しで運ぶ意味がなくなった。運ぶと逆に、古いファイルで新しい型を上書きしてしまう。
    ======================================== */
 (function () {
   'use strict';
@@ -29,8 +32,7 @@
     KEYS.forEach(function (k) {
       out[k] = (window.state && state[k] !== undefined) ? state[k] : null;
     });
-    /* 作業タイプは state.workTypes が実行用、settings.workTypes が保存用。両方入れておく */
-    out.workTypes = (window.state && state.workTypes) || null;
+    /* 🔧 v2.5.0：作業タイプは入れない（正は state.js の PIT_WORK_TYPES＝コード側にある） */
     return out;
   }
 
@@ -63,7 +65,7 @@
         return;
       }
       var det = '・予約カード／顧客／代車／自社車両には触りません\n'
-              + '・置き換わるのは 設定・作業タイプ・外注先・PIT配置図・入庫ルールの判定・付箋の色 です';
+              + '・置き換わるのは 設定・外注先・PIT配置図・入庫ルールの判定・付箋の色 です\n・作業タイプは入りません（アプリ側で決まっています）';
       pitAsk('この設定で今の設定を置き換えます。よろしいですか？', { title:'設定の読み込み', ok:'置き換える', detail:det })
         .then(function (yes) { if (yes) _go(); });
       return;
@@ -78,10 +80,10 @@
           state[k] = d[k];
         }
       });
-      if (Array.isArray(d.workTypes) && d.workTypes.length) {
-        state.workTypes = d.workTypes;
-        state.settings.workTypes = d.workTypes;
-      }
+      /* 🔧 v2.5.0：作業タイプは読み込まない。古いファイルに入っていても捨てる。
+         （正は state.js の PIT_WORK_TYPES。settings の中に混ざって来たぶんも
+           _mergeSettings → _applyWorkTypes がコード基準に揃え直す） */
+      if (window.PitDB && PitDB._applyWorkTypes) PitDB._applyWorkTypes();
       if (window.pitLog) pitLog('設定ファイルを読み込んだ', { kind: 'settings', label: String(d._at || '') });
       if (window.PitDB) PitDB.save(true);
       pitAlert('設定を読み込みました。画面を作り直します。');
@@ -96,7 +98,7 @@
     var cloud = !!window.PIT_CLOUD;
     var h = '<div class="ps-card"><div class="ps-h"><i data-ic=upload data-ics=16></i> 設定の引っ越し</div>';
     h += '<div class="ps-hint" style="margin-bottom:12px">'
-       + '設定・作業タイプ・外注先・PIT配置図・入庫ルールの判定・付箋の色を、ファイルにして別のサイトへ移します。'
+       + '設定・外注先・PIT配置図・入庫ルールの判定・付箋の色を、ファイルにして別のサイトへ移します。'
        + '<b>予約カード・顧客・代車・自社車両は入りません。</b>'
        + '</div>';
     h += '<div class="ps-transfer-btns">';

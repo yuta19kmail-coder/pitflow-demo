@@ -1548,14 +1548,18 @@ th.cfs-lg-d{ z-index:3; }
 .av-it-tags > .long{ font-size:9px; }/* 4文字以上のラベルは枠内で文字だけ縮める（枠サイズは固定のまま） */
 /* 相談・代車チップは他ビューと共通の tag-side 配色（背景/文字/枠色）を流用。サイズはこの枠で統一 */
 
-/* 設定：作業タイプ編集行（v0.27.0） */
+/* 設定：作業タイプの行（v0.27.0 → v2.5.0 で「見るだけ」に） */
 .ps-wt-row{ display:flex; align-items:center; gap:10px; padding:5px 0; border-bottom:1px dashed var(--border); }
 .ps-wt-row:last-child{ border-bottom:0; }
-.ps-wt-color{ width:34px; height:26px; border:1px solid var(--border); border-radius:6px; background:var(--bg3); cursor:pointer; padding:1px; }
-/* 作業タイプ設定の「併用可」チェック */
-.ps-wt-combo{ margin-left:auto; display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text2); white-space:nowrap; cursor:pointer; }
-.ps-wt-combo input{ width:15px; height:15px; cursor:pointer; }
-.ps-wt-row .rl-del{ margin-left:0; }
+/* v2.5.0：作業タイプは state.js が正＝設定からは触れない。色の丸・名前・札を並べるだけ */
+.ps-wt-ro{ padding:7px 0; }
+.ps-wt-dot{ width:14px; height:14px; border-radius:50%; border:1px solid var(--border); flex:0 0 auto; }
+.ps-wt-name{ font-size:14px; font-weight:700; color:var(--text); min-width:120px; }
+.ps-wt-tag{ font-size:11px; font-weight:700; color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:1px 6px; white-space:nowrap; }
+.ps-wt-old{ color:#b45309; border-color:#f59e0b; background:rgba(245,158,11,.12); }
+.ps-wt-id{ margin-left:auto; font-size:11px; color:var(--text3); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+/* 見出しの「見るだけ」札（ここからは変えられない、を一目で） */
+.ps-ro-tag{ margin-left:8px; font-size:11px; font-weight:700; color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:1px 6px; vertical-align:middle; }
 /* 入庫カード：作業タイプの「＋併用」チップ群（基本チップの下に少し離して） */
 .cf-wt-combo{ margin-top:6px; align-items:center; }
 .cf-combo-lab{ font-size:11px; font-weight:700; color:var(--text3); margin-right:2px; align-self:center; }

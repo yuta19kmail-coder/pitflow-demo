@@ -105,18 +105,7 @@
             if (d.inspectMutes && typeof d.inspectMutes === 'object') state.inspectMutes = d.inspectMutes;
             if (Array.isArray(d.boardNotes)) state.boardNotes = d.boardNotes;            // v0.63.0：付箋ボード
             if (d.boardLabels && typeof d.boardLabels === 'object') state.boardLabels = d.boardLabels; // v0.63.0：色ラベル
-            this._mergeSettings(d.settings);
-            // 作業タイプは設定で増減できる＝保存があれば実行リストを上書き
-            if (Array.isArray(state.settings.workTypes) && state.settings.workTypes.length) {
-              state.workTypes = state.settings.workTypes;
-              // 併用可フラグの初回補完：1Y/3M（コーティング）で未設定なら true（ユーザーが切り替えた値は尊重）
-              state.workTypes.forEach(function (w) {
-                if (w && (w.id === 'coat1y' || w.id === 'coat3m') && w.combinable === undefined) {
-                  w.combinable = true; migrated = true;
-                }
-              });
-              if (migrated) state.settings.workTypes = state.workTypes;
-            }
+            this._mergeSettings(d.settings);   // ← この中で作業タイプもコード基準に揃え直す（_applyWorkTypes）
             // 外注先：未設定 or 旧プレースホルダなら実名リストへ自動移行（v0.79.1）
             var OS_DEF = ['畑中板金','藤島板金','カーメイク','ブレス','タイヤマン','カーフラッシュ','野村自動車','各ディーラー','その他'];
             var OS_OLD = ['提携工場A','提携工場B','ガラス専門店'];
@@ -136,6 +125,9 @@
       } catch (e) {
         console.warn('[PitDB] 読み込み失敗。サンプルで継続します', e);
       }
+      /* 🔧 作業タイプはコードが正。保存が1度も無い端末でもここで確定させる（settings.workTypes に写す） */
+      this._applyWorkTypes();
+      this._flushWorkTypes();
       // 🔢 予約番号（resNo）が無いカードに採番（旧データ救済・1回で全部に付く）
       try { if (window.pitBackfillResNo && pitBackfillResNo()) this.save(true); } catch (e) {}
       this.ready = true;
@@ -243,7 +235,53 @@
         }
       });
       state.settings = cur;
+      this._applyWorkTypes();          // 作業タイプはコードが正（保存より優先）
       if (window.pitNormalizeEst) pitNormalizeEst();
+    },
+
+    /* 🔧🔧 作業タイプを**コード基準に揃え直す**（v2.5.0・2026-08-24 ゆうた指定）
+       -----------------------------------------------------------------
+       🔴 唯一の正＝`state.js` の `PIT_WORK_TYPES`。**設定画面からは足せない・変えられない。**
+          理由は state.js のコメント（id に挙動が結びついているので、名前と色だけ足しても付いてこない）。
+       ◎やること
+         ① コードの並び・名前・色・併用可で作り直す（クラウドに古い名前が残っていても勝つ）
+         ② コードに**無い** id が保存に残っていたら、**末尾に `legacy:true` を付けて残す**
+            ＝設定から足された型・コードから外した型で入っている**過去カードのバッジを消さないため**。
+            選択肢には出るが、設定画面では「旧」と出る（＝畳むか正式に入れるかを決めてもらう印）。
+         ③ 揃えた結果を `settings.workTypes` に書き戻す。**🔴 MHS はここを読んでいる**
+            （作業タイプの名前と色・概算金額）。書き戻しをやめると MHS の当日ビューから名前が消える。
+       ⚠ 呼ぶ場所＝`_mergeSettings` の最後（＝端末保存・クラウド初回・他端末の変更、全部ここを通る）と、
+          設定がまだ1度も保存されていない時のために `load()` / `connectCloud()` の締め。
+       ⚠ 中身が変わったぶんは、次のふつうの保存でクラウドへ上がる（差分判定に任せる＝ここでは保存しない）。 */
+    _applyWorkTypes: function () {
+      var master = (window.PIT_WORK_TYPES || []).map(function (w) {
+        var o = {}; Object.keys(w).forEach(function (k) { o[k] = w[k]; }); return o;
+      });
+      if (!master.length) return;                       // state.js が読めていない時は何もしない
+      var have = {};
+      master.forEach(function (w) { have[w.id] = 1; });
+      var saved = (state.settings && Array.isArray(state.settings.workTypes)) ? state.settings.workTypes : [];
+      saved.forEach(function (w) {
+        if (!w || !w.id || have[w.id]) return;
+        have[w.id] = 1;
+        var o = {}; Object.keys(w).forEach(function (k) { o[k] = w[k]; });
+        o.legacy = true;                                // コードに無い型＝旧
+        master.push(o);
+      });
+      if (!state.settings) state.settings = {};
+      /* 揃え直しで中身が変わったか（＝クラウドに古い作業タイプが残っていたか）を覚えておく。
+         変わっていたら、読み終わったあとで1回だけ保存して**クラウドと MHS にも行き渡らせる**。 */
+      if (this._js(state.settings.workTypes || null) !== this._js(master)) this._wtDirty = true;
+      state.workTypes = master;
+      state.settings.workTypes = master;                // 🔴 MHS が読む
+    },
+
+    /* 揃え直しで変わっていたら1回だけ保存する（読み終わったあとに呼ぶ） */
+    _flushWorkTypes: function () {
+      if (!this._wtDirty) return;
+      this._wtDirty = false;
+      console.log('[PitDB] 作業タイプをコード基準に揃え直しました（保存します）');
+      this.save(true);
     },
 
     _bindAutosave: function () {
@@ -281,6 +319,7 @@
     /* まとめて1枚に入れるもの */
     _SETTINGS_KEYS: ['settings', 'bays', 'floorPlan', 'aiVerdicts', 'boardLabels', 'inspectMarks', 'inspectMutes'],
 
+    _wtDirty: false,    // v2.5.0：作業タイプをコード基準に揃え直して中身が変わった＝1回保存が要る
     _loaded: false,     // v1.2.1：クラウドの中身を読み終わったか（読む前に書かないための鍵）
     _shadow: null,      // 最後にクラウドと合っていた内容（差分を出すための控え）
     _pending: {},       // いま書いている最中のもの（自分の書き込みが跳ね返ってくるのを無視する）
@@ -348,12 +387,18 @@
           console.log('[PitDB] 初回です。いまの設定を初期値としてクラウドに保存します');
           self._shadow.settings = '';
         }
+        /* 🔧 作業タイプはコードが正（設定がまだ1度も無いクラウドでもここで確定させる）。
+           揃え直しで中身が変わったなら、控えを空にして「設定はまだ上げていない」ことにする
+           ＝次の保存で設定が必ず1回上がる。🔴 MHS もここ（pitSettings/main）を読んでいる。 */
+        self._applyWorkTypes();
+        if (self._wtDirty) self._shadow.settings = '';
         self._applying = false;
 
         self._loaded = true;                      // ここから先だけ保存を許す
         console.log('[PitDB] 読み込み完了（' + total + '件）');
         if (window.PitSync) PitSync.connected();
         if (!sdoc.exists) self._cloudFlush();     // 初回だけ設定を書き上げる
+        self._flushWorkTypes();                   // 作業タイプが揃え直されていたら1回だけ保存
         self._watch();
         self._afterApply();
       }).catch(function (e) {
@@ -433,6 +478,7 @@
         });
         self._shadow.settings = js;
         self._applying = false;
+        self._flushWorkTypes();   // 他の端末が古い作業タイプを書いていたら、揃え直して書き戻す
         if (window.PitSync) PitSync.received();
         self._afterApply();
       }, function (e) { console.error('[PitDB] 設定の購読に失敗', e); });

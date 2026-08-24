@@ -108,7 +108,7 @@
      🔴 **1文字ずつの位置（cells）も一緒に返す。** 見出しの行から**列の位置**を測って、
         「どこからどこまでが顧客名か」を決めるのに使う（下の colsOf）。
      ================================================================ */
-  function linesOf(items, vp, pdfjs){
+  function linesOf(items, vp, pdfjs, pageNo){
     var rows = {};
     items.forEach(function (it) {
       var str = s(it.str);
@@ -132,7 +132,27 @@
           out += c.s;
           prevEnd = c.x + (c.w || 0);
         });
-        return { y: r.y, text: out.replace(/\s+/g, ' ').trim(), cells: r.cells };
+        /* 🖨 v2.4.0 **この行が紙のどこにあるか**を、PDFそのものの座標で覚えておく。
+           ＝ あとで元のPDFに帯を刷り込むために要る（ゆうた 2026-08-24）。
+           🔴 上の判定は「紙に見えているとおり」の座標でやっているが、
+              書き込む側（pdf-lib）は**回す前のPDFの座標**しか知らない。
+              なので pdf.js に**変換してもらう**（自分で回転の計算を書かない）。 */
+        var box = null;
+        if (vp && vp.convertToPdfPoint){
+          try {
+            var w1 = vp.width || 0;
+            var a = vp.convertToPdfPoint(0, r.y - 3.6);
+            var b = vp.convertToPdfPoint(w1, r.y + 3.6);
+            /* 🔴 **紙の右の余白がどこか**も、pdf.js に聞いておく。
+               ＝ 番号を打つ場所。回っている紙では「PDFのどちら側が紙の右か」が
+                  こちらからは分からないので、自分で計算せず**変換してもらう**。 */
+            var rr = vp.convertToPdfPoint(Math.max(0, w1 - 15), r.y - 0.4);
+            box = { x1: Math.min(a[0], b[0]), y1: Math.min(a[1], b[1]),
+                    x2: Math.max(a[0], b[0]), y2: Math.max(a[1], b[1]),
+                    右x: rr[0], 右y: rr[1] };
+          } catch (e) { box = null; }
+        }
+        return { y: r.y, text: out.replace(/\s+/g, ' ').trim(), cells: r.cells, 頁: pageNo || 0, 枠: box };
       })
       .filter(function (r) { return r.text; });
   }
@@ -222,6 +242,15 @@
         });
         if (best){ f[best] = (f[best] || '') + txt; return; }
       }
+      /* 🔴🔴 v2.3.0 **金額の欄に、数字ではなく字が入ることがある**（ゆうた 2026-08-24 指摘）。
+           ・持ち込み …… お客様が部品を持ってきた。売上は立たない（原価は1円で入っている）
+           ・部品サービス … 部品代をサービスした
+           ・工賃サービス … 工賃をサービスした
+         ⚠ 前はここで拾えず、金額が数字にならないので **行がまるごと消えていた**。
+            そのせいで「オイル交換なのにオイルが無い」という**嘘の指摘**が出ていた。
+         🔴 場所では決めない。**言葉そのもの**で決める
+            （持ち込み・部品サービスは部品の欄、工賃サービスは作業の欄にしか出ない）。 */
+      if (/^(持ち込み|部品サービス|工賃サービス)$/.test(txt)){ f['_ことわり'] = txt; return; }
       /* 区分（交換・部品・オイル…）＝**数量の列より左にいる字**。
          🔴 見出しの「作業原価」「部品区分」は実物で測れないことがあるので、
             それに頼らず「作業数量より左＝作業区分／部品数量より左＝部品区分」で決める。 */
@@ -443,8 +472,12 @@
           var rw = detRow(ln, det);
           if (rw){
             var pAmt = dnum(rw.f, '部品金額'), wAmt = dnum(rw.f, '作業金額');
-            var isP = (pAmt != null);
+            /* 🔴 v2.3.0 金額の欄が「持ち込み」「部品サービス」「工賃サービス」だった行。
+               ＝ **お金は0だが、仕事はしている。** 消さずに、断り書きを付けて残す。 */
+            var kot = t(rw.f['_ことわり'] || '');
+            var isP = (pAmt != null) || (kot === '持ち込み' || kot === '部品サービス');
             var amt = isP ? pAmt : wAmt;
+            if (amt == null && kot) amt = 0;
             if (amt != null){
               cur.明細.push({
                 種: isP ? '部品' : '作業',
@@ -453,7 +486,10 @@
                 数量: dnum(rw.f, isP ? '部品数量' : '作業数量') || 0,
                 単価: dnum(rw.f, isP ? '部品単価' : '作業単価') || 0,
                 金額: amt,
-                原価: dnum(rw.f, isP ? '部品原価' : '作業原価') || 0
+                原価: dnum(rw.f, isP ? '部品原価' : '作業原価') || 0,
+                ことわり: kot,           /* '' / 持ち込み / 部品サービス / 工賃サービス */
+                頁: ln.頁 || 0,          /* 🖨 v2.4.0 紙のどこにあるか（元のPDFに刷り込むため） */
+                枠: ln.枠 || null
               });
             }
           }
@@ -505,10 +541,13 @@
      ================================================================ */
   function read(file, onProgress){
     if (!file) return Promise.reject(new Error('PDF が選ばれていません'));
-    var _lb = null;
+    var _lb = null, _bytes = null;
     return lib().then(function (pdfjs) {
       _lb = pdfjs;
       return file.arrayBuffer().then(function (buf) {
+        /* 🖨 v2.4.0 **元のPDFそのもの**を覚えておく（あとで帯を刷り込んで出し直すため）。
+           ⚠ pdf.js に渡した Uint8Array は読み終わると中身が空になることがあるので、**写しを取る**。 */
+        _bytes = new Uint8Array(buf.slice(0));
         return pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
       });
     }).then(function (doc) {
@@ -523,7 +562,7 @@
                 /* 🔴 紙に見えているとおりの位置で並べ直す（この帳票は横向きに刷ってある） */
                 var vp = null;
                 try { vp = _pg.getViewport({ scale: 1 }); } catch (e) {}
-                linesOf(tc.items || [], vp, _lb).forEach(function (r) { lines.push(r); });
+                linesOf(tc.items || [], vp, _lb, pi).forEach(function (r) { lines.push(r); });
                 if (onProgress) { try { onProgress(pi, n); } catch (e) {} }
               });
           });
@@ -533,6 +572,7 @@
         var r = parse(lines);
         r.ページ数 = n;
         r.生の行 = lines.map(function (x) { return x.text; });
+        r.元のPDF = _bytes;                 /* 🖨 v2.4.0 刷り込み用 */
         return r;
       });
     });

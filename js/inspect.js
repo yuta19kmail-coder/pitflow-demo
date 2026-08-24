@@ -145,6 +145,16 @@
          +   '</span>'
          + '</div>';
   }
+  /* 🗓 v2.3.0 PDFを入れた時に、月バーを**そのPDFの月**へ動かす入口。
+     🔴 月の覚えはここ1つ（`UI.ym`）。クォーターチェックの画面は自分では動かさない。
+     ⚠ これが無いと、7月のPDFを入れても月バーが8月のままになり、
+        Qの箱が「8月ぶん4つ」＋「7月ぶん4つ」で**8個並んでしまう**（実際そうなっていた）。 */
+  window.pitInspectGoYm = function (y){
+    y = String(y == null ? '' : y).slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(y)) return;
+    UI.ym = y;
+    if (UI.q){ UI.q.ym = y; UI.q.saved = null; UI.q.savedId = ''; }
+  };
   window.pitInspectMonth = function (n){
     if (!+n){ UI.ym = ymNow(); }
     else {

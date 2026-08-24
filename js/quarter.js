@@ -809,6 +809,8 @@
       });
       /* 🗓 v2.0.0（ゆうた指定）**PDF が言っている期間から、クォーターを自動で割り振る。**
          🔴 割り方は quarter-match.js の1本。ここで 1-7／8-15 と書かない。 */
+      /* 🖨 v2.4.0 **元のPDFそのもの**を持っておく（気になる所を刷り込んで出し直すため）。 */
+      U.元のPDF = r.元のPDF || null;
       var sp = w.pitQSplit ? w.pitQSplit(r.期間, soft) : { 組: [], 期間: r.期間, 期間の出どころ: 'PDF' };
       U.term = sp.期間; U.termSrc = sp.期間の出どころ;
       U.groups = (sp.組 || []).map(function (g) {
@@ -829,8 +831,14 @@
         var sc = g.soft.length + (g.全部 ? 10000 : 0);
         if (sc > best){ best = sc; U.gi = i; }
       });
+      /* 🗓 v2.3.0 月バーを**このPDFの月**へ動かす（入口は inspect.js の1本）。
+         ⚠ これが無いと、7月のPDFを入れても箱は8月のままで、7月ぶんが下に別に並ぶ。 */
+      if (w.pitInspectGoYm && U.groups[U.gi]) w.pitInspectGoYm(U.groups[U.gi].from);
       applyGroup(U);
       U.tab = 'data';
+      /* 🔴 新しいPDFを入れたら、③の AI の見立ては**捨てる**。
+         ＝ 前のPDFの見立てが残っていると、別の伝票に別の伝票の話が付く。 */
+      if (w._insp && w._insp.ai){ w._insp.ai.見立て = null; w._insp.ai.err = ''; w._insp.ai.at = ''; }
       if (w.renderInspect) renderInspect();
       if (w.pitToast){
         var g0 = U.groups[U.gi];
@@ -941,6 +949,7 @@
     var U = Q();
     U.pdf = null; U.err = ''; U.busy = '';
     U.res = null; U.soft = null; U.groups = null; U.gi = 0; U.term = null; U.termSrc = '';
+    U.元のPDF = null; U.印刷中 = '';
     U.saved = null; U.savedId = ''; U.savedAt = '';
     if (w.renderInspect) renderInspect();
     if (w.pitToast) pitToast('画面を空にしました（残してある結果はそのままです）');

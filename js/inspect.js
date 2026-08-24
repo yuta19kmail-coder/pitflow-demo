@@ -376,14 +376,10 @@
     var res = UI.res || run();
     var openN = res ? res.findings.filter(function(f){ return !f.mark; }).length : 0;
 
+    /* 🧹 v2.2.0 見出しは撤去（ゆうた 2026-08-24「フォロー文は全部要らない」）。
+       ⚠ **いまのクォーター**を大きく出すと、PDFが言っている期間と食い違って見える
+          （8月Q1のPDFを読んでいるのに「第4クォーター」と出ていた）。 */
     var h = '';
-    h += '<div class="ins-q-head">'
-       +   '<div class="ins-q-now">' + (q ? esc(q.label) : 'クォーター')
-       +     (q ? ' <span>' + esc(q.s) + ' 〜 ' + esc(q.e) + '</span>' : '')
-       +   '</div>'
-       +   '<div class="ins-q-sub">クォーター＝1か月を4つに分けた区切り（1〜7日／8〜15日／16〜23日／24日〜末日）。'
-       +     'およそ週に1度、まとめて見直すための単位です。</div>'
-       + '</div>';
 
     /* ================================================================
        🔴 v1.181.0 ②の中身は **quarter.js（画面）＋ quarter-match.js（物差し）＋

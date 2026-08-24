@@ -23,24 +23,29 @@
 
 /* ── 🗄 その月の Q1〜Q4（ルーティン） ── */
 .q-plan{ border:1px solid var(--border); border-radius:10px; background:var(--bg2); padding:9px 12px; margin:0 0 10px; }
-.q-plan-h{ display:flex; align-items:center; gap:8px; font-size:11.5px; color:var(--text2); margin-bottom:7px; }
-.q-plan-h b{ color:var(--text); }
-.q-mv{ border:1px solid var(--border); background:var(--bg3); color:var(--text2);
-  border-radius:7px; width:24px; height:22px; font-size:12px; cursor:pointer; line-height:1; }
-.q-plan-b{ display:flex; gap:7px; flex-wrap:wrap; }
-/* ⚠ v2.0.0 「×」を右上に置くため、ボタンを箱で包んだ。**幅の伸び方は箱側に移す**（.q-pq は中で伸びる） */
-.q-plan-b > .q-pqwrap{ flex:1 1 130px; }
-.q-plan-b > .q-pqwrap > .q-pq{ flex:1 1 auto; width:100%; }
-.q-pq{ flex:1 1 130px; border:1px solid var(--border); background:var(--bg); color:var(--text2);
-  border-radius:9px; padding:7px 10px; cursor:pointer; text-align:left; line-height:1.5; }
+.q-plan-b{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+.q-plan-b > .q-pqwrap{ min-width:0; }
+/* 🗓 v2.2.0 Q1〜Q4＝下の4つの箱と同じテイスト。左＝期間・実施日・金額／右＝残り件数を大きく */
+.q-pqwrap{ position:relative; display:flex; }
+.q-pq{ display:flex; align-items:center; gap:10px; width:100%; text-align:left; cursor:pointer;
+  border:1px solid var(--border); background:var(--bg1); border-radius:12px; padding:10px 13px; }
 .q-pq:hover{ border-color:var(--text3); }
-.q-pq.done{ border-color:rgba(29,185,122,.5); }
+.q-pq.done{ border-color:rgba(245,158,11,.5); }
+.q-pq.ok{ border-color:rgba(29,185,122,.5); }
 .q-pq.ng{ border-color:rgba(239,68,68,.55); }
-.q-pq-t{ display:block; font-size:11px; font-weight:800; color:var(--text); }
-.q-pq-d{ display:block; font-size:9.5px; color:var(--text3); }
-.q-pq-v{ display:block; font-size:12.5px; font-weight:800; color:var(--text); margin-top:2px; }
-.q-pq-s{ display:block; font-size:9.5px; color:var(--text3); }
-.q-pq-n{ display:block; font-size:11px; color:var(--text3); margin-top:2px; }
+.q-pq-l{ display:flex; flex-direction:column; gap:1px; min-width:0; flex:1 1 auto; }
+.q-pq-t{ font-size:12.5px; font-weight:800; color:var(--text2); }
+.q-pq-t i{ font-style:normal; font-size:10.5px; font-weight:600; color:var(--text3); margin-left:6px; }
+.q-pq-d{ font-size:10.5px; color:var(--text3); }
+.q-pq-v{ font-size:12px; font-weight:800; color:var(--ins-c,#f59e0b); font-variant-numeric:tabular-nums; }
+.q-pq.ok .q-pq-v{ color:var(--green); }
+.q-pq-r{ flex:0 0 auto; font-size:13px; font-weight:800; color:var(--ins-c,#f59e0b); white-space:nowrap; }
+.q-pq-r b{ font-size:26px; font-weight:800; margin:0 2px; font-variant-numeric:tabular-nums; }
+.q-pq-r em{ font-style:normal; font-size:13px; font-weight:700; color:var(--text3); }
+.q-pq.ok .q-pq-r{ color:var(--green); font-size:22px; }
+.q-pq-x{ position:absolute; top:-6px; right:-6px; width:20px; height:20px; line-height:1; font-size:12px; font-weight:800;
+  color:var(--text3); background:var(--bg1); border:1px solid var(--border2); border-radius:50%; cursor:pointer; padding:0; }
+.q-pq-x:hover{ color:#fff; background:#ef4444; border-color:#ef4444; }
 .q-plan-off{ font-size:11px; color:var(--text3); margin:0 0 10px; }
 
 /* 残した／残してある結果 */
@@ -202,6 +207,9 @@
 .q-fx-mk{ font-size:11px; font-weight:700; color:var(--text2); background:transparent; border:1px solid var(--border2);
           border-radius:6px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
 .q-fx-mk:hover{ background:var(--bg3); }
+/* 🗓 v2.2.0 実績日のふだんの答え「このままでよい」は、目立つ側に置く */
+.q-fx-keep{ color:var(--text); border-color:var(--border2); background:var(--bg3); }
+.q-fx-keep:hover{ border-color:var(--brand); }
 .q-fx-lock{ display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700;
             color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:1px 7px; }
 .q-fx.is-done{ opacity:.62; }
@@ -316,3 +324,172 @@
   .q-c-a, .q-c-p{ text-align:left; grid-column:2; }
   .q-c-gap{ padding-left:0; }
 }
+
+
+/* ================================================================
+   🗂 v2.2.0 入り口は4つだけ（ゆうた 2026-08-24）
+   ・データがちがう／金額がちがう／日付がちがう／OK
+   ・1件は1か所にしか出ないので、4つを足すと全部になる
+   ================================================================ */
+.q-gr{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; margin:0 0 12px; align-items:stretch; }
+.q-grb{ display:flex; flex-direction:column; align-items:flex-start; gap:1px; text-align:left; cursor:pointer;
+  border:1px solid var(--border); border-radius:12px; background:var(--bg1); padding:10px 13px; min-width:0; }
+.q-grb:hover{ border-color:var(--text3); }
+.q-grb.on{ border-color:var(--brand); background:var(--bg2); box-shadow:0 0 0 1px var(--brand) inset; }
+.q-grb-l{ font-size:12.5px; font-weight:800; color:var(--text2); }
+.q-grb.on .q-grb-l{ color:var(--text); }
+.q-grb-n{ font-size:26px; font-weight:800; line-height:1.15; color:var(--text); font-variant-numeric:tabular-nums; }
+.q-grb-v{ font-size:11.5px; font-weight:700; color:var(--ins-c,#f59e0b); font-variant-numeric:tabular-nums; min-height:17px; }
+.q-grb-t{ font-size:10.5px; color:var(--text3); line-height:1.5; margin-top:3px; }
+.q-grb.is-ok .q-grb-n{ color:var(--green); }
+.q-grb.is-ok.on{ border-color:var(--green); box-shadow:0 0 0 1px var(--green) inset; }
+.q-chk{ display:flex; align-items:center; gap:10px; }
+.q-chk .q-print{ margin-left:auto; }
+/* 検算＝合っている時は小さく1行、合わない時だけ大きく赤く */
+.q-chk{ font-size:11px; margin-top:8px; }
+.q-chk.ok{ color:var(--green); }
+.q-chk.ng{ color:#ef4444; font-weight:700; font-size:12.5px; }
+
+/* 🔴🔴 片方にしか無い1件＝赤いカード／カードは有る＝黄色に格下げ */
+.q-c.gone{ border-color:rgba(239,68,68,.55); border-left-color:#ef4444; border-left-width:5px;
+  background:rgba(239,68,68,.06); }
+.q-c-gone{ font-size:11.5px; font-weight:800; color:#ef4444; background:rgba(239,68,68,.14);
+  border:1px solid rgba(239,68,68,.5); border-radius:6px; padding:1px 9px; }
+.q-c.gone-y{ border-color:rgba(245,158,11,.5); border-left-color:var(--ins-c,#f59e0b); border-left-width:5px;
+  background:rgba(245,158,11,.05); }
+.q-c-gone-y{ font-size:11.5px; font-weight:800; color:var(--ins-c,#f59e0b); background:rgba(245,158,11,.13);
+  border:1px solid rgba(245,158,11,.45); border-radius:6px; padding:1px 9px; }
+.q-c.mism{ border-left-color:#ef4444; }
+.q-c-warn{ font-size:10.5px; font-weight:800; color:#ef4444; background:rgba(239,68,68,.12);
+  border:1px solid rgba(239,68,68,.5); border-radius:6px; padding:1px 8px; }
+.q-fx-note{ font-size:10.5px; color:var(--text3); line-height:1.6; }
+.q-fx-note b{ color:#ef4444; }
+.q-act-ok b{ color:var(--text2); }
+.q-act-ok em{ font-style:normal; font-size:10px; color:var(--text3); }
+
+/* 🃏 v2.2.0 カードの中を2つに割る＝左は見くらべ、右は片づけ
+   🔴 1列のまま横に伸ばすと、金額だけが遠くへ飛んでいく（2026-08-23 ゆうた指摘） */
+.q-c-body{ display:grid; grid-template-columns:minmax(0,1fr) 250px; gap:14px; align-items:start; }
+.q-c-main{ min-width:0; }
+.q-c-plate em{ font-style:normal; color:var(--text3); font-weight:600; margin-left:9px; }
+.q-c-plate em.bad{ color:#ef4444; font-weight:700; }
+.q-c-plate em::before{ content:'／'; color:var(--border2); margin-right:9px; }
+.q-c-cmp{ max-width:660px; }
+.q-c-r{ display:grid; grid-template-columns:74px 100px 100px minmax(0,1fr) 78px 116px; gap:8px;
+  align-items:baseline; padding:3px 0; }
+.q-c-hd{ padding:0 0 2px; }
+.q-c-hd span{ font-size:9.5px; font-weight:700; color:var(--text3); }
+.q-c-hd span:nth-child(4), .q-c-hd span:nth-child(5), .q-c-hd span:nth-child(6){ text-align:right; }
+.q-c-r i{ display:none; }   /* 広い時は上の見出し行だけ。狭い時に中で名乗る */
+.q-c-d.none{ color:var(--text3); font-weight:600; }
+.q-c-d.flat{ color:var(--text2); font-weight:600; }   /* 実績日＝事実として出すだけ */
+.q-c-d.miss{ font-size:12.5px; color:var(--ins-c,#f59e0b); }
+.q-c-d.bad{ color:#ef4444; }
+.q-c-a.bad{ color:#ef4444; }
+.q-c-a.none{ color:var(--text3); font-weight:600; }
+.q-c-p{ white-space:nowrap; }
+/* 🚗 車体番号＝いちばん強い「同じ車」の証拠 */
+.q-c-v{ font-size:10.5px; letter-spacing:-.02em; color:var(--text3); text-align:right;
+  font-family:Consolas,Menlo,"Courier New",monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.q-c-v.ok{ color:var(--green); font-weight:700; }
+.q-c-v.bad{ color:#ef4444; font-weight:700; }
+.q-c-v.none{ color:var(--border2); font-family:inherit; }
+.q-c-gap{ padding-left:74px; }
+/* 右の列＝片づけ。上下に積む */
+.q-c-act{ border-left:1px dashed var(--border); border-top:none; padding:0 0 0 12px; margin-top:0; align-self:stretch; }
+.q-c-act .q-fx{ padding:4px 0; display:flex; flex-wrap:wrap; gap:5px; }
+.q-c-act .q-fx-k{ min-width:100%; font-size:10.5px; }
+@media (max-width:960px){
+  .q-c-body{ grid-template-columns:1fr; gap:0; }
+  .q-c-act{ border-left:none; border-top:1px dashed var(--border); padding:7px 0 0; margin-top:8px; }
+  .q-c-act .q-fx-k{ min-width:52px; font-size:11px; }
+  .q-gr, .q-plan-b{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:640px){
+  .q-c-hd{ display:none; }
+  .q-c-r{ grid-template-columns:1fr; gap:1px; padding:5px 0; }
+  .q-c-r + .q-c-r{ border-top:1px solid var(--border); }
+  .q-c-a, .q-c-p, .q-c-v{ text-align:left; }
+  .q-c-r i{ display:inline-block; font-style:normal; font-size:10px; font-weight:700;
+    color:var(--text3); min-width:44px; margin-right:6px; }
+  .q-c-gap{ padding-left:0; }
+}
+
+
+/* ================================================================
+   ✍ v2.2.0 書き込みの帯／書き込んだ内容の見え方
+   ⚠ 顧客詳細（customers.js）からも同じ表を使う＝見た目を2つ持たない。
+   ================================================================ */
+.q-wr{ display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  border:1px solid var(--brand,#26a269); background:var(--brand-soft,rgba(38,162,105,.15));
+  border-radius:12px; padding:11px 14px; margin:0 0 12px; }
+.q-wr.done{ border-color:var(--border); background:var(--bg1); }
+.q-wr-l{ display:flex; flex-direction:column; gap:1px; }
+.q-wr-l b{ font-size:13.5px; color:var(--text); }
+.q-wr-l span{ font-size:11.5px; color:var(--text3); }
+.q-wr-b{ margin-left:auto; font-size:12.5px; font-weight:700; color:var(--text2);
+  background:var(--bg3); border:1px solid var(--border); border-radius:9px; padding:7px 16px; cursor:pointer; }
+.q-wr-b.go{ color:#fff; background:var(--brand); border-color:var(--brand); font-size:13.5px; padding:8px 22px; }
+.q-wr-b:hover{ filter:brightness(1.1); }
+
+.vw{ border:1px solid var(--border); border-radius:12px; background:var(--bg1); overflow:hidden; }
+.vw-h{ display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--border); }
+.vw-h b{ font-size:13.5px; }
+.vw-x{ margin-left:auto; font-size:11.5px; font-weight:700; color:var(--text2);
+  background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:3px 12px; cursor:pointer; }
+.vw-pick{ display:flex; gap:6px; flex-wrap:wrap; padding:11px 14px 0; }
+.vw-p{ font-size:11.5px; color:var(--text3); background:transparent; border:1px solid var(--border);
+  border-radius:8px; padding:3px 11px; cursor:pointer; }
+.vw-p.on{ color:var(--text); border-color:var(--brand); background:var(--bg3); font-weight:700; }
+.vw-p i{ font-style:normal; font-size:9.5px; font-weight:800; color:var(--ins-c,#f59e0b);
+  background:rgba(245,158,11,.14); border-radius:5px; padding:0 5px; margin-left:5px; }
+.vw-sec{ padding:13px 14px 2px; }
+.vw-t{ font-size:11px; font-weight:800; color:var(--text3); margin-bottom:7px; }
+.vw-car{ border:1px solid var(--border); border-radius:10px; padding:11px 13px; background:var(--bg2); }
+.vw-cn{ font-size:16px; font-weight:800; color:var(--text); margin-bottom:7px; }
+.vw-t2{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.vw-t2 th{ text-align:left; font-weight:600; color:var(--text3); width:92px; padding:3px 0; font-size:11.5px; }
+.vw-t2 td{ color:var(--text); padding:3px 0; }
+.vw-t2 tr.vw-new td{ color:var(--green); font-weight:700; font-family:Consolas,Menlo,monospace; }
+.vw-badge{ font-size:10px; font-weight:800; color:var(--green); background:rgba(29,185,122,.14);
+  border:1px solid rgba(29,185,122,.45); border-radius:6px; padding:1px 7px; margin-left:8px; font-family:inherit; }
+.vw-his{ display:flex; flex-direction:column; gap:7px; }
+.vw-hr{ border:1px solid var(--border); border-radius:10px; padding:9px 12px; background:var(--bg2); }
+.vw-hr.on{ border-color:rgba(29,185,122,.4); }
+.vw-hr.old{ opacity:.55; }
+.vw-hd{ font-size:12.5px; font-weight:800; color:var(--text); }
+.vw-hm{ display:flex; align-items:baseline; gap:11px; flex-wrap:wrap; margin-top:2px; }
+.vw-hm b{ font-size:17px; color:var(--text); font-variant-numeric:tabular-nums; }
+.vw-hm span{ font-size:11.5px; color:var(--text3); }
+.vw-hm em{ font-style:normal; font-size:12.5px; font-weight:800; color:var(--green); }
+.vw-hn{ font-size:11px; color:var(--text3); margin-top:3px; }
+.vw-hou-c{ font-size:11px; color:var(--ins-c,#f59e0b); }
+.vw-tw{ overflow-x:auto; padding-bottom:10px; }
+.vw-t3{ width:100%; border-collapse:collapse; font-size:12px; min-width:600px; }
+.vw-t3 th{ text-align:left; font-size:10.5px; font-weight:700; color:var(--text3);
+  border-bottom:1px solid var(--border); padding:6px 8px; white-space:nowrap; }
+.vw-t3 td{ padding:5px 8px; color:var(--text2); border-bottom:1px solid var(--border2,#232c34); white-space:nowrap; }
+.vw-t3 td:first-child{ white-space:normal; color:var(--text); }
+.vw-t3 .n{ text-align:right; font-variant-numeric:tabular-nums; }
+.vw-t3 .k{ font-size:10.5px; color:var(--text3); }
+.vw-t3 .c{ color:var(--text3); }
+.vw-t3 .g{ color:var(--green); font-weight:700; }
+.vw-t3 tr.hd td{ background:var(--bg3); padding:6px 8px; border-bottom:1px solid var(--border); }
+.vw-t3 tr.hd b{ font-size:12.5px; color:var(--text); }
+.vw-t3 tr.hd span{ font-size:10.5px; color:var(--text3); margin-left:9px; }
+.vw-t3 tr.mi td, .vw-t3 tr.mi .g{ color:var(--ins-c,#f59e0b); }
+.vw-t3 tfoot th{ border-top:1px solid var(--border); border-bottom:none; font-size:12.5px; color:var(--text); padding-top:8px; }
+.vw-t3 tfoot th.g{ color:var(--green); }
+.vw-t3 tfoot th.c{ color:var(--text3); }
+.vw-hou{ border:1px dashed var(--border2); border-radius:10px; padding:10px 12px; margin-top:11px; background:var(--bg2); }
+.vw-hou-t{ font-size:12px; font-weight:800; color:var(--text2); }
+.vw-hou-t span{ display:block; font-size:10.5px; font-weight:400; color:var(--text3); margin-top:2px; }
+.vw-hou-t b{ color:var(--ins-c,#f59e0b); }
+.vw-hou-b{ margin-top:7px; }
+.vw-hou-r{ display:flex; align-items:baseline; gap:10px; font-size:12px; color:var(--text2); padding:2px 0; }
+.vw-hou-r b{ margin-left:auto; color:var(--text); font-variant-numeric:tabular-nums; }
+.vw-hou-r.sum{ border-top:1px solid var(--border); margin-top:4px; padding-top:5px; font-weight:700; }
+.vw-hou-n{ font-size:11px; color:var(--text3); line-height:1.8; margin-top:8px; }
+.vw-hou-n b{ color:var(--text2); }
+.vw-go{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 14px 14px; }
+.vw-go span{ font-size:11px; color:var(--text3); }

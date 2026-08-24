@@ -147,19 +147,104 @@
         （お名前も担当者も「姓 名」で、間はどちらも空白）。実際それで割れなかった。
      ================================================================ */
   var COL_KEYS = ['売上日', '登録番号', '個人・法人区分', '顧客コード', '顧客名', '受付担当者'];
-  function colsOf(line){
+  /* 🧾 v2.2.0 明細の列。**見出しの行から位置を測る**のは上と同じやり方。
+     ⚠ 字面で切ろうとすると、部品名に空白が入っているもの（`エンジンオイル（WAKO'S EX-`）で割れない。 */
+  var DET_KEYS = ['作業内容・使用部品名', '作業区分', '作業数量', '作業単価', '作業金額', '作業原価',
+                  '部品区分', '部品数量', '部品単価', '部品金額', '部品原価', '担当者名称'];
+  function rulerOf(line, keys, least){
     if (!line || !line.cells) return null;
     var got = {}, n = 0;
     line.cells.forEach(function (c) {
       var k = t(c.s);
-      if (COL_KEYS.indexOf(k) >= 0 && got[k] == null) { got[k] = c.x; n++; }
+      if (keys.indexOf(k) >= 0 && got[k] == null) { got[k] = { x: c.x, r: c.x + (c.w || 0) }; n++; }
     });
-    if (n < 4) return null;                    /* 見出しの行ではない */
-    var cols = COL_KEYS.filter(function (k) { return got[k] != null; })
-      .map(function (k) { return { key: k, x: got[k] }; })
+    if (n < least) return null;                /* 見出しの行ではない */
+    return keys.filter(function (k) { return got[k] != null; })
+      .map(function (k) { return { key: k, x: got[k].x, r: got[k].r }; })
       .sort(function (a, b) { return a.x - b.x; });
-    return cols;
   }
+  function colsOf(line){ return rulerOf(line, COL_KEYS, 4); }
+  /* 🧾 v2.2.0 明細の物差し */
+  function detOf(line){
+    var r = rulerOf(line, DET_KEYS, 6);
+    return r ? fillDet(r) : null;
+  }
+  /* 🧾 v2.2.0 見出しの字がくっついて**測れなかった列**を、前後から埋める。
+     🔴 実物では「作業原価」と「部品区分」の2つが測れなかった（隣の字とくっついていた）。
+        埋めないと、部品の区分が名前にくっつく（「ドレーンワッシャー部品」になっていた）。 */
+  function fillDet(det){
+    var have = {}, i;
+    det.forEach(function (c) { have[c.key] = c; });
+    var out = [], last = null;
+    for (i = 0; i < DET_KEYS.length; i++){
+      var k = DET_KEYS[i];
+      if (have[k]) { out.push(have[k]); last = { i: i, c: have[k] }; continue; }
+      /* 次に測れている列を探して、その間に等間隔で置く */
+      var nx = null, j;
+      for (j = i + 1; j < DET_KEYS.length; j++) if (have[DET_KEYS[j]]) { nx = { i: j, c: have[DET_KEYS[j]] }; break; }
+      if (!last || !nx) continue;                 /* 端が測れていない時は、その列はあきらめる */
+      var step = (nx.c.x - last.c.r) / (nx.i - last.i);
+      var x = last.c.r + step * (i - last.i);
+      out.push({ key: k, x: x, r: x + step * 0.8, 埋めた: true });
+    }
+    return out.sort(function (a, b) { return a.x - b.x; });
+  }
+
+  /* ================================================================
+     🧾 v2.2.0 明細の1行を、列の位置でほどく
+     ----------------------------------------------------------------
+     🔴🔴 ここが今回いちばん詰まった所。**数字は右そろえ**なので、
+        「字の左端がどの列に入っているか」で決めると、桁の多い数字が1つ左の列に落ちる。
+        （実際、単価90と金額90がくっついて「9090」になっていた）
+        👉 **数字は「右端がどの列の右端に近いか」で決める。**
+     ⚠ 区分（交換・部品・オイル…）は左そろえなので、こちらは**左端**で見る。
+     ⚠ 担当者名称の列（＊＊＊）は捨てる。
+     ⚠ 名前の左に作業コード（330・7501…）が付くことがある。数字だけの塊は落とす。
+     ================================================================ */
+  var DET_NUM = ['作業数量', '作業単価', '作業金額', '作業原価',
+                 '部品数量', '部品単価', '部品金額', '部品原価'];
+  function detRow(line, det){
+    if (!line || !line.cells || !det) return null;
+    var map = {}, f = {}, name = [];
+    det.forEach(function (c) { map[c.key] = c; });
+    line.cells.forEach(function (c) {
+      var txt = t(c.s);
+      if (!txt) return;
+      var R = c.x + (c.w || 0);
+      if (/^[0-9,.\-]+$/.test(txt)){
+        /* 🔴 数字は**右そろえ**。「右端がどの列の右端に近いか」だけで決める。
+           ⚠ 範囲で決める逃げ道を作ると、単独の「0」が金額にくっつく（15000 になっていた）。 */
+        var best = null, bd = 12;
+        DET_NUM.forEach(function (k) {
+          var col = map[k]; if (!col) return;
+          var d = Math.abs(R - col.r);
+          if (d < bd){ bd = d; best = k; }
+        });
+        if (best){ f[best] = (f[best] || '') + txt; return; }
+      }
+      /* 区分（交換・部品・オイル…）＝**数量の列より左にいる字**。
+         🔴 見出しの「作業原価」「部品区分」は実物で測れないことがあるので、
+            それに頼らず「作業数量より左＝作業区分／部品数量より左＝部品区分」で決める。 */
+      var w1 = map['作業数量'], w2 = map['部品数量'], nmc = map['作業内容・使用部品名'];
+      if (nmc && c.x > nmc.r + 4){
+        if (w1 && c.x < w1.x - 8){ f['作業区分'] = (f['作業区分'] || '') + txt; return; }
+        if (w2 && c.x < w2.x - 8){ f['部品区分'] = (f['部品区分'] || '') + txt; return; }
+      }
+      if (map['担当者名称'] && c.x >= map['担当者名称'].x - 6) return;   /* ＊＊＊ は捨てる */
+      name.push(txt);
+    });
+    /* 名前の頭に付く作業コード（330・7501…）と、行末に落ちた数字を落とす */
+    var nm = name.join('').replace(/\s+/g, ' ').trim()
+                 .replace(/^[0-9]+\s*(?=[^0-9])/, '')
+                 .replace(/[\s0-9.]+$/, '');
+    return { 名: nm, f: f };
+  }
+  function dnum(f, k){
+    var v = s(f[k]).replace(/[^0-9.\-]/g, '');
+    if (!v || !/^-?\d+(\.\d+)?$/.test(v)) return null;
+    return +v;
+  }
+
   /* その行の、その列に入っている字を集める（列の左端 − 3 から、次の列の左端 − 3 まで） */
   function pick(line, cols, key){
     if (!line || !line.cells || !cols) return '';
@@ -222,15 +307,22 @@
   var RE_KBN  = /日付区分\s*[:：]?\s*(\S+)/;
 
   function parse(lines){
-    var slips = [], cur = null, warn = [], cols = null;
+    var slips = [], cur = null, warn = [], cols = null, det = null;
     var total = null, sheets = null;
-    var pending = 0;      /* 頭のあと、伝票番号・車種名を拾うために見る行数 */
+    var pending = 0;      /* 頭のあと、伝票番号・車台番号・車種名を拾うために見る行数 */
     var term = null, kbn = '';
 
     function close(){
       if (!cur) return;
       /* 🔴 PitFlow と比べる額＝伝票計 − 消費税 − 非課税 */
       cur.比べる金額 = cur.伝票計 - cur.消費税 - cur.非課税;
+      /* 🧾 v2.2.0 明細の自己検証。
+         🔴 **足して伝票の額にならない明細は、持たせない。**
+            出しても合わない表を見せるほうが、無いより悪い（数字を疑う理由になる）。 */
+      var sum = 0;
+      cur.明細.forEach(function (x) { if (x.種 !== '見出し') sum += (x.金額 || 0); });
+      cur.明細が合う = (cur.明細.length > 0) && (sum === cur.比べる金額);
+      cur.明細合計 = sum;   /* 🔴 合わない時に「いくらズレたか」を残す（黙って捨てない） */
       slips.push(cur); cur = null; pending = 0;
     }
 
@@ -241,6 +333,8 @@
       /* 見出しの行が来たら、そこで**列の位置**を測り直す（ページごとに出てくる） */
       var c = colsOf(ln);
       if (c) { cols = c; return; }
+      var dd = detOf(ln);
+      if (dd) { det = dd; return; }            /* 🧾 v2.2.0 明細の物差しも測り直す */
 
       /* 🔴 いちばん最後＝組織計／総合計の行。**合計枚数が一緒に載っている** */
       if (RE_GRAND.test(x)){
@@ -276,8 +370,10 @@
         var p = rest.match(RE_PLATE);
         cur = {
           売上日: wareki(h[1], h[2], h[3], h[4]),
-          ナンバー: '', 顧客名: '', 受付担当: '', 伝票: '', 車種: '',
+          ナンバー: '', 顧客名: '', 受付担当: '', 伝票: '', 車種: '', 車台: '',
           伝票計: 0, 消費税: 0, 非課税: 0, 比べる金額: 0,
+          /* 🧾 v2.2.0 伝票の中身 */
+          明細: [], 法定: [], 原価: 0, 明細が合う: false,
           _頭: x
         };
         /* 🔴 まず**列の位置**で切る（これが本筋）。列が測れていない時だけ、字面で拾う。 */
@@ -300,28 +396,68 @@
       }
       if (!cur) return;
 
-      /* 頭のすぐ後ろ2行＝伝票番号（売上日の列）と車種名（登録番号の列） */
+      /* 頭のすぐ後ろ2行＝伝票番号（売上日の列）と、車台番号・車種名（登録番号の列） */
       if (pending > 0){
         pending--;
         if (!cur.伝票){
           var d = (cols ? pick(ln, cols, '売上日') : x).match(/^\s*([0-9]{2,6})\b/);
           if (d) cur.伝票 = d[1];
         }
-        if (!cur.車種){
-          var car = cols ? pick(ln, cols, '登録番号') : '';
-          /* 車台番号（英数字だけ）は車種名ではない */
-          if (car && !/^[A-Z0-9\-]+$/i.test(car)) cur.車種 = car;
+        var car = cols ? pick(ln, cols, '登録番号') : '';
+        if (car){
+          /* 🚗 v2.2.0 車台番号＝英数字と「-」だけの並び。車種名はそうならない */
+          if (/^[A-Z0-9][A-Z0-9\-]{4,}$/i.test(car)) { if (!cur.車台) cur.車台 = car; }
+          else if (!cur.車種) cur.車種 = car;
         }
       }
 
-      if (/非課税/.test(x)){ var nm = moneys(x); if (nm.length) cur.非課税 += nm[nm.length - 1]; }
-      if (/一般消費税/.test(x)){ var cm = moneys(x); if (cm.length) cur.消費税 += cm[cm.length - 1]; }
+      if (/非課税/.test(x)){
+        var nm = moneys(x);
+        if (nm.length){
+          cur.非課税 += nm[nm.length - 1];
+          /* 🧾 v2.2.0 何の費用かも残す（自賠責保険・重量税・印紙代） */
+          var nn = t(x.replace(/非課税/, ' ').replace(/[0-9,]+/g, ' ').replace(/^\s*\d+\s*/, ''))
+                   .replace(/\s+/g, '');
+          cur.法定.push({ 名: nn || '法定費用', 金額: nm[nm.length - 1] });
+        }
+      }
+      else if (/一般消費税/.test(x)){ var cm = moneys(x); if (cm.length) cur.消費税 += cm[cm.length - 1]; }
       /* 🔴 締め＝`作業計/原価計` の並び。行の**先頭の数**が伝票計
          （`伝票計 588,654 作業計/原価計 …` でも `957,022 作業計/原価計 …` でも同じ所） */
-      if (RE_CLOSE.test(x)){
+      else if (RE_CLOSE.test(x)){
         var tm = moneys(x);
         if (tm.length) cur.伝票計 = tm[0];
+        /* 🧾 v2.2.0 原価＝`… 作業計/原価計 A B … 部品計/原価計 C D` の B と D */
+        if (tm.length >= 5) cur.原価 = tm[2] + tm[4];
         close();
+      }
+      /* 🧾 v2.2.0 明細の1行。⚠ 見出し（【一般整備】など）も**そのまま残す**
+         （ゆうた指定：作業のまとまりが分かるように） */
+      else if (det){
+        var hd = x.match(/【(.+?)】/);
+        if (hd){
+          var hr = detRow(ln, det);
+          cur.明細.push({ 種: '見出し', 名: '【' + hd[1] + '】',
+                          区分: t((hr && hr.f['作業区分']) || '') });
+        } else {
+          var rw = detRow(ln, det);
+          if (rw){
+            var pAmt = dnum(rw.f, '部品金額'), wAmt = dnum(rw.f, '作業金額');
+            var isP = (pAmt != null);
+            var amt = isP ? pAmt : wAmt;
+            if (amt != null){
+              cur.明細.push({
+                種: isP ? '部品' : '作業',
+                名: rw.名 || '（名称なし）',
+                区分: t(rw.f[isP ? '部品区分' : '作業区分'] || ''),
+                数量: dnum(rw.f, isP ? '部品数量' : '作業数量') || 0,
+                単価: dnum(rw.f, isP ? '部品単価' : '作業単価') || 0,
+                金額: amt,
+                原価: dnum(rw.f, isP ? '部品原価' : '作業原価') || 0
+              });
+            }
+          }
+        }
       }
     });
     close();

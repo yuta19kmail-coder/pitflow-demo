@@ -234,6 +234,8 @@
         ナンバー: s(c.plate),
         顧客名: nameOf(c),
         車種: s(c.car),
+        /* 🚗 v2.2.0 車体番号＝お客様の車に入っている番号（customers.js の1本から引く） */
+        車体番号: s(w.pitVehVin ? w.pitVehVin(c.plate) : ''),
         確定金額: num(c.amountFinal),
         フロント担当: s(c.frontStaff || c.staff),
         対象期間内: !!(cd && cd >= from && cd <= to),
@@ -244,6 +246,75 @@
       return a.数える日 === b.数える日 ? (a.ナンバー < b.ナンバー ? -1 : 1) : (a.数える日 < b.数える日 ? -1 : 1);
     });
     return { 期間: { from: from, to: to }, 集めた範囲: { from: wFrom, to: wTo, 前後: padDays }, 明細: rows };
+  }
+
+  /* ================================================================
+     🚗 v2.2.0 「同じ車か」の物差し（ここ1本）
+     ----------------------------------------------------------------
+     🔴 **車体番号がそろっていれば、それが答え。**（ゆうた 2026-08-24）
+        車種の呼び方のちがい（「ＷＲＸ」と「スバル インプレッサ」）は見ない。
+     ⚠ PitFlow 側に車体番号が無いうちは、車種で見るしかない。
+        1回でも入庫して番号が入れば、そのあとは番号で見る。
+     ⚠ 車種は**片方が短いだけ**のことが多いので、**どちらかがどちらかを含んでいれば同じ**とみなす。
+     ================================================================ */
+  function normCar(v){
+    return toHalf(s(v)).replace(/[\s　・]/g, '').toUpperCase();
+  }
+  function sameCar(pair){
+    var sv = t(pair && pair.soft && pair.soft.車体番号).toUpperCase();
+    var pv = t(pair && pair.pit && pair.pit.車体番号).toUpperCase();
+    if (sv && pv) return (sv === pv) ? 'vinOK' : 'vinNG';
+    var sc = normCar(pair && pair.soft && pair.soft.車種);
+    var pc = normCar(pair && pair.pit && pair.pit.車種);
+    if (!sc || !pc) return 'ok';                       /* 片方が空＝言わない */
+    return (sc.indexOf(pc) >= 0 || pc.indexOf(sc) >= 0) ? 'ok' : 'carNG';
+  }
+
+  /* ================================================================
+     📅 v2.2.0 日付の答えは「**売上日どうし**」1本（ゆうた 2026-08-24）
+     ----------------------------------------------------------------
+     🔴 前はフロントマンの売上日と PitFlow の実績日（＝返車日）をくらべていた。
+        返車日は「車を返した日」で、伝票を立てた日とは意味がちがう。
+        🗣「実績日は返車日だから、常に当日ビューから返車済みにする。ほぼズレない」
+        ＝ 実績日は**事実として出すだけ**。良し悪しを言わない。
+     ⚠ PitFlow の売上日は 2026-08 に足したばかり。始めのうちは「入っていません」がずらっと出る。
+        **それが正しい姿**（隠さない）。
+     ================================================================ */
+  function salesGap(pair){
+    var sd = t(pair && pair.soft && pair.soft.売上日);
+    var pd = t(pair && pair.pit && pair.pit.売上日);
+    if (!pd) return { kind: 'none', 日: null, label: 'PitFlow に売上日が入っていません' };
+    var n = daysBetween(sd, pd), sg = (n > 0 ? '+' : '');
+    if (n === 0) return { kind: 'same', 日: 0, label: '売上日が一致' };
+    var g = dateGap(sd, pd);
+    if (g.kind === 'crossMonth') return { kind: 'crossMonth', 日: n, label: '売上日が月またぎ（' + sg + n + '日）' };
+    if (g.kind === 'crossQ')     return { kind: 'crossQ',     日: n, label: '売上日がQまたぎ（' + sg + n + '日）' };
+    return { kind: 'diff', 日: n, label: '売上日が ' + sg + n + '日 ちがう' };
+  }
+
+  /* ================================================================
+     🗂 v2.2.0 入り口は4つだけ（ゆうた 2026-08-24）
+     ----------------------------------------------------------------
+     🗣「金額が違う／日付が違う／データがちがう／OK の4グループで事足りない？」
+     🔴 **1件は1か所にしか出ない。** 重いほうから順に見て、最初に当たった所へ入れる。
+        ＝ 4つを足すと全部になる。「どこかで二重に数えている」が起きない。
+     🔴 見る順番＝**お金が動くものが先**。だからお金の内訳もこの4つでそのまま合う
+        （検算「内訳＝差」がこの並びのまま生きる）。
+     🔴 **OK ＝ 差に1円も効いていない**が条件。ここを緩めると検算が壊れる。
+     ⚠ 担当ちがいはお金が動かないので最後。ほかに何も無い車だけがここに出る。
+     ================================================================ */
+  function effect(pair){
+    /* その1件が「差」にいくら効いているか */
+    return pair.期間の外 ? num(pair.soft.金額) : (num(pair.soft.金額) - num(pair.pit.確定金額));
+  }
+  function groupOf(pair){
+    var id = sameCar(pair);
+    if (id === 'vinNG' || id === 'carNG') return 'data';   /* 別の車かも＝結びつけが怪しい */
+    if (pair.期間の外)                     return 'date';   /* お金は動くが、原因は日付 */
+    if (effect(pair) !== 0)                return 'money';  /* 1円でもちがえば金額の話 */
+    if (salesGap(pair).kind !== 'same')    return 'date';
+    if (!pair.担当一致)                    return 'data';
+    return 'ok';
   }
 
   /* ================================================================
@@ -270,6 +341,17 @@
         車種: t(r.車種),
         金額: num(r.金額),
         受付担当: t(r.受付担当),
+        車体番号: t(r.車台 || r.車体番号),      /* 🚗 v2.2.0 伝票が持っている車体番号 */
+        /* 🧾 v2.2.0 伝票の中身は**そのまま連れて行く**。
+           ⚠ ここで捨てると、書き込み（quarter-write.js）が空の伝票を作ってしまう。
+              「合っているか」の判定は PDF を読んだ側（quarter-pdf.js）の1本きり。ここでは作らない。 */
+        明細: Array.isArray(r.明細) ? r.明細 : [],
+        明細が合う: !!r.明細が合う,
+        明細合計: num(r.明細合計),
+        法定: Array.isArray(r.法定) ? r.法定 : [],
+        原価: num(r.原価),
+        消費税: num(r.消費税),
+        伝票計: num(r.伝票計),
         _plate: normPlate(r.ナンバー),
         _name: normName(r.顧客名)
       };
@@ -292,6 +374,8 @@
         実績: (r.実績 != null) ? !!r.実績 : (t(r.状態) === 'returned'),
         対象期間内: !!r.対象期間内,
         予約番号: t(r.予約番号),
+        車種: t(r.車種),
+        車体番号: t(r.車体番号),               /* 🚗 v2.2.0 PitFlow 側の車体番号（入っていなければ空） */
         返車日: t(r.返車日 || r.確定返車日),
         _plate: normPlate(r.ナンバー),
         _name: normName(r.顧客名),
@@ -317,6 +401,14 @@
            ⚠ 売上日を持っていないカードは「ちがう」と言わない（無いものを間違い扱いしない）。 */
         売上日ちがい: !!(pr.売上日 && pr.売上日 !== sr.売上日)
       });
+      /* 🚗📅🗂 v2.2.0 同一性・売上日どうし・どのグループか・差にいくら効くか。
+         🔴 判定は**この物差し1本**。画面（quarter.js）で綴り直さないこと。 */
+      var _p = pairs[pairs.length - 1];
+      _p.同一性 = sameCar(_p);
+      _p.同じ車 = (_p.同一性 !== 'vinNG' && _p.同一性 !== 'carNG');
+      _p.売上日差 = salesGap(_p);
+      _p.効き = effect(_p);
+      _p.組 = groupOf(_p);
     }
 
     /* ①-a ナンバー＋**カードの売上日**（💴 v1.185.0）
@@ -440,6 +532,14 @@
       月またぎ: crossM,
       担当ちがい: staffNg,
       売上日ちがい: sdNg,          /* 💴 v1.185.0 カードの売上日が伝票とちがう（お金は動かない・直すのは日付だけ） */
+      /* 🗂 v2.2.0 入り口は4つ。1件は1か所にしか出ない */
+      グループ: {
+        データ: pairs.filter(function (p) { return p.組 === 'data'; }),
+        金額:   pairs.filter(function (p) { return p.組 === 'money'; }),
+        日付:   pairs.filter(function (p) { return p.組 === 'date'; }),
+        OK:     pairs.filter(function (p) { return p.組 === 'ok'; })
+      },
+      別の車かも: pairs.filter(function (p) { return !p.同じ車; }),
       整備ソフトだけ: softOnly,
       PitFlowだけ: pitOnly,
       まとめ返車: lump
@@ -453,5 +553,9 @@
   w.pitQCollect   = collect;
   w.pitQSplit     = splitByQuarter;   /* 🗓 v2.0.0 PDF の期間をクォーターごとに割る */
   w.pitQMatch     = match;
+  w.pitQSameCar   = sameCar;      /* 🚗 v2.2.0 同じ車か（車体番号→無ければ車種） */
+  w.pitQSalesGap  = salesGap;     /* 📅 v2.2.0 売上日どうしのズレ */
+  w.pitQEffect    = effect;       /* 🗂 v2.2.0 その1件が差にいくら効くか */
+  w.pitQGroupOf   = groupOf;      /* 🗂 v2.2.0 4つのどれに入るか */
   w.PIT_Q_STAFF_ALIAS = STAFF_ALIAS;
 })(window);

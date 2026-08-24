@@ -94,6 +94,42 @@
   }
   window.pitIsRealPlate = isRealPlate;
 
+  /* ================================================================
+     🚗 v2.2.0 ナンバーから、その車そのものを引く（車体番号の出し入れ用）
+     ----------------------------------------------------------------
+     🔴 車体番号（車台番号）は**その車の一生ものの番号**。ナンバーは変わるが、これは変わらない。
+        クォーターチェックが伝票から拾って、ここに書き足す。
+     🔴 **上書きはしない。** すでに別の番号が入っていたら、書かずに知らせる
+        （ナンバーの付け替えも、結びつけのまちがいも、どちらもありうるので人が見る）。
+     ⚠ 出し入れの入口は**この3本だけ**。ほかの所で `veh.vin` を直に触らないこと。
+     ================================================================ */
+  function vehByPlate(plate){
+    if(!isRealPlate(plate)) return null;
+    const q=norm(plate), arr=list();
+    for(let i=0;i<arr.length;i++){
+      const p=arr[i], vs=(p&&Array.isArray(p.vehicles))?p.vehicles:[];
+      for(let k=0;k<vs.length;k++){
+        if(isRealPlate(vs[k].plate)&&norm(vs[k].plate)===q) return {cust:p, veh:vs[k]};
+      }
+    }
+    return null;
+  }
+  window.pitVehByPlate = vehByPlate;
+  window.pitVehVin = function(plate){ const h=vehByPlate(plate); return h?String(h.veh.vin||''):''; };
+  /* 書き足す。返り＝'入れた' / 'そのまま'（同じ番号）/ 'ちがう'（別の番号が入っている）/ '車がない' */
+  window.pitVehSetVin = function(plate, vin){
+    vin=String(vin||'').trim();
+    if(!vin) return 'そのまま';
+    const h=vehByPlate(plate);
+    if(!h) return '車がない';
+    const now=String(h.veh.vin||'').trim();
+    if(now && now.toUpperCase()===vin.toUpperCase()) return 'そのまま';
+    if(now) return 'ちがう';                       /* 🔴 上書きしない */
+    h.veh.vin=vin; h.veh.updatedAt=Date.now();
+    if(h.cust) h.cust.updatedAt=Date.now();
+    return '入れた';
+  };
+
   /* ===== 入庫カードから upsert（人を特定→車両を upsert） =====
      🔴 v1.53.0 ③（ゆうた確認）**どうやってその人だと決めたか**を一緒に返す。
         ナンバーで当てた時だけ「名前が違うなら上書きしない」という守りを入れるため。 */
@@ -587,6 +623,8 @@
          '<input class="ce-maker" value="'+esc(v.maker||'')+'" placeholder="メーカー">'+
          '<input class="ce-car" value="'+esc(v.car||'')+'" placeholder="車種">'+
          '<input class="ce-karte" value="'+esc(v.karteNo||'')+'" placeholder="カルテNo">'+
+         /* 🚗 v2.2.0 車体番号。クォーターチェックが伝票から入れるが、手でも直せる */
+         '<input class="ce-vin" value="'+esc(v.vin||'')+'" placeholder="車体番号">'+
          '</div><div class="ce-veh-r">'+_boardSel(v.boardId)+_divSel(v.division)+_frontSel(v.frontStaff)+
          '<button type="button" class="cf-ct-del" onclick="custEditDelVehicle(this)"><i data-ic=trash data-ics=16></i></button></div></div>';
     });
@@ -614,6 +652,8 @@
       const maker=(row.querySelector('.ce-maker').value||'').trim();
       const car=(row.querySelector('.ce-car').value||'').trim();
       const ke=row.querySelector('.ce-karte'); const karteNo=ke?(ke.value||'').trim():'';
+      /* 🚗 v2.2.0 車体番号。⚠ 画面に無い項目は触らない（prev から引き継ぐ）ので、ここで読む */
+      const ve=row.querySelector('.ce-vin'); const vin=ve?(ve.value||'').trim():'';
       const boardId=row.querySelector('.ce-board').value;
       const division=row.querySelector('.ce-div').value;
       const frontStaff=row.querySelector('.ce-front').value;
@@ -626,7 +666,7 @@
             画面に無い項目は触らない、が鉄則。 */
       const prev=((cust.vehicles||[]).find(x=>x&&x.id===vid))||{};
       const isPV=!!prev.perVisit;
-      if(plate||maker||car||isPV||(karteNo&&prev.id)) vehicles.push(Object.assign({}, prev, { id:vid, plate,maker,car,karteNo,boardId,division,frontStaff, frontStaffId:(_fm?_fm.id:'') }));
+      if(plate||maker||car||isPV||(karteNo&&prev.id)) vehicles.push(Object.assign({}, prev, { id:vid, plate,maker,car,karteNo,vin,boardId,division,frontStaff, frontStaffId:(_fm?_fm.id:'') }));
     });
     cust.vehicles=vehicles;
   }
@@ -656,6 +696,17 @@
 
   /* ===== 履歴（車両＝そのナンバー単位） ===== */
   function cardDate(c){ return c.returnDate || c.reserveDate || ''; }
+  /* 🧾 v2.2.0 その入庫にぶら下がっている伝票を引く（🔴 1予約に1伝票） */
+  function _denOf(veh, c){
+    const a=(veh&&Array.isArray(veh.伝票))?veh.伝票:[];
+    const res=String((c&&c.resNo)||'').trim();
+    if(!res) return null;
+    return a.find(x=>x&&String(x.予約番号||'').trim()===res)||null;
+  }
+  window.custDenToggle=function(id){
+    const e=document.getElementById(id); if(!e) return;
+    e.hidden=!e.hidden;
+  };
   window.custHistory=function(custId, vehId){
     const cust=list().find(x=>x.id===custId); if(!cust) return;
     const v=(cust.vehicles||[]).find(x=>x.id===vehId);
@@ -693,9 +744,26 @@
           const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
           loa='<i data-ic=van data-ics=16></i>代車'+(nm?('（'+nm+'）'):'')+(pr?(' '+pr):'');
         }
-        h+='<div class="cm-hrow"><div class="cm-hdt">'+esc(dt)+'</div>'+
-           '<div class="cm-hmid"><b>'+esc(wl)+'</b>'+(c.plate?' ・ '+esc(c.plate):'')+(c.frontStaff?' ・ 担当 '+esc(c.frontStaff):'')+(loa?' ・ <span style="color:#1db97a">'+esc(loa)+'</span>':'')+'<div class="cm-hsub">'+esc(st)+(c.menu?' ・ '+esc(String(c.menu).split('\n')[0]):'')+'</div></div>'+
-           '<div class="cm-hamt">'+esc(amt)+'</div></div>';
+        /* 🧾 v2.2.0 その入庫の**伝票**（クォーターチェックで書き込んだもの）。
+           🔴 1つの予約に1つの伝票。予約番号で引く。
+           ⚠ 金額は伝票の「税抜・法定費用を除いた売上」。粗利＝それ − 原価。
+              法定費用（自賠責・重量税・印紙代）は売上でも粗利でもないので、中で別に出す。 */
+        const den=_denOf(v, c);
+        const ara=den?(Number(den.金額||0)-Number(den.原価||0)):0;
+        const pct=(den&&Number(den.金額))?Math.round(ara/Number(den.金額)*1000)/10:0;
+        const hou=den?((den.法定||[]).reduce((a,x)=>a+Number(x.金額||0),0)):0;
+        const oid='dn'+esc(String(c.id||''));
+        h+='<div class="cm-hrow'+(den?' has-den':'')+'"'+(den?' onclick="custDenToggle(\''+oid+'\')"':'')+'>'+
+           '<div class="cm-hdt">'+esc(dt)+'</div>'+
+           '<div class="cm-hmid"><b>'+esc(wl)+'</b>'+(c.plate?' ・ '+esc(c.plate):'')+(c.frontStaff?' ・ 担当 '+esc(c.frontStaff):'')+(loa?' ・ <span style="color:#1db97a">'+esc(loa)+'</span>':'')+'<div class="cm-hsub">'+esc(st)+(c.menu?' ・ '+esc(String(c.menu).split('\n')[0]):'')+'</div>'+
+             (den?'<div class="cm-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
+                  +'<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
+                  +'<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
+                  +(hou?'<span class="cm-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
+                  +'<i>伝票 '+esc(den.伝票番号||'')+'　伝票を見る ▼</i></div>':'')+
+           '</div>'+
+           '<div class="cm-hamt">'+esc(amt)+'</div></div>'+
+           (den?'<div class="cm-den" id="'+oid+'" hidden>'+(window.pitQDenTable?pitQDenTable(den):'')+'</div>':'');
       });
       h+='</div><div class="cust-note" style="margin-top:10px">確定売上・台数の実績集計（当月予測→月末締め）は今後ここに足していく予定。いまは入庫カードの概算金額を表示しています。</div>';
     }
@@ -926,6 +994,8 @@
               :'<div class="cd-vcar">'+esc(((v.maker?v.maker+' ':'')+(v.car||'')).trim()||'—')+'</div>')+
            '<div class="cd-vpills">'+teamPill+(t.course?'<span class="cd-pill" style="background:'+esc(t.courseColor)+'22;color:'+esc(t.courseColor)+';border-color:'+esc(t.courseColor)+'66">'+esc(t.course)+'</span>':'')+(frontName(v)?'<span class="cd-vstaff" title="担当">'+esc(frontName(v))+'</span>':'')+'</div>'+
            ((v.karteNo||'').trim()?'<div class="cd-vkarte" title="カルテNo">'+esc(v.karteNo.trim())+'</div>':'')+
+           /* 🚗 v2.2.0 車体番号。クォーターチェックが伝票から入れたもの（手でも直せる） */
+           ((v.vin||'').trim()?'<div class="cd-vvin" title="車体番号">'+esc(v.vin.trim())+'</div>':'')+
            '<div class="cd-vacts"><span class="cd-vb" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=clock data-ics=16></i> 履歴</span>'+
            (vArc ? '' : '<span class="cd-vb go" onclick="custNewReserveFor(\''+cust.id+'\',\''+(v.id||'')+'\')">🆕 この車で新規予約</span>')+
            '</div>'+

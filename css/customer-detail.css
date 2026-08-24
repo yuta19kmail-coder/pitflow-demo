@@ -242,3 +242,21 @@
 /* v1.99.0 来店履歴：売上なしでアーカイブした入庫（実績には入っていない） */
 .cd-hnosale{ font-size:11.5px; font-weight:800; color:var(--text3); }
 .cd-hst.nosale{ color:var(--text3); border-style:dashed; }
+
+
+/* ================================================================
+   🚗🧾 v2.2.0 車体番号／来店履歴にぶら下がる伝票
+   ⚠ 伝票の表そのものは quarter.css（`.vw-t3` ほか）の1本を借りる。見た目を2つ持たない。
+   ================================================================ */
+.cd-vvin{ font-family:Consolas,Menlo,"Courier New",monospace; font-size:10.5px; letter-spacing:-.02em;
+  color:var(--text3); margin-top:2px; }
+.cm-hrow.has-den{ cursor:pointer; }
+.cm-hrow.has-den:hover{ background:var(--bg3); }
+.cm-den-h{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:4px; }
+.cm-den-h b{ font-size:15px; color:var(--text); font-variant-numeric:tabular-nums; }
+.cm-den-h span{ font-size:11px; color:var(--text3); }
+.cm-den-h em{ font-style:normal; font-size:12px; font-weight:800; color:var(--green); }
+.cm-den-h i{ font-style:normal; font-size:10.5px; color:var(--brand); margin-left:auto; }
+.cm-den-hou{ color:var(--orange) !important; }
+.cm-den{ border:1px solid var(--border); border-radius:10px; background:var(--bg1);
+  padding:10px 12px; margin:0 0 8px; }

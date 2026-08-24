@@ -232,89 +232,122 @@
      ⚠ 済んだものは押すと**残してある結果**が開く（PDFは要らない）。
      ================================================================ */
   /* ================================================================
-     🗓 v2.0.0 PDF が言っている期間と、クォーターの割り振り（ゆうた指定）
+     🗓 v2.2.0 PDF が言っている期間 ＝ **小さい1行だけ**（ゆうた 2026-08-24）
      ----------------------------------------------------------------
-     🗣「入れたPDFに対して日付で自動でQ割り振りできないかな？」
-     🗣「多少日付がズレても、その分も別Qとしてチェックを一部入れる みたいな感じであれば楽」
+     🗣「入れたPDFに対して上記の表示は要らなくない？ その下にQごとがあるから、
+        Qごとの BOX に結び付く感じじゃダメかな？」
+     🔴🔴 **クォーターの切り替え口は、下の Q の BOX 1本。** ここに2つ目のボタンを作らない。
+        ＝ 前は同じQが上下2か所に出ていて、どっちを押すのか毎回迷った。
+     ⚠ 期間の1行だけは残す（読み取りがズレていた時に、ここで気づけるから）。
      🔴 割り方は quarter-match.js の1本（`pitQSplit`）。ここで 1-7／8-15 と書かない。
-     ⚠ 「一部」の組は **そのQを見終わっていない**ので、はっきりそう書く＆済にしない。
      ================================================================ */
   function termRow(U){
-    if (!U.groups || !U.groups.length) return '';
-    var h = '<div class="q-term">'
-          + '<span class="q-term-h">このPDFは <b>' + esc(U.term ? (U.term.from + ' 〜 ' + U.term.to) : '?') + '</b> ぶん'
-          + (U.termSrc === 'PDF' ? '（PDFの「対象期間」から）' : '（伝票の日付から。PDFに対象期間が見つかりませんでした）')
-          + '</span>';
-    if (U.groups.length === 1){
-      var g0 = U.groups[0];
-      h += '<span class="q-term-1">' + esc(g0.label) + (g0.全部 ? '' : ' <b class="q-part">の一部</b>')
-         + '（' + g0.soft.length + '枚）</span>';
-      if (!g0.全部){
-        h += '<div class="q-term-n">⚠ このクォーターの日が<b>ぜんぶは入っていません</b>'
-           + '（' + esc(g0.from) + '〜' + esc(g0.to) + ' だけ）。'
-           + '<b>「済」にはしません。</b>そのQをまるごと見るときは、Qの日ぜんぶで出し直してください。</div>';
-      }
-      return h + '</div>';
+    if (!U.groups || !U.groups.length || !U.term) return '';
+    return '<div class="q-term"><span class="q-term-h">このPDFは <b>'
+         + esc(U.term.from + ' 〜 ' + U.term.to) + '</b> ぶん'
+         + (U.termSrc === 'PDF' ? '' : '（PDFに対象期間が無かったので、伝票の日付から）')
+         + '</span></div>';
+  }
+
+  /* 🗓 v2.2.0 いま入れているPDFの中で、このQに当たる組（無ければ -1）。
+     ⚠ 「一部」の組も当てる（そのQの端っこの数日だけ入っている時）。
+        まるごとの組が有ればそちらを優先する。 */
+  function groupIdx(U, from, to){
+    var a = (U && U.groups) || [], hit = -1;
+    for (var i = 0; i < a.length; i++){
+      if (a[i].from <= to && a[i].to >= from){ if (hit < 0 || a[i].全部) hit = i; }
     }
-    h += '<div class="q-gs">';
-    U.groups.forEach(function (g, i) {
-      var d = g.res ? g.res.差.金額 : 0;
-      h += '<button class="q-g' + (U.gi === i ? ' on' : '') + (g.全部 ? '' : ' part') + '"'
-         + ' onclick="pitQPickGroup(' + i + ')">'
-         +   '<span class="q-g-t">' + esc(g.label) + (g.全部 ? '' : '<i>の一部</i>') + '</span>'
-         +   '<span class="q-g-d">' + esc(g.from.slice(5)) + '〜' + esc(g.to.slice(5)) + '・' + g.soft.length + '枚</span>'
-         +   '<span class="q-g-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span>'
-         + '</button>';
-    });
-    h += '</div>';
-    var part = U.groups.filter(function (g) { return !g.全部; });
-    h += '<div class="q-term-n">クォーターごとに分けました。押すと切り替わります。'
-       + '<b>「まるごと」入っているQだけ結果を残しました</b>'
-       + (part.length ? '（<b class="q-part">の一部</b>と書いてあるQは、日がぜんぶ入っていないので残していません）' : '')
-       + '。</div>';
-    return h + '</div>';
+    return hit;
+  }
+  function dd(ymd){ return s(ymd).slice(8).replace(/^0/, ''); }
+
+  /* 🗄 Qの BOX 1つぶん。
+     ① いま入れたPDFに入っているQ …… 押すとその結果に切り替わる（数字はその場の生）
+     ② PDFに入っていないQ ………… 残してある結果 or「まだ」（今までどおり）
+     🔴 右は必ず **残○件 or OK**。左は 期間・実施日（or 枚数）・金額だけ。 */
+  function qBox(U, x){
+    var gi = groupIdx(U, x.from, x.to);
+    var g  = gi >= 0 ? U.groups[gi] : null;
+    var hd = 'Q' + x.no + '<i>' + esc(dd(x.from)) + '〜' + esc(dd(x.to)) + '日</i>';
+    if (g){
+      var nok = w.pitQNokori ? w.pitQNokori(g.res) : 0;
+      var d   = g.res ? g.res.差.金額 : 0;
+      var okQ = !!g.res && !nok;
+      return '<div class="q-pqwrap">'
+        + '<button class="q-pq now' + (U.gi === gi ? ' on' : '') + (okQ ? ' ok' : ' done')
+        +   (g.全部 ? '' : ' part') + '" onclick="pitQPickGroup(' + gi + ')">'
+        +   '<span class="q-pq-l">'
+        +     '<span class="q-pq-t">' + hd
+        +       (g.全部 ? '' : '<em class="q-pq-part">' + esc(dd(g.from)) + '〜' + esc(dd(g.to)) + '日だけ</em>')
+        +     '</span>'
+        +     '<span class="q-pq-d">このPDF ' + g.soft.length + '枚</span>'
+        +     '<span class="q-pq-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span>'
+        +   '</span>'
+        +   '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
+        + '</button></div>';
+    }
+    var r = x.run;
+    var nok2 = r ? (r.直す件数 || 0) : 0;
+    var ok2  = r && !nok2;
+    return '<div class="q-pqwrap">'
+      + '<button class="q-pq' + (r ? (ok2 ? ' ok' : ' done') : '') + '"'
+      +   ' onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
+      +   '<span class="q-pq-l"><span class="q-pq-t">' + hd + '</span>'
+      +     (r
+             ? '<span class="q-pq-d">' + esc(s(r.走らせた日時).slice(0, 10)) + ' に実施</span>'
+               + '<span class="q-pq-v">' + ((r.差金額 > 0) ? '+' : '') + yen(r.差金額) + '円</span>'
+             : '<span class="q-pq-d">まだ実施していません</span>')
+      +   '</span>'
+      +   '<span class="q-pq-r">' + (r ? (ok2 ? 'OK' : '残 <b>' + nok2 + '</b>件') : '<em>まだ</em>') + '</span>'
+      + '</button>'
+      /* 🧹 v2.0.0（ゆうた指定）済んだQを「まだ」に戻す。練習のぶんを片づけるため。 */
+      + (r ? '<button class="q-pq-x" title="この結果を消して「まだ」に戻す"'
+             + ' onclick="pitQDropRun(\'' + x.from + '\',\'' + x.to + '\')">×</button>' : '')
+      + '</div>';
   }
 
   function planRow(U){
     if (!w.pitQMonthPlan) return '';
+    /* 🔴 v2.2.0 練習用サイトでも、読み込み中でも、**BOX は出す**。
+       ＝ v2.2.0 で切り替え口をここ1本にしたので、ここを消すと
+          PDF を入れてもクォーターを選べなくなる（前は上に切り替えボタンが有った）。 */
+    var off = '';
     if (!w.PIT_CLOUD){
-      return '<div class="q-plan-off">練習用サイトでは、結果も「伝票を直した」の印も残りません（本番の PitFlow では残ります）。</div>';
-    }
-    if (U.list == null){
+      off = '練習用サイトでは、結果も「伝票を直した」の印も残りません（本番の PitFlow では残ります）。';
+    } else if (U.list == null){
       if (!U.listBusy){ U.listBusy = true; ensureList(); }
-      return '<div class="q-plan-off">これまでの突き合わせを読んでいます…</div>';
+      off = 'これまでの突き合わせを読んでいます…';
     }
     var ym = t(U.ym) || (t(U.from).slice(0, 7));
-    var plan = w.pitQMonthPlan(ym, U.list);
-    var head = ym ? (ym.split('-')[0] + '年 ' + (+ym.split('-')[1]) + '月') : '今月';
+    var plan = w.pitQMonthPlan(ym, U.list || []);
     /* ⚠ v2.1.0 月送りのボタンは**撤去した**（いちばん上の月バーが送る＝送る所を2つ持たない）。 */
-    /* 🗓 v2.2.0 左＝期間・実施日・金額／右＝残り件数 or OK（ゆうた 2026-08-24） */
+    /* 🗓 v2.2.0 左＝期間・実施日（or 枚数）・金額／右＝残り件数 or OK（ゆうた 2026-08-24） */
     var h = '<div class="q-plan"><div class="q-plan-b">';
-    plan.forEach(function (x) {
-      var r = x.run;
-      var nok = r ? (r.直す件数 || 0) : 0;
-      var okQ = r && !nok;
-      var cls = r ? (okQ ? ' ok' : ' done') : '';
-      h += '<div class="q-pqwrap">'
-         +   '<button class="q-pq' + cls + '" onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
-         +     '<span class="q-pq-l">'
-         +       '<span class="q-pq-t">Q' + x.no + '<i>' + esc(x.from.slice(8).replace(/^0/, '')) + '〜'
-         +         esc(x.to.slice(8).replace(/^0/, '')) + '日</i></span>'
-         +       (r
-                  ? '<span class="q-pq-d">' + esc(s(r.走らせた日時).slice(0, 10)) + ' に実施</span>'
-                    + '<span class="q-pq-v">' + ((r.差金額 > 0) ? '+' : '') + yen(r.差金額) + '円</span>'
-                  : '<span class="q-pq-d">まだ実施していません</span>')
-         +     '</span>'
-         +     '<span class="q-pq-r">'
-         +       (r ? (okQ ? 'OK' : '残 <b>' + nok + '</b>件') : '<em>まだ</em>')
-         +     '</span>'
-         +   '</button>'
-         /* 🧹 v2.0.0（ゆうた指定）済んだQを「まだ」に戻す。練習のぶんを片づけるため。 */
-         +   (r ? '<button class="q-pq-x" title="この結果を消して「まだ」に戻す"'
-                  + ' onclick="pitQDropRun(\'' + x.from + '\',\'' + x.to + '\')">×</button>' : '')
-         + '</div>';
+    plan.forEach(function (x) { h += qBox(U, x); });
+    h += '</div>';
+    /* ⚠ PDF が**別の月にもまたがっていた**時。月バーは今の月のままなので、
+       ここに出さないと、その組が画面のどこからも押せなくなる。**隠さない。** */
+    var extra = '';
+    (U.groups || []).forEach(function (g, i) {
+      var inPlan = plan.some(function (x) { return g.from <= x.to && g.to >= x.from; });
+      if (inPlan) return;
+      var nok = w.pitQNokori ? w.pitQNokori(g.res) : 0;
+      var d = g.res ? g.res.差.金額 : 0;
+      var okQ = !!g.res && !nok;
+      extra += '<div class="q-pqwrap"><button class="q-pq now'
+        + (U.gi === i ? ' on' : '') + (okQ ? ' ok' : ' done') + (g.全部 ? '' : ' part')
+        + '" onclick="pitQPickGroup(' + i + ')">'
+        + '<span class="q-pq-l"><span class="q-pq-t">' + esc(g.label)
+        +   (g.全部 ? '' : '<em class="q-pq-part">' + esc(dd(g.from)) + '〜' + esc(dd(g.to)) + '日だけ</em>')
+        + '</span>'
+        + '<span class="q-pq-d">このPDF ' + g.soft.length + '枚</span>'
+        + '<span class="q-pq-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span></span>'
+        + '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
+        + '</button></div>';
     });
-    return h + '</div></div>';
+    if (extra) h += '<div class="q-plan-b q-plan-x">' + extra + '</div>';
+    if (off) h += '<div class="q-plan-off">' + esc(off) + '</div>';
+    return h + '</div>';
   }
 
   function ensureList(){
@@ -701,6 +734,9 @@
   w.pitQOpenPlan = function (from, to){
     var U = Q();
     U.from = from; U.to = to; U.res = null; U.saved = null; U.savedId = '';
+    /* 🗓 v2.2.0 いま入れているPDFに入っていないQを開いた＝**どのBOXも「開いている」印にしない**。
+       ＝ 印だけ残ると、出ている中身と光っている箱がズレる。 */
+    U.gi = -1;
     var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
     var has = (U.list || []).some(function (x) { return x && x.id === id; });
     if (!has || !w.pitQLoadRun){ if (w.renderInspect) renderInspect(); return; }

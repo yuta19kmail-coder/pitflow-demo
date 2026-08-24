@@ -338,7 +338,8 @@ function openNewReserve(){
     menu: '', workType: null, dropType: null, consult: false,
     needLoaner: false, needWash: false, urgent: false, memo: '',
     tentative: false,   // 仮予約フラグ（仮予約で登録ボタン／詳細の切替でON）v0.100.0
-    workSpecials: []   // 特殊（保証/保険）＝作業タイプとセットの時だけ付く。予約詳細/ホバー/印刷にのみ表示 v0.116.0
+    workSpecials: [],  // その他・付加（保証/保険/社員）＝作業タイプとセットの時だけ付く。予約詳細/ホバー/印刷にのみ表示 v0.116.0
+    internKind: ''     // その他・社内区分（''/used=中古/loanercar=代車/inhouse=内部）＝売上が立たないカード v2.6.0
   };
   /* v1.17.0：ここで作るカードは「下書き（_draft）」。
      ⚠ _draft が付いている間は **クラウドにも端末の本保存にも書かない**（db-pit.js が外す）＝

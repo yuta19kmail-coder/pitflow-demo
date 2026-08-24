@@ -50,6 +50,19 @@
       { key:'menu',        label:'作業内容',         ok: !!t(c.menu),        lv:'yellow' }
     ];
 
+    /* 🏢🏢 v2.6.0 社内車両（中古・代車・内部）は、作業タイプの決まりが変わる。
+       ・中古／内部 … 単独で立つ＝**作業タイプは要らない**（区分そのものが中身）
+       ・代車       … 車検／12点／一般／B.P のどれか **1つが必須**（＝「代車車検」等のセット）
+       ⚠ 区分かどうかは intern-pit.js に聞く（ここで c.internKind を直に見ない）。 */
+    var internKind = w.pitInternKind ? w.pitInternKind(c) : '';
+    if (internKind) {
+      need = need.filter(function (n) { return n.key !== 'workType'; });
+      if (internKind === 'loanercar') {
+        need.push({ key:'workType', label:'代車の作業（車検/12点/一般/B.P）',
+                    ok: !!(w.pitInternMate && w.pitInternMate(c)), lv:'red' });
+      }
+    }
+
     /* 代車を「必要」にした時だけの3つ（不要に戻したら表から消える＝赤枠も消える） */
     if (c.needLoaner) {
       need.push({ key:'loanerId',   label:'使用代車', ok: !!c.loanerId,   lv:'red' });
@@ -62,7 +75,8 @@
        ⚠ 車検かどうかは pit-share.js の `pitIsShaken` 1本に聞く（ここで配列を数えない）。 */
     var isShaken = w.pitIsShaken ? w.pitIsShaken(c)
                  : ((Array.isArray(c.workTypes) ? c.workTypes : []).indexOf('shaken') >= 0 || c.workType === 'shaken');
-    if (isShaken) {
+    /* 🏢 v2.6.0 社内車両は伝票が無いので、諸費用は要らない（代車車検でも聞かない）。 */
+    if (isShaken && !internKind) {
       need.push({ key:'feeAmount', label:'諸費用（車検）',
                   ok: !(c.feeAmount == null || c.feeAmount === ''), lv:'red' });
     }

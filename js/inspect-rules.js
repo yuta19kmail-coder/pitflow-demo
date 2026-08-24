@@ -203,6 +203,12 @@
   function tierOf(c){ return w.pitSalesTier ? w.pitSalesTier(c) : null; }
   function countDate(c){ return w.pitSalesCountDate ? w.pitSalesCountDate(c) : ''; }
   function noSale(c){ return !!(w.pitCardNoSale && w.pitCardNoSale(c)); }
+  /* 🏢 v2.6.0 社内車両（中古・代車・内部）＝そもそも売上のやり取りが無い車 */
+  function intern(c){ return !!(w.pitCardIntern && w.pitCardIntern(c)); }
+  /* 👤 v2.6.0 社員（社割）＝値引きや原価で金額が動くので、金額の「肌感」の規則は当てない */
+  function isEmployee(c){
+    return !!(c && Array.isArray(c.workSpecials) && c.workSpecials.indexOf('employee') >= 0);
+  }
   function amountOf(c){ return w.pitFinalAmountOf ? num(w.pitFinalAmountOf(c)) : 0; }
   function isShaken(c){ return !!(w.pitIsShaken && w.pitIsShaken(c)); }
   /* ⚠ 空欄の言い方（（未入力））も、名前を出す1本と**同じ行**に置く＝画面ごとに言葉が散らない */
@@ -366,6 +372,7 @@
       fix:'見積を出したら見積金額を、受注したら受注金額を入れてください。',
       each: function(c){
         if (!tierOf(c)) return '';
+        if (isEmployee(c)) return '';                 /* 👤 v2.6.0 社員＝社割で動くので当てない */
         if (t(c.amountFinal) || t(c.amountOrder) || t(c.amountQuote)) return '';
         var a = amountOf(c);
         if (a < LIM.bigEst) return '';
@@ -379,6 +386,7 @@
       fix:'金額を見直してください。',
       each: function(c){
         if (!isDone(c)) return '';
+        if (isEmployee(c)) return '';                 /* 👤 v2.6.0 社員＝社割で安くなる。当てない */
         var a = num(c.amountFinal);
         if (a <= 0 || a >= LIM.tiny) return '';
         return '確定金額が ' + yen(a) + ' です';
@@ -390,6 +398,7 @@
       fix:'伝票と見比べてください。追加作業なら作業内容も足しておくと、あとで理由が分かります。',
       each: function(c){
         if (!isDone(c)) return '';
+        if (isEmployee(c)) return '';                 /* 👤 v2.6.0 社員＝値引きで見積と離れる。当てない */
         var q = num(c.amountQuote), f = num(c.amountFinal);
         if (q <= 0 || f <= 0) return '';
         if (f >= q * LIM.gapRate) return '見積 ' + man(q) + ' → 確定 ' + man(f) + '（' + (Math.round(f / q * 10) / 10) + '倍）';
@@ -402,7 +411,7 @@
       why:'売上なしで片づけた車は、どの集計にも乗りません。金額が入っていると、あとで見た人が混乱します。',
       fix:'本当に売上があるなら「売上なし」を外してください。無いなら金額を空にしてください。',
       each: function(c){
-        if (!noSale(c)) return '';
+        if (!noSale(c) || intern(c)) return '';       /* 🏢 v2.6.0 社内車両は「手で売上なしにした車」ではない */
         var a = num(c.amountFinal) || num(c.amountOrder) || num(c.amountQuote);
         return a > 0 ? ('売上なしの印が付いていますが ' + yen(a) + ' が入っています') : '';
       } },
@@ -412,7 +421,7 @@
       why:'誰が・いつ・なぜ売上なしにしたかが分からないと、あとから追えません。',
       fix:'カードのフローに一言残してください。',
       each: function(c){
-        if (!noSale(c)) return '';
+        if (!noSale(c) || intern(c)) return '';       /* 🏢 v2.6.0 社内車両は区分で決まる＝理由を書く欄がない */
         return (t(c.noSaleBy) && t(c.noSaleAt)) ? '' : '売上なしにした人か日付が残っていません';
       } },
 

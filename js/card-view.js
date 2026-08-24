@@ -142,6 +142,10 @@
     if (Array.isArray(c.workSpecials) && c.workSpecials.length){
       c.workSpecials.forEach(function(id){ var lb = window.pitSpecialLabel ? pitSpecialLabel(id) : ''; if (lb) badges += '<span class="cv-bdg cv-special">'+esc(lb)+'</span>'; });
     }
+    /* 🏢 v2.6.0 社内区分（中古／代車車検／内部）＝この車は売上が立たない、を一目で */
+    if (window.pitCardIntern && pitCardIntern(c)){
+      badges += '<span class="cv-bdg cv-intern">' + esc(pitInternLabel(c)) + '</span>';
+    }
     if (c.earlyDiscount) badges += '<span class="cv-bdg cv-early"><i data-ic=tag data-ics=16></i> 早期割</span>';
     if (!c.needLoaner) badges += '<span class="cv-bdg cv-none">代車なし</span>';
     h += '<div class="cv-wframe" style="border-left-color:'+wtColor+'">'
@@ -362,6 +366,20 @@
         （タイムライン・アクション記録の入口・消すボタンまで、フロータブと中身は同じ）
         ⚠ 写しにすると片方だけ直して食い違う（v1.54.0 の教訓）。 */
   function reserveTab(c){
+    /* 🏢 v2.6.0 社内車両（中古・代車・内部）はお金のやり取りが無い＝概算は出さない。
+       空欄にすると「入れ忘れ」に見えるので、**理由をそのまま書く**。 */
+    if (window.pitCardIntern && pitCardIntern(c)){
+      let hi = '<div class="cv-sec cv-rsv cv-rsv-off">';
+      hi += '<div class="cv-rsvhead"><i data-ic=clipboard data-ics=16></i> 予約の概算</div>';
+      hi += '<div class="cv-rsvbig">'
+          + '<div class="cv-rsvb"><div class="cv-rsvbl">概算 預かり日数</div><div class="cv-rsvbv">—</div></div>'
+          + '<div class="cv-rsvb"><div class="cv-rsvbl">概算 金額</div><div class="cv-rsvbv">—</div></div>'
+          + '</div>';
+      hi += '<div class="cv-rsvnote">' + esc(pitInternLabel(c)) + '（社内車両）です。'
+          + '金額・完TEL・洗車・伝票はありません。実績にはなりますが、売上には数えません。</div>';
+      hi += '</div>';
+      return hi + flowTab(c);
+    }
     const d = c.estHoldDays, a = c.estAmount;
     const dTxt = (d == null || d === '') ? '—'
                : (Number(d) === 0 ? '当日仕上げ' : esc(String(d)) + '<small>日</small>');
@@ -433,6 +451,8 @@
      ・概算はいつでも直せる（予約のときの読みなので、あとで直したい場面がある）
      ・先の段階は返さない＝作業前に確定金額を入れられる、が起きない */
   function amtOpenKinds(c){
+    /* 🏢 v2.6.0 社内車両は金額を1円も持たない＝どの欄も開けない */
+    if (window.pitCardIntern && pitCardIntern(c)) return [];
     const cur = AMT_CUR[c && c.status] || ((c && c.status === 'returned') ? 'final' : null);
     const out = ['est'];
     if (!cur) return out;                       /* 予約・キャンセル等＝概算だけ */
@@ -745,6 +765,14 @@
       }
     }
 
+    /* 🏢 v2.6.0 社内車両は 完TEL・支払い・洗車・お礼LINE のどれも無い＝表紙チェックを出さない。
+       　（消すだけだと「壊れた？」に見えるので、なぜ無いかを1行置く） */
+    if (window.pitCardIntern && pitCardIntern(c)){
+      h += '<div class="cv-sec cv-intern-note"><div class="cv-sect"><i data-ic=info data-ics=16></i> 表紙チェック</div>'
+         + '<div class="cv-hint">' + esc(pitInternLabel(c)) + '（社内車両）は、完TEL・支払い・洗車・お礼LINE・伝票がありません。'
+         + '完TEL済／完TEL依頼へドラッグすると、そのまま実績になります。</div></div>';
+      return h;
+    }
     // 表紙チェック（編集式）＝実績（returned）では上の「完了アーカイブ」に集約済みなので出さない v0.120.0
     if (c.status !== 'returned'){
       const pm = payMethods();
@@ -1312,7 +1340,9 @@
               + '</span>' : '')
       + (dt?'<span class="cv-intake">'+dt+'</span>':'')
       + '<div class="cv-acts">'
-      + '<button class="cv-iconbtn" title="表紙を印刷" onclick="pitPrintCover(\''+c.id+'\')"><i data-ic=printer data-ics=16></i></button>'
+      /* 🏢 v2.6.0 社内車両は伝票が無い＝表紙も刷らない（ボタンごと出さない） */
+      + ((window.pitCardIntern && pitCardIntern(c)) ? ''
+         : '<button class="cv-iconbtn" title="表紙を印刷" onclick="pitPrintCover(\''+c.id+'\')"><i data-ic=printer data-ics=16></i></button>')
       + '<button class="cv-iconbtn" title="この車両に付箋を発行" onclick="cvToggleFusen(event)"><i data-ic=sticky data-ics=16></i></button>'
       /* 📮 v1.175.0 予定依頼（ゆうた指定 2026-08-22）＝**付箋発行の隣**。
          この車の 客名・車種・作業タイプ・担当者 が入った状態で窓が開く。

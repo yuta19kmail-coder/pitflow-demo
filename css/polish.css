@@ -2329,3 +2329,39 @@ th.cfs-lg-d{ z-index:3; }
 .dl-datechip.today{ color:#06281d; background:#1db97a; border-color:#1db97a; }
 .dl-datechip em{ font-style:normal; font-size:9px; font-weight:800;
   background:rgba(0,0,0,.18); border-radius:4px; padding:0 4px; }
+
+/* ===================================================================
+   🗄 v2.6.0 「その他」＝ふだんあまり使わない印の引き出し（旧「特殊」）
+   　 中身は 付加（保証/保険/社員）と 社内区分（中古/代車/内部）の2段。
+   =================================================================== */
+.cf-other-btn{ max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cf-other-btn.active{ border-color:#0f766e; color:#0f766e; font-weight:700; }
+.cf-other-caret{ font-size:9px; opacity:.6; margin-left:2px; }
+.cf-other-panel{ margin:6px 0 10px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px; background:var(--bg2); display:flex; flex-direction:column; gap:10px; }
+.cf-other-sec{ display:flex; flex-direction:column; gap:5px; }
+.cf-other-lb{ font-size:12px; font-weight:700; color:var(--text2); display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.cf-other-lb span{ font-size:11px; font-weight:400; color:var(--text3); }
+.cf-other-note{ font-size:11.5px; color:var(--text2); line-height:1.6; background:var(--bg3); border-radius:6px; padding:6px 9px; }
+.cf-other-note.warn{ color:#b45309; background:rgba(245,158,11,.12); }
+/* 押せないチップ（社内車両を選んでいる間の作業タイプなど） */
+.cf-chip-off{ cursor:not-allowed !important; }
+/* 入れられない欄のグレーの箱（概算・代車） */
+.cf-offbox{ height:34px; display:flex; align-items:center; padding:0 10px; border:1px dashed var(--border); border-radius:8px; background:var(--bg3); color:var(--text3); font-size:13px; }
+
+/* 🏢 社内車両のバッジ（予約詳細・ホバー・実績カレンダー） */
+.cv-bdg.cv-intern{ background:#0f766e; color:#fff; border-color:#0f766e; font-weight:700; }
+.cv-rsv-off .cv-rsvbv{ color:var(--text3); }
+.cv-intern-note .cv-hint{ line-height:1.7; }
+.ph-b-intern{ background:rgba(15,118,110,.14); color:#0f766e; border-color:#0f766e88; font-weight:700; }
+.rme-wt.rme-intern{ color:#0f766e; font-weight:700; }
+
+/* 🔢 実績ビューの2段（数える／数えない）の帯 */
+.result-bar{ margin:0 0 10px; padding:8px 12px; border-radius:8px; background:var(--bg2); border:1px solid var(--border); font-size:12px; color:var(--text2); line-height:1.7; }
+.result-bar b{ color:var(--text); }
+.result-bar span{ color:var(--text3); margin-left:8px; }
+.result-bar.nc{ background:rgba(15,118,110,.10); border-color:#0f766e55; }
+
+/* 🏢 売上ビュー・作業サマリーの「参考：数えていない台数」1行
+   （数字が届かなかった月に、その裏付けをすぐ脇に置く・ゆうた 2026-08-24） */
+.sv-refnc{ margin:-2px 0 12px; padding:7px 12px; border-radius:8px; background:rgba(15,118,110,.10); border:1px solid #0f766e44; color:#0f766e; font-size:12px; font-weight:700; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.sv-refnc span{ font-weight:400; color:var(--text3); }

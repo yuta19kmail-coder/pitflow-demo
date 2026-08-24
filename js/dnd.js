@@ -83,6 +83,10 @@
 
     // 完TEL済／完TEL依頼エリアへドロップ＝ポップアップで入力（カードは盤面から外れる）
     if (kind === 'callDone' || kind === 'callReq') {
+      /* 🏢🏢 v2.6.0（ゆうた指定）社内車両（中古・代車・内部）は、完TELも金額も無い。
+         「この車両は◯◯なので、そのまま実績化します」の窓を1枚だけ出して実績にする。
+         ⚠ 中身は intern-pit.js の `pitInternReturn` 1本。ここに書き写さない。 */
+      if (window.pitInternReturn && pitInternReturn(c)) return;
       if (window.PitReturnPopup) PitReturnPopup.open(c, kind === 'callDone' ? 'callDone' : 'callReq');
       return;
     }

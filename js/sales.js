@@ -247,6 +247,31 @@
     s+='</svg>'; return s;
   }
 
+
+  /* ===================================================================
+     🏢 v2.6.0（ゆうた指定）**参考：数えていない台数**
+     -------------------------------------------------------------------
+     🗣「中古車の整備があったから（売上ちょっと行かなかった）って理由付け」
+     ＝ 売上が届かなかった月に、**その裏付けを数字のすぐ脇に置く**ためのもの。
+     🔴 台数だけ。**金額は1円も混ぜない**（混ぜると分母がずれて読み間違いを生む）。
+     ⚠ 拾う集合は実績ビューの「数えない側」と同じ＝実績日がこの月／作業完了 or 返車済み／
+        `pitCardNoSale`（社内車両＋手で売上なしにした車）。
+     =================================================================== */
+  function _refNoCount(moS, moE){
+    return (state.cards || []).filter(function (c) {
+      if (!c || !c.completedAt) return false;
+      if (c.completedAt < moS || c.completedAt > moE) return false;
+      if (c.status !== 'workDone' && c.status !== 'returned') return false;
+      return !!(window.pitCardNoSale && pitCardNoSale(c));
+    });
+  }
+  function _refNoCountHtml(moS, moE){
+    var txt = window.pitInternCountText ? pitInternCountText(_refNoCount(moS, moE)) : '';
+    if (!txt) return '';
+    return '<div class="sv-refnc"><i data-ic=info data-ics=14></i> ' + txt
+         + '<span>売上には入っていません（実績ビューの「数えない側」で見られます）</span></div>';
+  }
+
   // ===== 当月ビュー =====
   function renderMonth(wrap){
     var ym = window._svYM;
@@ -290,6 +315,7 @@
     h += '</div>';
     h += stackBarSvg(t, tg.min, tg.max, landing);
     h += '</div>';
+    h += _refNoCountHtml(moS, moE);   /* 🏢 v2.6.0 参考：数えていない台数（社内車両・売上なし） */
 
     // 日次進捗チャート
     /* 🔴 v1.72.0 見出しに「全体／±5日／±10日」。当日が無い月（過去・未来）は押せない。 */

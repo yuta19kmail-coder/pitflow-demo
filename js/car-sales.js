@@ -9,8 +9,8 @@
       ⚠ 返車カレンダー・当日ビューは今までどおり「確定だけ」。**物差しが違う。混ぜない。**
      ② 今週の洗車予定  ＝翌営業日より後〜今週末(日曜)の洗車。**返車日が決まっていない車も同じ並びに混ぜる**（v1.152.0）
      ③ 車検ヘッドライト磨き ＝headlight フラグ（受注時に車検車へ設定）
-     ④ コーティング依頼 ＝1Y/3Mバッジ＋coatingOK（受注OK）＝返車予定日も表示
-     ⑤ 直近1か月のコーティング予定 ＝1Y/3Mバッジで 予約 or 入庫中（直近1か月）
+     ④ コーティング・その他依頼 ＝1Y/3M・車販バッジ＋coatingOK（受注OK）＝返車予定日も表示
+     ⑤ 直近1か月のコーティング・その他予定 ＝1Y/3M・車販バッジで 予約 or 入庫中（直近1か月）
      ⑥ その他依頼事項  ＝salesReq フラグ（車販依頼）＝1行メモ表示
    完了＝各カードの項目別「✓完了」で done フラグ→セクション下部にグレーで残し「↩戻す」可。本体フローは継続。
    カードは予約/タスクと同じコンパクトカード（クリックで予約詳細）。＝同じ客のカードが二重に存在する設計。
@@ -39,11 +39,13 @@ function _csThisSunday(){
   return ymd(d);
 }
 
-/* 1Y/3M（コーティング）が付いているか */
+/* 1Y/3M（コーティング）または 車販（v2.6.0）が付いているか
+   🚗 v2.6.0（ゆうた指定）「車販」バッジは、この一覧に**拾い上げるための合図**。
+      実際にやること（ルームクリーニング等）は依頼事項に直接書く。 */
 function _csHasCoat(c){
   const ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes
             : (Array.isArray(c.workAddons) ? c.workAddons.concat(c.workType?[c.workType]:[]) : (c.workType?[c.workType]:[]));
-  return ids.indexOf('coat1y') >= 0 || ids.indexOf('coat3m') >= 0;
+  return ids.indexOf('coat1y') >= 0 || ids.indexOf('coat3m') >= 0 || ids.indexOf('carsale') >= 0;
 }
 function _csIsShaken(c){
   const ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType?[c.workType]:[]);
@@ -112,9 +114,9 @@ function renderCarSales(){
 
   // ③ 車検ヘッドライト磨き
   const headlight = cards.filter(c => c.headlight && _csActive(c));
-  // ④ コーティング依頼（1Y/3M＋受注OK）
+  // ④ コーティング・その他依頼（1Y/3M・車販＋受注OK）
   const coatReq = cards.filter(c => _csHasCoat(c) && c.coatingOK && _csActive(c));
-  // ⑤ 直近1か月のコーティング予定（1Y/3Mで 予約 or 入庫中）
+  // ⑤ 直近1か月のコーティング・その他予定（1Y/3M・車販で 予約 or 入庫中）
   const monthAhead = (function(){ const d=new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate()+31); return ymd(d); })();
   const todayStr = ymd(new Date());
   const coatPlan = cards.filter(c => _csHasCoat(c) && _csActive(c) && !c.returnStage && (
@@ -175,16 +177,16 @@ function renderCarSales(){
       s.open.map(c=>_csCard(c,'headlight')).join(''),
       s.done.map(c=>_csDoneCard(c,'headlight')).join(''));
   }
-  // ④ コーティング依頼
+  // ④ コーティング・その他依頼
   {
     const s = split(coatReq.sort(sortDate), 'coatingDone');
-    h += _csSec('<i data-ic=sparkle data-ics=16></i> コーティング依頼', '受注OK・返車予定日つき',
+    h += _csSec('<i data-ic=sparkle data-ics=16></i> コーティング・その他依頼', '1Y/3M・車販＋受注OK／返車予定日つき',
       s.open.map(c=>_csCard(c,'coating',_csRetLabel(c))).join(''),
       s.done.map(c=>_csDoneCard(c,'coating')).join(''));
   }
-  // ⑤ 直近1か月のコーティング予定（完了なし＝予定一覧）
+  // ⑤ 直近1か月のコーティング・その他予定（完了なし＝予定一覧）
   {
-    h += _csSec('<i data-ic=calendar data-ics=16></i> 直近1か月のコーティング予定', '予約・入庫中の1Y/3M',
+    h += _csSec('<i data-ic=calendar data-ics=16></i> 直近1か月のコーティング・その他予定', '予約・入庫中の 1Y/3M・車販',
       coatPlan.sort((a,b)=>String(a.reserveDate||'9999').localeCompare(String(b.reserveDate||'9999'))).map(c=>_csCard(c,null,_csInLabel(c))).join(''),
       '');
   }

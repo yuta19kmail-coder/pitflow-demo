@@ -414,8 +414,71 @@
     h += '<button class="q-print" onclick="window.print()">印刷</button></div>';
     h += '<div class="q-note">残してあるのは<b>これから直すものだけ</b>です'
        +   '（合っていた行は残していません）。' + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</div>';
-    h += '<div class="q-body">' + savedTable(((R.直すもの || {})[U.savedTab]) || []) + '</div>';
+    h += '<div class="q-body">' + savedBody(R, U.savedTab) + '</div>';
     return h;
+  }
+
+  /* ================================================================
+     🃏🃏 v2.7.0 残した結果も**走らせた直後と同じカード**で出す
+     ----------------------------------------------------------------
+     🗣 ゆうた「一回閉じると 前の表示スタイルにもどっちゃう」
+     ◎なにが起きていたか
+       走らせた直後は `card()`（v2.1.0 のカード）、閉じて開き直すと
+       残した結果は `savedTable()`（昔の素の表）で出ていた。
+       ＝**同じ画面が2つの顔を持っていた。**
+     ◎直し方
+       描き手は増やさない。残した行を `card()` が読める形に**戻して**渡す。
+     🔴 v2.7.0 より前に残した結果には、カードに要る項目（車種・車体番号・
+        同一性・売上日差…）が入っていない。**その時は今までの表で出す。**
+        黙って空のカードを並べない＝古い結果も読めるままにしておく。
+     ================================================================ */
+  function savedBody(R, key){
+    var rows = ((R.直すもの || {})[key]) || [];
+    if (!rows.length) return '<div class="q-none">0件です。</div>';
+    if (!(+R._v >= 2)) {
+      return '<div class="q-note">これは古い形で残した結果なので、表で出しています'
+           + '（もう一度PDFを読ませて残すと、いまの見た目になります）。</div>'
+           + savedTable(rows);
+    }
+    if (key === '整備ソフトだけ'){
+      return '<div class="q-cards">' + rows.map(function (r) { return oneCard(savedSoftOnly(r), 'soft', true); }).join('') + '</div>';
+    }
+    if (key === 'PitFlowだけ'){
+      return '<div class="q-cards">' + rows.map(function (r) { return oneCard(savedPitOnly(r), 'pit', true); }).join('') + '</div>';
+    }
+    return '<div class="q-cards">' + rows.map(function (r) { return card(savedPair(r), true); }).join('') + '</div>';
+  }
+
+  /* 残した行 → card() が読む形に戻す。
+     ⚠ 対応は quarter-store.js の `slimPair` と**1対1**。片方だけ直さないこと。 */
+  function savedPair(r){
+    return {
+      soft: { 顧客名: r.お客様, ナンバー: r.ナンバー, 車種: r.車種, 売上日: r.売上日,
+              金額: r.整備ソフト, 伝票: r.伝票, 車体番号: r.車体番号, 受付担当: r.受付担当 },
+      pit:  { 車種: r.カード車種, 売上日: r.カード売上日, 数える日: r.数える日,
+              確定金額: r.PitFlow, 予約番号: r.予約番号, 車体番号: r.カード車体番号,
+              フロント担当: r.フロント, 生: { id: r.カードid } },
+      結び方: r.結び方, 期間の外: !!r.期間の外, 同じ車: !!r.同じ車, 同一性: r.同一性,
+      売上日差: { kind: r.売上日差kind, label: r.売上日差label },
+      金額一致: !!r.金額一致, 担当一致: !!r.担当一致, 差: r.差 || 0
+    };
+  }
+  /* ⚠ 対応は `slimSoftOnly` と1対1 */
+  function savedSoftOnly(r){
+    return {
+      soft: { 顧客名: r.お客様, ナンバー: r.ナンバー, 車種: r.車種, 売上日: r.売上日,
+              金額: r.金額, 伝票: r.伝票, 車体番号: r.車体番号, 受付担当: r.受付担当 },
+      カード: r.カードid ? { 状態: r.カード状態, 返車日: r.カード返車日,
+                            予約番号: r.カード予約番号, 生: { id: r.カードid } } : null
+    };
+  }
+  /* ⚠ 対応は `slimPitOnly` と1対1 */
+  function savedPitOnly(r){
+    return {
+      顧客名: r.お客様, ナンバー: r.ナンバー, 車種: r.車種, 数える日: r.数える日,
+      確定金額: r.金額, 予約番号: r.予約番号, 車体番号: r.車体番号,
+      フロント担当: r.フロント, 生: { id: r.カードid }
+    };
   }
 
   /* 残してある結果の内訳（⚠ 残してある中身の名前は変えていないので、見出しだけ言い換える） */
@@ -496,8 +559,12 @@
      ・管理番号の右に**車体番号**
      ・左が見くらべ、右が片づけ（横スクロールは1つも出さない）
      ================================================================ */
-  function card(p){
-    var left = w.pitQRowLeft ? w.pitQRowLeft(p) : 1;
+  function card(p, saved){
+    /* 🃏 v2.7.0 saved=true ＝ 残した結果として描く。
+       ⚠ 「直す」ボタンは出さない。直す処理（pitQDo / pitQMk）は
+          **読み込んだPDFの行番号（p.soft.i）に効く**もので、残した結果には行番号が無い。
+          出すと押せるのに効かないボタンになるので、代わりに「カードを開く」を出す。 */
+    var left = saved ? 1 : (w.pitQRowLeft ? w.pitQRowLeft(p) : 1);
     var sg = p.売上日差 || { kind:'', label:'' };
     var sdCls = sg.kind === 'none' ? 'miss' : (sg.kind === 'same' ? '' : 'bad');
     var idNg = !p.同じ車;
@@ -541,7 +608,7 @@
       +   '<span>／</span>PitFlow <b>' + esc(p.pit.フロント担当 || '—') + '</b>'
       +   (p.担当一致 ? '' : '<em>ちがいます</em>') + '</div>'
       + '</div>'
-      + '<div class="q-act q-c-act">' + fixInner(p) + '</div>'
+      + '<div class="q-act q-c-act">' + (saved ? savedAct(p) : fixInner(p)) + '</div>'
       + '</div></div>';
   }
   function idChip(p){
@@ -568,7 +635,7 @@
      ================================================================ */
   var STATE_JA = { workDone:'作業は終わっている', check:'確認の段階', contact:'連絡待ち',
                    reserve:'予約の段階', inShop:'入庫中', returned:'返車済み', scrap:'取りやめ' };
-  function oneCard(x, kind){
+  function oneCard(x, kind, saved){
     var soft = (kind === 'soft');
     var c = soft ? x.カード : null;
     var lv = oneLevel({ x:x, k:kind });
@@ -612,7 +679,7 @@
       + '<div class="q-c-st">' + (soft ? 'フロントマン <b>' + esc(S.受付担当 || '—') + '</b>'
                                        : 'PitFlow <b>' + esc(S.フロント担当 || '—') + '</b>') + '</div>'
       + '</div>'
-      + '<div class="q-act q-c-act">' + oneFix(x, kind, lv, c, cid, mk) + '</div>'
+      + '<div class="q-act q-c-act">' + (saved ? savedAct({ pit:{ 生:{ id:cid } } }) : oneFix(x, kind, lv, c, cid, mk)) + '</div>'
       + '</div></div>';
   }
   function oneFix(x, kind, lv, c, cid, mk){
@@ -648,6 +715,18 @@
           + '<button class="q-fx-un" onclick="pitQOneMk(\'' + esc(no) + '\',0)">戻す</button>'
         : '<b class="q-fx-k">答え</b><button class="q-fx-mk" onclick="pitQOneMk(\'' + esc(no) + '\',1)">確認した</button>')
       + '</div>';
+  }
+
+  /* 🃏 v2.7.0 残した結果のカードの右側。
+     直すのは**PDFを読ませた時だけ**（行番号が要るため）。ここは開く道だけ出す。 */
+  function savedAct(p){
+    var id = s(p && p.pit && p.pit.生 && p.pit.生.id);
+    return '<div class="q-fx">'
+      + (id ? '<button class="q-fx-go" onclick="pitInspectGo(\'' + esc(id) + '\')">カードを開く</button>'
+            : '<span class="q-act-ok">カードがありません</span>')
+      + '</div>'
+      + '<div class="q-fx"><span class="q-fx-note">直すときは、'
+      + '<b>もう一度PDFを読ませて</b>ください（残した結果からは直せません）</span></div>';
   }
 
   function noCell(no){

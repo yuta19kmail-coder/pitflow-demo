@@ -697,11 +697,21 @@
   /* ===== 履歴（車両＝そのナンバー単位） ===== */
   function cardDate(c){ return c.returnDate || c.reserveDate || ''; }
   /* 🧾 v2.2.0 その入庫にぶら下がっている伝票を引く（🔴 1予約に1伝票） */
+  /* 🧾 v2.11.2（ゆうた「ナンバーがなくても伝票とは紐づくわけだから」）
+     🔴 **伝票は予約番号で紐づく。** まずその車の中を見て、無ければ**全部の車から探す**。
+     ⚠ 1予約に1伝票なので、見つかったら1つだけ。 */
   function _denOf(veh, c){
-    const a=(veh&&Array.isArray(veh.伝票))?veh.伝票:[];
     const res=String((c&&c.resNo)||'').trim();
     if(!res) return null;
-    return a.find(x=>x&&String(x.予約番号||'').trim()===res)||null;
+    const mine=(veh&&Array.isArray(veh.伝票))?veh.伝票:[];
+    const hit=mine.find(x=>x&&String(x.予約番号||'').trim()===res);
+    if(hit) return hit;
+    let out=null;
+    (list()||[]).some(cu=>(cu.vehicles||[]).some(v=>{
+      const f=(Array.isArray(v.伝票)?v.伝票:[]).find(x=>x&&String(x.予約番号||'').trim()===res);
+      if(f){ out=f; return true; } return false;
+    }));
+    return out;
   }
   /* ✂️ v2.11.1 伝票の開け閉め（custDenToggle）は消した。
      ゆうた「伝票は直近のを開いた形で最初から出して。**閉じておくっていう動作は要らない**」 */
@@ -787,7 +797,7 @@
       +     '<div class="ch-tags">'+tags+'</div>'
       +   '</div>'
       +   '<div class="ch-amt">'+esc(amt)+'</div>'
-      +   '<div class="ch-btns">'+_histBtns(c)+'</div>'
+      +   '<div class="ch-btns">'+_histBtns(c, { detail:true })+'</div>'
       + '</div>'
       + (den?'<div class="ch-den">'
              + '<div class="ch-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
@@ -807,35 +817,48 @@
         飛び先は**ボタン**として並べる（押せる所と、読む所を混ぜない）。
      ⚠ 作り方はここ1本。顧客詳細の行も、履歴の画面の行も同じ形を使う。
      ================================================================ */
-  function _histBtns(c, custId, vehId){
+  function _histBtns(c, opt){
+    opt = opt || {};
     const isNS = _cardNoSale(c) || _cardCancelled(c);
+    /* ⚠ アイコンは出す／出さないを選べる。並べる場所によって見え方が変わるため。 */
+    const ic = (opt.icons === false) ? function(){ return ''; }
+                                     : function(n){ return '<i data-ic='+n+' data-ics=14></i> '; };
     let h = '';
-    if (custId != null){
-      h += '<button class="cd-b" onclick="event.stopPropagation();custHistory(\''+custId+'\',\''+esc(vehId||'')+'\',\''+esc(c.id)+'\')">'
-         +   '<i data-ic=clock data-ics=14></i> 履歴</button>';
+    if (opt.hist){
+      h += '<button class="cd-b" onclick="event.stopPropagation();custHistory(\''+opt.hist.custId+'\',\''+esc(opt.hist.vehId||'')+'\',\''+esc(c.id)+'\')">'
+         +   ic('clock') + '履歴</button>';
     }
     if (c.status === 'reserved'){
       h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoReserveDate(\''+esc(c.reserveDate||'')+'\')">'
-         +   '<i data-ic=calendar data-ics=14></i> 予約表</button>';
+         +   ic('calendar') + '予約表</button>';
     } else if (c.status === 'returned' && !isNS){
       h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoResultMonth(\''+esc(c.returnDate||c.reserveDate||'')+'\')">'
-         +   '<i data-ic=chart data-ics=14></i> 実績ボード</button>';
+         +   ic('chart') + '実績ボード</button>';
     }
-    h += '<button class="cd-b" onclick="event.stopPropagation();pitOpenCardDetail(\''+esc(c.id)+'\')">'
-       +   '<i data-ic=file data-ics=14></i> 予約詳細</button>';
+    if (opt.detail){
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitOpenCardDetail(\''+esc(c.id)+'\')">'
+         +   ic('file') + '予約詳細</button>';
+    }
     return h;
   }
 
   function _histHtml(){
-    const cust = list().find(function(x){ return x.id===_hist.custId; });
-    if (!cust) return '';
-    const cars = _histCars(cust);
+    /* ⚠ 1件だけの道（車に紐づかないカード）ではお客様が引けない。空で進める。 */
+    const cust = list().find(function(x){ return x.id===_hist.custId; }) || null;
+    if (!cust && !_hist.only) return '';
+    const cars = cust ? _histCars(cust) : [];
     const cur  = cars.find(function(v){ return v.id===_hist.vehId; }) || cars[0] || null;
     const ぜんぶ = (_hist.mode === 'cust');
 
     /* 出す行を作る。お客様ぜんぶの時は全部の車を混ぜて、日付の新しい順 */
     let rows = [], open = 0;
-    if (ぜんぶ){
+    /* 🔴 v2.11.2（ゆうた「1件なら1件だし」）
+       ナンバーが無くて車に紐づかないカードは、**そのカード1件だけ**を出す。
+       ＝ 押しても何も出ない、という行き止まりを作らない。 */
+    if (_hist.only){
+      const c = (state.cards||[]).find(x => x && x.id === _hist.only);
+      if (c) rows = [{ c:c, v:cur }];
+    } else if (ぜんぶ){
       cars.forEach(function(v){
         const r = _histCards(v.plate); open += r.open;
         r.done.forEach(function(c){ rows.push({ c:c, v:v }); });
@@ -846,17 +869,21 @@
       rows = r.done.map(function(c){ return { c:c, v:cur }; });
     }
 
-    let h = '<div class="cm-head"><i data-ic=clock data-ics=16></i> 来店履歴 '
-      + '<span class="cm-sub">'+esc(custDispName(cust)||'(無名)')+'</span>'
+    let h = '<div class="cm-head"><i data-ic=clock data-ics=16></i> 作業履歴 '
+      + '<span class="cm-sub">'+esc((cust?custDispName(cust):(_hist.名||''))||'(無名)')+'</span>'
       + '<button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div>';
     h += '<div class="ch-wrap">';
 
     /* ---- 左のサイドバー ---- */
     h += '<aside class="ch-side">';
-    h += '<div class="ch-mode">'
-       +   '<button class="ch-mb'+(ぜんぶ?'':' on')+'" onclick="custHistMode(\'veh\')">この車</button>'
-       +   '<button class="ch-mb'+(ぜんぶ?' on':'')+'" onclick="custHistMode(\'cust\')">お客様ぜんぶ</button>'
-       + '</div>';
+    /* ⚠ 車が1台も無い（＝1件だけの道）時は、切替も車の一覧も出さない。
+       押しても何も変わらないボタンを並べないため。 */
+    if (!_hist.only){
+      h += '<div class="ch-mode">'
+         +   '<button class="ch-mb'+(ぜんぶ?'':' on')+'" onclick="custHistMode(\'veh\')">この車</button>'
+         +   '<button class="ch-mb'+(ぜんぶ?' on':'')+'" onclick="custHistMode(\'cust\')">お客様ぜんぶ</button>'
+         + '</div>';
+    }
     h += '<div class="ch-cars">';
     cars.forEach(function(v){
       const n = _histCards(v.plate).done.length;
@@ -874,7 +901,7 @@
     /* ---- 右の本体 ---- */
     h += '<div class="ch-main">';
     if (!rows.length){
-      h += '<div class="cust-empty">来店履歴はまだありません。'
+      h += '<div class="cust-empty">作業履歴はまだありません。'
          + (open?'<br><b>いま予約・作業中が '+open+'件 あります</b>':'') + '</div>';
     } else {
       h += '<div class="ch-list">';
@@ -911,13 +938,30 @@
   /* 🔘 v2.11.1（ゆうた「アーカイブ済みのカード詳細の引継ぎメモの下にも履歴ボタンが欲しい」）
      カードからは**ナンバーしか手元に無い**ので、ここで顧客と車を引いて開く。
      🔴 引き方は `vehByPlate` 1本（ほかで `vehicles` を舐め直さない）。 */
-  window.custHistoryByPlate = function(plate, cardId){
-    const h = vehByPlate(plate);
-    if (!h || !h.cust){
-      if (window.pitToast) pitToast('この車はお客様に登録されていません');
+  /* 🔘 v2.11.2（ゆうた「ナンバーがなくても伝票とは紐づくわけだから入れて。
+        この車両ではなく単純に**作業履歴**にして。そうすればその先の画面で
+        車両に紐づいたら横断できるし、1件なら1件だし」）
+     🔴 **カードから開く入口はここ1本。**
+       ① ナンバーでお客様の車が引けた → いつもの画面（サイドバーで横断できる）
+       ② 引けなかった              → **そのカード1件だけ**を出す（行き止まりにしない）
+     ⚠ 伝票は予約番号で引くので、②でも伝票は出る（`_denOf` が全部の車から探す）。 */
+  window.custHistoryForCard = function(cardId){
+    const c = (state.cards||[]).find(x => x && x.id === cardId);
+    if (!c) return;
+    const h = isRealPlate(c.plate) ? vehByPlate(c.plate) : null;
+    if (h && h.cust){
+      window.custHistory(h.cust.id, (h.veh && h.veh.id) || '', cardId);
       return;
     }
-    window.custHistory(h.cust.id, (h.veh && h.veh.id) || '', cardId || '');
+    _hist = { custId:'', vehId:'', mode:'veh', cardId:String(cardId||''), only:String(cardId||''),
+              名: String(c.customer || (window.pitCustName?pitCustName(c):'') || '') };
+    _histOpen();
+  };
+  /* 昔の名前（ナンバーから開く）。中身は上の1本を通す。 */
+  window.custHistoryByPlate = function(plate, cardId){
+    if (cardId) return window.custHistoryForCard(cardId);
+    const h = vehByPlate(plate);
+    if (h && h.cust) window.custHistory(h.cust.id, (h.veh && h.veh.id) || '', '');
   };
   window.custHistMode = function(m){ _hist.mode = (m==='cust'?'cust':'veh'); _histOpen(); };
   window.custHistVeh  = function(id){ _hist.vehId = id; _hist.mode = 'veh'; _histOpen(); };
@@ -1225,32 +1269,31 @@
                                      +(c.cancelledAt?('　'+esc(c.cancelledAt)):'')+(c.cancelledBy?('　'+esc(c.cancelledBy)):'');
         // ステータスバッジ：予約→予約カレンダー／返車済み→実績カレンダー（行クリックは予約詳細）
         /* 売上なしの車は実績カレンダーに載っていないので、バッジから飛ばさない（飛んでも無い） */
-        const isNS=_cardNoSale(c)||_cardCancelled(c);
         /* ================================================================
-           🕘 v2.11.0／v2.11.1（ゆうた 2026-08-25）行の作りを変えた。
-           ・**ナンバーは出さない**（車種・担当・代車でいい。この画面は同じお客様の中なので）
-           ・状態などの札は**2行目にまとめて並べる**
-           🔴 v2.11.1 **「返車済み」はただの札にする。押させない。**
-              飛び先（実績ボード／予約表）は**ボタン**にして「履歴」と並べる
-              ＝ 読む所と押す所を混ぜない。札の大きさも全部そろう。
+           🕘 v2.11.2（ゆうた 2026-08-25）**2行に戻す。**
+           ・行ぜんぶを押すと予約詳細（今までどおり）
+           ・**日付の下に予約番号**
+           ・**「返車済み」の札は出さない**（右のボタンで実績ボードへ行ける）
+           ・右端に **履歴／実績ボード を上下に**（アイコンは抜く）
+           ⚠ 保険・社内区分などの印は**1行目の後ろ**に置く＝2行のまま情報を落とさない。
            ================================================================ */
-        let tags='<span class="cd-htag st'+(isNS?' nosale':'')+'">'+esc(_statusLbl(c))+'</span>';
+        let tags='';
         if(window.pitCardIntern&&pitCardIntern(c)) tags+='<span class="cd-htag">'+esc(pitInternLabel(c))+'</span>';
         (Array.isArray(c.workSpecials)?c.workSpecials:[]).forEach(function(id){
           const lb=window.pitSpecialLabel?pitSpecialLabel(id):''; if(lb) tags+='<span class="cd-htag">'+esc(lb)+'</span>';
         });
         if(c.earlyDiscount) tags+='<span class="cd-htag">早期割</span>';
-        if(c.resNo) tags+='<span class="cd-htag no">'+esc(c.resNo)+'</span>';
+        if(_cardNoSale(c)||_cardCancelled(c)) tags+='<span class="cd-htag st nosale">'+esc(_statusLbl(c))+'</span>';
         /* この行の車＝ナンバーで引く（履歴ボタンの飛び先） */
         const _hv=(cust.vehicles||[]).find(function(x){ return x&&isRealPlate(x.plate)&&norm(x.plate)===norm(c.plate||''); });
-        h+='<div class="cd-hrow">'+
-           '<div class="cd-hdt">'+esc(_doneDate(c)||'日付未定')+'</div>'+
+        h+='<div class="cd-hrow clickable" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
+           '<div class="cd-hdt">'+esc(_doneDate(c)||'日付未定')+
+             (c.resNo?'<span class="cd-hres">'+esc(c.resNo)+'</span>':'')+'</div>'+
            '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+
-           '<div class="cd-hmid"><div class="cd-hl1"><b>'+esc(c.car||'—')+'</b>'+(c.frontStaff?'<span class="cd-hstaff">担当 '+esc(c.frontStaff)+'</span>':'')+loa+'</div>'+
-             (menuTxt?'<div class="cd-hsub">'+menuTxt+'</div>':'')+
-             '<div class="cd-htags">'+tags+'</div></div>'+
+           '<div class="cd-hmid"><div class="cd-hl1"><b>'+esc(c.car||'—')+'</b>'+(c.frontStaff?'<span class="cd-hstaff">担当 '+esc(c.frontStaff)+'</span>':'')+loa+tags+'</div>'+
+             (menuTxt?'<div class="cd-hsub">'+menuTxt+'</div>':'')+'</div>'+
            '<div class="cd-hamt">'+amtStr+'</div>'+
-           '<div class="cd-hbtns">'+_histBtns(c, cust.id, (_hv?(_hv.id||''):''))+'</div>'+
+           '<div class="cd-hbtns">'+_histBtns(c, { hist:{ custId:cust.id, vehId:(_hv?(_hv.id||''):'') }, icons:false })+'</div>'+
            '</div>';
       });
       h+='</div>';

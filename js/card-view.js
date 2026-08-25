@@ -362,14 +362,17 @@
        + '<textarea class="cv-hoinput cv-grow" placeholder="引継ぎ・伝達を入力（自動で保存されます）"'
        +   ' oninput="cvGrow(this);cvHandoff(this.value)" onchange="cvHandoffSave(this.value)">'
        +   esc(c.handoffMemo||'')+'</textarea></div>';
-    /* 🕘 v2.11.1（ゆうた「引継ぎメモの下にも履歴ボタンが欲しいかも」）
-       ＝ この車の来店履歴を、そのままここから開く。アーカイブ済みのカードでも同じ。
-       🔴 開くのは `customers.js` の `custHistoryByPlate` 1本（ここで顧客を探さない）。
-       ⚠ ナンバーが無いカード（仮登録など）では出さない＝押せて効かないボタンを作らない。 */
-    if (window.custHistoryByPlate && window.pitIsRealPlate && pitIsRealPlate(c.plate)){
+    /* 🕘 v2.11.1／v2.11.2（ゆうた「引継ぎメモの下にも履歴ボタンが欲しいかも」
+       →「**ナンバーがなくても伝票とは紐づくわけだから入れて。
+          この車両ではなく単純に「作業履歴」にして**」）
+       🔴 **ナンバーの有無で出し分けない。** 伝票は予約番号で紐づくので、
+          ナンバーが無いカードでも見るものがある。
+       🔴 開くのは `customers.js` の `custHistoryForCard` 1本
+          （車に紐づけば横断できる画面、紐づかなければその1件だけ）。 */
+    if (window.custHistoryForCard){
       h += '<div class="cv-wsec cv-histbtn">'
-         +   '<button class="cd-b" onclick="custHistoryByPlate(\''+esc(c.plate)+'\',\''+esc(c.id)+'\')">'
-         +     '<i data-ic=clock data-ics=14></i> この車の来店履歴</button></div>';
+         +   '<button class="cd-b" onclick="custHistoryForCard(\''+esc(c.id)+'\')">'
+         +     '<i data-ic=clock data-ics=14></i> 作業履歴</button></div>';
     }
     return h + '</div>';
   }

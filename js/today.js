@@ -459,7 +459,9 @@ function _pitTodayReturnGo(c){
   const t = ymd(new Date());
   c.status = 'returned';
   c.returnDate = c.returnDate || t;
-  c.completedAt = t;                 // 実績カレンダーはこの日付で表示
+  /* 🛡 v2.9.0 保険＝返車しても実績に乗せない（入金日を入れた時に乗る）。
+     🔴 物差しも書き込みも `insurance-pit.js` の1本。完TELポップアップと**同じ1行**。 */
+  if (!(window.pitInsOnReturn && pitInsOnReturn(c, t))) c.completedAt = t;   // 実績カレンダーはこの日付で表示
   /* 🔴 v1.64.0 拾う順番を完TELのポップアップ（return-popup.js）と揃えた＝**確定→受注→見積→概算**。
      ここだけ概算しか見ていなかったので、クイック受注で人が打った受注金額が捨てられていた。
      ⚠ 「いくらの車か」を2か所が別々に決めない。 */

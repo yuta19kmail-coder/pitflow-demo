@@ -1113,3 +1113,8 @@ select.cf-input{
   background:transparent; color:#b45309; border:1px dashed #f59e0b;
   border-radius:5px;
 }
+
+/* 🛡 v2.9.0 保険＝入金日で実績に乗る、の1行 */
+.cv-insnote{ margin-top:6px; font-size:11.5px; font-weight:700; color:#2563eb;
+  background:rgba(37,99,235,.10); border:1px solid rgba(37,99,235,.32);
+  border-radius:8px; padding:5px 10px; line-height:1.7; }

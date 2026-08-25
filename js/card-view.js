@@ -819,6 +819,15 @@
         実績カレンダーと返車カレンダーがズレる。 */
   window.pitApplyResultDate = function (c, v) {
     if (!c) return;
+    /* 🛡🛡 v2.9.0 保険は**返車日と実績日が別物**（返車→請求書→入金）。
+       🔴 だから返車日まで一緒に動かしてはいけない。**本当の返車日を上書きしない。**
+          代わりに入金日を合わせる（保険の実績日＝入金日なので）。 */
+    if (window.pitCardInsurance && pitCardInsurance(c)) {
+      c.completedAt = v;
+      c.paymentDate = v || null;
+      if (v) c.paymentSeparate = true;
+      return;
+    }
     c.completedAt = v;
     c.returnDate = v;
     c.returnDateFinal = v;
@@ -1038,9 +1047,14 @@
       btn = '<i data-ic=pencil data-ics=16></i> 売掛にする';
     }
     var label = (c.paymentSeparate && c.paymentDate) ? '入金日' : '入金';
+    /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**。本当の返車日も一緒に出す。
+       ⚠ 言葉は `insurance-pit.js` の1本。ここで書き分けない。 */
+    var insNote = (window.pitCardInsurance && pitCardInsurance(c) && window.pitInsNote)
+      ? '<div class="cv-insnote"><i data-ic=shield data-ics=14></i> ' + esc(pitInsNote(c)) + '</div>' : '';
     return '<div class="cv-fixrow cv-fixlocked"><div class="cv-frt">'+label+' '+tag+' <button type="button" class="cv-unlockbtn" onclick="cvUnlockPay()">'+btn+'</button></div><div class="cv-frb">'
       + val
-      + '<span class="cv-unlockwrap" id="cv-payedit" style="display:none">'+paymentControlHtml(c)+'</span></div></div>';
+      + '<span class="cv-unlockwrap" id="cv-payedit" style="display:none">'+paymentControlHtml(c)+'</span></div>'
+      + insNote + '</div>';
   }
   /* 💳 入金日を分ける（売掛）コントロール＝チェック＋（ON時）入金日ピッカー。金額欄と完了アーカイブで共用 v0.121.0 */
   function paymentControlHtml(c){
@@ -1669,9 +1683,15 @@
   };
   // 入金日をセット（予約詳細側）。実績側の入金待ちにも即反映 v0.121.0
   window.cvSetPaymentDate = function(v){
-    _c.paymentDate = v || null;
-    if(v && !_c.paymentSeparate) _c.paymentSeparate = true;
-    if(v && window.logFlow) logFlow(_c, '入金日を記録（'+v+'）');
+    /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**になる。書き込みは insurance-pit.js の1本。
+       ⚠ 保険でない車は今までどおり（入金日はメモ。実績日は動かさない）。 */
+    if (window.pitInsSetPaid && pitInsSetPaid(_c, v)){
+      /* 実績日まで面倒を見てくれた＝ここでは何も足さない */
+    } else {
+      _c.paymentDate = v || null;
+      if(v && !_c.paymentSeparate) _c.paymentSeparate = true;
+      if(v && window.logFlow) logFlow(_c, '入金日を記録（'+v+'）');
+    }
     save(); cvRefreshBg();
     if(window.renderCardView) renderCardView(_c,'md-body-modal');
   };

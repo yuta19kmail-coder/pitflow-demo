@@ -483,6 +483,10 @@
       fix:'カードを開いて返車日を入れ直してください。',
       each: function(c){
         if (!isDone(c)) return '';
+        /* 🛡 v2.9.0 保険は**入金日を入れるまで実績日が空なのが正しい姿**（ゆうた指定 2026-08-25）。
+           🔴 ここを赤で出すと、現場が慌てて手で実績日を埋めてしまう＝返車日で計上され直す。
+           ⚠ 判定は `insurance-pit.js` の1本。ここで `workSpecials` を見ない。 */
+        if (w.pitInsPayWait && pitInsPayWait(c)) return '';
         return t(c.completedAt) ? '' : '実績の日（完了日）が空です。どの月にも数えられていません';
       } },
 

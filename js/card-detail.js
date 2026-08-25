@@ -2640,6 +2640,9 @@ function bindCardFormEvents(root){
           }
           c[key].push(v);
         }
+        /* 🛡 v2.9.0 保険を付けたら**自動で売掛チェックが入る**（ゆうた指定 2026-08-25）。
+           🔴 判定も書き込みも `insurance-pit.js` の1本。ここで 'insurance' と書き分けない。 */
+        if (window.pitInsOnBadge) pitInsOnBadge(c);
         if (window.PitDB) PitDB.save();
         renderCardForm(c);
       });

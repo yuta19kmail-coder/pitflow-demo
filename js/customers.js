@@ -805,6 +805,9 @@
     if (!c) return false;
     if (_cardNoSale(c)) return true;
     if (_cardCancelled(c)) return true;
+    /* 🛡 v2.9.0 保険で入金待ち＝実績日はまだ空だが、**車はもう返している**。
+       来店した事実は残す（売上なしアーカイブと同じ考え方）。日付は下の `_doneDate` が返車日を使う。 */
+    if (window.pitInsPayWait && pitInsPayWait(c)) return true;
     return !!(c.status==='returned' && String(c.completedAt||'').trim());
   }
   window.pitCardIsDone = _cardDone;
@@ -825,6 +828,8 @@
   function _doneDate(c){
     if (_cardCancelled(c)) return c.reserveDate || c.cancelledAt || '';   /* 来るはずだった日 */
     if (_cardNoSale(c)) return c.reserveDate || c.returnDate || '';
+    /* 🛡 v2.9.0 保険で入金待ち＝**本当の返車日**を履歴の日付にする（実績日はまだ無い） */
+    if (window.pitInsPayWait && pitInsPayWait(c)) return c.returnDateFinal || c.returnDate || c.reserveDate || '';
     return c.completedAt || c.returnDate || c.reserveDate || '';
   }
   /* v0.93.0 LINE状態→表示HTML（NG=地味ピル／登録済+番号=Lステップボタン）。未案内は出さない。 */

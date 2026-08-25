@@ -213,7 +213,7 @@ function renderReturnTbd(){
         + '<label class="rtbd-paylb">入金日 <input type="date" class="rtbd-paydate" value="" onclick="event.stopPropagation()" onchange="pitSetPaymentDate(\'' + c.id + '\',this.value)"></label></div>'
         + '</div>'
       ).join('') : '<div class="today-empty">なし</div>') + '</div>';
-  h += '<div class="und-note">入金日を入れると、入金待ちから消え、実績カードに入金日が記録されます。</div></div>';
+  h += '<div class="und-note">入金日を入れると、入金待ちから消えます。<b>保険の車はその日で実績に計上</b>されます（返車日ではなく入金日）。</div></div>';
 
   h += '</div>';
   wrap.innerHTML = h;
@@ -224,11 +224,15 @@ window.renderReturnTbd = renderReturnTbd;
 window.pitSetPaymentDate = function(id, v){
   const c = state.cards.find(x => x.id === id);
   if (!c || !v) return;
-  c.paymentDate = v;
-  if (window.logFlow) logFlow(c, '入金日を記録（' + v + '）');
+  /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**。書き込みは insurance-pit.js の1本。 */
+  var ins = !!(window.pitInsSetPaid && pitInsSetPaid(c, v));
+  if (!ins){
+    c.paymentDate = v;
+    if (window.logFlow) logFlow(c, '入金日を記録（' + v + '）');
+  }
   if (window.PitDB) PitDB.save();
   renderReturnTbd();
-  if (window.pitToast) pitToast('入金日 '+ v + 'を記録しました');
+  if (window.pitToast) pitToast(ins ? ('入金日 ' + v + ' で実績に計上しました') : ('入金日 '+ v + 'を記録しました'));
 };
 
 function _undRow(c, kind){

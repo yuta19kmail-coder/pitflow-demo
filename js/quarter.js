@@ -731,11 +731,17 @@
           **読み込んだPDFの行番号（p.soft.i）に効く**もので、残した結果には行番号が無い。
           出すと押せるのに効かないボタンになるので、代わりに「カードを開く」を出す。 */
     var left = saved ? 1 : (w.pitQRowLeft ? w.pitQRowLeft(p) : 1);
+    /* 🔴🔴 v2.9.3（ゆうた「OKボタンが既に押されているのかな？ グレーアウトしてある」）
+       灰色（is-done）は「**人が印を押して片づけた**」時だけ。
+       ⚠ 直すところが**もともと無い**行（OKの行）まで灰色にすると、
+          「押した覚えがないのに押したように見える」＝ゆうたが踏んだやつ。 */
+    var total = saved ? 1 : (w.pitQRowTotal ? w.pitQRowTotal(p) : 1);
+    var 片づけた = (total > 0 && left === 0);
     var sg = p.売上日差 || { kind:'', label:'' };
     var sdCls = sg.kind === 'none' ? 'miss' : (sg.kind === 'same' ? '' : 'bad');
     var idNg = !p.同じ車;                       /* 🔴 vinNG / carNG だけ。plateNG は赤くしない（v2.9.2） */
     /* 🔔 v2.8.3 直す先が無いものは、左の帯も黄ではなく青（見るだけ、と分かるように） */
-    return '<div class="q-c' + (left ? '' : ' is-done')
+    return '<div class="q-c' + (片づけた ? ' is-done' : '')
          + (p.期間の外 ? (p.正常なQまたぎ ? ' note' : ' out') : '') + (idNg ? ' mism' : '') + '">'
       + '<div class="q-c-h">' + noBtn(w.pitQRowNo ? w.pitQRowNo(p) : '')
       +   '<span class="q-c-how">' + esc(p.結び方) + '</span>'
@@ -940,16 +946,17 @@
       h += '<b class="q-fx-k">' + esc(k.kind) + '</b>';
       if (mk){
         /* 🔴 押しても**消さない**。誰がいつ決めたかを残す（データチェックの「確認した」と同じ作法）。 */
-        h += '<span class="q-fx-done">' + (k.保つ ? 'このままでよい' : '伝票を直した')
+        h += '<span class="q-fx-done">' + (k.保つ ? esc(k.label || 'このままでよい') : '伝票を直した')
            + (mk.by ? '<i>' + esc(mk.by) + '</i>' : '')
            + (mk.at ? '<i>' + esc(s(mk.at).slice(5, 10).replace('-', '/')) + '</i>' : '')
            + '</span>'
            + '<button class="q-fx-un" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',0)">戻す</button>';
       } else if (k.保つ){
         /* 🗓 v2.2.0 実績日＝返車日。ふだんの答えは**これ1つだけ**（直すボタンは出さない） */
+        /* ⚠ v2.9.3 文言は物差し（quarter-fix.js の `keepKinds`）が決める。ここで決め打ちしない */
         h += '<button class="q-fx-mk q-fx-keep"'
-           + ' title="返車日は当日に付けているので、伝票と日がちがっても直す必要はありません"'
-           + ' onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">このままでよい</button>';
+           + ' title="' + esc(k.why || '') + '"'
+           + ' onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">' + esc(k.label || 'このままでよい') + '</button>';
       } else if (!k.can){
         h += '<span class="q-fx-lock" title="' + esc(k.why) + '"><i data-ic=lock data-ics=14></i> 管理のみ</span>'
            + '<button class="q-fx-mk" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">伝票を直した</button>';

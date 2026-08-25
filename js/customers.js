@@ -834,6 +834,11 @@
     return '';
   }
   window.pitCustLastVisit = lastVisitOf;
+  /* 🗓 v2.9.5 **その1台を「いつのこと」として置くか。** 来店履歴も実績カレンダーもここを見る。
+     🔴 売上なしアーカイブは `completedAt` を**入れない**決めごと（v1.99.0・二重の守り）なので、
+        `completedAt` だけを見ると**どのカレンダーにも置けない**（ゆうたが踏んだ）。
+        だから来た日（入庫日）に落とす。**この落とし方はここ1本。** */
+  window.pitCardDoneDate = _doneDate;
   /* その人のカード全部（予約中も含む）。件数の案内に使う */
   function _custCardsAll(cust){
     /* 🔴 v1.53.0 意味をなさないナンバー（「0」など）は突き合わせに使わない */

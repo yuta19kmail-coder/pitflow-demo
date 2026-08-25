@@ -68,6 +68,20 @@
       h += '</div>';
     }
 
+    /* ===== 🗃 v2.12.0 過去の伝票を取り込む（PitFlow を始める前のぶん・管理だけ） =====
+       🗣 ゆうた「PitFlowの始動前のデータ、**車体番号と履歴の挿入**を」
+       🔴 入れるのは**ナンバーとお名前が両方合ったものだけ**。判断は past-import.js の1本。 */
+    if (window.pitPastImportOpen && window.pitIsAdmin && pitIsAdmin()) {
+      h += '<div class="ps-card">';
+      h += '<div class="ps-h"><i data-ic=box data-ics=16></i> 過去の伝票を取り込む</div>';
+      h += '<div class="ps-desc">PitFlow を始める前の<b>売上チェックリストPDF</b>から、'
+         + '<b>車体番号</b>と<b>作業の履歴</b>を入れます。'
+         + '入れるのは<b>ナンバーとお名前が両方合ったものだけ</b>です。</div>';
+      h += '<div style="margin-top:8px"><button class="vh-btn" onclick="pitPastImportOpen()">'
+         + '<i data-ic=box data-ics=16></i> 取り込む画面を開く</button></div>';
+      h += '</div>';
+    }
+
     /* ===== 入庫まわりは🧩ルールページへ集約（2026-06-04 ゆうた指示） ===== */
     h += '<div class="ps-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
     h += '<div style="font-size:13px;color:var(--text2);line-height:1.7;flex:1;min-width:240px"><i data-ic=download data-ics=16></i> <b>入庫に関する設定（予約枠・売上目標・平均単価・曜日ルールなど）は「<i data-ic=puzzle data-ics=16></i> ルール」ページに集約</b>しました。入庫のアルゴリズムはすべてそちらで調整します。</div>';

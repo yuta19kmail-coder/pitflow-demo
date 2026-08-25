@@ -811,6 +811,29 @@
     return !!(c.status==='returned' && String(c.completedAt||'').trim());
   }
   window.pitCardIsDone = _cardDone;
+  /* ================================================================
+     🗓🗓 v2.9.4 **「最終入庫」は、来店履歴のいちばん新しい日**（ゆうた 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「成田 脩人さん。カードがないと。**最終入庫 2026/8/20 なぜか残っている。
+     　　でも実績にはない。これなんだ？？**」
+     ◎正体 …… ここは `cust.updatedAt` ／ `vehicle.updatedAt`（＝**レコードを最後に触った時刻**）を
+       「最終入庫」と書いて出していた。成田さんの車は **8/20 に11/07の車検予約を作った時**に
+       更新されただけで、**8/20 に入庫した事実は無い**。**札が嘘をついていた。**
+     🔴 入庫の事実は**カード**にしか無い。だから来店履歴（`_custCards`）のいちばん新しい日を返す。
+     🔴 **物差しはここ1本。** 検索（search.js）もこれを借りる（`updatedAt` を書き写さない）。
+     ⚠ 1度も来ていないお客様は **''（空）** を返す。呼ぶ側が「まだ来店なし」と言う。
+        ⚠ ここで 0 や updatedAt を代わりに返さないこと。**それが今回の嘘の作り方だった。**
+     ================================================================ */
+  function lastVisitOf(cust){
+    if (!cust) return '';
+    var a = _custCards(cust);                 /* 来店履歴＝実績になったもの。新しい順に並んでいる */
+    for (var i = 0; i < a.length; i++){
+      var d = String(_doneDate(a[i]) || '').trim();
+      if (d) return d;                        /* 'YYYY-MM-DD' */
+    }
+    return '';
+  }
+  window.pitCustLastVisit = lastVisitOf;
   /* その人のカード全部（予約中も含む）。件数の案内に使う */
   function _custCardsAll(cust){
     /* 🔴 v1.53.0 意味をなさないナンバー（「0」など）は突き合わせに使わない */
@@ -921,7 +944,8 @@
     /* 🔴 v1.54.0 金額は**確定額（返車時に固めたもの）**を使う。まだ無ければ概算で埋める */
     const total=cards.reduce(function(s,c){ if(_cardCancelled(c)||_cardNoSale(c)) return s;   /* 🔴 キャンセル・売上なしは金額に入れない */
       const a=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(Number(c.estAmount)||0); return s+(isFinite(a)?a:0); },0);
-    let last=cust.updatedAt||0; vehicles.forEach(function(v){ if((v.updatedAt||0)>last) last=v.updatedAt||0; });
+    /* 🗓 v2.9.4 最終入庫＝**来店履歴のいちばん新しい日**（`updatedAt` は「レコードを触った日」であって入庫ではない） */
+    const last=lastVisitOf(cust);
     const yen=function(n){ return '¥'+Number(n||0).toLocaleString('ja-JP'); };
 
     let h='';
@@ -946,7 +970,7 @@
     h+='<div class="cd-hero"><div class="cd-hmain">'+
        '<div class="cd-hname">'+esc(custDispName(cust)||'(無名)')+' <small>様</small></div>'+
        (cust.kana?'<div class="cd-hkana">'+esc(cust.kana)+'</div>':'')+
-       '<div class="cd-hpills"><span class="cd-pill mut">最終入庫 '+fmtDate(last)+'</span></div>'+
+       '<div class="cd-hpills"><span class="cd-pill mut">最終入庫 '+(last?esc(last.replace(/-/g,'/')):'まだ来店なし')+'</span></div>'+
        '</div><div class="cd-stats"><div class="cd-statrow">'+
        '<div class="cd-stat"><b>'+visits+'</b><span>来店回数</span></div>'+
        '<div class="cd-stat"><b>'+vehicles.length+'</b><span>保有台数</span></div>'+

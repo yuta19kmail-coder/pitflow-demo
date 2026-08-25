@@ -206,9 +206,6 @@
     var cur = t(G().見る) || t(a[0].soft.伝票);
     var p = a.filter(function (x) { return t(x.soft.伝票) === cur; })[0] || a[0];
     var m = p.soft;
-    var ara = num(m.金額) - num(m.原価);
-    var pct = num(m.金額) ? Math.round(ara / num(m.金額) * 1000) / 10 : 0;
-    var hou = (m.法定 || []).reduce(function (x, y) { return x + num(y.金額); }, 0);
     var h = '<div class="vw"><div class="vw-h"><b>書き込んだ内容</b>'
           + '<button class="vw-x" onclick="pitQWriteSee(0)">閉じる</button></div>';
     h += '<div class="vw-pick">';
@@ -229,12 +226,35 @@
     h += '<div class="vw-sec"><div class="vw-t">来店履歴にぶら下がったもの</div>'
       + '<div class="vw-hr on"><div class="vw-hd">' + esc(m.売上日) + '　伝票 ' + esc(m.伝票)
       +   '　予約 ' + esc(p.pit.予約番号) + '</div>'
-      + '<div class="vw-hm"><b>' + yen(m.金額) + '円</b><span>原価 ' + yen(m.原価) + '円</span>'
-      +   '<em>粗利 ' + yen(ara) + '円（' + pct + '%）</em>'
-      +   (hou ? '<span class="vw-hou-c">＋法定費用 ' + yen(hou) + '円</span>' : '') + '</div></div></div>';
+      + '<div class="vw-hm">' + denHead(m) + '</div></div></div>';
     h += '<div class="vw-sec"><div class="vw-t">この時の伝票</div>' + denTable(m) + '</div>';
     /* ✂️ v2.10.2 導線の案内は消した（お客様の画面から見られることは、使えば分かる） */
     return h + '</div>';
+  }
+
+  /* ================================================================
+     🧾💴 v2.12.2 **金額の言い方は、この2本だけ**（ゆうた 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「伝票画面に **左上の計に（抜き）表記**」
+     🗣「**下の計の下に税込み計を表示**」
+     ◎前は同じ見出しの行が**3か所に書き写されていた**
+       （クォーターチェックの伝票／履歴のカードの行／履歴の始動前の行）。
+       ＝「（抜き）」を足すのに3か所直すことになる＝いつか1か所だけ古くなる。
+     🔴 だから見出しは `denHead(m)` 1本。呼ぶ側は入れ物の class だけを持つ。
+     ⚠ 消費税が分からない伝票では**税込の行を出さない**。
+        「税抜＝税込」と見える行を作るのは、黙るより悪い（嘘になる）。
+     ================================================================ */
+  function houOf(m){ return (m.法定 || []).reduce(function (x, y) { return x + num(y.金額); }, 0); }
+
+  function denHead(m){
+    var ara = num(m.金額) - num(m.原価);
+    var pct = num(m.金額) ? Math.round(ara / num(m.金額) * 1000) / 10 : 0;
+    var hou = houOf(m);
+    return '<b>' + yen(m.金額) + '円<span class="den-nuki">（抜き）</span></b>'
+         + '<span>原価 ' + yen(m.原価) + '円</span>'
+         + '<em>粗利 ' + yen(ara) + '円（' + pct + '%）</em>'
+         + (hou ? '<span class="den-hou">＋法定費用 ' + yen(hou) + '円</span>' : '')
+         + (t(m.伝票番号 || m.伝票) ? '<i>伝票 ' + esc(t(m.伝票番号 || m.伝票)) + '</i>' : '');
   }
 
   /* ================================================================
@@ -244,7 +264,12 @@
      ================================================================ */
   function denTable(m){
     var ara = num(m.金額) - num(m.原価);
-    var hou = (m.法定 || []).reduce(function (x, y) { return x + num(y.金額); }, 0);
+    var hou = houOf(m);
+    /* 💴 消費税が入っている伝票だけ、税込の行を足す。 */
+    var zei = num(m.消費税);
+    var 税込 = zei > 0 ? (num(m.金額) + zei) : 0;
+    /* 伝票計＝お客様に請求した額（税・法定費用こみ）。無い伝票は足し算で出す。 */
+    var 請求 = num(m.伝票計) > 0 ? num(m.伝票計) : (税込 ? (税込 + hou) : 0);
     var h = '<div class="vw-tw"><table class="vw-t3"><thead><tr>'
       + '<th>作業・部品</th><th>区分</th><th class="n">数量</th><th class="n">単価</th>'
       + '<th class="n">金額</th><th class="n">原価</th><th class="n">粗利</th></tr></thead><tbody>';
@@ -263,7 +288,15 @@
     });
     h += '</tbody><tfoot><tr><th colspan="4">売上（税抜）</th>'
       + '<th class="n">' + yen(m.金額) + '</th><th class="n c">' + yen(m.原価) + '</th>'
-      + '<th class="n g">' + yen(ara) + '</th></tr></tfoot></table></div>';
+      + '<th class="n g">' + yen(ara) + '</th></tr>';
+    if (税込){
+      h += '<tr class="ft2"><th colspan="4">売上（税込）</th>'
+         + '<th class="n">' + yen(税込) + '</th><th colspan="2"></th></tr>';
+      /* ⚠ 法定費用が無い伝票では、伝票計は上の税込と**同じ数**。同じ数を2回並べない。 */
+      if (hou) h += '<tr class="ft2"><th colspan="4">伝票計（請求）</th>'
+                  + '<th class="n">' + yen(請求) + '</th><th colspan="2"></th></tr>';
+    }
+    h += '</tfoot></table></div>';
     if (hou){
       /* ✂️ v2.11.1（ゆうた「この辺りも要らない」）説明の2文を消した。
          「法定費用（非課税）」という見出しと、売上の表と別枠になっている作りで意味は通る。 */
@@ -281,6 +314,7 @@
   w.pitQWriteView  = view;
   w.pitQWriteGo    = go;
   w.pitQDenTable   = denTable;      /* 🧾 顧客詳細からも同じものを呼ぶ */
+  w.pitQDenHead    = denHead;       /* 💴 v2.12.2 伝票の見出し1行。物差しはこの1本 */
   w.pitQWriteSee   = function (v){ Q().viewer = !!+v; if (w.renderInspect) renderInspect(); };
   w.pitQWritePick  = function (d){ G().見る = d; if (w.renderInspect) renderInspect(); };
 })(window);

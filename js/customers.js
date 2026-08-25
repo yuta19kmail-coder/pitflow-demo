@@ -781,9 +781,6 @@
     }
     /* 🧾 その入庫の伝票（クォーターチェックが書き込んだもの）。1予約に1伝票。 */
     const den = _denOf(veh, c);
-    const ara = den ? (Number(den.金額||0)-Number(den.原価||0)) : 0;
-    const pct = (den&&Number(den.金額)) ? Math.round(ara/Number(den.金額)*1000)/10 : 0;
-    const hou = den ? ((den.法定||[]).reduce(function(a,x){ return a+Number(x.金額||0); },0)) : 0;
     const oid = 'dn'+esc(String(c.id||''));
     /* 2行目に並べる札（ゆうた「細かいバッチ類や返車済み等情報を羅列」） */
     let tags = '<span class="ch-tag st">'+esc(st)+'</span>';
@@ -810,12 +807,9 @@
       +   '<div class="ch-amt">'+esc(amt)+'</div>'
       +   '<div class="ch-btns">'+_histBtns(c, { detail:true })+'</div>'
       + '</div>'
+      /* 💴 v2.12.2 見出しの作り方は quarter-write.js の `pitQDenHead` 1本（ここで書き写さない） */
       + (den?'<div class="ch-den">'
-             + '<div class="ch-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
-             + '<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
-             + '<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
-             + (hou?'<span class="ch-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
-             + '<i>伝票 '+esc(den.伝票番号||'')+'</i></div>'
+             + '<div class="ch-den-h">'+(window.pitQDenHead?pitQDenHead(den):'')+'</div>'
              + (window.pitQDenTable?pitQDenTable(den):'')
            + '</div>':'')
       + '</div>';
@@ -862,9 +856,6 @@
      ⚠ 押す先が無いのでボタンは出さない（押せて効かないボタンを作らない）。
      ================================================================ */
   function _denOnlyRow(den, veh, showCar, oid){
-    const ara=Number(den.金額||0)-Number(den.原価||0);
-    const pct=Number(den.金額)?Math.round(ara/Number(den.金額)*1000)/10:0;
-    const hou=(den.法定||[]).reduce((a,x)=>a+Number(x.金額||0),0);
     /* ⚠ 目印に伝票番号は使えない。整備ソフトの伝票番号は**番号が無いとき "00"**＝重なる。
           （v2.12.0 の取り込みでも同じ穴を踏んだ）並び順の番号で1件を指す。 */
     return '<div class="ch-item has-den" id="'+esc(oid||'')+'">'
@@ -883,11 +874,7 @@
       +   '<div class="ch-btns"></div>'
       + '</div>'
       + '<div class="ch-den">'
-      +   '<div class="ch-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
-      +   '<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
-      +   '<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
-      +   (hou?'<span class="ch-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
-      +   '<i>伝票 '+esc(den.伝票番号||'')+'</i></div>'
+      +   '<div class="ch-den-h">'+(window.pitQDenHead?pitQDenHead(den):'')+'</div>'
       +   (window.pitQDenTable?pitQDenTable(den):'')
       + '</div></div>';
   }

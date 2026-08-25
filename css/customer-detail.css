@@ -358,7 +358,7 @@
 .ch-den-h span{ font-size:11px; color:var(--text3); }
 .ch-den-h em{ font-style:normal; font-size:12px; font-weight:800; color:var(--green); }
 .ch-den-h i{ font-style:normal; font-size:10.5px; color:var(--text3); margin-left:auto; }
-.ch-den-hou{ color:var(--orange) !important; }
+/* ✂️ v2.12.2 .ch-den-hou は .den-hou に一本化（見出しは pitQDenHead が作る） */
 @media (max-width:980px){
   .ch-wrap{ grid-template-columns:1fr; }
   .ch-side{ border-right:none; border-bottom:1px solid var(--border); max-height:none; }

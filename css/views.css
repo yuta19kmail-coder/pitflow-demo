@@ -726,7 +726,11 @@
 /* 作業タイプ・受付の文字は幅に合わせて自動縮小（長い「コーティング」等でもはみ出さない） */
 .tag-drop{ font-size:14px; }
 .tag-work{ font-size:13px; }
-.tag-work.long{ font-size:11px; }
+/* 🚗 v2.7.1（ゆうた指摘で「車販」→「車販依頼」に改名したぶん）
+   4文字のラベルは1行だと枠からはみ出す。**2行に折り返して**入れる。
+   ⚠ 枠の大きさ（26px）は変えない＝当日ビューの札は全部そろえてある。 */
+.tag-work.long{ font-size:10px; line-height:1.02; white-space:normal; word-break:break-word; padding:0 2px; }
+.tr-tag-work.multi .tag-work.long{ font-size:9px; white-space:normal; text-overflow:clip; }
 
 /* 休憩ゾーン：全体が黄色の斜めストライプの連続ブロック。中のカードもその上に乗る。
    ゾーンの一番下に明るい黄色の点線（休憩の終わりの目印） */

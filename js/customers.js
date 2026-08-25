@@ -81,7 +81,9 @@
      ⚠ **データは消さない**＝照合に使わないだけ。ただし**控えに新しく保存する時は空にする**（これ以上増やさない）。 */
   /* ⚠ norm() はカタカナをひらがなに直すので、この一覧も同じ物差しに通してから比べる
         （「ナンバーなし」をそのまま比べても一生一致しない） */
-  const PLATE_NG = ['なし','無し','未定','不明','無','新規車両','ナンバーなし','ナンバー無し','番号なし','未登録','仮ナンバー','-','ー','―','−','--','ーー','・','／','/'].map(norm);
+  /* ⚠ 「仮登録車両」は整備ソフトが“番号がまだ無い車”に入れる文言。本物の番号ではない。
+        （過去伝票の束 864枚のうち 43枚がこれ。照合に使うと全部が同じ1台に吸い込まれる） */
+  const PLATE_NG = ['なし','無し','未定','不明','無','新規車両','仮登録車両','仮登録','ナンバーなし','ナンバー無し','番号なし','未登録','仮ナンバー','-','ー','―','−','--','ーー','・','／','/'].map(norm);
   function isRealPlate(plate){
     const s = String(plate==null?'':plate).trim();
     if(!s) return false;
@@ -101,7 +103,8 @@
         クォーターチェックが伝票から拾って、ここに書き足す。
      🔴 **上書きはしない。** すでに別の番号が入っていたら、書かずに知らせる
         （ナンバーの付け替えも、結びつけのまちがいも、どちらもありうるので人が見る）。
-     ⚠ 出し入れの入口は**この3本だけ**。ほかの所で `veh.vin` を直に触らないこと。
+     ⚠ 出し入れの入口は**この4本だけ**（v2.12.0 で `pitVehSetVinOn` を足した）。
+        ほかの所で `veh.vin` を直に触らないこと。
      ================================================================ */
   function vehByPlate(plate){
     if(!isRealPlate(plate)) return null;
@@ -116,18 +119,26 @@
   }
   window.pitVehByPlate = vehByPlate;
   window.pitVehVin = function(plate){ const h=vehByPlate(plate); return h?String(h.veh.vin||''):''; };
-  /* 書き足す。返り＝'入れた' / 'そのまま'（同じ番号）/ 'ちがう'（別の番号が入っている）/ '車がない' */
-  window.pitVehSetVin = function(plate, vin){
+  /* 書き足す。返り＝'入れた' / 'そのまま'（同じ番号）/ 'ちがう'（別の番号が入っている）/ '車がない'
+     🔴 v2.12.0 **車そのものを渡す形**を本体にした。
+        ナンバーで引くと、**同じナンバーの車が2台ある時にどちらか分からない**。
+        呼ぶ側がすでに車を1台に決めているなら、その車に書く（過去の伝票の取り込みがこれ）。 */
+  function vehSetVinOn(cust, veh, vin){
     vin=String(vin||'').trim();
     if(!vin) return 'そのまま';
-    const h=vehByPlate(plate);
-    if(!h) return '車がない';
-    const now=String(h.veh.vin||'').trim();
+    if(!veh) return '車がない';
+    const now=String(veh.vin||'').trim();
     if(now && now.toUpperCase()===vin.toUpperCase()) return 'そのまま';
     if(now) return 'ちがう';                       /* 🔴 上書きしない */
-    h.veh.vin=vin; h.veh.updatedAt=Date.now();
-    if(h.cust) h.cust.updatedAt=Date.now();
+    veh.vin=vin; veh.updatedAt=Date.now();
+    if(cust) cust.updatedAt=Date.now();
     return '入れた';
+  }
+  window.pitVehSetVinOn = vehSetVinOn;
+  window.pitVehSetVin = function(plate, vin){
+    const h=vehByPlate(plate);
+    if(!h) return String(vin||'').trim() ? '車がない' : 'そのまま';
+    return vehSetVinOn(h.cust, h.veh, vin);
   };
 
   /* ===== 入庫カードから upsert（人を特定→車両を upsert） =====
@@ -842,6 +853,49 @@
     return h;
   }
 
+  /* ================================================================
+     🗃 v2.12.0 **カードが無い伝票の行**（PitFlow を始める前のぶん）
+     ----------------------------------------------------------------
+     来店履歴は「カードにぶら下がった伝票」を出す作りだが、
+     始動前の伝票には予約カードが無い。**それでも出さないと、入れた意味が無い。**
+     🔴 出し方は**カードの行とそろえる**（同じカード・同じ札・同じ伝票の表）。
+     ⚠ 押す先が無いのでボタンは出さない（押せて効かないボタンを作らない）。
+     ================================================================ */
+  function _denOnlyRow(den, veh, showCar){
+    const ara=Number(den.金額||0)-Number(den.原価||0);
+    const pct=Number(den.金額)?Math.round(ara/Number(den.金額)*1000)/10:0;
+    const hou=(den.法定||[]).reduce((a,x)=>a+Number(x.金額||0),0);
+    return '<div class="ch-item has-den" id="dnp'+esc(String(den.伝票番号||''))+'">'
+      + '<div class="ch-row">'
+      +   '<div class="ch-dt">'+esc(den.売上日||'')+'</div>'
+      +   '<div class="ch-wt" style="background:#64748b">伝票</div>'
+      +   '<div class="ch-mid">'
+      +     '<div class="ch-l1"><b>'+esc((veh&&(veh.car||veh.maker))||'—')+'</b>'
+      +       (showCar&&veh&&veh.plate?'<span class="ch-plate">'+esc(veh.plate)+'</span>':'')
+      +       (den.フロント?'<span class="ch-st2">担当 '+esc(den.フロント)+'</span>':'')
+      +     '</div>'
+      +     '<div class="ch-tags"><span class="ch-tag st">PitFlow を始める前</span>'
+      +       '<span class="ch-tag no">'+esc(den.伝票番号||'')+'</span></div>'
+      +   '</div>'
+      +   '<div class="ch-amt">¥'+Number(den.金額||0).toLocaleString()+'</div>'
+      +   '<div class="ch-btns"></div>'
+      + '</div>'
+      + '<div class="ch-den">'
+      +   '<div class="ch-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
+      +   '<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
+      +   '<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
+      +   (hou?'<span class="ch-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
+      +   '<i>伝票 '+esc(den.伝票番号||'')+'</i></div>'
+      +   (window.pitQDenTable?pitQDenTable(den):'')
+      + '</div></div>';
+  }
+  /* その車の伝票のうち、**どのカードにも紐づいていない**もの（＝始動前のぶん） */
+  function _denOnly(veh, cards){
+    const a=(veh&&Array.isArray(veh.伝票))?veh.伝票:[];
+    const used={}; (cards||[]).forEach(c=>{ if(c&&c.resNo) used[String(c.resNo).trim()]=1; });
+    return a.filter(x=>x && !(String(x.予約番号||'').trim() && used[String(x.予約番号).trim()]));
+  }
+
   function _histHtml(){
     /* ⚠ 1件だけの道（車に紐づかないカード）ではお客様が引けない。空で進める。 */
     const cust = list().find(function(x){ return x.id===_hist.custId; }) || null;
@@ -862,11 +916,17 @@
       cars.forEach(function(v){
         const r = _histCards(v.plate); open += r.open;
         r.done.forEach(function(c){ rows.push({ c:c, v:v }); });
+        /* 🗃 v2.12.0 カードが無い伝票（始動前）も混ぜる */
+        _denOnly(v, r.done).forEach(function(dn){ rows.push({ den:dn, v:v, 日:dn.売上日 }); });
       });
-      rows.sort(function(a,b){ return (_doneDate(b.c)||'').localeCompare(_doneDate(a.c)||''); });
+      rows.sort(function(a,b){
+        return (b.日||_doneDate(b.c)||'').localeCompare(a.日||_doneDate(a.c)||''); });
     } else if (cur){
       const r = _histCards(cur.plate); open = r.open;
-      rows = r.done.map(function(c){ return { c:c, v:cur }; });
+      rows = r.done.map(function(c){ return { c:c, v:cur }; })
+        .concat(_denOnly(cur, r.done).map(function(dn){ return { den:dn, v:cur, 日:dn.売上日 }; }));
+      rows.sort(function(a,b){
+        return (b.日||_doneDate(b.c)||'').localeCompare(a.日||_doneDate(a.c)||''); });
     }
 
     let h = '<div class="cm-head"><i data-ic=clock data-ics=16></i> 作業履歴 '
@@ -886,7 +946,8 @@
     }
     h += '<div class="ch-cars">';
     cars.forEach(function(v){
-      const n = _histCards(v.plate).done.length;
+      const _d = _histCards(v.plate).done;
+      const n = _d.length + _denOnly(v, _d).length;
       const on = (!ぜんぶ && cur && v.id===cur.id);
       h += '<button class="ch-car'+(on?' on':'')+'" onclick="custHistVeh(\''+esc(v.id||'')+'\')">'
          +   '<span class="ch-car-c">'+esc(vehLabel(v))+'</span>'
@@ -905,7 +966,9 @@
          + (open?'<br><b>いま予約・作業中が '+open+'件 あります</b>':'') + '</div>';
     } else {
       h += '<div class="ch-list">';
-      rows.forEach(function(r){ h += _histRow(r.c, r.v, ぜんぶ); });
+      rows.forEach(function(r){
+        h += r.den ? _denOnlyRow(r.den, r.v, ぜんぶ) : _histRow(r.c, r.v, ぜんぶ);
+      });
       h += '</div>';
     }
     h += '</div></div>';

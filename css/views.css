@@ -802,8 +802,15 @@
 .pit-card.pcm.dnd-over{ box-shadow:inset 0 3px 0 0 var(--green); }
 
 /* ===== side列（廃車・外注）の縦積み ===== */
-.kanban-side-stack{ display:flex; flex-direction:column; gap:8px; flex:0 0 220px; min-width:0; margin-left:8px; align-self:stretch; }
-.kanban-side-stack .kanban-col.side{ margin-left:0; flex:0 0 auto; }
+.kanban-side-stack{ display:flex; flex-direction:column; gap:8px; flex:0 0 220px; min-width:0; margin-left:8px; align-self:stretch; min-height:0; }
+/* ★中身が増えたら「列の中で」スクロールさせる（v2.9.6）
+   0 0 auto だと中身の高さのまま伸びて枠の外へはみ出す＝スクロールバーが出ない。
+   0 1 auto ＋ 親の min-height:0 で「枠の高さで止まる」ようにする。
+   ⚠ 1 1 auto にしない＝2列とも空のときに、からっぽの箱が画面いっぱいに伸びてしまうから。
+      0 1 auto なら「中身が少ないときは今までどおりの高さ・多いときだけ縮んでスクロール」。
+   min-height:120px は、片方が長いときにもう片方が潰れて見えなくならないための下限。 */
+.kanban-side-stack .kanban-col.side{ margin-left:0; flex:0 1 auto; min-height:120px; max-height:100%; }
+.kanban-side-stack .kanban-col.side .kanban-col-body{ min-height:0; }
 
 /* ===== 外注ビュー（外注先ごとの俯瞰） ===== */
 .os-row{ background:var(--bg2); border:1px solid var(--border); border-radius:10px; margin-bottom:12px; overflow:hidden; }

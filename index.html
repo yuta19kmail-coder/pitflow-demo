@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.9.5"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.9.6"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/coreflow-ui.css?v=756022d3"><!-- 見た目の基準（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=9">
-<link rel="stylesheet" href="css/views.css?v=56">
+<link rel="stylesheet" href="css/views.css?v=57">
 <link rel="stylesheet" href="css/polish.css?v=214">
 <link rel="stylesheet" href="css/floor.css?v=23">
 <link rel="stylesheet" href="css/board-notes.css?v=2">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.9.5</div>
+    <div class="login-ver">v2.9.6</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.9.5</span>
+    <span class="ver">v2.9.6</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -388,7 +388,7 @@
           <span id="result-month-label" style="font-size:14px;font-weight:600;min-width:90px;text-align:center"></span>
           <button class="vh-btn" onclick="nextMonth()"><i data-ic=chevRight data-ics=16></i></button>
           <!-- 🔢 v2.6.0 実績は2段。数える側（今までどおり）／数えない側（社内車両・売上なし） -->
-          <button class="vh-btn" id="result-mode-btn" onclick="pitResultToggleMode()">数えない側へ</button>
+          <button class="vh-btn" id="result-mode-btn" onclick="pitResultToggleMode()">非カウント一覧</button>
           <button class="vh-btn" onclick="closeMonth()">この月を締める</button>
         </div>
       </div>
@@ -897,9 +897,9 @@ window.PIT_DEMO = true;</script>
 <script src="js/insurance-pit.js?v=1"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
 <script src="js/sales-count.js?v=7"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=5"></script>
-<script src="js/sales.js?v=18"></script>
+<script src="js/sales.js?v=19"></script>
 <script src="js/sales-print.js?v=5"></script>
-<script src="js/mech-summary.js?v=6"></script>
+<script src="js/mech-summary.js?v=7"></script>
 <script src="js/inspect-rules.js?v=18"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=6"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
 <script src="js/quarter-match.js?v=9"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
@@ -925,7 +925,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/car-sales.js?v=9"></script>
 <script src="js/task.js?v=24"></script>
 <script src="js/work.js?v=14"></script>
-<script src="js/result.js?v=16"></script>
+<script src="js/result.js?v=17"></script>
 <script src="js/shaken.js?v=31"></script>
 <script src="js/shaken-log.js?v=7"></script>
 <script src="js/outsource.js?v=5"></script>
@@ -949,7 +949,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/mech-guard.js?v=4"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
 <script src="js/phase-popup.js?v=19"></script>
 <script src="js/return-popup.js?v=13"></script>
-<script src="js/help-content.js?v=60"></script>
+<script src="js/help-content.js?v=61"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=18"></script>
 <script src="js/main.js?v=12"></script>

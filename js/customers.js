@@ -707,73 +707,168 @@
     const e=document.getElementById(id); if(!e) return;
     e.hidden=!e.hidden;
   };
-  window.custHistory=function(custId, vehId){
-    const cust=list().find(x=>x.id===custId); if(!cust) return;
-    const v=(cust.vehicles||[]).find(x=>x.id===vehId);
-    const plate=v?(v.plate||''):'';
-    const arr=Array.isArray(state.cards)?state.cards:[];
-    /* 🔴 v1.53.0 「0」などのナンバーで引くと、他のお客様のカードまで履歴に混ざるので使わない
-       🔴 v1.54.0 出すのは**実績になったものだけ**（顧客詳細の来店履歴と同じ決まり） */
-    const _all=(isRealPlate(plate)?arr.filter(c=>isRealPlate(c.plate)&&norm(c.plate)===norm(plate)):[]);
-    const cards=_all.filter(_cardDone).slice().sort((a,b)=>(_doneDate(b)||'').localeCompare(_doneDate(a)||''));
-    const _open=_all.length-cards.length;
-    const vlabel=v?(vehLabel(v)+(plate?' / '+plate:'')):'（車両不明）';
-    let h='<div class="cm-head"><i data-ic=clock data-ics=16></i> 来店履歴 <span class="cm-sub">'+esc(custDispName(cust)||'(無名)')+' ・ '+esc(vlabel)+'</span><button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div><div class="cm-body">';
-    if(!cards.length){
-      h+='<div class="cust-empty">この車の来店履歴はまだありません。<br>返車まで終わって実績になった入庫だけが、ここに並びます。'
-        +(_open?'<br><b>（いま予約・作業中のものが '+_open+' 件あります）</b>':'')
-        +'<br>（整備ソフトに正式履歴があります）</div>';
-    } else {
-      h+='<div class="cm-hist">';
-      cards.forEach(c=>{
-        /* 🔧 v2.9.7 作業タイプの拾い方は `pit-share.js` の `pitCardWorkTypes` 1本。
-           ⚠ 昔は `c.workType`（基本）だけを見ていたので、B.P・1Y・3M・車販依頼だけの車が
-              「—」になっていた（＝作業タイプが無い車に見えた）。併用は「車検＋B.P」と並べる。 */
-        const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
-        const wt=_wts[0]||null;
-        const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
-        /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の `pitCardStatusText` 1本。
-           ⚠ 来店履歴には**人が押した予約キャンセル**が並ぶ（v1.101.0）。
-              ここに状態の文字だけを渡していたので、その行に**英語で「cancelled」**と出ていた。 */
-        const st=(window.pitCardStatusText)?pitCardStatusText(c):((typeof statusLabel==='function')?statusLabel(c.status):(c.status||''));
-        const amt=_cardCancelled(c)?'キャンセル':_cardNoSale(c)?'売上なし':((c.estAmount!=null&&c.estAmount!=='')?('¥'+Number(c.estAmount).toLocaleString()):'—');
-        const dt=_doneDate(c)||'日付未定';
-        let loa='';
-        /* 🔴 v1.83.0（ゆうた指定）**過去の入庫＝終わった貸出は「〇/〇〜〇/〇」も出す。**
-           ＝いつからいつまで代車を貸していたかが、履歴として要る情報。
-           ⚠ 期間の書き方は loaner-free.js の `pitLoanerPeriodOf` 1本（ここで組み立てない）。 */
-        if(c.needLoaner){
-          const l=(state.loaners||[]).find(x=>x.id===c.loanerId);
-          const nm=(window.pitLoanerModel?pitLoanerModel(c.loanerId):'')||(l?(l.name||'代車'):'');
-          const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
-          loa='<i data-ic=van data-ics=16></i>代車'+(nm?('（'+nm+'）'):'')+(pr?(' '+pr):'');
-        }
-        /* 🧾 v2.2.0 その入庫の**伝票**（クォーターチェックで書き込んだもの）。
-           🔴 1つの予約に1つの伝票。予約番号で引く。
-           ⚠ 金額は伝票の「税抜・法定費用を除いた売上」。粗利＝それ − 原価。
-              法定費用（自賠責・重量税・印紙代）は売上でも粗利でもないので、中で別に出す。 */
-        const den=_denOf(v, c);
-        const ara=den?(Number(den.金額||0)-Number(den.原価||0)):0;
-        const pct=(den&&Number(den.金額))?Math.round(ara/Number(den.金額)*1000)/10:0;
-        const hou=den?((den.法定||[]).reduce((a,x)=>a+Number(x.金額||0),0)):0;
-        const oid='dn'+esc(String(c.id||''));
-        h+='<div class="cm-hrow'+(den?' has-den':'')+'"'+(den?' onclick="custDenToggle(\''+oid+'\')"':'')+'>'+
-           '<div class="cm-hdt">'+esc(dt)+'</div>'+
-           '<div class="cm-hmid"><b>'+esc(wl)+'</b>'+(c.plate?' ・ '+esc(c.plate):'')+(c.frontStaff?' ・ 担当 '+esc(c.frontStaff):'')+(loa?' ・ <span style="color:#1db97a">'+esc(loa)+'</span>':'')+'<div class="cm-hsub">'+esc(st)+(c.menu?' ・ '+esc(String(c.menu).split('\n')[0]):'')+'</div>'+
-             (den?'<div class="cm-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
-                  +'<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
-                  +'<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
-                  +(hou?'<span class="cm-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
-                  +'<i>伝票 '+esc(den.伝票番号||'')+'　伝票を見る ▼</i></div>':'')+
-           '</div>'+
-           '<div class="cm-hamt">'+esc(amt)+'</div></div>'+
-           (den?'<div class="cm-den" id="'+oid+'" hidden>'+(window.pitQDenTable?pitQDenTable(den):'')+'</div>':'');
-      });
-      h+='</div><div class="cust-note" style="margin-top:10px">確定売上・台数の実績集計（当月予測→月末締め）は今後ここに足していく予定。いまは入庫カードの概算金額を表示しています。</div>';
+  /* ================================================================
+     🕘🕘 v2.11.0 **来店履歴の画面**（ゆうた指定 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「履歴画面自体は今**ワイドがかなりなくてスクロールが入っちゃってる**。もっと広げてほしい」
+     🗣「また**左側にサイドバーを付けて履歴全体を横断**できるようにしてほしい」
+     🗣「サイドバーには複数車種のために**顧客全体でみるのか、車両で見るのかのソートボタン**も搭載」
+
+     ◎作り＝左に車の一覧、右に履歴。**見る範囲**は2つだけ。
+       ・この車だけ  … 選んでいる車のぶん
+       ・お客様ぜんぶ … その顧客の全部の車を混ぜて、日付の新しい順
+     🔴 拾う決まりは今までどおり `_cardDone`（実績になったものだけ）1本。ここで作り直さない。
+     ⚠ 覚えは `_hist` 1つ。開き直しても同じ所を見る。
+     ================================================================ */
+  var _hist = { custId:'', vehId:'', mode:'veh' };
+
+  /* この顧客の「見せる車」（アーカイブ済みも履歴は見たいので出す） */
+  function _histCars(cust){ return (cust.vehicles||[]).filter(function(v){ return v && isRealPlate(v.plate); }); }
+
+  /* その車の、実績になったカード（新しい順）
+     🔴 ナンバーで引く。「0」などの仮ナンバーでは引かない（他人のカードが混ざるため） */
+  function _histCards(plate){
+    const arr = Array.isArray(state.cards) ? state.cards : [];
+    if (!isRealPlate(plate)) return { done:[], open:0 };
+    const all = arr.filter(function(c){ return isRealPlate(c.plate) && norm(c.plate) === norm(plate); });
+    const done = all.filter(_cardDone).slice().sort(function(a,b){ return (_doneDate(b)||'').localeCompare(_doneDate(a)||''); });
+    return { done: done, open: all.length - done.length };
+  }
+
+  /* 履歴の1行 */
+  function _histRow(c, veh, showCar){
+    /* 🔧 作業タイプの拾い方は `pit-share.js` の `pitCardWorkTypes` 1本 */
+    const _wts = (window.pitCardWorkTypes ? pitCardWorkTypes(c) : []);
+    const wt = _wts[0] || null;
+    const wl = _wts.length ? _wts.map(function(x){ return x.label; }).join('＋') : '—';
+    const wc = wt ? wt.color : '#64748b';
+    /* 🔴 状態の言葉は pit-share.js の `pitCardStatusText` 1本 */
+    const st = (window.pitCardStatusText) ? pitCardStatusText(c)
+             : ((typeof statusLabel === 'function') ? statusLabel(c.status) : (c.status||''));
+    const amt = _cardCancelled(c) ? 'キャンセル' : _cardNoSale(c) ? '売上なし'
+              : ((c.amountFinal!=null&&c.amountFinal!=='') ? ('¥'+Number(c.amountFinal).toLocaleString())
+              : ((c.estAmount!=null&&c.estAmount!=='') ? ('¥'+Number(c.estAmount).toLocaleString()) : '—'));
+    const dt = _doneDate(c) || '日付未定';
+    /* 🔴🔴 v2.11.0 ここは `esc()` で丸ごと包まない。
+       包むと `<i data-ic=van>` が**そのまま文字で出る**（ゆうた「コードの一部が出ちゃってる」）。
+       ⚠ 中の値（名前・期間）だけを esc する。 */
+    let loa = '';
+    if (c.needLoaner){
+      const l = (state.loaners||[]).find(function(x){ return x.id===c.loanerId; });
+      const nm = (window.pitLoanerModel?pitLoanerModel(c.loanerId):'') || (l ? (l.name||'代車') : '');
+      const pr = (window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
+      loa = '<span class="ch-loa"><i data-ic=van data-ics=15></i>代車'
+          + (nm?('（'+esc(nm)+'）'):'') + (pr?(' '+esc(pr)):'') + '</span>';
     }
-    h+='</div><div class="cm-foot"><button class="cm-cancel" onclick="custCloseModal()">閉じる</button></div>';
-    openModal(h);
+    /* 🧾 その入庫の伝票（クォーターチェックが書き込んだもの）。1予約に1伝票。 */
+    const den = _denOf(veh, c);
+    const ara = den ? (Number(den.金額||0)-Number(den.原価||0)) : 0;
+    const pct = (den&&Number(den.金額)) ? Math.round(ara/Number(den.金額)*1000)/10 : 0;
+    const hou = den ? ((den.法定||[]).reduce(function(a,x){ return a+Number(x.金額||0); },0)) : 0;
+    const oid = 'dn'+esc(String(c.id||''));
+    /* 2行目に並べる札（ゆうた「細かいバッチ類や返車済み等情報を羅列」） */
+    let tags = '<span class="ch-tag st">'+esc(st)+'</span>';
+    if (window.pitCardIntern && pitCardIntern(c)) tags += '<span class="ch-tag">'+esc(pitInternLabel(c))+'</span>';
+    (Array.isArray(c.workSpecials)?c.workSpecials:[]).forEach(function(id){
+      const lb = window.pitSpecialLabel ? pitSpecialLabel(id) : '';
+      if (lb) tags += '<span class="ch-tag">'+esc(lb)+'</span>';
+    });
+    if (c.earlyDiscount) tags += '<span class="ch-tag">早期割</span>';
+    if (c.resNo) tags += '<span class="ch-tag no">'+esc(c.resNo)+'</span>';
+    return '<div class="ch-row'+(den?' has-den':'')+'">'
+      + '<div class="ch-dt">'+esc(dt)+'</div>'
+      + '<div class="ch-wt" style="background:'+wc+'">'+esc(wl)+'</div>'
+      + '<div class="ch-mid">'
+      +   '<div class="ch-l1"><b>'+esc(c.car||'—')+'</b>'
+      +     (showCar && c.plate ? '<span class="ch-plate">'+esc(c.plate)+'</span>' : '')
+      +     (c.frontStaff?'<span class="ch-st2">担当 '+esc(c.frontStaff)+'</span>':'')
+      +     loa + '</div>'
+      +   (c.menu?'<div class="ch-sub">'+esc(String(c.menu).split('\n')[0])+'</div>':'')
+      +   '<div class="ch-tags">'+tags+'</div>'
+      +   (den?'<div class="ch-den-h" onclick="custDenToggle(\''+oid+'\')"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
+             + '<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
+             + '<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
+             + (hou?'<span class="ch-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
+             + '<i>伝票 '+esc(den.伝票番号||'')+' ▼</i></div>':'')
+      + '</div>'
+      + '<div class="ch-amt">'+esc(amt)+'</div>'
+      + '<button class="ch-open" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')">予約詳細</button>'
+      + '</div>'
+      + (den?'<div class="cm-den" id="'+oid+'" hidden>'+(window.pitQDenTable?pitQDenTable(den):'')+'</div>':'');
+  }
+
+  function _histHtml(){
+    const cust = list().find(function(x){ return x.id===_hist.custId; });
+    if (!cust) return '';
+    const cars = _histCars(cust);
+    const cur  = cars.find(function(v){ return v.id===_hist.vehId; }) || cars[0] || null;
+    const ぜんぶ = (_hist.mode === 'cust');
+
+    /* 出す行を作る。お客様ぜんぶの時は全部の車を混ぜて、日付の新しい順 */
+    let rows = [], open = 0;
+    if (ぜんぶ){
+      cars.forEach(function(v){
+        const r = _histCards(v.plate); open += r.open;
+        r.done.forEach(function(c){ rows.push({ c:c, v:v }); });
+      });
+      rows.sort(function(a,b){ return (_doneDate(b.c)||'').localeCompare(_doneDate(a.c)||''); });
+    } else if (cur){
+      const r = _histCards(cur.plate); open = r.open;
+      rows = r.done.map(function(c){ return { c:c, v:cur }; });
+    }
+
+    let h = '<div class="cm-head"><i data-ic=clock data-ics=16></i> 来店履歴 '
+      + '<span class="cm-sub">'+esc(custDispName(cust)||'(無名)')+'</span>'
+      + '<button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div>';
+    h += '<div class="ch-wrap">';
+
+    /* ---- 左のサイドバー ---- */
+    h += '<aside class="ch-side">';
+    h += '<div class="ch-mode">'
+       +   '<button class="ch-mb'+(ぜんぶ?'':' on')+'" onclick="custHistMode(\'veh\')">この車</button>'
+       +   '<button class="ch-mb'+(ぜんぶ?' on':'')+'" onclick="custHistMode(\'cust\')">お客様ぜんぶ</button>'
+       + '</div>';
+    h += '<div class="ch-cars">';
+    cars.forEach(function(v){
+      const n = _histCards(v.plate).done.length;
+      const on = (!ぜんぶ && cur && v.id===cur.id);
+      h += '<button class="ch-car'+(on?' on':'')+'" onclick="custHistVeh(\''+esc(v.id||'')+'\')">'
+         +   '<span class="ch-car-c">'+esc(vehLabel(v))+'</span>'
+         +   '<span class="ch-car-p">'+esc(v.plate||'—')+'</span>'
+         +   '<span class="ch-car-n">'+n+'</span>'
+         + '</button>';
+    });
+    h += '</div>';
+    h += '<div class="ch-sum">'+rows.length+'件'+(open?('　／　予約・作業中 '+open+'件'):'')+'</div>';
+    h += '</aside>';
+
+    /* ---- 右の本体 ---- */
+    h += '<div class="ch-main">';
+    if (!rows.length){
+      h += '<div class="cust-empty">来店履歴はまだありません。'
+         + (open?'<br><b>いま予約・作業中が '+open+'件 あります</b>':'') + '</div>';
+    } else {
+      h += '<div class="ch-list">';
+      rows.forEach(function(r){ h += _histRow(r.c, r.v, ぜんぶ); });
+      h += '</div>';
+    }
+    h += '</div></div>';
+    return h;
+  }
+
+  /* ⚠ アイコンを埋める入口は `pit-icons.js` の **`icoBoot`**（`pitIcons` という名前は無い）。
+     見張っている MutationObserver でも埋まるが、**開いた瞬間に**埋めたいのでここでも呼ぶ。 */
+  function _histOpen(){
+    openModal(_histHtml(), 'ch-box');
+    if (window.icoBoot) { try { icoBoot(document.getElementById('cust-modal')); } catch(e){} }
+  }
+
+  window.custHistory = function(custId, vehId){
+    _hist = { custId: custId, vehId: vehId || '', mode: 'veh' };
+    _histOpen();
   };
+  window.custHistMode = function(m){ _hist.mode = (m==='cust'?'cust':'veh'); _histOpen(); };
+  window.custHistVeh  = function(id){ _hist.vehId = id; _hist.mode = 'veh'; _histOpen(); };
 
   /* ===== 顧客詳細（グラフィカル・一覧の名前クリックで開く／編集・削除もここから） ===== */
   function _statusLbl(c){
@@ -1033,7 +1128,8 @@
            '<div class="cd-vpills">'+teamPill+(t.course?'<span class="cd-pill" style="background:'+esc(t.courseColor)+'22;color:'+esc(t.courseColor)+';border-color:'+esc(t.courseColor)+'66">'+esc(t.course)+'</span>':'')+(frontName(v)?'<span class="cd-vstaff" title="担当">'+esc(frontName(v))+'</span>':'')+'</div>'+
            ((v.karteNo||'').trim()?'<div class="cd-vkarte" title="カルテNo">'+esc(v.karteNo.trim())+'</div>':'')+
            /* 🚗 v2.2.0 車体番号。クォーターチェックが伝票から入れたもの（手でも直せる） */
-           ((v.vin||'').trim()?'<div class="cd-vvin" title="車体番号">'+esc(v.vin.trim())+'</div>':'')+
+           /* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベルを付けて、読める大きさにした */
+           ((v.vin||'').trim()?'<div class="cd-vvin"><i>車体番号</i>'+esc(v.vin.trim())+'</div>':'')+
            '<div class="cd-vacts"><span class="cd-vb" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=clock data-ics=16></i> 履歴</span>'+
            (vArc ? '' : '<span class="cd-vb go" onclick="custNewReserveFor(\''+cust.id+'\',\''+(v.id||'')+'\')">🆕 この車で新規予約</span>')+
            '</div>'+
@@ -1069,7 +1165,7 @@
           const l=(state.loaners||[]).find(x=>x.id===c.loanerId);
           const nm=(window.pitLoanerModel?pitLoanerModel(c.loanerId):'')||(l?(l.name||'代車'):'');
           const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
-          loa=' ・ <span class="cd-loa"><i data-ic=van data-ics=16></i>代車'+(nm?('（'+esc(nm)+'）'):'')+(pr?(' '+esc(pr)):'')+'</span>';
+          loa='<span class="cd-loa"><i data-ic=van data-ics=15></i>代車'+(nm?('（'+esc(nm)+'）'):'')+(pr?(' '+esc(pr)):'')+'</span>';
         }
         let menuTxt=c.menu?esc(String(c.menu).split('\n')[0]):'';
         /* 🔴 v1.101.0 キャンセルは**理由**を出す（次に来た時に経緯が分かるように） */
@@ -1081,13 +1177,31 @@
         const isResv=(c.status==='reserved'), isRet=(c.status==='returned'&&!isNS);
         const stClick=isResv?("event.stopPropagation();pitGotoReserveDate('"+esc(c.reserveDate||'')+"')")
                     :isRet?("event.stopPropagation();pitGotoResultMonth('"+esc(c.returnDate||c.reserveDate||'')+"')"):'';
-        const stBadge='<span class="cd-hst'+(isNS?' nosale':'')+((isResv||isRet)?' clickable':'')+'"'+(stClick?(' onclick="'+stClick+'" title="'+(isResv?'予約カレンダーへ':'実績カレンダーへ')+'"'):'')+'>'+esc(_statusLbl(c))+(isResv?' <i data-ic=calendar data-ics=16></i>':isRet?' <i data-ic=chart data-ics=16></i>':'')+'</span>';
+        /* ================================================================
+           🕘 v2.11.0（ゆうた 2026-08-25）行の作りを変えた。
+           ・**ナンバーは出さない**（車種・担当・代車でいい。この画面は同じお客様の中なので）
+           ・状態などの札は**2行目にまとめて並べる**
+           ・右の押せる所は「返車済み」ではなく **「履歴」ボタン**
+           ================================================================ */
+        const stBadge='<span class="cd-htag st'+(isNS?' nosale':'')+((isResv||isRet)?' clickable':'')+'"'+(stClick?(' onclick="'+stClick+'" title="'+(isResv?'予約カレンダーへ':'実績カレンダーへ')+'"'):'')+'>'+esc(_statusLbl(c))+(isResv?' <i data-ic=calendar data-ics=15></i>':isRet?' <i data-ic=chart data-ics=15></i>':'')+'</span>';
+        let tags=stBadge;
+        if(window.pitCardIntern&&pitCardIntern(c)) tags+='<span class="cd-htag">'+esc(pitInternLabel(c))+'</span>';
+        (Array.isArray(c.workSpecials)?c.workSpecials:[]).forEach(function(id){
+          const lb=window.pitSpecialLabel?pitSpecialLabel(id):''; if(lb) tags+='<span class="cd-htag">'+esc(lb)+'</span>';
+        });
+        if(c.earlyDiscount) tags+='<span class="cd-htag">早期割</span>';
+        if(c.resNo) tags+='<span class="cd-htag no">'+esc(c.resNo)+'</span>';
+        /* この行の車＝ナンバーで引く（履歴ボタンの飛び先） */
+        const _hv=(cust.vehicles||[]).find(function(x){ return x&&isRealPlate(x.plate)&&norm(x.plate)===norm(c.plate||''); });
         h+='<div class="cd-hrow clickable" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
            '<div class="cd-hdt">'+esc(_doneDate(c)||'日付未定')+'</div>'+
            '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+
-           '<div class="cd-hmid"><b>'+esc(c.car||'')+'</b>'+(c.plate?' ・ '+esc(c.plate):'')+(c.frontStaff?' ・ 担当 '+esc(c.frontStaff):'')+loa+(menuTxt?'<div class="cd-hsub">'+menuTxt+'</div>':'')+'</div>'+
-           stBadge+
-           '<div class="cd-hamt">'+amtStr+'</div></div>';
+           '<div class="cd-hmid"><div class="cd-hl1"><b>'+esc(c.car||'—')+'</b>'+(c.frontStaff?'<span class="cd-hstaff">担当 '+esc(c.frontStaff)+'</span>':'')+loa+'</div>'+
+             (menuTxt?'<div class="cd-hsub">'+menuTxt+'</div>':'')+
+             '<div class="cd-htags">'+tags+'</div></div>'+
+           '<div class="cd-hamt">'+amtStr+'</div>'+
+           '<button class="cd-hhist" onclick="event.stopPropagation();custHistory(\''+cust.id+'\',\''+esc(_hv?(_hv.id||''):'')+'\')" title="この車の来店履歴"><i data-ic=clock data-ics=15></i> 履歴</button>'+
+           '</div>';
       });
       h+='</div>';
     } else {

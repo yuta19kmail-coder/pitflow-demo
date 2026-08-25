@@ -246,6 +246,11 @@
         車体番号: s(w.pitVehVin ? w.pitVehVin(c.plate) : ''),
         確定金額: num(c.amountFinal),
         フロント担当: s(c.frontStaff || c.staff),
+        /* 🛡 v2.9.0 保険＝入金日で実績に乗る車（ゆうた指定 2026-08-25）。
+           突合でも**この流れをOKとする**ので、印を連れて行く。 */
+        保険: !!(w.pitCardInsurance && w.pitCardInsurance(c)),
+        入金待ち: !!(w.pitInsPayWait && w.pitInsPayWait(c)),
+        入金日: s(c.paymentDate),
         対象期間内: !!(cd && cd >= from && cd <= to),
         実績: (s(c.status) === 'returned' && !noSale(c))
       });
@@ -343,8 +348,14 @@
      ================================================================ */
   function crossOnly(pair){
     if (!pair || !pair.期間の外) return false;
-    /* 🔴 月またぎは問答無用で外す */
-    if (pair.日付 && pair.日付.kind === 'crossMonth') return false;
+    /* 🛡🛡 v2.9.0 **保険だけは月またぎでも「直す先が無い」**（ゆうた指定 2026-08-25）。
+       🗣「保険が付いたものは返車と入金が大きくずれる。……各データチェックやPDFチェックでも
+       　　このフローはOKとする」
+       ＝ 伝票（請求書）を切った月と、入金＝実績の月がずれるのが**正常**。
+       ⚠ ただし**金額・車・売上日が全部合っていること**は同じように要る（下で見ている）。
+       ⚠ 保険でない車の月またぎは、今までどおり 🔴 全件NG（2026-08-08 の決めごと）。 */
+    var _ins = !!(pair.pit && pair.pit.保険);
+    if (!_ins && pair.日付 && pair.日付.kind === 'crossMonth') return false;
     if (!pair.同じ車) return false;                       /* 車体番号／車種が合っている */
     if (!pair.金額一致) return false;                     /* ±1円まで */
     if (!pair.売上日差 || pair.売上日差.kind !== 'same') return false;  /* 売上日どうしがぴったり */
@@ -422,6 +433,7 @@
         予約番号: t(r.予約番号),
         車種: t(r.車種),
         車体番号: t(r.車体番号),               /* 🚗 v2.2.0 PitFlow 側の車体番号（入っていなければ空） */
+        保険: !!r.保険, 入金待ち: !!r.入金待ち, 入金日: t(r.入金日),   /* 🛡 v2.9.0 */
         返車日: t(r.返車日 || r.確定返車日),
         _plate: normPlate(r.ナンバー),
         _name: normName(r.顧客名),
@@ -586,6 +598,12 @@
     softOnly.forEach(function (x) {
       x.カード別Q = '';
       var c = x.カード; if (!c) return;
+      /* 🛡 v2.9.0 保険で入金待ち＝**まだ実績にしていないのが正しい姿**。
+         「PitFlow に実績が無い」ではなく、そう言う。 */
+      if (c.入金待ち){
+        x.カード別Q = '保険：入金待ちです（入金日を入れると、その日で実績になります）';
+        return;
+      }
       var cd = t(c.数える日);
       if (!cd || !from || !to) return;
       if (cd >= from && cd <= to) return;

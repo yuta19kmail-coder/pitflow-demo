@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.8.7"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.9.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="css/coreflow-ui.css?v=756022d3"><!-- 見た目の基準（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=9">
-<link rel="stylesheet" href="css/views.css?v=55">
+<link rel="stylesheet" href="css/views.css?v=56">
 <link rel="stylesheet" href="css/polish.css?v=214">
 <link rel="stylesheet" href="css/floor.css?v=23">
 <link rel="stylesheet" href="css/board-notes.css?v=2">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.8.7</div>
+    <div class="login-ver">v2.9.0</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.8.7</span>
+    <span class="ver">v2.9.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -876,15 +876,15 @@ window.PIT_DEMO = true;</script>
 <script src="js/views.js?v=54"></script>
 <script src="js/work-content.js?v=13"></script>
 <script src="js/card-miss.js?v=2"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
-<script src="js/card-detail.js?v=139"></script>
+<script src="js/card-detail.js?v=140"></script>
 <script src="js/flow-pit.js?v=4"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=2"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=80"></script>
+<script src="js/card-view.js?v=63"></script>
 <script src="js/cover-print.js?v=15"></script>
 <script src="js/avail.js?v=7"></script>
 <script src="js/card-tabs.js?v=14"></script>
 <script src="js/archive-pit.js?v=5"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
-<script src="js/customers.js?v=52"></script>
+<script src="js/customers.js?v=53"></script>
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=32"></script>
@@ -894,13 +894,14 @@ window.PIT_DEMO = true;</script>
 <script src="js/coreflow-note-all.js?v=830ce1ff"></script><!-- 📎 付箋のまとめて表示（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
 <script src="js/board-notes.js?v=11"></script>
 <script src="js/search.js?v=18"></script>
-<script src="js/sales-count.js?v=6"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
+<script src="js/insurance-pit.js?v=1"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
+<script src="js/sales-count.js?v=7"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=5"></script>
 <script src="js/sales.js?v=18"></script>
 <script src="js/sales-print.js?v=5"></script>
 <script src="js/mech-summary.js?v=6"></script>
-<script src="js/inspect-rules.js?v=16"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
-<script src="js/inspect-fix.js?v=5"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
+<script src="js/inspect-rules.js?v=17"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
+<script src="js/inspect-fix.js?v=6"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
 <script src="js/quarter-match.js?v=7"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
 <script src="js/quarter-store.js?v=8"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->
 <script src="js/quarter-pdf.js?v=8"></script><!-- 🧾 v1.181.0 売上チェックリストPDFの読み取り（自己検証つき） -->
@@ -917,8 +918,8 @@ window.PIT_DEMO = true;</script>
 <script src="js/settings-transfer.js?v=5"></script>
 <script src="js/import-bizcloud.js?v=8"></script>
 <script src="js/rules.js?v=16"></script>
-<script src="js/today.js?v=49"></script>
-<script src="js/undetermined.js?v=20"></script>
+<script src="js/today.js?v=71"></script>
+<script src="js/undetermined.js?v=21"></script>
 <script src="js/reserve.js?v=75"></script>
 <script src="js/return.js?v=28"></script>
 <script src="js/car-sales.js?v=9"></script>
@@ -947,7 +948,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-hover.js?v=41"></script>
 <script src="js/mech-guard.js?v=4"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
 <script src="js/phase-popup.js?v=19"></script>
-<script src="js/return-popup.js?v=12"></script>
+<script src="js/return-popup.js?v=13"></script>
 <script src="js/help-content.js?v=60"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=18"></script>

@@ -122,8 +122,19 @@
   function pitSalesCountDate(c){
     if (!c) return '';
     if (pitCardNoSale(c)) return '';        /* 🔴 v1.99.0 売上なし＝数える日そのものが無い */
-    /* 実績＝実績カウント日が正。返車日は予備（v1.57.0 で completedAt が売上の基準になった） */
-    if (c.status === 'returned') return s(c.completedAt) || s(c.returnDateFinal) || s(c.returnDate);
+    /* 実績＝実績カウント日が正。返車日は予備（v1.57.0 で completedAt が売上の基準になった）
+       🛡🛡 v2.9.0（ゆうた指定 2026-08-25）**保険は「入金日」で数える。**
+       　　 「保険が付いたものは返車と入金が大きくずれる。作業→返車→請求書作成→売上。
+       　　　 自社の計算方法だと一番最後の売上日を実質的な返車日として計上している」
+       🔴 だから保険は **`completedAt` にも `returnDate` にも落とさない。** 入金日だけを見る。
+          ⚠ ここを下の `||` の連鎖に戻すと、**入金前の保険車が返車日で計上されてしまう**
+             （＝今回いちばん防ぎたい事故）。物差しは `insurance-pit.js` の1本。 */
+    if (c.status === 'returned') {
+      if (window.pitInsResultDate && window.pitCardInsurance && pitCardInsurance(c)) {
+        return s(pitInsResultDate(c));        /* 入金前は '' ＝どの月にも数えない */
+      }
+      return s(c.completedAt) || s(c.returnDateFinal) || s(c.returnDate);
+    }
     if (window.pitReturnDates){
       var d = pitReturnDates(c);
       return s(d.c) || s(d.b) || s(d.a);
@@ -140,6 +151,10 @@
     if (!c || c.status === 'scrap') return null;
     if (pitCardNoSale(c)) return null;      /* 🔴 v1.99.0 売上なし＝どの区分にも入れない */
     var st = c.status;
+    /* 🛡 v2.9.0 保険で入金待ち＝返したが、まだ実績カレンダーに入っていない。
+       ＝ 状態としては「実績待」（作業は終わっている。あとはお金が入るだけ）。
+       ⚠ 数える日が無いので、どの月にも積まれない（`pitSalesInRange` が false）。それで正しい。 */
+    if (st === 'returned' && window.pitInsPayWait && pitInsPayWait(c)) return 'actualWait';
     if (st === 'returned') return 'actual';                                            /* 実績＝返車済み（実績カレンダーに入った） */
     if (st === 'reserved') return 'forecast';                                          /* 予測＝未入庫の予約 */
     /* 🔴 v1.167.0 実績待＝**作業は終わっている。あとは返すだけ。**
@@ -158,7 +173,9 @@
     todayStr = todayStr || today();
     var d = pitSalesCountDate(c);
 
-    /* 実績＝日付そのまま。過去も未来も寄せない */
+    /* 実績＝日付そのまま。過去も未来も寄せない
+       ⚠ 🛡 v2.9.0 保険で入金待ちは d が '' ＝ここで false になる。
+          **当月に寄せない**こと（入金日が決まっていないのに今月の数字に混ぜない）。 */
     if (c.status === 'returned') return !!d && d >= fromStr && d <= toStr;
 
     /* 🔴 まだ返していない車は、もう終わった期間には出さない（締めた月の数字を後から動かさない） */

@@ -368,7 +368,10 @@
         /* ☎ 完TEL日（ログ）は上の1本ですでに記録済み。ここで書き写さない（v1.185.0） */
         if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd0=new Date(); c.coverCall.at=(dd0.getMonth()+1)+'/'+dd0.getDate(); } }
         c.status = 'returned';
-        c.completedAt = rd;
+        /* 🛡 v2.9.0 保険＝返車しても実績に乗せない（入金日を入れた時に乗る）。
+           🔴 判定も書き込みも `insurance-pit.js` の1本。ここで `workSpecials` を見ない。
+           ⚠ 当日ビューの「返車済みにする」（today.js）と**同じ1行**にしてある。片方だけ直さないこと。 */
+        if (!(window.pitInsOnReturn && pitInsOnReturn(c, rd))) c.completedAt = rd;
         /* 🔴 拾う順番は当日ビューの「返車済みにする」と同じ＝確定→受注→見積→概算 */
         /* 🔴 v1.103.0 拾う順番は pit-share.js の1本（当日ビューの「返車済みにする」と同じ道）。 */
         if (c.amountFinal == null || c.amountFinal === ''){

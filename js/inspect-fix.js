@@ -344,7 +344,10 @@
       var ov = valOf(fd, c);
       if (nv === ov) return;
       /* 🔴 実績カウント日は空にできない（空＝どの月にも数えられなくなる） */
-      if (fd.id === 'completedAt' && !nv){ stop = '実績カウント日は空にできません（どの月にも数えられなくなります）'; return; }
+      /* 🛡 v2.9.0 保険は**入金日を入れるまで実績日が空**が正しい（＝空に戻せないと直せなくなる）。 */
+      if (fd.id === 'completedAt' && !nv && !(w.pitCardInsurance && pitCardInsurance(c))){
+        stop = '実績カウント日は空にできません（どの月にも数えられなくなります）'; return;
+      }
       changes.push({ fd: fd, from: ov, to: nv });
     });
 

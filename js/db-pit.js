@@ -284,6 +284,15 @@
     _appVer: function () {
       try { return String(document.querySelector('meta[name=app-version]').content || ''); } catch (e) { return ''; }
     },
+    /* 🔴🔴 v2.8.2 印に使うのは **「作業タイプの一覧の版」**（`state.js` の `PIT_WORK_TYPES_VER`）。
+       ⚠ アプリの版（index.html の meta）を使ってはいけない。
+          **index.html だけ古いまま残った端末**が実際に居た（本番で meta=2.8.0・js=2.8.1 を見た）。
+          そういう端末は自分を実際より古いと名乗るので、印くらべが狂う。
+          一覧そのものに版を持たせれば、js が新しければ印も必ず新しい。
+       ⚠ 一覧を1文字でも変えたら `PIT_WORK_TYPES_VER` も上げること（state.js に赤で書いてある）。 */
+    _wtVer: function () {
+      return String(window.PIT_WORK_TYPES_VER || this._appVer() || '');
+    },
     /* 版くらべ（2.8.1 と 2.10.0 を文字で比べない）。a が b より古ければ −1 */
     _verCmp: function (a, b) {
       var x = String(a || '').split('.').map(Number), y = String(b || '').split('.').map(Number);
@@ -312,36 +321,49 @@
       /* 🔴 画面はいつでもコードのものを使う（ここは版に関係なく）。 */
       state.workTypes = master;
 
-      /* 🔴 ここから下は「クラウドへ書き戻してよいか」だけの話。
-         ⚠ 書き戻さないと決めたら **`state.settings.workTypes` を1バイトも触らずに帰る。** */
-      if (this._wtGaveUp) return;                                  // ② 空回りした＝もう書かない
-      var mine = this._appVer();
-      var stamp = String((state.settings && state.settings.workTypesVer) || '');
-      if (stamp && mine && this._verCmp(mine, stamp) < 0) return;   // ① 自分より新しい版が決めた＝従う
+      /* 🔴🔴 ここから下は「クラウドへ書き戻してよいか」だけの話。
+         ⚠ 書き戻さないと決めたら **`state.settings.workTypes` を1バイトも触らずに帰る。**
+            触るだけで、差分保存（`_cloudFlush`）が勝手に書きにいく。
+
+         🔴🔴 v2.8.2（2026-08-25・**2.8.1 の直し方が甘かった**）
+         　 2.8.1 では空回り止めを `_flushWorkTypes` に置いたのに、
+         　 同じ版で `_flushWorkTypes` を購読ハンドラから外した＝**呼ぶ人がいなくなり、一度も折れなかった。**
+         　 （本番で `_wtSpins:49 / _wtGaveUp:false` を見た）
+         　 ＝ **数える場所と折れる場所は、同じ関数に置くこと。** 判断はここ1本。 */
+      if (this._wtGaveUp) return;                                  // ③ 空回りした＝もう書かない
 
       var changed = (this._js(state.settings.workTypes || null) !== this._js(master));
-      if (!changed && stamp === mine) return;                       // すでに揃っている＝何もしない
-      state.settings.workTypes = master;                            // 🔴 MHS が読む
-      if (mine) state.settings.workTypesVer = mine;                 // 🔴 誰が決めたかの印
-      this._wtDirty = true;
-      if (changed) this._wtSpins++;
-    },
+      var mine  = this._wtVer();
+      var stamp = String((state.settings && state.settings.workTypesVer) || '');
+      /* ① 自分より新しい端末が決めた＝従う（次に名前を変えた時に喧嘩しないため） */
+      if (stamp && mine && this._verCmp(mine, stamp) < 0) return;
+      if (!changed && stamp === mine) return;                      // すでに揃っている＝何もしない
 
-    /* 揃え直しで変わっていたら1回だけ保存する（読み終わったあとに呼ぶ）。
-       🔴 v2.8.1 4回目からは折れる（＝版のちがう端末との喧嘩を、こちらから終わらせる）。 */
-    _WT_SPIN_MAX: 3,
-    _flushWorkTypes: function () {
-      if (!this._wtDirty) return;
-      this._wtDirty = false;
-      if (this._wtSpins > this._WT_SPIN_MAX) {
+      /* ② 空回り止め。①は**印を知らない古い端末**には効かないので、
+            「書き戻すと決めた回数」を数えて、多すぎたらこの端末はもうやめる。
+         🔴 相手が古いままでも、これで**必ず止まる**。折れたことは黙らない。 */
+      if (changed && ++this._wtSpins > this._WT_SPIN_MAX) {
         this._wtGaveUp = true;
-        console.warn('[PitDB] 🔴 作業タイプの書き戻しが止まりません。'
-                   + 'この端末では以後やめます（版のちがう端末が開いています）');
+        console.warn('[PitDB] 🔴 作業タイプの書き戻しが止まりません（' + this._wtSpins + '回目）。'
+                   + 'この端末では以後やめます。版のちがう端末が開いています');
         if (window.showToast) {
           showToast('版のちがう端末が開いています。全部の端末を開き直してください', 'PF-0009');
         }
-        return;
+        return;                                                    // 🔴 settings に触らずに帰る
       }
+
+      state.settings.workTypes = master;                           // 🔴 MHS が読む
+      if (mine) state.settings.workTypesVer = mine;                // 🔴 誰が決めたかの印
+      this._wtDirty = true;
+    },
+    _WT_SPIN_MAX: 3,
+
+    /* 揃え直しで変わっていたら1回だけ保存する（読み込みの締めに呼ぶ）。
+       ⚠ v2.8.1 で購読ハンドラからは外した（受信のたびに保存する増幅器だったため）。
+          ここに折れる判断は置かない（呼ばれない時があるので）。判断は `_applyWorkTypes` 1本。 */
+    _flushWorkTypes: function () {
+      if (!this._wtDirty) return;
+      this._wtDirty = false;
       console.log('[PitDB] 作業タイプをコード基準に揃え直しました（保存します）');
       this.save(true);
     },

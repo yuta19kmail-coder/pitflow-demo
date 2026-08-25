@@ -739,7 +739,7 @@
      🔴 拾う決まりは今までどおり `_cardDone`（実績になったものだけ）1本。ここで作り直さない。
      ⚠ 覚えは `_hist` 1つ。開き直しても同じ所を見る。
      ================================================================ */
-  var _hist = { custId:'', vehId:'', mode:'veh' };
+  var _hist = { custId:'', vehId:'', mode:'veh', pick:'' };
 
   /* この顧客の「見せる車」（アーカイブ済みも履歴は見たいので出す） */
   function _histCars(cust){ return (cust.vehicles||[]).filter(function(v){ return v && isRealPlate(v.plate); }); }
@@ -885,10 +885,14 @@
     return a.filter(x=>x && !(String(x.予約番号||'').trim() && used[String(x.予約番号).trim()]));
   }
 
-  function _histHtml(){
+  /* ================================================================
+     🔖 いま出す1件ずつの並びを作る。**画面のどこからでもここ1本で引く。**
+     ＝ 左の目次・右の本体・押した時の差し替えが、同じ並びを見るようにするため。
+     ================================================================ */
+  function _histPack(){
     /* ⚠ 1件だけの道（車に紐づかないカード）ではお客様が引けない。空で進める。 */
     const cust = list().find(function(x){ return x.id===_hist.custId; }) || null;
-    if (!cust && !_hist.only) return '';
+    if (!cust && !_hist.only) return null;
     const cars = cust ? _histCars(cust) : [];
     const cur  = cars.find(function(v){ return v.id===_hist.vehId; }) || cars[0] || null;
     const ぜんぶ = (_hist.mode === 'cust');
@@ -921,6 +925,29 @@
        ⚠ 伝票番号は目印に使わない（"00" が重なる）。カードは id、伝票は並び順。 */
     rows.forEach(function(r, i){ r.id = r.c ? ('dn'+String(r.c.id||'')) : ('dnp'+i); });
 
+    /* ================================================================
+       🔴🔴 v2.12.5 **右は1件だけ**（ゆうた「もくじから選択してそれが1件ずつ表示」）
+       ----------------------------------------------------------------
+       ◎前は全件を縦に続けて出していた。明細の長い伝票が続くので、
+         目当ての1枚を読み終わるまでスクロールし続けることになっていた。
+       🔴 いま見ている1件は `_hist.pick`。**開いた時の1件は**
+          ① 該当の履歴から来たなら その1件（`_hist.cardId`）
+          ② そうでなければ         一番新しい1件
+       ⚠ 切替（この車／お客様ぜんぶ）で選んでいたものが並びから消える時は、
+          黙って**一番新しい1件**に戻す（空の右側を出さない）。
+       ================================================================ */
+    let 選 = rows.filter(function(r){ return r.id === _hist.pick; })[0]
+          || rows.filter(function(r){ return r.c && String(r.c.id) === String(_hist.cardId||''); })[0]
+          || rows[0] || null;
+    _hist.pick = 選 ? 選.id : '';
+    return { cust:cust, cars:cars, cur:cur, ぜんぶ:ぜんぶ, rows:rows, open:open, 選:選 };
+  }
+
+  function _histHtml(){
+    const P = _histPack();
+    if (!P) return '';
+    const cust = P.cust, cars = P.cars, ぜんぶ = P.ぜんぶ, rows = P.rows, open = P.open;
+
     let h = '<div class="cm-head"><i data-ic=clock data-ics=16></i> 作業履歴 '
       + '<span class="cm-sub">'+esc((cust?custDispName(cust):(_hist.名||''))||'(無名)')+'</span>'
       + '<button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div>';
@@ -948,7 +975,7 @@
        ================================================================ */
     h += '<div class="ch-idx">';
     rows.forEach(function(r){
-      const on = (_hist.cardId && r.c && String(r.c.id)===String(_hist.cardId));
+      const on = (r.id === _hist.pick);   /* 🔖 v2.12.5 いま右に出している1件 */
       const 日 = r.den ? (r.den.売上日||'') : (_doneDate(r.c) || '日付未定');
       const 名 = r.den ? '伝票'
                : (function(){ const w=(window.pitCardWorkTypes?pitCardWorkTypes(r.c):[]);
@@ -972,50 +999,54 @@
     h += '<div class="ch-sum">'+rows.length+'件'+(open?('　／　予約・作業中 '+open+'件'):'')+'</div>';
     h += '</aside>';
 
-    /* ---- 右の本体 ---- */
+    /* ---- 右の本体（🔖 v2.12.5 いま選んでいる**1件だけ**） ---- */
     h += '<div class="ch-main">';
     if (!rows.length){
       h += '<div class="cust-empty">作業履歴はまだありません。'
          + (open?'<br><b>いま予約・作業中が '+open+'件 あります</b>':'') + '</div>';
     } else {
-      h += '<div class="ch-list">';
-      rows.forEach(function(r){
-        h += r.den ? _denOnlyRow(r.den, r.v, ぜんぶ, r.id) : _histRow(r.c, r.v, ぜんぶ);
-      });
-      h += '</div>';
+      h += '<div class="ch-list">' + _histOne(P) + '</div>';
     }
     h += '</div></div>';
     return h;
   }
 
+  /* 選んでいる1件のHTML。🔴 作り方はここ1本＝押した時の差し替えも同じものを使う。 */
+  function _histOne(P){
+    const r = P && P.選; if (!r) return '';
+    return r.den ? _denOnlyRow(r.den, r.v, P.ぜんぶ, r.id) : _histRow(r.c, r.v, P.ぜんぶ);
+  }
+
   /* ⚠ アイコンを埋める入口は `pit-icons.js` の **`icoBoot`**（`pitIcons` という名前は無い）。
      見張っている MutationObserver でも埋まるが、**開いた瞬間に**埋めたいのでここでも呼ぶ。 */
   /* ⚠ アイコンを埋める入口は `pit-icons.js` の **`icoBoot`**（`pitIcons` という名前は無い）。 */
-  /* 🔖 その1件まで動かして、そこだと分かるようにする。
-     🔴 **飛ばし方はここ1本。** 開いた時（該当の履歴から来た）も、左の目次を押した時も同じ。 */
-  function _histJump(id){
-    const box = document.getElementById('cust-modal'); if (!box || !id) return;
-    const el = box.querySelector('#' + (window.CSS && CSS.escape ? CSS.escape(id) : id));
-    if (!el) return;
-    [].forEach.call(box.querySelectorAll('.ch-item.is-here'), function(x){ x.classList.remove('is-here'); });
-    [].forEach.call(box.querySelectorAll('.ch-ix.on'), function(x){ x.classList.remove('on'); });
-    el.classList.add('is-here');
-    const b = box.querySelector('.ch-ix[onclick*="' + id + '"]'); if (b) b.classList.add('on');
-    const main = box.querySelector('.ch-main');
-    if (main) main.scrollTop = Math.max(0, el.offsetTop - main.offsetTop - 8);
+  /* ================================================================
+     🔖 v2.12.5 **目次を押したら、右だけ差し替える。**
+     ----------------------------------------------------------------
+     🔴 画面ごと作り直さない＝**左の目次のスクロールが頭に戻らない**。
+        （伝票が何十件もある車では、押すたびに頭に戻ると探し直しになる）
+     ⚠ 出す中身は `_histOne` 1本＝開いた時と押した時で顔が変わらない。
+     ================================================================ */
+  function _histPick(id){
+    _hist.pick = String(id || '');
+    const box = document.getElementById('cust-modal'); if (!box) return;
+    const P = _histPack(); if (!P) return;
+    const main = box.querySelector('.ch-main .ch-list');
+    if (main){ main.innerHTML = _histOne(P); main.parentNode.scrollTop = 0; }
+    [].forEach.call(box.querySelectorAll('.ch-ix'), function(b){
+      b.classList.toggle('on', (b.getAttribute('onclick') || '').indexOf("'" + _hist.pick + "'") >= 0);
+    });
+    if (window.icoBoot) { try { icoBoot(box); } catch(e){} }
   }
 
   function _histOpen(){
     openModal(_histHtml(), 'ch-box');
     const box = document.getElementById('cust-modal');
     if (window.icoBoot) { try { icoBoot(box); } catch(e){} }
-    /* 🔴 v2.11.1 その行から来たなら、**そこまで動かす**（ゆうた「該当の履歴をクリックした場合はそこから」）。
-       ⚠ 伝票はもう開いているので、探して読むだけでいい。 */
-    if (_hist.cardId) _histJump('dn' + _hist.cardId);
   }
 
   window.custHistory = function(custId, vehId, cardId){
-    _hist = { custId: custId, vehId: vehId || '', mode: 'veh', cardId: String(cardId || '') };
+    _hist = { custId: custId, vehId: vehId || '', mode: 'veh', cardId: String(cardId || ''), pick: '' };
     _histOpen();
   };
   /* 🔘 v2.11.1（ゆうた「アーカイブ済みのカード詳細の引継ぎメモの下にも履歴ボタンが欲しい」）
@@ -1036,7 +1067,7 @@
       window.custHistory(h.cust.id, (h.veh && h.veh.id) || '', cardId);
       return;
     }
-    _hist = { custId:'', vehId:'', mode:'veh', cardId:String(cardId||''), only:String(cardId||''),
+    _hist = { custId:'', vehId:'', mode:'veh', cardId:String(cardId||''), only:String(cardId||''), pick:'',
               名: String(c.customer || (window.pitCustName?pitCustName(c):'') || '') };
     _histOpen();
   };
@@ -1048,8 +1079,8 @@
   };
   /* 🔀 上の2つは**絞り**（ゆうた「あくまでソートとして動くイメージ」）。押すと目次も一緒に入れ替わる。 */
   window.custHistMode = function(m){ _hist.mode = (m==='cust'?'cust':'veh'); _histOpen(); };
-  /* 🔖 v2.12.1 左の目次から、右のその1件へ飛ぶ。開き直さない（画面が跳ねないため）。 */
-  window.custHistGo   = function(id){ _histJump(String(id||'')); };
+  /* 🔖 v2.12.1／v2.12.5 左の目次で1件を選ぶ。右だけ差し替える（画面を開き直さない）。 */
+  window.custHistGo   = function(id){ _histPick(id); };
 
   /* ===== 顧客詳細（グラフィカル・一覧の名前クリックで開く／編集・削除もここから） ===== */
   function _statusLbl(c){

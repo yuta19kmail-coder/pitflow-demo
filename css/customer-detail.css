@@ -302,12 +302,24 @@
    🕘🕘 v2.11.0／v2.11.1 来店履歴の画面（広く・左サイドバー・伝票は開いたまま）
    ================================================================ */
 .cm-box.ch-box{ width:1240px; max-width:calc(100vw - 40px); }
-/* 🔖 v2.12.5 右は1件だけになったので、中身が短いと箱ごと縮んで目次が窮屈になる。
-   ＝ 目次が読める高さは、右の中身に関係なく確保する。 */
+/* ================================================================
+   📐 v2.12.6 **高さは伝票ごとに変えない。いつも画面いっぱい。**（ゆうた 2026-08-25）
+   ----------------------------------------------------------------
+   🗣「ハイトを伝票ごとに変えないで。**最大サイズにして、空いてる部分は素直に空欄**でいい」
+   🗣「長いのは勿論スクロールね」
+   ◎v2.12.5 で右を1件にしたら、**伝票の長さで箱の高さが変わる**ようになった。
+     目次から次を押すたびに画面が伸び縮みして、目が落ち着かない。
+   🔴 高さは**画面から決める**（中身から決めない）。
+      `.cm-overlay` の上下の余白が 6vh ずつなので、使えるのは 88vh。
+      そこから見出し（.cm-head 約52px）を引いた残りが、この2列ぶん。
+   ⚠ モニターが大きければそのぶん大きくなる（vh なので画面に合う）。
+      小さい画面のために下限だけ置く。それ以下は overlay 側がスクロールする。
+   ================================================================ */
 .ch-wrap{ display:grid; grid-template-columns:236px minmax(0,1fr); gap:0; align-items:stretch;
-  min-height:min(74vh, 460px); }
+  height:calc(88vh - 52px); min-height:360px; }
 .ch-side{ border-right:1px solid var(--border); background:var(--bg1);
-  padding:12px; display:flex; flex-direction:column; gap:10px; max-height:74vh; }
+  padding:12px; display:flex; flex-direction:column; gap:10px;
+  height:100%; min-height:0; }
 .ch-mode{ display:grid; grid-template-columns:1fr 1fr; gap:5px; }
 .ch-mb{ font-size:11.5px; font-weight:700; padding:7px 4px; border-radius:8px; cursor:pointer;
   border:1px solid var(--border2); background:var(--bg2); color:var(--text3); }
@@ -330,7 +342,8 @@
 .ch-ix-c{ grid-column:2; justify-self:end; align-self:center; font-size:10.5px; color:var(--text3);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:96px; }
 .ch-sum{ font-size:11px; color:var(--text3); border-top:1px solid var(--border); padding-top:9px; }
-.ch-main{ padding:14px 16px; max-height:74vh; overflow:auto; min-width:0; }
+/* 🔴 長い伝票は**ここが**スクロールする（箱は伸びない） */
+.ch-main{ padding:14px 16px; height:100%; min-height:0; overflow:auto; min-width:0; }
 .ch-list{ display:flex; flex-direction:column; gap:10px; }
 
 /* 1件＝上の行 ＋ 下の伝票（伝票は**最初から開いている**） */
@@ -363,8 +376,8 @@
 .ch-den-h i{ font-style:normal; font-size:10.5px; color:var(--text3); margin-left:auto; }
 /* ✂️ v2.12.2 .ch-den-hou は .den-hou に一本化（見出しは pitQDenHead が作る） */
 @media (max-width:980px){
-  .ch-wrap{ grid-template-columns:1fr; }
-  .ch-side{ border-right:none; border-bottom:1px solid var(--border); max-height:none; }
+  .ch-wrap{ grid-template-columns:1fr; height:auto; }
+  .ch-side{ border-right:none; border-bottom:1px solid var(--border); height:auto; }
   .ch-idx{ flex-direction:row; overflow-x:auto; }
   .ch-ix{ flex:0 0 172px; }
   .ch-row,.cd-hrow{ grid-template-columns:1fr auto; }

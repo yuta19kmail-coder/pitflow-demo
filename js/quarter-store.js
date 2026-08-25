@@ -26,11 +26,17 @@
      ⚠ 行は 400件で切る（切った時は正直に `切った:true` を残す）。
 
    ◎ここが返すもの
-     pitQRunId(from,to)      … その期間の書類の名前
-     pitQSaveRun(res, opt)   … 結果を残す（Promise）
-     pitQLoadList()          … 一覧を読む（Promise<[…]>）
-     pitQLoadRun(id)         … 1件の中身を読む（Promise）
-     pitQMonthPlan(ym)       … その月の Q1〜Q4 と、済んでいるかを並べて返す
+     pitQRunId(from,to)          … その期間の書類の名前
+     pitQSaveRun(res, opt)       … 結果を1つ残す（Promise）※ opt.soft で伝票の行も残る
+     pitQSaveRuns([{res,opt}])   … 🧾 v2.9.8 **1枚のPDFぶんをまとめて残す**（一覧に触るのは最後の1回）
+     pitQRepairList(plans, list) … 🩹 v2.9.8 一覧の取りこぼしを、書類から作り直して足す
+     pitQLoadList()              … 一覧を読む（Promise<[…]>）
+     pitQLoadRun(id)             … 1件の中身を読む（Promise）
+     pitQMonthPlan(ym)           … その月の Q1〜Q4 と、済んでいるかを並べて返す
+
+   ◎🧾 v2.9.8（ゆうた 2026-08-25）**読んだ伝票の行を、そのまま残すようにした。**
+     ＝ 開き直したら「写しを描き直す」のではなく「**もう一度突き合わせる**」。
+       走らせた直後と、残した結果の**顔が1つ**になる（詳しくは下の slimSoft のところ）。
    ================================================================================ */
 (function (w) {
   'use strict';
@@ -40,6 +46,10 @@
   function pad(n){ return (n < 10 ? '0' : '') + n; }
   var CAP_ROWS = 400;
   var CAP_LIST = 200;
+  /* 🧾 v2.9.8 伝票の行の上限。1行 **296バイト**（本番実測 2026-08-25）なので
+     1500枚 ≒ 444KB。Firestore の1書類 1MB に対して余裕を残した数。
+     ⚠ 1クォーターは8日ぶん＝ふだん100枚前後。ここに当たることはまず無い。 */
+  var CAP_SOFT = 1500;
 
   function co(){
     try { return (w.fb && w.fb.company) ? w.fb.company() : null; } catch (e) { return null; }
@@ -111,6 +121,48 @@
       別のQ確定: !!r.別のQ確定   /* 🧾 v2.9.1 実際に別のQで結ばれた＝OK（お知らせ）側に置く */
     };
   }
+  /* ================================================================
+     🧾🧾 v2.9.8（ゆうた 2026-08-25）**読んだ伝票の行そのものを残す。**
+     ----------------------------------------------------------------
+     🗣「素直に直近のPDF自体を保持する形だとデータ的に大変かな？」
+     🗣「PDFを保持するならチェック済みと未チェックまで一覧で保持しておいて。
+        上書きor消去が掛かったタイミングでチェック内容ごと消えるような挙動でどうだろう？」
+
+     ◎これで何が良くなるか＝**顔が1つになる。**
+       いままでは「走らせた直後」と「残した結果」で**別の道**を通っていた。
+         走らせた直後 … 伝票とカードを突き合わせた**生の結果**（`pitQMatch` が作る）
+         残した結果   … 直す行だけを削って残した**写し**（`slimPair` → `savedPair`）
+       写しには判定の材料が全部は入らないので、
+         ・押せるボタンが出ない（あけぼのさんの「グレーで残ったまま」がこれ）
+         ・OK の行が消えている
+         ・分け方を変えるたびに**両側を直さないと顔が割れる**（v2.8.4 で踏んだ）
+       伝票の行さえ残っていれば、**開き直した時にもう一度突き合わせるだけ**でいい。
+       ＝ 物差しも描き手も1本。写しを直す必要がそもそも無くなる。
+
+     ◎大きさ（🔴 出す前に実測した・2026-08-25 本番データ）
+       1行 **296バイト**（明細を持たない形）。
+         109枚 → 約 32KB ／ 400枚 → 約 116KB
+       Firestore の1書類 **1MB** に対して十分な余裕。
+     ◎🚫 **明細は持たない。**（1枚に20〜40行あり、ここだけで桁が変わる）
+       明細を使うのは「原価の気になる行（quarter-cost.js）」と
+       「元のPDFに刷り込む（quarter-print.js）」の2つだけで、
+       どちらも**元のPDFそのもの**が要る＝どのみちPDFを入れ直してもらう道になる。
+       ⚠ だから明細が要る仕事は、開き直しただけでは出来ない。そこは今までどおり。
+     ================================================================ */
+  function slimSoft(r){
+    return {
+      売上日: s(r.売上日), 伝票: s(r.伝票), ナンバー: s(r.ナンバー), 顧客名: s(r.顧客名),
+      車種: s(r.車種), 金額: (r.金額 || 0), 受付担当: s(r.受付担当),
+      車台: s(r.車台 || r.車体番号),
+      /* 金額の内わけ（画面が「伝票計 − 消費税 − 非課税」と説明するために使う） */
+      法定計: (Array.isArray(r.法定) ? r.法定.reduce(function (a, x) { return a + ((x && x.金額) || 0); }, 0) : 0),
+      原価: (r.原価 || 0), 消費税: (r.消費税 || 0), 伝票計: (r.伝票計 || 0),
+      明細が合う: !!r.明細が合う, 明細合計: (r.明細合計 || 0),
+      /* 🚫 明細・法定の中身・枠（紙の場所）は持たない＝上のコメントの理由 */
+      明細: []
+    };
+  }
+
   function cut(arr, fn){
     var a = (arr || []).slice(0, CAP_ROWS).map(fn);
     a._cut = (arr || []).length > CAP_ROWS;
@@ -138,22 +190,49 @@
     };
   }
 
+  /* 🔴 v2.9.8 **伝票が0枚の期間は残さない。**
+     PDFの期間が1か月ぶんだと、まだ来ていない Q4 が「0枚・0台・検算OK」で作られる。
+     残すと Q4 の印が**走らせてもいないのに「済・OK」**になり、
+     「どれが済んでいて、どれがまだか」というこの機能の目的そのものが壊れる。
+     🔴 判定はここ1本。画面（quarter.js）でも `pitQCanSave` を借りて、条件を書き写さない。 */
+  function canSave(res){
+    return !!(res && res.整備ソフト && (res.整備ソフト.枚数 || 0) > 0);
+  }
+
   function saveRun(res, opt){
     opt = opt || {};
     if (!res || !res.期間 || !res.期間.from) return Promise.reject(new Error('期間がありません'));
     /* 🔴 検算が合っていない結果は残さない。
        ＝ 合わない数字を保存すると、あとで見た人が**それを本当の数字だと思う**。 */
     if (!(res.検算 && res.検算.合う)) return Promise.reject(new Error('検算が合っていないので残しません'));
+    if (!canSave(res)) return Promise.reject(new Error('伝票が1枚も無い期間なので残しません'));
     var c = co();
     if (!cloud() || !c) return Promise.reject(new Error('練習用サイトでは残せません（本番の PitFlow で使ってください）'));
 
     var d = digest(res, opt);
+
+    /* 🧾 v2.9.8 伝票の行。
+       🔴 **切ったら持たない。** 半分だけ残すと、開き直した時に
+          「PitFlow にしか無い」が**嘘で量産される**（伝票が足りないだけなのに）。
+          ＝「無いと言う前に窓を広げて探す」の逆をやることになる。
+          だから多すぎる時は**持たないと決めて、そう書く**（古い写しの道に落ちる）。 */
+    var softRows = (opt.soft || []).map(slimSoft);
+    var 伝票OK = softRows.length > 0 && softRows.length <= CAP_SOFT;
+
     var body = {
       期間: { from: d.from, to: d.to },
       走らせた日時: d.at, 走らせた人: d.by, PDF: d.pdf,
       /* 🃏 v2.7.0 残した行の作り。2 以上＝カードで出せる（quarter.js の savedHtml が見る）。
+         🧾 v2.9.8 **3 ＝ 伝票の行を持っている**＝開き直したら**もう一度突き合わせる**（写しを見ない）。
          ⚠ 上の slim* に項目を足したら、この数も上げること。 */
-      _v: 2,
+      _v: (伝票OK ? 3 : 2),
+      /* 🧾 v2.9.8 読んだ伝票の行そのもの。**これがあれば残りは飾り**（もう一度突き合わせれば出る）。
+         ⚠ 下の `直すもの` は**古い版のために残している**。伝票があるなら誰も読まない。
+            消さない理由＝v2.9.8 より前の端末が開いた時に、空の画面を出さないため。 */
+      伝票: (伝票OK ? softRows : []),
+      伝票を残せなかった: (伝票OK ? '' : (softRows.length
+        ? (softRows.length + '枚は多すぎるので、伝票の行は残していません（' + CAP_SOFT + '枚まで）')
+        : '伝票の行が手元にありませんでした')),
       整備ソフト: res.整備ソフト, PitFlow: res.PitFlow, 差: res.差,
       内訳: res.内訳, 検算: res.検算, まとめ返車: res.まとめ返車 || [],
       /* 🔔 v2.8.4 「直す先が無いQまたぎ」の台数と金額。**行は残さない**（直すものではないので）。
@@ -189,21 +268,114 @@
     Object.keys(body.直すもの).forEach(function (k) { delete body.直すもの[k]._cut; });
 
     return c.collection('pitSettings').doc(d.id).set(body)
-      .then(function () { return pushList(d); })
+      /* 🔴 v2.9.8 まとめて残す時（saveRuns）は、一覧に触るのは**最後の1回だけ**。
+         ここで各自が書くと上書き合戦になって、Q1 が一覧から消える。 */
+      .then(function () { return opt._listOff ? null : pushList([d]); })
       .then(function () { return d; });
   }
 
-  /* 一覧に足す（同じ期間があれば差し替え・新しい順・上限200件） */
-  function pushList(d){
+  /* ================================================================
+     🧾🧾 v2.9.8 **1枚のPDFぶんを、まとめて残す**（ゆうた 2026-08-25「Q1が抜けたりする」）
+     ----------------------------------------------------------------
+     ◎何が起きていたか（本番で現物を見て確かめた）
+       1枚のPDFが Q1・Q2・Q3 に分かれると、`saveRun` が**3本同時に**走っていた。
+       書類（`qrun-*`）は別々なので3つとも無事。
+       ところが**一覧（`qruns`）は1つ**で、3本がそれぞれ
+         読む → 自分のぶんを足す → 書く
+       をやるので、**最後に書いた人が勝つ**＝先の2つが消える。
+       実際 2026-08-25 の本番では、3つとも書類はあるのに一覧には2つしか無かった。
+       ＝ データは無事。**壊れていたのは一覧だけ。**
+     🔴 直し方＝**書類は並列でよい。一覧に触るのは最後に1回だけ。**
+        （順番に保存するのでは遅いだけで、根っこは「一覧を何度も書く」こと）
+     ================================================================ */
+  function saveRuns(items){
+    var c = co();
+    if (!cloud() || !c) return Promise.reject(new Error('練習用サイトでは残せません（本番の PitFlow で使ってください）'));
+    var jobs = (items || []).map(function (it) {
+      return saveOne(it.res, it.opt || {}).catch(function (e) { return { エラー: s(e && e.message ? e.message : e) }; });
+    });
+    return Promise.all(jobs).then(function (ds) {
+      var okd = ds.filter(function (x) { return x && x.id; });
+      if (!okd.length) return ds;
+      return pushList(okd).then(function () { return ds; });
+    });
+  }
+  /* 書類だけ書く（一覧には触らない）＝ 上の saveRuns から呼ぶ用 */
+  function saveOne(res, opt){
+    var o = {}; Object.keys(opt || {}).forEach(function (k) { o[k] = opt[k]; });
+    o._listOff = true;
+    return saveRun(res, o);
+  }
+
+  /* 一覧に足す（同じ期間があれば差し替え・新しい順・上限200件）
+     🔴 v2.9.8 **配列で受ける。** 1回の読み書きで全部入れる＝上書き合戦にならない。 */
+  function pushList(ds){
     var c = co(); if (!c) return Promise.resolve();
+    var arr = Array.isArray(ds) ? ds : [ds];
+    if (!arr.length) return Promise.resolve();
     var ref = c.collection('pitSettings').doc('qruns');
     return ref.get().then(function (snap) {
       var list = (snap.exists && snap.data() && snap.data().一覧) || [];
-      list = list.filter(function (x) { return x && x.id !== d.id; });
-      list.unshift(d);
+      var ids = {}; arr.forEach(function (d) { if (d && d.id) ids[d.id] = 1; });
+      list = list.filter(function (x) { return x && !ids[x.id]; });
+      list = arr.concat(list);
       list.sort(function (a, b) { return (a.from < b.from) ? 1 : (a.from > b.from ? -1 : 0); });
       if (list.length > CAP_LIST) list = list.slice(0, CAP_LIST);
       return ref.set({ 一覧: list });
+    });
+  }
+
+  /* ================================================================
+     🩹 v2.9.8 **一覧の取りこぼしを、その場で直す。**
+     ----------------------------------------------------------------
+     ◎一覧はあくまで**索引**で、本当のことは書類（`qrun-*`）に書いてある。
+       上の競合で既に落ちてしまったぶん（本番の Q1）は、直しただけでは戻らない。
+       だから「その月の Q1〜Q4 を開く時に、一覧に無いものは**書類を直接見に行く**」。
+       あれば索引を作り直して足す。＝ 人が何もしなくても、開いた時に揃う。
+     ⚠ 読むのは **一覧に無いものだけ**（ふつうは0件＝ただ働きしない）。
+     ⚠ `直す件数` は書類の中の行から数え直す。行が400で切られていたら
+        その数までしか数えられないので、`行を切った` の時は正直に `+` を付ける。
+     ================================================================ */
+  function digestOfDoc(id, doc){
+    if (!doc) return null;
+    var d = doc.直すもの || {};
+    var n = (d.整備ソフトだけ || []).length + (d.PitFlowだけ || []).length
+          + (d.金額ちがい || []).length + (((doc.内訳 || {}).期間の外 || {}).台数 || 0);
+    return {
+      id: id, from: s((doc.期間 || {}).from), to: s((doc.期間 || {}).to),
+      at: s(doc.走らせた日時), by: s(doc.走らせた人), pdf: s(doc.PDF),
+      枚数: (doc.整備ソフト || {}).枚数 || 0, 台数: (doc.PitFlow || {}).台数 || 0,
+      整備ソフト金額: (doc.整備ソフト || {}).金額 || 0, PitFlow金額: (doc.PitFlow || {}).金額 || 0,
+      差台数: (doc.差 || {}).台数 || 0, 差金額: (doc.差 || {}).金額 || 0,
+      検算: !!((doc.検算 || {}).合う),
+      直す件数: n,
+      売上日ちがい件数: (d.売上日ちがい || []).length,
+      /* 🩹 索引を作り直したものだと分かるようにしておく（あとで追いかけられるように） */
+      索引を作り直した: true
+    };
+  }
+  function repairList(plans, list){
+    var c = co();
+    if (!cloud() || !c) return Promise.resolve(list || []);
+    var have = {}; (list || []).forEach(function (x) { if (x && x.id) have[x.id] = 1; });
+    var miss = (plans || []).map(function (p) { return runId(p.from, p.to); })
+                            .filter(function (id) { return id && !have[id]; });
+    if (!miss.length) return Promise.resolve(list || []);
+    return Promise.all(miss.map(function (id) {
+      return c.collection('pitSettings').doc(id).get()
+        .then(function (sn) { return sn.exists ? digestOfDoc(id, sn.data()) : null; })
+        .catch(function () { return null; });
+    })).then(function (found) {
+      var add = found.filter(Boolean);
+      if (!add.length) return list || [];
+      return pushList(add).then(function () {
+        var out = (list || []).slice().concat(add);
+        out.sort(function (a, b) { return (a.from < b.from) ? 1 : (a.from > b.from ? -1 : 0); });
+        return out;
+      }).catch(function () {
+        /* 書き戻せなくても、画面には出す（黙って「まだ」と嘘をつかない） */
+        return (list || []).concat(add);
+      });
     });
   }
 
@@ -270,6 +442,9 @@
 
   w.pitQRunId     = runId;
   w.pitQSaveRun   = saveRun;
+  w.pitQSaveRuns  = saveRuns;    /* 🧾 v2.9.8 1枚のPDFぶんをまとめて残す（一覧は最後に1回） */
+  w.pitQCanSave   = canSave;     /* 🔴 v2.9.8 残してよい期間か（伝票が0枚なら残さない） */
+  w.pitQRepairList = repairList; /* 🩹 v2.9.8 一覧の取りこぼしを書類から作り直す */
   w.pitQLoadList  = loadList;
   w.pitQLoadRun   = loadRun;
   w.pitQDeleteRun = deleteRun;   /* 🧹 v2.0.0 その期間の結果を消す（印は消さない） */

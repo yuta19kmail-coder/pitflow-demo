@@ -48,7 +48,10 @@
   function daysBetween(aISO,bISO){ const a=parseISO(aISO),b=parseISO(bISO); if(!a||!b) return null; return Math.round((b-a)/86400000); }
 
   // ---- 各種マスタ参照 ----
-  function workType(c){ return (state.workTypes||[]).find(w=>w.id===c.workType) || null; }
+  /* 🔴 v2.9.7 ここにあった `workType(c)` は消した。
+     `c.workType`（基本タイプ）**だけ**を見る自前の物差しで、B.P・1Y・3M・車販依頼のような
+     「併用可」の型（＝`c.workAddons` 側に入る）を拾えず、「作業」と出していた。
+     作業タイプを拾うのは `pit-share.js` の `pitCardWorkTypes` 1本。ここでは持たない。 */
   function dropType(c){ return (state.dropTypes||[]).find(d=>d.id===c.dropType) || null; }
   function teamColor(c){ return c.boardId==='import' ? '#ec4899' : '#1db97a'; }
   /* 代車リミット。
@@ -108,9 +111,18 @@
 
   // ===== ヘッダー（左カラム） =====
   function leftHtml(c){
-    const wt = workType(c);
+    /* 🔧 v2.9.7（ゆうた報告「BPを選択した時に予約詳細カードの表示が　作業　になる」）
+       🔴 作業タイプを拾うのは `pit-share.js` の `pitCardWorkTypes` **1本**。ここで数えない。
+       ⚠ 昔はここが `c.workType`（＝基本タイプ）だけを見ていた。B.P・1Y・3M・車販依頼は
+          **併用可**なので `c.workAddons` 側に入る＝単体で選ぶと null になり、
+          「作業」という言い訳の文字＋一般の緑色が出ていた。
+       🔴 v2.9.7（ゆうた指定「両方出す」）併用も**全部並べる**。
+          「車検＋B.P」で B.P が消えていた＝予約カードのバッジと言うことが違っていた。
+       ⚠ 色は先頭（基本タイプ）のもの。枠の左線と字の色をここから取る。 */
+    const wts = (window.pitCardWorkTypes ? pitCardWorkTypes(c) : []);
+    const wt = wts[0] || null;
     const wtColor = wt ? wt.color : '#84cc16';
-    const wtLabel = wt ? wt.label : (c.workType||'作業');
+    const wtLabel = wts.length ? wts.map(function(x){ return x.label; }).join('＋') : '作業';
     const dt = dropType(c);
     let h = '';
 

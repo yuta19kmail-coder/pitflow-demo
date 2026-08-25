@@ -235,8 +235,12 @@
     if(!cards.length) return '<div class="pk-noreason" style="padding:8px">この日の預かり入庫はありません。</div>';
     let h='<div class="pk-brk">';
     cards.forEach(function(c){
-      const wt=(state.workTypes||[]).find(function(w){return w.id===c.workType;});
-      const wl=wt?wt.label:(c.workType||'—'); const wc=wt?wt.color:'#64748b';
+      /* 🔧 v2.9.7 作業タイプの拾い方は `pit-share.js` の `pitCardWorkTypes` 1本。
+         ⚠ 昔は `c.workType`（基本）だけを見ていたので、B.P だけの車が「—」になっていた。 */
+      const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
+      const wt=_wts[0]||null;
+      const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
+      const wc=wt?wt.color:'#64748b';
       const loa=c.needLoaner?'<span class="pk-lo"><i data-ic=van data-ics=16></i>代車</span>':'';
       h+='<div class="pk-brkrow" onclick="openDetail(\''+c.id+'\')"><span class="pk-wt" style="background:'+wc+'">'+esc(wl)+'</span><span class="pk-nm">'+esc((window.pitCustName?pitCustName(c):c.customer)||'（未入力）')+' 様</span><span class="pk-meta">'+esc(c.car||'')+(c.plate?' ・ '+esc(c.plate):'')+'</span>'+loa+'</div>';
     });

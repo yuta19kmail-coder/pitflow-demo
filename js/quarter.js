@@ -733,7 +733,7 @@
     var left = saved ? 1 : (w.pitQRowLeft ? w.pitQRowLeft(p) : 1);
     var sg = p.売上日差 || { kind:'', label:'' };
     var sdCls = sg.kind === 'none' ? 'miss' : (sg.kind === 'same' ? '' : 'bad');
-    var idNg = !p.同じ車;
+    var idNg = !p.同じ車;                       /* 🔴 vinNG / carNG だけ。plateNG は赤くしない（v2.9.2） */
     /* 🔔 v2.8.3 直す先が無いものは、左の帯も黄ではなく青（見るだけ、と分かるように） */
     return '<div class="q-c' + (left ? '' : ' is-done')
          + (p.期間の外 ? (p.正常なQまたぎ ? ' note' : ' out') : '') + (idNg ? ' mism' : '') + '">'
@@ -791,6 +791,10 @@
     if (p.同一性 === 'vinNG') return '<span class="q-c-g bad">車体番号がちがう＝別の車かも</span>';
     if (p.同一性 === 'carNG') return '<span class="q-c-g bad">車種がちがう＝結びつけを疑う</span>';
     if (p.同一性 === 'vinOK') return '<span class="q-c-g ok">車体番号が一致＝同じ車</span>';
+    /* 🔵 v2.9.2 ナンバーと客名が両方そろって一致＝同じ車（車種のゆれは見ない） */
+    if (p.同一性 === 'plateOK') return '<span class="q-c-g ok">ナンバーと お客様が一致＝同じ車</span>';
+    /* 🟡 v2.9.2 ナンバーが読めない＝結びつけの根拠が弱い。**人に確かめてもらう** */
+    if (p.同一性 === 'plateNG') return '<span class="q-c-g warn">ナンバーが読めません＝結びつけを確かめてください</span>';
     return '';
   }
   function sdChip(p){

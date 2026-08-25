@@ -51,6 +51,23 @@
        + '<span class="ps-status" id="ps-status"></span>'
        + '<button class="vh-btn" onclick="pitSettingsReset()">↩ 初期値に戻す</button></div>';
 
+    /* ===== 📣 全端末を今すぐ更新する（v2.8.2・2026-08-25 ゆうた指定） =====
+       🗣「強制リロードを全端末でかけるデプロイはできない？」
+       🔴 出したあと、全部の端末を**その場で**読み直させる。1時間待たない。
+       ⚠ 押すのは**出したあと**。出す前に押しても、同じ版を読み直すだけで意味がない。
+       ⚠ 判断（いつ読み直すか・二度反応しないか）は force-reload-pit.js の1本。ここは呼ぶだけ。 */
+    if (window.PIT_CLOUD && window.pitIsAdmin && pitIsAdmin() && window.pitForceReloadFire) {
+      h += '<div class="ps-card">';
+      h += '<div class="ps-h"><i data-ic=refresh data-ics=16></i> 全端末を今すぐ更新する</div>';
+      h += '<div class="ps-desc">新しい版を<b>出したあと</b>に押すと、開いている<b>全部の端末</b>が1〜2秒で最新版を読み直します。'
+         + 'ふだんは自動更新（1時間に1回）に任せていて問題ありません。'
+         + '<b>版のちがう端末が混ざって困っている時</b>のための手です。'
+         + '<br>⚠ 打ち込み中の端末は、手が空いてから（最大60秒）読み直します。</div>';
+      h += '<div style="margin-top:8px"><button class="vh-btn" onclick="pitForceReloadAsk()">'
+         + '<i data-ic=refresh data-ics=16></i> 全端末を今すぐ更新する</button></div>';
+      h += '</div>';
+    }
+
     /* ===== 入庫まわりは🧩ルールページへ集約（2026-06-04 ゆうた指示） ===== */
     h += '<div class="ps-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
     h += '<div style="font-size:13px;color:var(--text2);line-height:1.7;flex:1;min-width:240px"><i data-ic=download data-ics=16></i> <b>入庫に関する設定（予約枠・売上目標・平均単価・曜日ルールなど）は「<i data-ic=puzzle data-ics=16></i> ルール」ページに集約</b>しました。入庫のアルゴリズムはすべてそちらで調整します。</div>';

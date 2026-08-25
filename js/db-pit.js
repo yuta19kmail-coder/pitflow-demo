@@ -252,7 +252,47 @@
             （作業タイプの名前と色・概算金額）。書き戻しをやめると MHS の当日ビューから名前が消える。
        ⚠ 呼ぶ場所＝`_mergeSettings` の最後（＝端末保存・クラウド初回・他端末の変更、全部ここを通る）と、
           設定がまだ1度も保存されていない時のために `load()` / `connectCloud()` の締め。
-       ⚠ 中身が変わったぶんは、次のふつうの保存でクラウドへ上がる（差分判定に任せる＝ここでは保存しない）。 */
+       ⚠ 中身が変わったぶんは、次のふつうの保存でクラウドへ上がる（差分判定に任せる＝ここでは保存しない）。
+
+       🔴🔴🔴 v2.8.1（2026-08-25・**本番が止まった**）ここには穴があった。**必ず読むこと。**
+       -----------------------------------------------------------------
+       🗣「同期中と同期済が超絶点滅を繰り返してて、まともに操作できない。全デバイスで発生してる」
+
+       ◎何が起きたか（コンソールが毎秒これをくり返していた）
+         [PitDB] 作業タイプをコード基準に揃え直しました（保存します）
+         [PitDB] 保存しました（1件）      ← 8秒で95往復
+         `pitSettings/main` の中身が `"label":"車販"`（v2.7.0以前のコード）と
+         `"label":"車販依頼"`（v2.7.1以降のコード）の**間を永久に往復**していた。
+
+       ◎なぜ起きたか ── **「コードが正」＋「クラウドへ書き戻す」は、版がちがう端末が2台開くと喧嘩する。**
+         ・2.7.1 の端末「車販依頼が正だ」→ 書く
+         ・2.7.0 の端末「いや車販が正だ」→ 書く
+         ・以下、無限。**どちらも自分が正しいので、どちらも折れない。**
+         引き金は v2.7.1 の「車販→車販依頼」の改名。作った時に**この目で見えていなかった穴**。
+
+       ◎だから、正を決める物差しを **「コード」から「新しい版のコード」** に変えた。
+         🔴 ① **版の印**（`settings.workTypesVer`）… 書き戻した端末の版を残す。
+              **自分の版が印より古かったら、書き戻さない**（新しい端末の言うことを聞く）。
+              ＝次に名前を変えたときに、同じ喧嘩が起きない。
+         🔴 ② **空回り止め**（`_wtGaveUp`）… 版の印を知らない**古い端末**が相手だと①は効かない。
+              なので「同じ揃え直しが**4回目**」になったら、この端末は**以後いっさい書き戻さない**。
+              ＝相手が古いままでも、**必ず止まる**。折れたことは黙らずトーストで言う。
+         🔴 ③ 書き戻さないと決めたときは **`state.settings.workTypes` に触らない。**
+              ⚠ ここが肝。触ると、`_flushWorkTypes` を呼ばなくても
+                 差分判定（`_cloudFlush`）が勝手に書きにいく＝止まらない。
+              ⚠ 画面が使う `state.workTypes` は**いつでもコードのもの**（表示は自分の版で正しい）。 */
+    _appVer: function () {
+      try { return String(document.querySelector('meta[name=app-version]').content || ''); } catch (e) { return ''; }
+    },
+    /* 版くらべ（2.8.1 と 2.10.0 を文字で比べない）。a が b より古ければ −1 */
+    _verCmp: function (a, b) {
+      var x = String(a || '').split('.').map(Number), y = String(b || '').split('.').map(Number);
+      for (var i = 0; i < 3; i++) {
+        var p = x[i] || 0, q = y[i] || 0;
+        if (p !== q) return p < q ? -1 : 1;
+      }
+      return 0;
+    },
     _applyWorkTypes: function () {
       var master = (window.PIT_WORK_TYPES || []).map(function (w) {
         var o = {}; Object.keys(w).forEach(function (k) { o[k] = w[k]; }); return o;
@@ -269,17 +309,39 @@
         master.push(o);
       });
       if (!state.settings) state.settings = {};
-      /* 揃え直しで中身が変わったか（＝クラウドに古い作業タイプが残っていたか）を覚えておく。
-         変わっていたら、読み終わったあとで1回だけ保存して**クラウドと MHS にも行き渡らせる**。 */
-      if (this._js(state.settings.workTypes || null) !== this._js(master)) this._wtDirty = true;
+      /* 🔴 画面はいつでもコードのものを使う（ここは版に関係なく）。 */
       state.workTypes = master;
-      state.settings.workTypes = master;                // 🔴 MHS が読む
+
+      /* 🔴 ここから下は「クラウドへ書き戻してよいか」だけの話。
+         ⚠ 書き戻さないと決めたら **`state.settings.workTypes` を1バイトも触らずに帰る。** */
+      if (this._wtGaveUp) return;                                  // ② 空回りした＝もう書かない
+      var mine = this._appVer();
+      var stamp = String((state.settings && state.settings.workTypesVer) || '');
+      if (stamp && mine && this._verCmp(mine, stamp) < 0) return;   // ① 自分より新しい版が決めた＝従う
+
+      var changed = (this._js(state.settings.workTypes || null) !== this._js(master));
+      if (!changed && stamp === mine) return;                       // すでに揃っている＝何もしない
+      state.settings.workTypes = master;                            // 🔴 MHS が読む
+      if (mine) state.settings.workTypesVer = mine;                 // 🔴 誰が決めたかの印
+      this._wtDirty = true;
+      if (changed) this._wtSpins++;
     },
 
-    /* 揃え直しで変わっていたら1回だけ保存する（読み終わったあとに呼ぶ） */
+    /* 揃え直しで変わっていたら1回だけ保存する（読み終わったあとに呼ぶ）。
+       🔴 v2.8.1 4回目からは折れる（＝版のちがう端末との喧嘩を、こちらから終わらせる）。 */
+    _WT_SPIN_MAX: 3,
     _flushWorkTypes: function () {
       if (!this._wtDirty) return;
       this._wtDirty = false;
+      if (this._wtSpins > this._WT_SPIN_MAX) {
+        this._wtGaveUp = true;
+        console.warn('[PitDB] 🔴 作業タイプの書き戻しが止まりません。'
+                   + 'この端末では以後やめます（版のちがう端末が開いています）');
+        if (window.showToast) {
+          showToast('版のちがう端末が開いています。全部の端末を開き直してください', 'PF-0009');
+        }
+        return;
+      }
       console.log('[PitDB] 作業タイプをコード基準に揃え直しました（保存します）');
       this.save(true);
     },
@@ -320,6 +382,8 @@
     _SETTINGS_KEYS: ['settings', 'bays', 'floorPlan', 'aiVerdicts', 'boardLabels', 'inspectMarks', 'inspectMutes'],
 
     _wtDirty: false,    // v2.5.0：作業タイプをコード基準に揃え直して中身が変わった＝1回保存が要る
+    _wtSpins: 0,        // v2.8.1：揃え直しが何回起きたか（版のちがう端末との往復を数える）
+    _wtGaveUp: false,   // v2.8.1：空回りと判断した＝この端末はもう書き戻さない
     _loaded: false,     // v1.2.1：クラウドの中身を読み終わったか（読む前に書かないための鍵）
     _shadow: null,      // 最後にクラウドと合っていた内容（差分を出すための控え）
     _pending: {},       // いま書いている最中のもの（自分の書き込みが跳ね返ってくるのを無視する）
@@ -478,7 +542,13 @@
         });
         self._shadow.settings = js;
         self._applying = false;
-        self._flushWorkTypes();   // 他の端末が古い作業タイプを書いていたら、揃え直して書き戻す
+        /* 🔴🔴 v2.8.1 **ここで書き戻さない。**
+           前は「他の端末が古い作業タイプを書いていたら、揃え直して書き戻す」を
+           **受け取るたびに即**やっていた。これが版のちがう端末との往復を
+           **毎秒10往復まで加速させる増幅器**になっていた（2026-08-25 の停止）。
+           揃え直し自体は上の `_mergeSettings` → `_applyWorkTypes` で済んでいて、
+           書き戻しが要るぶんは**ふつうの差分保存**（`_cloudFlush`）が拾う。
+           ⚠ ここに `_flushWorkTypes()` を戻さないこと。 */
         if (window.PitSync) PitSync.received();
         self._afterApply();
       }, function (e) { console.error('[PitDB] 設定の購読に失敗', e); });

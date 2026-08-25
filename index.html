@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.9.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.9.1"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.9.0</div>
+    <div class="login-ver">v2.9.1</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.9.0</span>
+    <span class="ver">v2.9.1</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -902,14 +902,14 @@ window.PIT_DEMO = true;</script>
 <script src="js/mech-summary.js?v=6"></script>
 <script src="js/inspect-rules.js?v=17"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=6"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
-<script src="js/quarter-match.js?v=7"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
-<script src="js/quarter-store.js?v=8"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->
+<script src="js/quarter-match.js?v=8"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
+<script src="js/quarter-store.js?v=9"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->
 <script src="js/quarter-pdf.js?v=8"></script><!-- 🧾 v1.181.0 売上チェックリストPDFの読み取り（自己検証つき） -->
 <script src="js/quarter-fix.js?v=4"></script><!-- 🛠 v2.0.0 突き合わせた一覧をその場で片づける（直す／伝票を直した の2択）。quarter-match / card-view（pitCanEditFinal・pitApplyResultDate）/ sales-date より後ろ、quarter.js より前 -->
 <script src="js/quarter-write.js?v=1"></script><!-- ✍ v2.2.0 残り0になったQの結果を、車体番号と伝票としてお客様の車に書き込む。quarter-fix / customers（pitVehSetVin）より後ろ、quarter.js より前 -->
 <script src="js/cost-book.js?v=1"></script><!-- 📚 v2.3.0 会社の覚え（過去の売上チェックリスト 2026-03〜07 から作った、うちのふつうの掛け率・売価・セット）。データだけ。quarter-cost.js より前 -->
 <script src="js/quarter-cost.js?v=2"></script><!-- 🔎 v2.3.0 入れたPDFの中身を覚えと照らす物差し（画面を持たない）。cost-book より後ろ、ai-check.js より前 -->
-<script src="js/quarter.js?v=18"></script><!-- 🧾 v1.181.0 クォーターチェック②の画面。quarter-match / quarter-pdf より後ろ、inspect.js より前 -->
+<script src="js/quarter.js?v=19"></script><!-- 🧾 v1.181.0 クォーターチェック②の画面。quarter-match / quarter-pdf より後ろ、inspect.js より前 -->
 <script src="js/quarter-print.js?v=6"></script><!-- 🖨 v2.4.0 元の売上チェックリストPDFに、気になる行の帯と番号を刷り込んで出し直す。quarter-cost より後ろ、ai-check.js より前 -->
 <script src="js/ai-check.js?v=4"></script><!-- 🤖 v1.181.0 クォーターチェック③AIチェック。quarter.js より後ろ、inspect.js より前 -->
 <script src="js/inspect.js?v=14"></script><!-- 🩺 v1.170.0 データチェックの画面（並べるだけ）。inspect-rules.js / inspect-fix.js / quarter*.js より後ろ -->

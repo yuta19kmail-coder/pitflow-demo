@@ -182,6 +182,26 @@
      ⚠ 「片方にしか無い」はデータがちがうの中。**赤いカード**で先頭に出す（一覧にしない）。
      ================================================================ */
   function eff(a){ return (a || []).reduce(function (x, p) { return x + (p.効き || 0); }, 0); }
+
+  /* ================================================================
+     🧾 v2.9.1 片方にしか無い行を「直すもの」と「お知らせ」に分ける（ゆうた 2026-08-25・QP-415514）
+     ----------------------------------------------------------------
+     🗣「板金に近いが、返車が先で伝票があとのパターン。……**Qまたぎと同じような扱いにしてほしい**」
+     ◎**別のQで実際に伝票と結ばれた**車（`別のQ確定`）は、直す先が無い。
+       だから「データがちがう」ではなく **OK（お知らせ）** に置く。
+     🔴 判定は書き写さない。`pitQCrossLink` が貼った `別のQ確定` を読むだけ。
+     ⚠ `別のQ`（カード自身の売上日から推した、確定でないもの）は**まだデータがちがう側**に置く。
+        別の回に走らせたPDFの話で、こちらでは確かめられないため。黄で出るのは今までどおり。
+     ================================================================ */
+  function onesOf(R){
+    var soft = (R.整備ソフトだけ || []).map(function (x) { return { x:x, k:'soft' }; });
+    var pit  = (R.PitFlowだけ   || []).map(function (x) { return { x:x, k:'pit' }; });
+    var all  = soft.concat(pit);
+    return {
+      直す:     all.filter(function (o) { return !(o.k === 'pit' && o.x.別のQ確定); }),
+      お知らせ: all.filter(function (o) { return   o.k === 'pit' && o.x.別のQ確定; })
+    };
+  }
   /* まだ片づいていない件数（印が付いたもの・直したものは数えない） */
   function nokoriOf(R){
     var n = 0;
@@ -205,8 +225,10 @@
     var G = R.グループ, S = R.整備ソフトだけ || [], P = R.PitFlowだけ || [];
     var softAmt = S.reduce(function (a, x) { return a + x.soft.金額; }, 0);
     var pitAmt  = P.reduce(function (a, x) { return a + x.確定金額; }, 0);
+    /* 🧾 v2.9.1 別のQで伝票と結ばれた車は「データがちがう」から外して OK へ（数字は動かさない） */
+    var ONE = onesOf(R), 知 = ONE.お知らせ.length;
     var GS = [
-      { id:'data',  l:'データがちがう', n:G.データ.length + S.length + P.length,
+      { id:'data',  l:'データがちがう', n:G.データ.length + S.length + P.length - 知,
         v:eff(G.データ) + softAmt - pitAmt, note:'片方にしか無い／別の車かも／担当がちがう' },
       { id:'money', l:'金額がちがう',   n:G.金額.length, v:eff(G.金額), note:'伝票と確定金額がちがう' },
       { id:'date',  l:'日付がちがう',   n:G.日付.length, v:eff(G.日付), note:'売上日のズレ／返車日が期間の外' },
@@ -216,12 +238,12 @@
       /* 🔴 v2.8.6 残した結果は OK の行を持っていないので、残してある数を使う
          （お知らせの金額＝OK の効きの全部。ほかの OK は定義上0円） */
       { id:'ok',    l:'OK',
-        n: (R.OK台数 == null ? G.OK.length : +R.OK台数),
+        n: (R.OK台数 == null ? G.OK.length : +R.OK台数) + 知,
         v: (R.OK台数 == null ? eff(G.OK) : ((R.お知らせ && R.お知らせ.金額) || 0)),
         note: (function () {
-          var k = (R.お知らせ && R.お知らせ.台数 != null)
+          var k = ((R.お知らせ && R.お知らせ.台数 != null)
                 ? +R.お知らせ.台数
-                : G.OK.filter(function (p) { return p.正常なQまたぎ; }).length;
+                : G.OK.filter(function (p) { return p.正常なQまたぎ; }).length) + 知;
           return k ? '直すところがありません（うち' + k + '件は返車日が期間の外・お知らせ）'
                    : '直すところがありません';
         })() }
@@ -587,7 +609,8 @@
       顧客名: r.お客様, ナンバー: r.ナンバー, 車種: r.車種, 数える日: r.数える日,
       確定金額: r.金額, 予約番号: r.予約番号, 車体番号: r.車体番号,
       フロント担当: r.フロント, 生: { id: r.カードid },
-      別のQ: r.別のQ                                /* 🔗 v2.8.0 */
+      別のQ: r.別のQ,                               /* 🔗 v2.8.0 */
+      別のQ確定: !!r.別のQ確定                      /* 🧾 v2.9.1 */
     };
   }
 
@@ -634,20 +657,29 @@
       /* 🔴 v2.8.6 残した結果には**OKだった行を残していない**（軽くするため）。
          数だけ言って、黙って「0件です」と嘘をつかない。 */
       if (saved) {
+        var 知S = onesOf(R).お知らせ;
         var n = (R.OK台数 == null) ? null : +R.OK台数;
+        if (知S.length) {
+          return '<div class="q-cards">' + 知S.map(function (o) { return oneCard(o.x, o.k, true); }).join('') + '</div>'
+               + '<div class="q-none">ほかに直すところはありません。'
+               + (n == null ? '合っていた行は残していません（軽くするため）。'
+                            : '合っていた <b>' + n + '件</b> は残していません（軽くするため）。') + '</div>';
+        }
         return '<div class="q-none">直すところはありません。'
              + (n == null ? '合っていた行は残していません（軽くするため）。'
                           : '合っていた <b>' + n + '件</b> は残していません（軽くするため）。')
              + '</div>';
       }
-      return G.OK.length ? '<div class="q-cards">' + G.OK.map(one).join('') + '</div>'
-                         : '<div class="q-none">0件です。</div>';
+      var 知 = onesOf(R).お知らせ;   /* 🧾 v2.9.1 別のQで伝票と結ばれた車＝直す先が無い */
+      if (!G.OK.length && !知.length) return '<div class="q-none">0件です。</div>';
+      return '<div class="q-cards">'
+        + 知.map(function (o) { return oneCard(o.x, o.k, saved); }).join('')
+        + G.OK.map(one).join('') + '</div>';
     }
     if (tab === 'data'){
       /* 🔴🔴 片方にしか無い車＝**赤いカード**。中身がちがう車より先に出す。
          ⚠ 「まだ実績になっていない（カードは有る）」は黄色に格下げ（ゆうた 2026-08-24）。 */
-      var ones = (R.整備ソフトだけ || []).map(function (x) { return { x:x, k:'soft' }; })
-        .concat((R.PitFlowだけ || []).map(function (x) { return { x:x, k:'pit' }; }));
+      var ones = onesOf(R).直す;   /* 🧾 v2.9.1 別のQで結ばれた車は OK 側へ移した */
       ones.sort(function (a, b) { return (oneLevel(a) === 'red' ? 0 : 1) - (oneLevel(b) === 'red' ? 0 : 1); });
       var mid = G.データ;
       if (!ones.length && !mid.length) return '<div class="q-none">0件です。</div>';
@@ -743,8 +775,9 @@
       /* 🔔 v2.8.3 直す先が無いことを、はっきり書く（ゆうた「あくまでお知らせで、扱いはOK」）。
          ⚠ 判定は書き写さない。`pitQMatch` が貼った `正常なQまたぎ` を読むだけ。 */
       +   (p.正常なQまたぎ
-          ? '<span class="q-c-g cross">🔔 伝票を切った日と車を返した日でQがまたがっただけです。'
-            + '金額・車・売上日は合っています＝<b>直すところはありません</b></span>'
+          ? '<span class="q-c-g cross">🔔 ' + esc(p.お知らせ理由
+              || (w.pitQCrossWhy ? w.pitQCrossWhy(p) : '伝票と返車でQがまたがっただけです'))
+            + '＝<b>直すところはありません</b></span>'
           : '')
       + '</div>'
       + '<div class="q-c-st' + (p.担当一致 ? '' : ' bad') + '">フロントマン <b>' + esc(p.soft.受付担当 || '—') + '</b>'

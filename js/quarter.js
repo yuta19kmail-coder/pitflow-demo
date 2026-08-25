@@ -96,9 +96,10 @@
        +       (_loaded ? '' : ' を選ぶ<small>（ここに<b>ドラッグ</b>しても入ります）</small>')
        +     '</span>'
        +   '</label>'
-       +   (_loaded ? '' : '<span class="q-pick-n">期間は選ばなくて大丈夫です。'
-                        + 'PDFに書いてある期間を読んで、<b>クォーターに自動で振り分けます</b>。'
-                        + '<b>PDFはこのパソコンの中だけで読みます</b>（どこにも送りません）。</span>')
+       /* 🔴 「どこにも送らない」だけ残す＝**入れてよいか**の判断に要る。
+          期間の自動振り分けは、出た結果を見れば分かる（✂️ v2.10.2） */
+       +   (_loaded ? '' : '<span class="q-pick-n">'
+                        + '<b>PDFはこのパソコンの中だけで読みます</b>（どこにも送りません）</span>')
        +   (U.pdf ? '<span class="q-fname">' + esc(U.pdf) + '</span>' : '')
        +   (U.busy ? '<span class="q-busy">' + esc(U.busy) + '</span>' : '')
        /* 🧹 v2.0.0（ゆうた指定）**入れたPDFを片づける。** 残してある結果には触らない。 */
@@ -112,11 +113,10 @@
     h += '</div>';
 
     if (U.err){
+      /* 🔴 エラーの理由は消さない（2026-08-25 の決めごとの例外側）。ただし1行に。 */
       h += '<div class="q-ng"><b>読み取りに失敗しました。</b>'
          +   '<div class="q-ng-why">' + esc(U.err) + '</div>'
-         +   '<div class="q-ng-note">🔴 <b>数字は出しません。</b>合計が合わないまま出すと、'
-         +     '「合っている」と嘘をつくことになります。'
-         +     '整備ソフトの帳票の形が変わった時も、ここで止まります。この文をそのまま伝えてください。</div>'
+         +   '<div class="q-ng-note">🔴 合わないので数字は出しません。この文をそのまま伝えてください。</div>'
          + '</div>';
       return h;
     }
@@ -131,18 +131,15 @@
           ここは**二重の保険**（どこから来ても、busy の間は数字を出さない）。
        ================================================================ */
     if (U.busy){
+      /* ✂️ v2.10.2 くるくると1行だけ。「なぜ数字が無いか」は見れば分かる（2026-08-25 の決めごと） */
       return h + '<div class="q-load"><span class="q-load-sp"></span>'
-               + '<b>' + esc(U.busy) + '</b>'
-               + '<span>読み終わるまで数字は出しません（古い数字を見て決めないため）。</span>'
-               + '</div>';
+               + '<b>' + esc(U.busy) + '</b></div>';
     }
     /* 🗄 v1.184.0 残してあった結果を開いている時（PDFを読まずに見返している） */
     if (!U.res && U.saved) return h + savedHtml(U);
 
     if (!U.res) {
-      h += '<div class="q-empty">PDF を選ぶ（またはドラッグで放り込む）と、ここに突き合わせの結果が出ます。<br>'
-         +   '<span>読み取れた枚数と総合計が PDF と合っているかを、まず自分で確かめます。'
-         +   '合わなければ数字は出しません。</span></div>';
+      h += '<div class="q-empty">PDF を入れると、ここに結果が出ます。</div>';
       return h;
     }
 
@@ -181,14 +178,11 @@
          +   (U.再生
               /* 🧾 v2.9.8 PDFを読んだのではなく、**残してある伝票で組み直した**時。
                  ⚠ 黙ると「いまPDFを読んだ」と勘ちがいされる。どこから来た画面かを必ず言う。 */
+              /* ✂️ v2.10.2 どこから来た画面かだけ言う（これを黙ると勘ちがいされるので消せない）。
+                 ⚠ 刷り込み印刷・原価チェックが使えないことは、**押した時にそちらが言う**。 */
               ? '📄 残してある伝票（' + esc(s(U.再生.at).slice(0, 16).replace('T', ' '))
-                + (U.再生.by ? '・' + esc(U.再生.by) : '')
-                + (U.再生.pdf ? '・' + esc(U.再生.pdf) : '')
-                + '）で組み直しました。PitFlow 側は<b>いまのデータ</b>で数え直しています。'
-                + '<span class="q-saved-n">⚠ 気になる行の刷り込み印刷と原価チェックは、PDFを入れ直すと使えます。</span>'
-              : (U.savedAt
-                 ? 'この結果を残しました（' + esc(U.savedAt) + '）／同じ期間をもう一度やると置きかわります'
-                 : '結果を残しています…'))
+                + (U.再生.by ? '・' + esc(U.再生.by) : '') + '）で組み直しました'
+              : (U.savedAt ? '残しました（' + esc(U.savedAt) + '）' : '結果を残しています…'))
          + '</div>';
     }
 
@@ -274,7 +268,7 @@
     var h = '<details class="q-done"><summary><span class="q-done-h">✅ チェック済み</span>'
           + '<span class="q-done-n">' + D.済み.length + '件</span>'
           + (D.効き ? '<span class="q-done-v">' + (D.効き > 0 ? '+' : '') + yen(D.効き) + '円</span>' : '')
-          + '<span class="q-done-t">この期間で「直した」「このままでよい」と決めたもの</span></summary>';
+          + '</summary>';
     h += '<div class="q-done-list">';
     D.済み.forEach(function (item) {
       /* 🔴 出し方は走らせた直後と同じカード。灰色は**包み**に着せる（中は変えない） */
@@ -302,9 +296,8 @@
       h += '<div class="q-done-i">' + inner + what + '</div>';
     });
     h += '</div>';
-    h += '<div class="q-done-note">⚠ ここに出ていても、<b>上の合計・差・検算は1円も動きません</b>。'
-       + '手元のPDFは直す前のものなので、そこに出ている数字は事実のままです。'
-       + '<br>⚠ 押し間違えたら、カードの中の押した札をもう一度押すと戻ります。</div>';
+    /* 🔴 これは残す＝**消すと「数字が動いた」と誤解される**（2026-08-25 の決めごとの例外側） */
+    h += '<div class="q-done-note">⚠ 上の合計・差・検算は1円も動きません</div>';
     return h + '</details>';
   }
 
@@ -667,9 +660,10 @@
     if (R4) {
       var D4 = splitDone(R4);
       h += groupBar(D4.R);
-      h += '<div class="q-tabs"><span class="q-note" style="margin:0">残してあるのは'
-         + '<b>これから直すものだけ</b>です（合っていた行は残していません）。'
-         + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</span>'
+      /* 🔴 「合っていた行は残していない」は消せない＝**0件を「全部OK」と読まれる**ため。1行に。 */
+      h += '<div class="q-tabs"><span class="q-note" style="margin:0">'
+         + '残してあるのは<b>直すものだけ</b>です（合っていた行は残していません）'
+         + (R.行を切った ? '／⚠ 多すぎたので途中で切っています' : '') + '</span>'
          + '<button class="q-print" onclick="window.print()">印刷</button></div>';
       h += '<div class="q-body">' + list(D4.R, U.tab, true) + '</div>';
       h += doneBox(U, D4);   /* ✅ v2.9.9 古い写しの画面にも出す（やったことは同じ場所にある） */
@@ -685,8 +679,8 @@
          + ' onclick="pitQSavedTab(\'' + k + '\')">' + esc(k) + '<span>' + n + '</span></button>';
     });
     h += '<button class="q-print" onclick="window.print()">印刷</button></div>';
-    h += '<div class="q-note">残してあるのは<b>これから直すものだけ</b>です'
-       +   '（合っていた行は残していません）。' + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</div>';
+    h += '<div class="q-note">残してあるのは<b>直すものだけ</b>です（合っていた行は残していません）'
+       +   (R.行を切った ? '／⚠ 多すぎたので途中で切っています' : '') + '</div>';
     h += '<div class="q-body">' + savedBody(R, U.savedTab) + '</div>';
     return h;
   }
@@ -1061,15 +1055,13 @@
         + '<div class="q-fx"><b class="q-fx-k">②</b>'
         + (cid ? '<button class="q-fx-go is-heavy" onclick="pitInspectGo(\'' + esc(cid) + '\')">カードを開いて実績を取り消す</button>'
                : '<span class="q-act-ok">カードを開いて実績を取り消す</span>') + '</div>'
-        + '<div class="q-fx"><span class="q-fx-note">この2つしかありません。'
-        + '<b>確認しただけでは消しません</b></span></div>';
+        + '<div class="q-fx"><span class="q-fx-note"><b>確認しただけでは消えません</b></span></div>';
     }
     if (!c){
       /* 🔴🔴 伝票があるのに PitFlow を通っていない。**必ず作る。** */
       return '<div class="q-fx"><b class="q-fx-k">やること</b>'
         + '<span class="q-act-ok">この車を<b>新規予約として作ってください</b></span></div>'
-        + '<div class="q-fx"><span class="q-fx-note">伝票があるなら<b>必ず作ってください</b>。'
-        + '確認しただけでは消しません</span></div>';
+        + '<div class="q-fx"><span class="q-fx-note"><b>確認しただけでは消えません</b></span></div>';
     }
     /* 🟡 カードは有る＝返車済みにすれば消える。翌週返車にずれた時は印で置いておける */
     var no = w.pitQSoftNo ? w.pitQSoftNo(x) : '';

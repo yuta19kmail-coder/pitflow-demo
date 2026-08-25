@@ -233,8 +233,7 @@
       +   '<em>粗利 ' + yen(ara) + '円（' + pct + '%）</em>'
       +   (hou ? '<span class="vw-hou-c">＋法定費用 ' + yen(hou) + '円</span>' : '') + '</div></div></div>';
     h += '<div class="vw-sec"><div class="vw-t">この時の伝票</div>' + denTable(m) + '</div>';
-    h += '<div class="vw-go"><span>ふだんはお客様の画面から見ます。'
-       + '検索でナンバーかお名前を引く → お客様 → 車 → 来店履歴</span></div>';
+    /* ✂️ v2.10.2 導線の案内は消した（お客様の画面から見られることは、使えば分かる） */
     return h + '</div>';
   }
 

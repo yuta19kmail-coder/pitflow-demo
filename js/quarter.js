@@ -213,9 +213,15 @@
       /* 🔔 v2.8.3 OK にも「返車日だけQをまたいだ（正常）」が入るようになった。
          🔴 だから **0円と決め打ちしない**。決め打ちのままだと「4つを足すと差になる」が崩れる。
          ⚠ v2.8.3 より前は OK の効きは必ず0だったので、`eff(G.OK)` は昔の結果でも同じ0になる。 */
-      { id:'ok',    l:'OK',            n:G.OK.length,   v:eff(G.OK),
+      /* 🔴 v2.8.6 残した結果は OK の行を持っていないので、残してある数を使う
+         （お知らせの金額＝OK の効きの全部。ほかの OK は定義上0円） */
+      { id:'ok',    l:'OK',
+        n: (R.OK台数 == null ? G.OK.length : +R.OK台数),
+        v: (R.OK台数 == null ? eff(G.OK) : ((R.お知らせ && R.お知らせ.金額) || 0)),
         note: (function () {
-          var k = G.OK.filter(function (p) { return p.正常なQまたぎ; }).length;
+          var k = (R.お知らせ && R.お知らせ.台数 != null)
+                ? +R.お知らせ.台数
+                : G.OK.filter(function (p) { return p.正常なQまたぎ; }).length;
           return k ? '直すところがありません（うち' + k + '件は返車日が期間の外・お知らせ）'
                    : '直すところがありません';
         })() }
@@ -420,8 +426,34 @@
       });
       h += '</div>';
     }
-    /* ⚠ v1.185.0 『売上日ちがい』を足した。**この並びは残してある中身の名前と1文字も同じにすること**
-       （quarter-store.js の `直すもの` の見出しをそのまま開く作りなので、綴りが違うと空になる）。 */
+    /* ================================================================
+       🗂🗂 v2.8.6（ゆうた 2026-08-25「またPDFなしのリロードでこの表示に戻るよ」）
+       ----------------------------------------------------------------
+       ◎ここが**顔がちがう**最後の場所だった。
+         走らせた直後 … **4つの箱**（データ／金額／日付／OK）＋残り件数
+         残した結果   … **8つのタブ**（期間の外・金額ちがい・月またぎ・Qまたぎ…）
+         v2.7.0 で直したのは**カードの描き方**だけで、**分け方は昔の8つのまま**だった。
+       🔴 直し方＝**新しい判定を1つも作らない。**
+          残した行を `savedPair` で戻して、いまある `pitQGroupOf`（4つのどれに入るか）に通す。
+          ＝ v2.8.6 より前に残した結果も、そのまま4つの箱で出る
+            （必要な項目は v2.7.0 で既に残してある）。
+       🔴 描き手も増やさない。`groupBar()` と `list()` を**走らせた直後とそのまま共用**する。
+       ⚠ 同じ1件が複数の入れ物（期間の外／Qまたぎ…）に入っているので、**必ず重複を落とす**。
+         落とさないと「1件は1か所にしか出ない」が崩れて、数が二重になる。
+       ⚠ OK の行は残していない（軽くするため）＝件数だけ `OK台数` から出す。
+       ================================================================ */
+    var R4 = savedGroups(R);
+    if (R4) {
+      h += groupBar(R4);
+      h += '<div class="q-tabs"><span class="q-note" style="margin:0">残してあるのは'
+         + '<b>これから直すものだけ</b>です（合っていた行は残していません）。'
+         + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</span>'
+         + '<button class="q-print" onclick="window.print()">印刷</button></div>';
+      h += '<div class="q-body">' + list(R4, U.tab, true) + '</div>';
+      return h;
+    }
+    /* 🔴 ここから下は **`_v` が無い＝v2.7.0 より前に残した結果**だけの道。
+       カードに要る項目が入っていないので、今までの表のまま出す（黙って空にしない）。 */
     var keys = ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '売上日ちがい', '担当ちがい', '整備ソフトだけ', 'PitFlowだけ'];
     h += '<div class="q-tabs">';
     keys.forEach(function (k) {
@@ -434,6 +466,37 @@
        +   '（合っていた行は残していません）。' + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</div>';
     h += '<div class="q-body">' + savedBody(R, U.savedTab) + '</div>';
     return h;
+  }
+
+  /* 残した結果 → 走らせた直後と同じ形（4つの箱）に組み直す。
+     🔴 判定は `pitQGroupOf` 1本。ここで「これは日付」「これは金額」と書き分けない。
+     戻り＝null なら古い形（表で出す）。 */
+  function savedGroups(R){
+    if (!(+R._v >= 2)) return null;
+    var src = R.直すもの || {};
+    var seen = {}, pairs = [];
+    ['期間の外', '金額ちがい', '月またぎ', 'Qまたぎ', '売上日ちがい', '担当ちがい'].forEach(function (k) {
+      (src[k] || []).forEach(function (r) {
+        /* ⚠ 重複落とし。伝票と予約番号だけだと、どちらも空の行がぶつかるので日付まで見る */
+        var key = s(r.伝票) + '|' + s(r.予約番号) + '|' + s(r.売上日) + '|' + s(r.数える日);
+        if (seen[key]) return;
+        seen[key] = 1;
+        pairs.push(savedPair(r));
+      });
+    });
+    var G = { データ: [], 金額: [], 日付: [], OK: [] };
+    pairs.forEach(function (p) {
+      var g = w.pitQGroupOf ? w.pitQGroupOf(p) : 'date';
+      p.組 = g;
+      p.効き = w.pitQEffect ? w.pitQEffect(p) : 0;
+      (G[g === 'data' ? 'データ' : g === 'money' ? '金額' : g === 'ok' ? 'OK' : '日付']).push(p);
+    });
+    return {
+      グループ: G,
+      整備ソフトだけ: (src.整備ソフトだけ || []).map(savedSoftOnly),
+      PitFlowだけ:   (src.PitFlowだけ   || []).map(savedPitOnly),
+      内訳: R.内訳, お知らせ: R.お知らせ, OK台数: R.OK台数
+    };
   }
 
   /* ================================================================
@@ -537,9 +600,21 @@
      ⚠ 説明の文は置かない（ゆうた 2026-08-24「フォロー文は全部要らない」）。
         重さはカードの色で見せる。
      ================================================================ */
-  function list(R, tab){
+  function list(R, tab, saved){
     var G = R.グループ || { データ:[], 金額:[], 日付:[], OK:[] };
+    /* ⚠ `.map(one)` の `one` は**引数1つ**の包み（v2.8.5 の事故を二度と起こさないため）。
+       残した結果かどうかは、ここで包み直して渡す。 */
+    var one1 = saved ? function (p) { return card(p, true); } : one;
     if (tab === 'ok'){
+      /* 🔴 v2.8.6 残した結果には**OKだった行を残していない**（軽くするため）。
+         数だけ言って、黙って「0件です」と嘘をつかない。 */
+      if (saved) {
+        var n = (R.OK台数 == null) ? null : +R.OK台数;
+        return '<div class="q-none">直すところはありません。'
+             + (n == null ? '合っていた行は残していません（軽くするため）。'
+                          : '合っていた <b>' + n + '件</b> は残していません（軽くするため）。')
+             + '</div>';
+      }
       return G.OK.length ? '<div class="q-cards">' + G.OK.map(one).join('') + '</div>'
                          : '<div class="q-none">0件です。</div>';
     }
@@ -552,8 +627,8 @@
       var mid = G.データ;
       if (!ones.length && !mid.length) return '<div class="q-none">0件です。</div>';
       return '<div class="q-cards">'
-        + ones.map(function (o) { return oneCard(o.x, o.k); }).join('')
-        + mid.map(one).join('')
+        + ones.map(function (o) { return oneCard(o.x, o.k, saved); }).join('')
+        + mid.map(one1).join('')
         + '</div>';
     }
     var rows = (tab === 'money') ? G.金額 : G.日付;
@@ -564,7 +639,7 @@
       var lb = w.pitQRowLeft ? (w.pitQRowLeft(b) > 0 ? 0 : 1) : 0;
       return la - lb;
     });
-    return '<div class="q-cards">' + rows.map(one).join('') + '</div>';
+    return '<div class="q-cards">' + rows.map(one1).join('') + '</div>';
   }
 
   /* 🔴 赤＝本当にどちらか片方にしか無い（カードすら無い／伝票が無い）

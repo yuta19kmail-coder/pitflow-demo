@@ -302,7 +302,10 @@
    🕘🕘 v2.11.0／v2.11.1 来店履歴の画面（広く・左サイドバー・伝票は開いたまま）
    ================================================================ */
 .cm-box.ch-box{ width:1240px; max-width:calc(100vw - 40px); }
-.ch-wrap{ display:grid; grid-template-columns:236px minmax(0,1fr); gap:0; align-items:stretch; }
+/* 🔖 v2.12.5 右は1件だけになったので、中身が短いと箱ごと縮んで目次が窮屈になる。
+   ＝ 目次が読める高さは、右の中身に関係なく確保する。 */
+.ch-wrap{ display:grid; grid-template-columns:236px minmax(0,1fr); gap:0; align-items:stretch;
+  min-height:min(74vh, 460px); }
 .ch-side{ border-right:1px solid var(--border); background:var(--bg1);
   padding:12px; display:flex; flex-direction:column; gap:10px; max-height:74vh; }
 .ch-mode{ display:grid; grid-template-columns:1fr 1fr; gap:5px; }
@@ -332,7 +335,7 @@
 
 /* 1件＝上の行 ＋ 下の伝票（伝票は**最初から開いている**） */
 .ch-item{ border:1px solid var(--border); border-radius:11px; background:var(--bg); overflow:hidden; }
-.ch-item.is-here{ border-color:var(--brand); box-shadow:0 0 0 2px var(--brand-soft); }
+/* ✂️ v2.12.5 .ch-item.is-here は要らなくなった（右に出るのは1件だけ＝どれかは目次が示す） */
 .ch-row{ display:grid; grid-template-columns:92px auto minmax(0,1fr) 108px auto;
   align-items:center; gap:13px; padding:11px 14px; }
 .ch-dt{ font-size:12px; font-weight:700; color:var(--text2); font-variant-numeric:tabular-nums; }

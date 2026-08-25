@@ -556,3 +556,15 @@
 .vw-hou-n b{ color:var(--text2); }
 .vw-go{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 14px 14px; }
 .vw-go span{ font-size:11px; color:var(--text3); }
+
+/* 🧹 v2.8.7 内訳は押した時だけ開く（ゆうた「ややこしいから出さないで」） */
+.q-more{ margin:0 0 12px; }
+.q-more > summary{ list-style:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; color:var(--text3); border:1px solid var(--border); border-radius:8px; padding:4px 11px; }
+.q-more > summary::-webkit-details-marker{ display:none; }
+.q-more > summary::before{ content:'▸'; }
+.q-more[open] > summary::before{ content:'▾'; }
+.q-more > summary:hover{ color:var(--text2); border-color:var(--text3); }
+.q-more[open] > summary{ margin-bottom:8px; }
+/* 🎉 0件＝オールグリーン */
+.q-diff.zero b{ color:var(--green,#1db97a); }

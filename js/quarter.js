@@ -385,6 +385,7 @@
   function savedHtml(U){
     var R = U.saved;
     var ok = !!(R.検算 && R.検算.合う);
+    var R4 = savedGroups(R);   /* 🗂 v2.8.6 残した結果を4つの箱に組み直す（上の数字でも使う） */
     var h = '<div class="q-savedbar">'
           +   '<b>残してある結果</b>'
           +   '<span>' + esc(s(R.走らせた日時).slice(0, 16).replace('T', ' '))
@@ -392,39 +393,62 @@
           +     (R.PDF ? '・' + esc(R.PDF) : '') + '</span>'
           +   '<button class="q-open" onclick="pitQCloseSaved()">閉じる</button>'
           + '</div>';
-    h += '<div class="q-sum">'
-       +   '<div class="q-card"><span class="q-k">フロントマン</span><b>' + (R.整備ソフト ? R.整備ソフト.枚数 : 0)
-       +     '</b>枚<span class="q-y">' + yen(R.整備ソフト ? R.整備ソフト.金額 : 0) + '円</span></div>'
-       +   '<div class="q-card"><span class="q-k">PitFlow</span><b>' + (R.PitFlow ? R.PitFlow.台数 : 0)
-       +     '</b>台<span class="q-y">' + yen(R.PitFlow ? R.PitFlow.金額 : 0) + '円</span></div>'
-       +   '<div class="q-card q-diff"><span class="q-k">差</span><b>' + ((R.差 && R.差.台数 > 0) ? '+' : '')
-       +     (R.差 ? R.差.台数 : 0) + '</b>台<span class="q-y">' + ((R.差 && R.差.金額 > 0) ? '+' : '')
-       +     yen(R.差 ? R.差.金額 : 0) + '円</span></div>'
-       + '</div>';
-    h += '<div class="q-audit' + (ok ? ' ok' : ' ng') + '">'
-       +   (ok ? '<b>差額の内訳が、実際の差とぴったり合っていました。</b>'
-             : '<b>この結果は検算が合っていません。</b>')
-       +   '<div class="q-parts">'
+    /* ================================================================
+       🧹🧹 v2.8.7（ゆうた 2026-08-25）**「この辺りの表示が出るとややこしいから出さないで」**
+       　　　　　　　　　　　　　　　　**「とにかくオールグリーン」「0件をシンプルに目指すように」**
+       ----------------------------------------------------------------
+       ◎走らせた直後の画面は v2.2.0 で**もう数字だけ**にしてある
+         （フロントマン／PitFlow／まだ合っていない N件 ＋ 検算の1行）。
+         ところが**残した結果の画面だけ**、内訳の4つ・お知らせの1行・まとめ返車が
+         開いたまま並んでいた。＝ここでも顔が2つあった。
+       🔴 だから**走らせた直後とまったく同じ形**にする。見るのは「**残り N件**」1つ。
+       🔴 ただし **検算そのものは消さない**（2026-08-08「合計が合うまで数字を出さない」の証拠）。
+          ・合っている  … 1行だけ。内訳・お知らせ・まとめ返車は**畳む**（押せば開く）
+          ・合っていない … 今までどおり**開いたまま赤で**出す。ここを畳んだら嘘になる
+       ================================================================ */
+    var nokori4 = R4 ? nokoriOf(R4) : null;
+    h += '<div class="q-nums' + (ok ? '' : ' bad') + '">';
+    h +=   '<div class="q-sum">'
+       +     '<div class="q-card"><span class="q-k">フロントマン</span><b>' + (R.整備ソフト ? R.整備ソフト.枚数 : 0)
+       +       '</b>枚<span class="q-y">' + yen(R.整備ソフト ? R.整備ソフト.金額 : 0) + '円</span></div>'
+       +     '<div class="q-card"><span class="q-k">PitFlow</span><b>' + (R.PitFlow ? R.PitFlow.台数 : 0)
+       +       '</b>台<span class="q-y">' + yen(R.PitFlow ? R.PitFlow.金額 : 0) + '円</span></div>'
+       +     '<div class="q-card q-diff' + (nokori4 === 0 ? ' zero' : '') + '">'
+       +       '<span class="q-k">まだ合っていない</span><b>' + (nokori4 == null ? '—' : nokori4) + '</b>件'
+       +       '<span class="q-y">' + ((R.差 && R.差.金額 > 0) ? '+' : '') + yen(R.差 ? R.差.金額 : 0) + '円</span></div>'
+       +   '</div>';
+    h +=   '<div class="q-chk ' + (ok ? 'ok' : 'ng') + '">'
+       +     (ok ? (nokori4 === 0 ? '🎉 オールグリーン。直すところはありません'
+                                  : '✓ 下の3つを足すと、この差とぴったり同じです')
+                 : '⚠ 内訳を足しても実際の差に届きません。この画面の数字は当てにしないでください')
+       +     '<button class="q-print" onclick="window.print()">印刷</button>'
+       +   '</div>';
+    h += '</div>';
+
+    /* 内訳のこまかい話は、**押した時だけ**開く。ふだんは1行も出さない。 */
+    var 中身 = '<div class="q-parts">'
        +     part('PitFlow に実績が無い',    R.内訳.整備ソフトだけ)
        +     part('フロントマンに伝票が無い', R.内訳.PitFlowだけ)
        +     part('返車日が期間の外',        R.内訳.期間の外)
        +     part('金額がちがう',            R.内訳.金額ちがい)
        +   '</div>'
-       /* 🔔 v2.8.4 「直す先が無いQまたぎ」を残す側で外したので、**どこへ行ったかを1行で言う。**
-          ⚠ 黙って消すと「16件どこ行った？」になる（内訳の金額には今までどおり入っている）。
-          ⚠ v2.8.4 より前に残した結果には `お知らせ` が無い＝この行は出ない（それで正しい）。 */
        + ((R.お知らせ && R.お知らせ.台数)
           ? '<div class="q-audit-note">🔔 このうち <b>' + R.お知らせ.台数 + '台</b>（'
             + yen(R.お知らせ.金額) + '円）は、<b>伝票を切った日と車を返した日でQがまたがっただけ</b>です。'
             + '金額・車・売上日は合っているので、<b>直すところはありません</b>（下の一覧には出ません）。</div>'
-          : '')
-       + '</div>';
+          : '');
     if (R.まとめ返車 && R.まとめ返車.length){
-      h += '<div class="q-lump"><b><i data-ic=warn data-ics=16></i> まとめて返車済みにした日</b>';
+      中身 += '<div class="q-lump"><b><i data-ic=warn data-ics=16></i> まとめて返車済みにした日</b>';
       R.まとめ返車.forEach(function (x) {
-        h += '<div class="q-lump-r">' + esc(x.日) + ' に <b>' + x.台数 + '台</b>（' + yen(x.金額) + '円）</div>';
+        中身 += '<div class="q-lump-r">' + esc(x.日) + ' に <b>' + x.台数 + '台</b>（' + yen(x.金額) + '円）</div>';
       });
-      h += '</div>';
+      中身 += '</div>';
+    }
+    if (ok){
+      h += '<details class="q-more"><summary>差額の内訳を見る</summary>' + 中身 + '</details>';
+    } else {
+      /* 🔴 合っていない時は畳まない。理由を隠したら「合っている」と嘘をつくのと同じ */
+      h += '<div class="q-audit ng"><b>この結果は検算が合っていません。</b>' + 中身 + '</div>';
     }
     /* ================================================================
        🗂🗂 v2.8.6（ゆうた 2026-08-25「またPDFなしのリロードでこの表示に戻るよ」）
@@ -442,7 +466,6 @@
          落とさないと「1件は1か所にしか出ない」が崩れて、数が二重になる。
        ⚠ OK の行は残していない（軽くするため）＝件数だけ `OK台数` から出す。
        ================================================================ */
-    var R4 = savedGroups(R);
     if (R4) {
       h += groupBar(R4);
       h += '<div class="q-tabs"><span class="q-note" style="margin:0">残してあるのは'
@@ -493,6 +516,8 @@
     });
     return {
       グループ: G,
+      /* ⚠ `nokoriOf` は `結びついた` を読む。残した結果でも同じ数え方をするために渡す。 */
+      結びついた: pairs,
       整備ソフトだけ: (src.整備ソフトだけ || []).map(savedSoftOnly),
       PitFlowだけ:   (src.PitFlowだけ   || []).map(savedPitOnly),
       内訳: R.内訳, お知らせ: R.お知らせ, OK台数: R.OK台数

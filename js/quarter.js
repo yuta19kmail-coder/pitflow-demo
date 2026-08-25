@@ -442,6 +442,22 @@
     var gi = groupIdx(U, x.from, x.to);
     var g  = gi >= 0 ? U.groups[gi] : null;
     var hd = 'Q' + x.no + '<i>' + esc(dd(x.from)) + '〜' + esc(dd(x.to)) + '日</i>';
+    /* ================================================================
+       ⏳🔴 v2.10.1（ゆうた 2026-08-25「旧データが出てるは**さらにその上のBOX**だよ
+          Q1〜Q4 の部分」）
+       ----------------------------------------------------------------
+       v2.10.0 で下の数字は止めたが、**この箱だけ前のまま**だった。
+       `U.groups` と `U.list` は読み終わるまで**前のもの**なので、
+       「このPDF 67枚／残 3件」が、まだ何も読んでいないQに出ていた。
+       🔴 **読んでいる間は、この箱も数字を1つも出さない。** 押せなくもする。
+          ＝ どこにも古い数字が残らない。 */
+    if (U.busy){
+      return '<div class="q-pqwrap"><button class="q-pq is-load" disabled>'
+        + '<span class="q-pq-l"><span class="q-pq-t">' + hd + '</span>'
+        + '<span class="q-pq-d">読んでいます…</span></span>'
+        + '<span class="q-pq-r"><span class="q-pq-sp"></span></span>'
+        + '</button></div>';
+    }
     if (g){
       /* 🔴 v2.10.0 残り件数の物差しは `pitQNokori` 1本。
          保存の要約（`x.run.直す件数`）も v2.10.0 から同じ式で作っている＝
@@ -1292,6 +1308,7 @@
        ＝ 読み終わるまで前のQの数字が出ていると、それを見て判断してしまう
          （ゆうた「PDFを読み込むまで古いデータが出てたりもしてる」）。 */
     U.res = null; U.soft = null; U.saved = null; U.savedId = ''; U.再生 = null; U.gi = -1;
+    U.viewer = false;
     U.busy = '残してある結果を読んでいます…';
     if (w.renderInspect) renderInspect();
 
@@ -1522,7 +1539,9 @@
   w.pitQPickGroup = function (i){
     var U = Q();
     if (!U.groups || !U.groups[+i]) return;
-    U.gi = +i; applyGroup(U); U.tab = 'data';
+    /* 🔴 v2.10.1 組を変えたら「書き込んだ内容を見る」は閉じる
+       ＝ 開いたまま別のQへ移ると、そのQのものだと思って読んでしまう。 */
+    U.gi = +i; applyGroup(U); U.tab = 'data'; U.viewer = false;
     /* 🗓 v2.10.0 保存から借りた組を選んだら、その断り書きに切り替える */
     var g = U.groups[U.gi];
     U.再生 = (g.出どころ === '保存') ? (g.保存 || { at:'', by:'', pdf:'' }) : null;

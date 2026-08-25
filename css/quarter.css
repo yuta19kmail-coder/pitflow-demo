@@ -629,3 +629,9 @@
 @media (prefers-reduced-motion:reduce){ .q-load-sp{ animation-duration:2.4s; } }
 /* 🗓 v2.10.0 保存から借りてきたQの箱は、いま読んだPDFの箱と見た目を分ける */
 .q-pq.kept{ border-style:dashed; }
+/* ⏳ v2.10.1 読み込み中の Q の箱（古い数字を出さない・押せない） */
+.q-pq.is-load{ opacity:.5; cursor:default; }
+.q-pq.is-load .q-pq-d{ color:var(--text3); }
+.q-pq-sp{ display:inline-block; width:13px; height:13px; border-radius:50%;
+  border:2px solid var(--border); border-top-color:var(--text3);
+  animation:q-spin .8s linear infinite; }

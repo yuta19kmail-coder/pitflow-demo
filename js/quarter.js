@@ -137,6 +137,10 @@
        ================================================================ */
     var ok = R.検算.合う;
     var G = R.グループ, nokori = nokoriOf(R);
+    /* ✅ v2.9.9 片づいた行を4つの箱から抜いて、下の「チェック済み」へ移す。
+       🔴 抜いたぶんは箱の件数からも金額からも消えるので、
+          足し算は **4つ ＋ チェック済み ＝ 差**。検算の1行にもそう書く。 */
+    var D = splitDone(R);
     h += '<div class="q-nums' + (ok ? '' : ' bad') + '">';
     h +=   '<div class="q-sum">'
        +     '<div class="q-card"><span class="q-k">フロントマン</span>'
@@ -148,7 +152,7 @@
        +       '<span class="q-y">' + (R.差.金額 > 0 ? '+' : '') + yen(R.差.金額) + '円</span></div>'
        +   '</div>';
     h +=   '<div class="q-chk ' + (ok ? 'ok' : 'ng') + '">'
-       +     (ok ? '✓ 下の3つを足すと、この差とぴったり同じです'
+       +     (ok ? ('✓ 下の3つ' + (D.済み.length ? '＋チェック済み' : '') + 'を足すと、この差とぴったり同じです')
                  : '⚠ 内訳を足しても実際の差に届きません（' + yen(R.検算.ずれ) + '円ぶん）。'
                    + 'この画面の数字は当てにしないでください')
        +     '<button class="q-print" onclick="window.print()">印刷</button>'
@@ -175,60 +179,116 @@
     /* ---- ✍ v2.2.0 残りが0になったら書き込める ---- */
     if (w.pitQWritePanel) h += w.pitQWritePanel(R, U);
 
-    /* ---- 🗂 v2.2.0 入り口は4つだけ ---- */
-    h += groupBar(R);
-    h += '<div class="q-body">' + (U.viewer ? (w.pitQWriteView ? w.pitQWriteView(R, U) : '') : list(R, U.tab)) + '</div>';
-    /* ---- ✅ v2.9.8 4つの箱の下に「チェック済み」 ---- */
-    h += doneBox(U);
+    /* ---- 🗂 v2.2.0 入り口は4つだけ（✅ v2.9.9 チェック済みを抜いた R で描く） ---- */
+    h += groupBar(D.R);
+    h += '<div class="q-body">' + (U.viewer ? (w.pitQWriteView ? w.pitQWriteView(R, U) : '') : list(D.R, U.tab)) + '</div>';
+    /* ---- ✅ v2.9.9 4つの箱の下に「チェック済み」（元のカードのまま・灰色） ---- */
+    h += doneBox(U, D);
     return h;
   };
 
   /* ================================================================
-     ✅✅ v2.9.8 **チェック済み**（ゆうた 2026-08-25）
+     ✅✅ v2.9.9 **チェック済み**（ゆうた 2026-08-25）
      ----------------------------------------------------------------
      🗣「チェックしたあとクリックすると消えちゃうのが何をやったかわからなくなるかも」
-     🗣「だからチェック済みみたいな枠をその下に作って、クリックで修正した一覧を開きたい」
+     🗣「チェック済みみたいな枠をその下に作って、クリックで修正した一覧を開きたい」
      🗣「グレーアウトの状態でOK　で何を直したかわかると嬉しい」
-     ◎押した行は**直ったので一覧から消える**。それは正しいが、**やった記録が消える**のが困る。
-     🔴 中身は `qmarks` **1か所だけ**を読む。ここで別の記録を作らない。
-        （直した記録も v2.9.8 から同じ場所に入る＝quarter-fix.js の `did`）
-     ⚠ 出すのは**いま見ている期間のぶんだけ**（売上日で絞る）。
-        全部出すと、別のQでやったことが混ざって「この期間で何をしたか」が読めなくなる。
-     ⚠ ふだんは**閉じている**（0件をシンプルに、の邪魔をしない）。押すと開く。
+     🗣 v2.9.9「**Q-945725 あけぼのが移動してない**」
+     🗣 v2.9.9「**チェック済みは元のカード表示がいい。グレーアウトはした状態で**」
+
+     ◎v2.9.8 では、押した行を灰色にするだけで**同じ箱に残していた**。
+       だから押しても「データがちがう」の中に居座り、片づいた気がしなかった。
+       そのうえ、チェック済みの枠は**専用の細い行**を新しく描いていた＝**描き手が2つ**。
+     🔴 v2.9.9 で2つとも直した。
+       ① 片づいた行は**箱から出して、ここへ移す**（判定は `pitQRowDone` 1本）
+       ② 出し方は**走らせた直後とまったく同じカード**（`card()` / `oneCard()`）。
+          灰色は**包みに着せる**（`q-done-i`）＝カードの中は1文字も変えない。
+     🔴 数字の約束は守る。**箱の件数も金額も「残り」だけ**になるので、
+        `4つ ＋ チェック済み ＝ 差` になる。だから検算の1行にも
+        「＋チェック済み」と**書く**（黙って足りない足し算を見せない）。
      ================================================================ */
-  function doneRows(U){
-    var ms = (w._pitQMarks || []);
-    var from = s(U.from), to = s(U.to);
-    if (!from || !to) return [];
-    return ms.filter(function (m) {
-      var d = s(m && m.売上日);
-      return d && d >= from && d <= to;
+
+  /* 片づいた行を、4つの箱から**抜いて**別に持つ。
+     🔴 判定は `pitQRowDone`（quarter-fix.js）1本。ここで条件を書き写さない。
+     ⚠ 元の R は触らない（浅い写しを返す）＝ほかで数えている所を巻き添えにしない。 */
+  function splitDone(R){
+    if (!R || !R.グループ) return { R: R, 済み: [], 効き: 0 };
+    var done = [], G = R.グループ;
+    var isDone = w.pitQRowDone || function () { return false; };
+    var G2 = { データ: [], 金額: [], 日付: [], OK: [] };
+    ['データ', '金額', '日付', 'OK'].forEach(function (k) {
+      (G[k] || []).forEach(function (p) {
+        if (isDone(p)) done.push({ kind: 'pair', p: p });
+        else G2[k].push(p);
+      });
     });
+    var S = [], P = [];
+    (R.整備ソフトだけ || []).forEach(function (x) {
+      if (w.pitQOneMarkOf && w.pitQOneMarkOf(x)) done.push({ kind: 'one', x: x, k: 'soft' });
+      else S.push(x);
+    });
+    (R.PitFlowだけ || []).forEach(function (x) { P.push(x); });   /* 片方だけ＝本当に直すまで残す */
+    var R2 = {};
+    Object.keys(R).forEach(function (k) { R2[k] = R[k]; });
+    R2.グループ = G2; R2.整備ソフトだけ = S; R2.PitFlowだけ = P;
+    /* 残した結果（OK台数）は「合っていた行の数」なので、移した行のぶんだけ引く */
+    if (R.OK台数 != null) {
+      R2.OK台数 = Math.max(0, +R.OK台数 - done.filter(function (d) {
+        return d.kind === 'pair' && (w.pitQGroupOf ? w.pitQGroupOf(d.p) === 'ok' : false);
+      }).length);
+    }
+    var 効き = done.reduce(function (a, d) {
+      if (d.kind === 'pair') return a + (w.pitQEffect ? w.pitQEffect(d.p) : (d.p.効き || 0));
+      return a + ((d.x && d.x.soft && d.x.soft.金額) || 0);
+    }, 0);
+    return { R: R2, 済み: done, 効き: 効き };
   }
-  function doneBox(U){
-    var rows = doneRows(U);
-    if (!rows.length) return '';
+
+  /* その行で何をしたか（印＋直した記録）。無ければ空。 */
+  function whatDone(item){
+    if (item.kind === 'one'){
+      var m1 = w.pitQOneMarkOf ? w.pitQOneMarkOf(item.x) : null;
+      return m1 ? [m1] : [];
+    }
+    return (w.pitQRowMarks ? w.pitQRowMarks(item.p) : []);
+  }
+
+  function doneBox(U, D){
+    if (!D || !D.済み.length) return '';
     var h = '<details class="q-done"><summary><span class="q-done-h">✅ チェック済み</span>'
-          + '<span class="q-done-n">' + rows.length + '件</span>'
+          + '<span class="q-done-n">' + D.済み.length + '件</span>'
+          + (D.効き ? '<span class="q-done-v">' + (D.効き > 0 ? '+' : '') + yen(D.効き) + '円</span>' : '')
           + '<span class="q-done-t">この期間で「直した」「このままでよい」と決めたもの</span></summary>';
     h += '<div class="q-done-list">';
-    rows.forEach(function (m) {
-      var 直 = !!m.直した;
-      h += '<div class="q-done-r' + (直 ? ' fixed' : ' kept') + '">'
-         +   '<span class="q-done-b">' + (直 ? '直した' : 'このままでよい') + '</span>'
-         +   '<span class="q-done-w">' + esc(s(m.種類)) + '</span>'
-         +   '<span class="q-done-c">' + esc(s(m.お客様) || '（お名前なし）')
-         +     (m.ナンバー ? ' <em>' + esc(m.ナンバー) + '</em>' : '') + '</span>'
-         +   '<span class="q-done-d">' + esc(s(m.内容) || ('整備ソフト側を直したので、PitFlow はこのまま')) + '</span>'
-         +   '<span class="q-done-m">' + esc(s(m.売上日))
-         +     (m.伝票 ? '・伝票 ' + esc(m.伝票) : '') + '</span>'
-         +   '<span class="q-done-a">' + esc(s(m.at).slice(0, 16).replace('T', ' '))
-         +     (m.by ? '・' + esc(m.by) : '') + '</span>'
-         + '</div>';
+    D.済み.forEach(function (item) {
+      /* 🔴 出し方は走らせた直後と同じカード。灰色は**包み**に着せる（中は変えない） */
+      var inner = (item.kind === 'one')
+        ? oneCard(item.x, item.k)
+        : card(item.p);
+      var ms = whatDone(item);
+      var what = '';
+      if (ms.length){
+        /* ⚠ 1つの記録＝1行。横に並べると「どれが何の話か」が読めなくなる。 */
+        what = '<div class="q-done-what">';
+        ms.forEach(function (m) {
+          var 直 = !!m.直した;
+          what += '<div class="q-done-w1">'
+                +   '<span class="q-done-b' + (直 ? ' fixed' : ' kept') + '">'
+                +     (直 ? '直した' : 'このままでよい') + '</span>'
+                +   '<span class="q-done-d">' + esc(s(m.内容)
+                      || (s(m.種類) + '：整備ソフト側を直したので、PitFlow はこのまま')) + '</span>'
+                +   '<span class="q-done-a">' + esc(s(m.at).slice(0, 16).replace('T', ' '))
+                +     (m.by ? '・' + esc(m.by) : '') + '</span>'
+                + '</div>';
+        });
+        what += '</div>';
+      }
+      h += '<div class="q-done-i">' + inner + what + '</div>';
     });
     h += '</div>';
-    h += '<div class="q-done-note">⚠ ここに出ていても、<b>上の数字（合計・差・検算）は1円も動きません</b>。'
-       + '手元のPDFは直す前のものなので、そこに出ている数字は事実のままです。</div>';
+    h += '<div class="q-done-note">⚠ ここに出ていても、<b>上の合計・差・検算は1円も動きません</b>。'
+       + '手元のPDFは直す前のものなので、そこに出ている数字は事実のままです。'
+       + '<br>⚠ 押し間違えたら、カードの中の押した札をもう一度押すと戻ります。</div>';
     return h + '</details>';
   }
 
@@ -559,13 +619,14 @@
        ⚠ OK の行は残していない（軽くするため）＝件数だけ `OK台数` から出す。
        ================================================================ */
     if (R4) {
-      h += groupBar(R4);
+      var D4 = splitDone(R4);
+      h += groupBar(D4.R);
       h += '<div class="q-tabs"><span class="q-note" style="margin:0">残してあるのは'
          + '<b>これから直すものだけ</b>です（合っていた行は残していません）。'
          + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</span>'
          + '<button class="q-print" onclick="window.print()">印刷</button></div>';
-      h += '<div class="q-body">' + list(R4, U.tab, true) + '</div>';
-      h += doneBox(U);   /* ✅ v2.9.8 古い写しの画面にも出す（やったことは同じ場所にある） */
+      h += '<div class="q-body">' + list(D4.R, U.tab, true) + '</div>';
+      h += doneBox(U, D4);   /* ✅ v2.9.9 古い写しの画面にも出す（やったことは同じ場所にある） */
       return h;
     }
     /* 🔴 ここから下は **`_v` が無い＝v2.7.0 より前に残した結果**だけの道。
@@ -581,7 +642,6 @@
     h += '<div class="q-note">残してあるのは<b>これから直すものだけ</b>です'
        +   '（合っていた行は残していません）。' + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</div>';
     h += '<div class="q-body">' + savedBody(R, U.savedTab) + '</div>';
-    h += doneBox(U);
     return h;
   }
 

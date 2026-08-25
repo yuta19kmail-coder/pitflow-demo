@@ -446,9 +446,45 @@
     return fixKinds(p).concat(keepKinds(p)).length;
   }
 
+  /* ================================================================
+     ✅✅ v2.9.9 **この行はもう片づいたか**（ゆうた 2026-08-25「Q-945725 あけぼのが移動してない」）
+     ----------------------------------------------------------------
+     ◎v2.9.3 では、押した行を**灰色にするだけ**で**同じ箱に残していた**。
+       だから「押したのに、まだデータがちがうの中に居る」＝片づいた気がしない。
+     🔴 片づいた行は**箱から出して「チェック済み」へ移す。** 判定はここ1本。
+     ◎片づいたと言えるのは2通り。**どちらも人が手を打った行**。
+       ① 印を全部押した … もともと仕事があって（`rowTotal`>0）、残りが0（`rowLeft`===0）
+       ② 実際に直した   … 直したので `fixKinds` が空になり ①では拾えない。
+                          `DID|` の記録があるかで見る（v2.9.8 で残すようにした）
+     ⚠ ②が無いと「直した瞬間に OK の箱へ紛れて、何をしたのか分からなくなる」。
+     ================================================================ */
+  function rowDidMarks(p){
+    var cardId = t(p && p.pit && p.pit.生 && p.pit.生.id);
+    var soft = (p && p.soft) || {};
+    var head = t(soft.売上日) + '|' + t(soft.伝票) + '|' + cardId + '|';
+    return marks().filter(function (m) { return m && String(m.key).indexOf('DID|' + head) === 0; });
+  }
+  /* その行に付いている記録を全部（印＋直した）。チェック済みの一覧で「何をしたか」を出すのに使う。 */
+  function rowMarks(p){
+    var cardId = t(p && p.pit && p.pit.生 && p.pit.生.id);
+    var soft = (p && p.soft) || {};
+    var head = t(soft.売上日) + '|' + t(soft.伝票) + '|' + cardId + '|';
+    return marks().filter(function (m) {
+      var k = String(m && m.key || '');
+      return k.indexOf(head) === 0 || k.indexOf('DID|' + head) === 0;
+    });
+  }
+  function rowDone(p){
+    if (rowDidMarks(p).length) return true;                 /* ② 実際に直した */
+    var tot = rowTotal(p);
+    return tot > 0 && rowLeft(p) === 0;                      /* ① 印を全部押した */
+  }
+
   w.pitQMarkKey   = markKey;
   w.pitQRowLeft   = rowLeft;
   w.pitQRowTotal  = rowTotal;
+  w.pitQRowDone   = rowDone;      /* ✅ v2.9.9 片づいた行（チェック済みへ移す） */
+  w.pitQRowMarks  = rowMarks;     /* ✅ v2.9.9 その行に付いている記録（印＋直した） */
   w.pitQRowNo     = pairNo;
   w.pitQSoftNo    = softOnlyNo;
   w.pitQPitNo     = pitOnlyNo;

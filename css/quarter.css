@@ -338,11 +338,15 @@
 .q-c{ background:var(--bg1); border:1px solid var(--border); border-left:3px solid var(--border2);
       border-radius:11px; padding:11px 13px; }
 .q-c.out{ border-left-color:#f59e0b; }
+.q-c.note{ border-left-color:#2563eb; }   /* 🔔 v2.8.3 直す先が無い＝お知らせ */
 .q-c.is-done{ opacity:.55; }
 .q-c-h{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:5px; }
 .q-c-how{ font-size:10.5px; font-weight:700; color:var(--text3); }
 .q-c-out{ font-size:10.5px; font-weight:800; color:#f59e0b; background:rgba(245,158,11,.13);
           border:1px solid rgba(245,158,11,.45); border-radius:6px; padding:1px 8px; }
+/* 🔔 v2.8.3 直す先が無い「お知らせ」＝黄でも赤でもない青。ひと目で「見るだけ」と分かるように */
+.q-c-note{ font-size:10.5px; font-weight:800; color:#2563eb; background:rgba(37,99,235,.13);
+           border:1px solid rgba(37,99,235,.45); border-radius:6px; padding:1px 8px; }
 /* 🔴 お客様の名前がいちばん大きい */
 .q-c-who{ font-size:16px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.35; }
 .q-c-plate{ display:block; font-size:12.5px; font-weight:600; color:var(--text2); margin-top:1px; }

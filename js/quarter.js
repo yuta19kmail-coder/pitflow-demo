@@ -120,6 +120,22 @@
          + '</div>';
       return h;
     }
+    /* ================================================================
+       ⏳🔴 v2.10.0（ゆうた 2026-08-25「読み込んだ後に、PDFを読み込むまで古いデータが
+          出てたりもしてる。ちゃんと読み込むまでくるくるとかにして違うよー って感じがいい」）
+       ----------------------------------------------------------------
+       🔴 **読んでいる間は、数字を1つも出さない。**
+          前は `U.res` が前のQのまま残っていたので、読み終わるまで**前の数字**が出ていた。
+          出ていると、それを見て判断してしまう。＝「合っている」と嘘をつくのと同じ。
+       ⚠ 押した側（`pitQOpenPlan` / `readFile`）でも `U.res` を先に捨てている。
+          ここは**二重の保険**（どこから来ても、busy の間は数字を出さない）。
+       ================================================================ */
+    if (U.busy){
+      return h + '<div class="q-load"><span class="q-load-sp"></span>'
+               + '<b>' + esc(U.busy) + '</b>'
+               + '<span>読み終わるまで数字は出しません（古い数字を見て決めないため）。</span>'
+               + '</div>';
+    }
     /* 🗄 v1.184.0 残してあった結果を開いている時（PDFを読まずに見返している） */
     if (!U.res && U.saved) return h + savedHtml(U);
 
@@ -427,17 +443,26 @@
     var g  = gi >= 0 ? U.groups[gi] : null;
     var hd = 'Q' + x.no + '<i>' + esc(dd(x.from)) + '〜' + esc(dd(x.to)) + '日</i>';
     if (g){
+      /* 🔴 v2.10.0 残り件数の物差しは `pitQNokori` 1本。
+         保存の要約（`x.run.直す件数`）も v2.10.0 から同じ式で作っている＝
+         **押す前と押したあとで数字が変わらない**（ゆうた「クリックしたら⓪になったり」）。 */
       var nok = w.pitQNokori ? w.pitQNokori(g.res) : 0;
       var d   = g.res ? g.res.差.金額 : 0;
       var okQ = !!g.res && !nok;
+      /* 🗓 v2.10.0 いま読んだPDFの組か、保存から借りてきた組かを**書き分ける**。
+         ＝ 全部「このPDF」と書くと、読んでいない期間まで読んだように見える。 */
+      var 保存 = (g.出どころ === '保存');
       return '<div class="q-pqwrap">'
         + '<button class="q-pq now' + (U.gi === gi ? ' on' : '') + (okQ ? ' ok' : ' done')
-        +   (g.全部 ? '' : ' part') + '" onclick="pitQPickGroup(' + gi + ')">'
+        +   (g.全部 ? '' : ' part') + (保存 ? ' kept' : '') + '" onclick="pitQPickGroup(' + gi + ')">'
         +   '<span class="q-pq-l">'
         +     '<span class="q-pq-t">' + hd
         +       (g.全部 ? '' : '<em class="q-pq-part">' + esc(dd(g.from)) + '〜' + esc(dd(g.to)) + '日だけ</em>')
         +     '</span>'
-        +     '<span class="q-pq-d">このPDF ' + g.soft.length + '枚</span>'
+        +     '<span class="q-pq-d">'
+        +       (保存 ? (esc(s(g.保存 && g.保存.at).slice(0, 10)) + ' に実施（残してある伝票 ' + g.soft.length + '枚）')
+                      : ('このPDF ' + g.soft.length + '枚'))
+        +     '</span>'
         +     '<span class="q-pq-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span>'
         +   '</span>'
         +   '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
@@ -516,6 +541,11 @@
          ＝ v2.9.8 より前の上書き合戦で消えた Q1 が、開いた時に自分で戻る。
          ⚠ 読みに行くのは**一覧に無いものだけ**（ふだんは0件＝ただ働きしない）。 */
       if (!w.pitQRepairList || !w.pitQMonthPlan) return;
+      /* ⚠ v2.10.0 索引の直しは**その月について1回だけ**。
+         ここを毎回やると、まだ実施していない月でも書類を4つ読みに行く（ただ働き）。 */
+      var _ym = s(U.ym || '').slice(0, 7);
+      if (U.索引を直した月 === _ym) return;
+      U.索引を直した月 = _ym;
       var plans = w.pitQMonthPlan(U.ym || '', U.list);
       w.pitQRepairList(plans, U.list).then(function (fixed) {
         if (!fixed || fixed.length === (U.list || []).length) return;
@@ -1137,65 +1167,168 @@
 
 
 
+  /* ================================================================
+     🗓🗓🗓 v2.10.0 **クォーターチェックは「その月まるごと」を1つの単位として持つ**
+     ----------------------------------------------------------------
+     🗣 ゆうた 2026-08-25
+       「また別Q売上が綺麗に消えないかも　**Q1に小松園芸が復活してる**　修正も確認もできない」
+       「**Q2にはまた期ズレのがずらっと出てる**」
+       「なんかこの辺り凄いごたつくな。小手先の修正ではなくしっかりなおしてほしい」
+
+     ◎🔴 いちばん大事な気づき ── **判定はQをまたぐのに、持ち物は1つのQしか無かった。**
+       `pitQCrossLink` は「Q1でPitFlowだけに落ちた車が、Q2やQ3で伝票と結ばれていないか」を見る。
+       つまり **全部の組がそろって初めて意味がある。**
+         PDFを読んだ時   … 3つの組がそろう → 正しく「伝票は別のQにあります」と言える
+         保存から開いた時 … **1つの組しか作っていなかった** → 名札が消える
+                            → Q1に小松園芸が赤で復活／Q2に期ズレがずらっと
+       ＝ v2.9.8 で「開き直したら、もう一度突き合わせる」に変えた時、
+         **突き合わせる材料を1つのQぶんしか用意していなかった。** そこが抜けていた。
+
+     ◎本番で確かめた実例（2026-08-25）
+       有限会社 小松園芸／松戸 800 さ 453／キャンター／82,470円
+         PitFlow … 実績日(数える日) **2026-08-03**（Q1）／カードの売上日 2026-08-20
+         伝票     … 売上日 **2026-08-20**（Q3）
+       ＝ Q1では「PitFlowだけ」、Q3では伝票とカードが結ばれて「期間の外＝OK」。
+         Q1とQ3が**同時に手元にある時だけ**、Q1の行に「伝票はQ3にあります」と言える。
+
+     🔴 直し方 ── **見ているQがどれでも、判定材料は常に月ぶんそろえる。**
+       ① その月の Q1〜Q4 を出す（`pitQMonthPlan`）
+       ② PDF から来た組はそのまま使う（**PDFが最優先**。いま読んだものが本物）
+       ③ 足りない期間は**保存してある伝票**から組を作る
+       ④ そろってから **`pitQCrossLink`** を1回通す
+       ⑤ そのあとで、見たい組を選ぶ
+     ⚠ 読みに行くのは**足りない期間だけ**。同じ月を続けて見る時は覚えを使い回す。
+     ⚠ 保存から作った組は `出どころ:'保存'`。**保存し直さない**
+        （読んだだけで「走らせた日時」が今に書き換わると、いつ実施したか分からなくなる）。
+     ================================================================ */
+
+  function periodKey(x){ return s(x.from) + '_' + s(x.to); }
+  function overlaps(a, b){ return s(a.from) <= s(b.to) && s(a.to) >= s(b.from); }
+
+  /* いま見ている月。PDFを読んだ直後は PDF の月、ふだんは月バーの月。 */
+  function monthOf(U, hint){
+    var y = t(hint) || t(U.ym) || t(U.from) || t(U.term && U.term.from);
+    return s(y).slice(0, 7);
+  }
+
+  /* その月の組をそろえる（足りないぶんを保存から補って、crossLink を通す）。
+     🔴 ここが新しい入口。PDFを読んだ時も、Qの箱を押した時も、必ずここを通る。 */
+  function buildMonth(U, ym, opt){
+    opt = opt || {};
+    var plans = w.pitQMonthPlan ? w.pitQMonthPlan(ym, U.list || []) : [];
+    var cur = (U.groups || []).slice();
+    /* PDF から来た組が当たっている期間は、保存を読みに行かない（PDFが最優先） */
+    var need = plans.filter(function (x) {
+      return !cur.some(function (g) { return g.出どころ !== '保存' && overlaps(g, x); });
+    });
+    /* 同じ月をもう一度そろえ直さない（覚えを使う）
+       ⚠ 「まだ実施していない期間」も覚える。覚えないと、Qを押すたびに
+          **在りもしない書類を読みに行く**（ただ働き＋通信が増える）。 */
+    U.月に無い = (U.月に無い && U.月そろえた === ym) ? U.月に無い : {};
+    if (!opt.force && U.月そろえた === ym){
+      need = need.filter(function (x) {
+        if (U.月に無い[periodKey(x)]) return false;
+        return !cur.some(function (g) { return periodKey(g) === periodKey(x); });
+      });
+    }
+    if (!need.length || !w.pitQLoadRun){
+      return Promise.resolve(finishMonth(U, ym, cur));
+    }
+    return Promise.all(need.map(function (x) {
+      var id = w.pitQRunId(x.from, x.to);
+      return w.pitQLoadRun(id).then(function (r) {
+        var den = (r && Array.isArray(r.伝票)) ? r.伝票 : [];
+        if (!den.length){ U.月に無い[periodKey(x)] = 1; return null; }
+        var pit = w.pitQCollect({ from: x.from, to: x.to }).明細;
+        return { no: x.no, label: x.label, from: x.from, to: x.to, 全部: true,
+                 soft: den, res: w.pitQMatch(den, pit, { from: x.from, to: x.to }),
+                 出どころ: '保存',
+                 保存: { at: s(r.走らせた日時), by: s(r.走らせた人), pdf: s(r.PDF) } };
+      }).catch(function () { return null; });
+    })).then(function (add) {
+      return finishMonth(U, ym, cur.concat(add.filter(Boolean)));
+    });
+  }
+
+  /* そろった組を並べて、**最後に1回だけ** crossLink を通す。 */
+  function finishMonth(U, ym, groups){
+    /* 同じ期間が二重に入らないように（PDF優先で1つだけ残す） */
+    var seen = {}, out = [];
+    groups.forEach(function (g) {
+      var k = periodKey(g);
+      if (seen[k] != null){
+        if (out[seen[k]].出どころ === '保存' && g.出どころ !== '保存') out[seen[k]] = g;
+        return;
+      }
+      seen[k] = out.length; out.push(g);
+    });
+    out.sort(function (a, b) { return a.from < b.from ? -1 : (a.from > b.from ? 1 : 0); });
+    U.groups = out;
+    U.月そろえた = ym;
+    /* 🔴 ここが本題。**そろってから1回**。組が1つでも呼ぶ（何度呼んでも同じ結果になる作り） */
+    if (w.pitQCrossLink) w.pitQCrossLink(U.groups);
+    return out;
+  }
+
+  /* 見たい期間の組を選ぶ（無ければ -1） */
+  function pickPeriod(U, from, to){
+    var i = groupIdx(U, from, to);
+    U.gi = i;
+    if (i >= 0){
+      applyGroup(U);
+      var g = U.groups[i];
+      U.再生 = (g.出どころ === '保存') ? (g.保存 || { at:'', by:'', pdf:'' }) : null;
+    } else {
+      U.res = null; U.soft = null; U.from = from; U.to = to; U.再生 = null;
+    }
+    return i;
+  }
+
   /* 🗄 Q1〜Q4 のどれかを押した＝その期間に合わせる。残してあれば、それを開く */
   w.pitQOpenPlan = function (from, to){
     var U = Q();
-    U.from = from; U.to = to; U.res = null; U.saved = null; U.savedId = ''; U.再生 = null;
-    /* 🗓 v2.2.0 いま入れているPDFに入っていないQを開いた＝**どのBOXも「開いている」印にしない**。
-       ＝ 印だけ残ると、出ている中身と光っている箱がズレる。 */
-    U.gi = -1;
-    var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
-    /* 🩹 v2.9.8 **一覧に載っていなくても、書類があるなら開く。**
-       一覧はただの索引で、本当のことは書類に書いてある。
-       ⚠ 前はここで一覧を信じて止まっていたので、Q1 が「まだ」に見えていた。 */
-    if (!w.pitQLoadRun){ if (w.renderInspect) renderInspect(); return; }
+    U.from = from; U.to = to;
+    /* 🔴 v2.10.0 押した瞬間に**古い数字を消す**。
+       ＝ 読み終わるまで前のQの数字が出ていると、それを見て判断してしまう
+         （ゆうた「PDFを読み込むまで古いデータが出てたりもしてる」）。 */
+    U.res = null; U.soft = null; U.saved = null; U.savedId = ''; U.再生 = null; U.gi = -1;
     U.busy = '残してある結果を読んでいます…';
     if (w.renderInspect) renderInspect();
-    w.pitQLoadRun(id).then(function (r) {
+
+    var ym = monthOf(U, from);
+    buildMonth(U, ym).then(function () {
       U.busy = '';
-      /* ================================================================
-         🧾🧾 v2.9.8（ゆうた 2026-08-25）**伝票の行が残っていたら、もう一度突き合わせる。**
-         ----------------------------------------------------------------
-         🗣「素直に直近のPDF自体を保持する形だとデータ的に大変かな？」
-         ◎これで消える問題（全部おなじ根っこ＝**画面が2つの顔を持っていた**）
-           ・押せるボタンが出ない（あけぼのさんが「グレーで残ったまま」だった）
-           ・OK の行が残っていないので、何が合っていたのか見えない
-           ・分け方を変えるたびに**残す側も直さないと顔が割れる**（v2.8.4 で踏んだ）
-         🔴 ここで新しい判定を**1つも作らない**。走らせた時とまったく同じ道
-            （`pitQCollect` → `pitQMatch` → `applyGroup`）を通すだけ。
-         ⚠ PitFlow 側は**今のデータ**で数え直す。＝ 別の画面で直したぶんは、
-            開き直した時にちゃんと減っている（残ってほしいのは伝票のほうだけ）。
-         ⚠ 元のPDF そのものは持っていない＝**刷り込み印刷と原価チェックは使えない**。
-            その2つは「PDFを入れ直してください」と、それぞれの画面が今までどおり言う。
-         ================================================================ */
-      var 伝票 = (r && Array.isArray(r.伝票)) ? r.伝票 : [];
-      if (伝票.length && w.pitQMatch && w.pitQCollect){
-        U.saved = null; U.savedId = '';
-        U.pdf = s(r.PDF) || '（残してある伝票）';
-        U.元のPDF = null; U.err = '';
-        /* ⚠ 期間の1行（q-term）は出さない。**PDFを読んだ時の話**なので、
-           残してある伝票で組み直した画面に出すと「いまPDFを読んだ」と読めてしまう。
-           どこから来た画面かは、下の断り書きの帯（q-saved）が言う。 */
-        U.term = null; U.termSrc = '';
-        var pit = w.pitQCollect({ from: from, to: to }).明細;
-        var res = w.pitQMatch(伝票, pit, { from: from, to: to });
-        U.groups = [{ no: 1, label: from + '〜' + to, from: from, to: to,
-                      全部: true, soft: 伝票, res: res }];
-        U.gi = 0;
-        applyGroup(U);
-        U.tab = 'data';
-        U.再生 = { at: s(r.走らせた日時), by: s(r.走らせた人), pdf: s(r.PDF) };
-        if (w.renderInspect) renderInspect();
-        return;
-      }
-      /* 🔴 伝票が無い＝v2.9.8 より前に残した結果。今までどおり**写し**で出す
+      var i = pickPeriod(U, from, to);
+      if (i >= 0){ U.tab = 'data'; if (w.renderInspect) renderInspect(); return; }
+      /* 伝票が残っていない＝v2.9.8 より前の保存。今までどおり**写し**で出す
          （黙って空の画面を出さない）。もう一度PDFを入れれば、次からは上の道になる。 */
-      U.再生 = null;
-      U.saved = r || null; U.savedId = id; U.savedTab = '期間の外';
+      var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
+      if (!w.pitQLoadRun || !id){ if (w.renderInspect) renderInspect(); return; }
+      U.busy = '残してある結果を読んでいます…';
       if (w.renderInspect) renderInspect();
-    }).catch(function () {
-      U.busy = ''; if (w.renderInspect) renderInspect();
+      w.pitQLoadRun(id).then(function (r) {
+        U.busy = '';
+        U.saved = r || null; U.savedId = id; U.savedTab = '期間の外';
+        if (w.renderInspect) renderInspect();
+      }).catch(function () { U.busy = ''; if (w.renderInspect) renderInspect(); });
+    }).catch(function (e) {
+      U.busy = '';
+      if (w.pitToast) pitToast('残してある結果を読めませんでした：' + s(e && e.message ? e.message : e));
+      if (w.renderInspect) renderInspect();
     });
+  };
+
+  /* 🔴 v2.10.0 月が変わった＝**前の月の結果は捨てる。**
+     ＝ 月バーを動かしても数字が残っていて、それを今月のものだと思ってしまう
+       （ゆうた「読み込んだ後に、PDFを読み込むまで古いデータが出てたりもしてる」）。
+     ⚠ 入れたPDFそのものも捨てる。別の月のPDFの話なので、残すほうが危ない。 */
+  w.pitQClearForMonth = function (ym){
+    var U = Q();
+    U.res = null; U.soft = null; U.groups = null; U.gi = 0;
+    U.saved = null; U.savedId = ''; U.savedAt = ''; U.再生 = null;
+    U.pdf = null; U.元のPDF = null; U.term = null; U.termSrc = ''; U.err = ''; U.busy = '';
+    U.月そろえた = ''; U.月に無い = {}; U.索引を直した月 = ''; U.viewer = false; U.書き込んだ = '';
+    if (ym) U.ym = ym;
   };
 
   /* ================================================================
@@ -1264,7 +1397,7 @@
       U.term = sp.期間; U.termSrc = sp.期間の出どころ;
       U.groups = (sp.組 || []).map(function (g) {
         return { no:g.no, label:g.label, from:g.from, to:g.to, 全部:g.全部,
-                 soft: g.伝票, res: null };
+                 soft: g.伝票, res: null, 出どころ: 'PDF' };   /* 🗓 v2.10.0 どこから来た組か */
       });
       /* 全部の組を先に数えておく（PDFはもう読み終わっているので安い）。
          ＝ どのQに何件あるかが**押す前に**見える。 */
@@ -1272,39 +1405,49 @@
         var pit = w.pitQCollect({ from: g.from, to: g.to }).明細;
         g.res = w.pitQMatch(g.soft, pit, { from: g.from, to: g.to });
       });
-      /* 🔗 v2.8.0（ゆうた報告 2026-08-25）**組をまたいで見る。**
-         🔴 **全部の組を数え終わったあと**でないと意味がない（隣の組の結果を読むため）。
-         ＝ Q1で「PitFlowだけ」に落ちた車が、Q2で伝票と結ばれていたら、そう言い直す。
-         ⚠ 数字は1つも動かない。名札を貼るだけ。 */
-      if (w.pitQCrossLink) w.pitQCrossLink(U.groups);
       /* 🔴 はじめに選ぶのは「**まるごとで、いちばん枚数が多い**」組。
          ＝ ふだんは1つしか無いので今までどおり。ズレて出た端っこの数枚を先に見せない。 */
-      U.gi = 0;
-      var best = -1;
-      U.groups.forEach(function (g, i) {
+      var best = -1, pick = U.groups[0] || null;
+      U.groups.forEach(function (g) {
         var sc = g.soft.length + (g.全部 ? 10000 : 0);
-        if (sc > best){ best = sc; U.gi = i; }
+        if (sc > best){ best = sc; pick = g; }
       });
       /* 🗓 v2.3.0 月バーを**このPDFの月**へ動かす（入口は inspect.js の1本）。
          ⚠ これが無いと、7月のPDFを入れても箱は8月のままで、7月ぶんが下に別に並ぶ。 */
-      if (w.pitInspectGoYm && U.groups[U.gi]) w.pitInspectGoYm(U.groups[U.gi].from);
-      applyGroup(U);
-      U.tab = 'data';
+      if (w.pitInspectGoYm && pick) w.pitInspectGoYm(pick.from);
       /* 🔴 新しいPDFを入れたら、③の AI の見立ては**捨てる**。
          ＝ 前のPDFの見立てが残っていると、別の伝票に別の伝票の話が付く。 */
       if (w._insp && w._insp.ai){ w._insp.ai.見立て = null; w._insp.ai.err = ''; w._insp.ai.at = ''; }
+      /* ================================================================
+         🗓🗓 v2.10.0 **その月の足りないQを、保存から補ってから名札を貼る。**
+         ----------------------------------------------------------------
+         ⚠ PDFが1つのQしか入っていない時（ふだんのルーティンはこれ）、
+            前は組が1つだけで `crossLink` が何もできず、
+            **Qの境目の車が毎回「伝票が無い」で赤く出ていた。**
+         🔴 いま読んだPDFが最優先。足りない期間だけ保存から借りる。
+         ================================================================ */
+      U.busy = 'この月のほかのクォーターを見ています…';
       if (w.renderInspect) renderInspect();
-      if (w.pitToast){
-        var g0 = U.groups[U.gi];
-        pitToast(r.伝票.length + '枚を読みました'
-               + (g0 ? '／' + g0.label + (g0.全部 ? '' : ' の一部') : '')
-               + (U.groups.length > 1 ? '（' + U.groups.length + 'クォーターに分かれています）' : ''));
-      }
-      /* 🗄 v1.184.0（ゆうた指定）**結果を残す。**
-         🔴 同じ期間をもう一度走らせたら**上書き**＝練習でくり返してもゴミが積み上がらない。
-         🔴 検算が合っていない結果は残さない（合わない数字を、あとで本当の数字だと思わせないため）。
-         ⚠ 残せなかった時も黙らない（練習用サイト・通信できない時など）。 */
-      saveAllGroups(U);
+      buildMonth(U, monthOf(U, pick ? pick.from : ''), { force: true }).then(function () {
+        U.busy = '';
+        pickPeriod(U, pick ? pick.from : U.from, pick ? pick.to : U.to);
+        U.再生 = null;                       /* いまPDFを読んだ＝「残してある伝票」ではない */
+        U.tab = 'data';
+        if (w.renderInspect) renderInspect();
+        if (w.pitToast){
+          var g0 = U.groups[U.gi];
+          pitToast(r.伝票.length + '枚を読みました'
+                 + (g0 ? '／' + g0.label + (g0.全部 ? '' : ' の一部') : '')
+                 + (U.groups.filter(function (x) { return x.出どころ === 'PDF'; }).length > 1
+                    ? '（' + U.groups.filter(function (x) { return x.出どころ === 'PDF'; }).length
+                      + 'クォーターに分かれています）' : ''));
+        }
+        /* 🗄 v1.184.0（ゆうた指定）**結果を残す。**
+           🔴 同じ期間をもう一度走らせたら**上書き**＝練習でくり返してもゴミが積み上がらない。
+           🔴 検算が合っていない結果は残さない（合わない数字を、あとで本当の数字だと思わせないため）。
+           ⚠ 残せなかった時も黙らない（練習用サイト・通信できない時など）。 */
+        saveAllGroups(U);
+      });
     }).catch(function (e) {
       U.busy = '';
       U.err = s(e && e.message ? e.message : e);
@@ -1380,6 +1523,9 @@
     var U = Q();
     if (!U.groups || !U.groups[+i]) return;
     U.gi = +i; applyGroup(U); U.tab = 'data';
+    /* 🗓 v2.10.0 保存から借りた組を選んだら、その断り書きに切り替える */
+    var g = U.groups[U.gi];
+    U.再生 = (g.出どころ === '保存') ? (g.保存 || { at:'', by:'', pdf:'' }) : null;
     if (w.renderInspect) renderInspect();
   };
 
@@ -1399,7 +1545,9 @@
     /* 🔴 v2.9.8 **0枚の組は残さない**（まだ来ていない Q4 が「済・OK」になるため）。
        🔴 判定は quarter-store.js の `pitQCanSave` 1本。ここで条件を書き写さない。 */
     var items = (U.groups || []).filter(function (g) {
-      return g.全部 && g.res && (!w.pitQCanSave || w.pitQCanSave(g.res));
+      /* 🔴 v2.10.0 **保存から借りてきた組は、保存し直さない。**
+         読んだだけで「走らせた日時」が今に書き換わると、いつ実施したか分からなくなる。 */
+      return g.出どころ !== '保存' && g.全部 && g.res && (!w.pitQCanSave || w.pitQCanSave(g.res));
     })
       .map(function (g) { return { res: g.res, opt: { pdf: U.pdf, soft: g.soft } }; });
     if (!items.length) return;
@@ -1458,6 +1606,11 @@
         w.pitQDeleteRun(from, to).then(function () {
           U.list = (U.list || []).filter(function (x) { return x && x.id !== id; });
           if (U.savedId === id){ U.saved = null; U.savedId = ''; }
+          /* 🗓 v2.10.0 消した期間の組も手元から外して、次に開いた時にそろえ直す */
+          U.groups = (U.groups || []).filter(function (g) {
+            return !(g.出どころ === '保存' && g.from === from && g.to === to);
+          });
+          U.月そろえた = ''; U.月に無い = {};
           if (w.pitLog) pitLog('突き合わせの結果を消した', { kind:'inspect', label: from + '〜' + to });
           if (w.renderInspect) renderInspect();
           if (w.pitToast) pitToast(from + '〜' + to + ' の結果を消しました');

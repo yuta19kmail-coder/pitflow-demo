@@ -612,3 +612,20 @@
 .q-saved-n{ display:block; font-size:10px; color:var(--text3); margin-top:2px; }
 /* 🧾 v2.9.8 残してある伝票で組み直した時、書き込みで出来ないことを断る1行 */
 .q-wr-n{ display:block; font-size:10.5px; color:var(--text3); margin-top:3px; }
+
+/* ================================================================
+   ⏳ v2.10.0 読み込み中は「くるくる」だけ（古い数字を出さない）
+   ゆうた「ちゃんと読み込むまでくるくるとかにして違うよー って感じがいいかも」
+   ================================================================ */
+.q-load{ display:flex; flex-direction:column; align-items:center; gap:9px;
+  padding:44px 20px; border:1px dashed var(--border); border-radius:12px;
+  background:var(--bg2); margin:4px 0 12px; }
+.q-load b{ font-size:13px; color:var(--text2); font-weight:700; }
+.q-load span:last-child{ font-size:11px; color:var(--text3); }
+.q-load-sp{ width:26px; height:26px; border-radius:50%;
+  border:3px solid var(--border); border-top-color:var(--green,#1db97a);
+  animation:q-spin .8s linear infinite; }
+@keyframes q-spin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce){ .q-load-sp{ animation-duration:2.4s; } }
+/* 🗓 v2.10.0 保存から借りてきたQの箱は、いま読んだPDFの箱と見た目を分ける */
+.q-pq.kept{ border-style:dashed; }

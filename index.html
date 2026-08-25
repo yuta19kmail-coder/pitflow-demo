@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.11.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.11.1"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="css/coreflow-note-reply.css?v=b5c2b3fb"><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.css より後ろに読む -->
 <link rel="stylesheet" href="css/coreflow-req.css?v=fd4a9c74"><!-- 📮 予定依頼（全アプリ共通・_shared から配布） -->
 <link rel="stylesheet" href="css/search.css?v=8">
-<link rel="stylesheet" href="css/customer-detail.css?v=16">
+<link rel="stylesheet" href="css/customer-detail.css?v=17">
 <link rel="stylesheet" href="css/work-content.css?v=7">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=c679db13">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.11.0</div>
+    <div class="login-ver">v2.11.1</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.11.0</span>
+    <span class="ver">v2.11.1</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -879,12 +879,12 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-detail.js?v=140"></script>
 <script src="js/flow-pit.js?v=4"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=2"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=64"></script>
+<script src="js/card-view.js?v=65"></script>
 <script src="js/cover-print.js?v=15"></script>
 <script src="js/avail.js?v=7"></script>
 <script src="js/card-tabs.js?v=14"></script>
 <script src="js/archive-pit.js?v=5"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
-<script src="js/customers.js?v=57"></script>
+<script src="js/customers.js?v=58"></script>
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=32"></script>
@@ -906,7 +906,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/quarter-store.js?v=11"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->
 <script src="js/quarter-pdf.js?v=8"></script><!-- 🧾 v1.181.0 売上チェックリストPDFの読み取り（自己検証つき） -->
 <script src="js/quarter-fix.js?v=7"></script><!-- 🛠 v2.0.0 突き合わせた一覧をその場で片づける（直す／伝票を直した の2択）。quarter-match / card-view（pitCanEditFinal・pitApplyResultDate）/ sales-date より後ろ、quarter.js より前 -->
-<script src="js/quarter-write.js?v=4"></script><!-- ✍ v2.2.0 残り0になったQの結果を、車体番号と伝票としてお客様の車に書き込む。quarter-fix / customers（pitVehSetVin）より後ろ、quarter.js より前 -->
+<script src="js/quarter-write.js?v=5"></script><!-- ✍ v2.2.0 残り0になったQの結果を、車体番号と伝票としてお客様の車に書き込む。quarter-fix / customers（pitVehSetVin）より後ろ、quarter.js より前 -->
 <script src="js/cost-book.js?v=1"></script><!-- 📚 v2.3.0 会社の覚え（過去の売上チェックリスト 2026-03〜07 から作った、うちのふつうの掛け率・売価・セット）。データだけ。quarter-cost.js より前 -->
 <script src="js/quarter-cost.js?v=2"></script><!-- 🔎 v2.3.0 入れたPDFの中身を覚えと照らす物差し（画面を持たない）。cost-book より後ろ、ai-check.js より前 -->
 <script src="js/quarter.js?v=26"></script><!-- 🧾 v1.181.0 クォーターチェック②の画面。quarter-match / quarter-pdf より後ろ、inspect.js より前 -->

@@ -260,14 +260,20 @@ window.state = {
         （その型で入っている過去カードのバッジを消さないため）。
      ⚠ MHS は pitSettings/main の作業タイプ（名前・色・概算金額）を読んでいる。
         ここを直したものが settings.workTypes として保存され続ける（_applyWorkTypes()）。 */
+  /* 🏷🏷 v2.13.0 `desc` ＝**その印の意味**（ゆうた 2026-08-25 口述）。
+     🗣「作業タイプのバッチをマウスオーバーしたら**バッチの持つ意味を表示して間違えないように**したい」
+     🔴 意味の置き場は**マスターのここ1本**。画面（予約フォーム・お知らせ・ヘルプ）は読むだけ。
+        画面に書き写すと、名前を変えた時に片方だけ古くなる。 */
   workTypes: [
-    { id: 'shaken',  label: '車検',           color: '#ef4444' },
-    { id: '12pt',    label: '12点',           color: '#f97316' },
-    { id: 'general', label: '一般',           color: '#84cc16' },
-    { id: 'oil',     label: 'オイル',         color: '#eab308' },
-    { id: 'bp',      label: 'B.P',            color: '#3b82f6', combinable: true },
-    { id: 'coat1y',  label: '1Y', color: '#8b5cf6', combinable: true },
-    { id: 'coat3m',  label: '3M', color: '#a855f7', combinable: true },
+    { id: 'shaken',  label: '車検',           color: '#ef4444', desc: '通常の車検作業' },
+    { id: '12pt',    label: '12点',           color: '#f97316', desc: '通常の点検作業' },
+    { id: 'general', label: '一般',           color: '#84cc16', desc: '通常の修理作業' },
+    { id: 'oil',     label: 'オイル',         color: '#eab308', desc: 'オイル交換単体での依頼' },
+    { id: 'bp',      label: 'B.P',            color: '#3b82f6', combinable: true, desc: '板金修理作業' },
+    { id: 'coat1y',  label: '1Y', color: '#8b5cf6', combinable: true,
+      desc: '自社作業によるコーティング（確定でなくてもチェックする）' },
+    { id: 'coat3m',  label: '3M', color: '#a855f7', combinable: true,
+      desc: '自社作業によるコーティング（確定でなくてもチェックする）' },
     /* 🚗 v2.6.0（ゆうた指定）＝納車前のルームクリーニング等。1Y/3M と同じ**併用可**。
        ◎これが付いた車は 車販作業ビューの「コーティング・その他依頼／予定」に拾い上げられる
          （car-sales.js の `_csHasCoat`）。**実際に何をやるかは「依頼事項」に直接書く**
@@ -276,7 +282,8 @@ window.state = {
           「車販」だけだと**部門名**に読めて、社内区分の「中古（自社の販売車両）」と
           取りちがえられる。この印の意味は「**車販部門に、コーティング以外の作業を依頼する**」。
           ⚠ **id（carsale）は変えない。** 変えると過去のカードと車販作業ビューの拾い上げが切れる。 */
-    { id: 'carsale', label: '車販依頼', color: '#06b6d4', combinable: true },
+    { id: 'carsale', label: '車販依頼', color: '#06b6d4', combinable: true,
+      desc: '艶出し・ルークリなど車販に依頼する作業（確定でなくてもチェックする）' },
   ],
 
   dropTypes: [
@@ -312,23 +319,63 @@ window.PIT_WORK_TYPES = window.state.workTypes.map(function (w) {
      （本番で meta=2.8.0・js=2.8.1 を見た）。一覧そのものに版を持たせること。
    ⚠ 上げ忘れると、名前を変えたのにクラウドへ行き渡らない（＝MHS の当日ビューが古い名前のまま）。
      見張り＝`test_worktype_pingpong.mjs`。 */
-window.PIT_WORK_TYPES_VER = '2.8.2';
+window.PIT_WORK_TYPES_VER = '2.13.0';
 
 /* 作業タイプ「特殊」＝保証／保険（v0.116.0）。
    ・単体では選べず、作業タイプ（基本 or 併用可）が1つ以上ある時だけ付けられる。
    ・保持は c.workSpecials[]（基本/併用可の c.workTypes とは別枠＝予約カード自体には出さない）。
    ・表示は予約詳細・ホバー詳細・印刷表紙のみ。画面はグレー、印刷は黒字・黒枠（アウトライン）。 */
 window.PIT_WORK_SPECIALS = [
-  { id: 'warranty',  label: '保証' },
-  { id: 'insurance', label: '保険' },
+  { id: 'warranty',  label: '保証',
+    desc: '保証会社による整備保証の際に追加で付与（売掛がデフォルトで入る）' },
+  { id: 'insurance', label: '保険',
+    desc: '保険会社による板金等の保険作業に付与（保険専用の入金日による実績化挙動）' },
   /* 👤 v2.6.0（ゆうた指定）社員＝社員販売・社員整備。値引きや原価で社割が効くので、
      金額の「肌感」チェック（M04/M06/M07）から外すためだけの印。
      🔴 売上・実績・完TEL は**通常どおり**。売上なしにはしない。 */
-  { id: 'employee', label: '社員' },
+  { id: 'employee', label: '社員',
+    desc: '工賃の割引やパーツ原価販売を許容する' },
 ];
 window.pitSpecialLabel = function (id) {
   var m = (window.PIT_WORK_SPECIALS || []).find(function (x) { return x.id === id; });
   return m ? m.label : '';
+};
+
+/* ===================================================================
+   🏷🏷 v2.13.0 **バッジの意味を引く口はここ1本**（ゆうた 2026-08-25）
+   -------------------------------------------------------------------
+   🗣「作業タイプのバッチをマウスオーバーしたら**バッチの持つ意味を表示して
+     　間違えないようにしたい**」
+   ◎印は3つの引き出しに分かれている。**どこに居るかを呼ぶ側に考えさせない。**
+     ・作業タイプ … state.workTypes（車検・12点・一般・オイル・B.P・1Y・3M・車販依頼）
+     ・付加       … PIT_WORK_SPECIALS（保証・保険・社員）
+     ・社内区分   … PIT_INTERN_KINDS（中古・代車・内部）
+   🔴 意味そのものは**マスターの `desc`**。ここは探して返すだけ＝**書き写さない。**
+   ⚠ 見つからない id（クラウドに残った古い型）は空を返す。
+      空なら画面は説明を出さない＝**知らないことを、それらしく言わない。**
+   =================================================================== */
+window.pitBadgeDesc = function (id) {
+  var k = String(id == null ? '' : id);
+  if (!k) return '';
+  var pools = [(window.state && window.state.workTypes) || window.PIT_WORK_TYPES || [],
+               window.PIT_WORK_SPECIALS || [],
+               window.PIT_INTERN_KINDS || []];
+  for (var i = 0; i < pools.length; i++){
+    for (var j = 0; j < pools[i].length; j++){
+      if (pools[i][j] && pools[i][j].id === k) return String(pools[i][j].desc || '');
+    }
+  }
+  return '';
+};
+/* 印の一覧を、引き出しごとにまとめて返す（お知らせ・ヘルプが同じ順で並べるため）。 */
+window.pitBadgeGroups = function () {
+  var wt = (window.state && window.state.workTypes) || window.PIT_WORK_TYPES || [];
+  return [
+    { key: 'work',    名: '作業タイプ',
+      items: wt.filter(function (x) { return x && !x.legacy; }) },
+    { key: 'special', 名: '付加',     items: (window.PIT_WORK_SPECIALS || []).slice() },
+    { key: 'intern',  名: '社内区分', items: (window.PIT_INTERN_KINDS || []).slice() }
+  ];
 };
 
 /* 概算預かり日数の既定（入庫予約時の初期値・後で手で調整できる）

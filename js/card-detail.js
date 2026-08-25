@@ -1740,13 +1740,31 @@ function dropChips(c){
 
 /* 作業タイプのチップ＝基本（単一選択＝c.workType）＋ 併用可タイプ（追加トグル＝c.workAddons[]）。
    設定で「併用可」にした作業（例：3M/1Y）は、基本の作業を選んでいても重ねて選べる。 */
+/* ================================================================
+   🏷🏷 v2.13.0 **押す前に、その印の意味が読める**（ゆうた 2026-08-25）
+   ----------------------------------------------------------------
+   🗣「新規予約や予約詳細から編集に入った場合、作業タイプのバッチを
+     　**マウスオーバーしたらバッチの持つ意味を表示して間違えないように**したい」
+   ◎とくに取りちがえると**あとの数字が変わる**印がある。
+     ・保証 … 売掛がデフォルトで入る
+     ・保険 … 保険専用の入金日で実績化する
+     ・中古／代車／内部 … 売上に数えない
+   🔴 意味は `pitBadgeDesc(id)` 1本に聞く。ここで文を書かない。
+   ⚠ 押せない時の理由（`why`）は**消さない**。意味と両方あるなら2行にして両方出す
+     （「なぜ押せないか」は、意味より先に知りたいので上に置く）。
+   ================================================================ */
+function _chipTitle(id, why){
+  var d = (window.pitBadgeDesc ? pitBadgeDesc(id) : '');
+  var t = why ? (d ? (why + '\n' + d) : why) : d;
+  return t ? (' title="' + String(t).replace(/"/g, '&quot;') + '"') : '';
+}
 function _wtChipBtn(it, active, off, why){
   let style = '';
   if (active && it.color) style = 'background:' + it.color + ';color:#fff;border-color:' + it.color + ';';
   else if (it.color)      style = 'border-color:' + it.color + ';color:' + it.color + ';';
   if (off) style += 'opacity:.35;';
   return '<button type="button" class="cf-chip' + (active ? ' active' : '') + (off ? ' cf-chip-off' : '') + '"'
-       + ' data-val="' + it.id + '"' + (off ? ' disabled' : '') + (off && why ? ' title="' + why + '"' : '')
+       + ' data-val="' + it.id + '"' + (off ? ' disabled' : '') + _chipTitle(it.id, off ? why : '')
        + ' style="' + style + '">' + it.label + '</button>';
 }
 
@@ -1845,7 +1863,7 @@ function otherPanelHtml(c){
                         : ('border-color:' + GREY + ';color:' + GREY + ';');
     if (addOff) style += 'opacity:.35;';
     h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + (addOff ? ' cf-chip-off' : '') + '"'
-       + ' data-val="' + it.id + '"' + (addOff ? ' disabled title="' + addWhy + '"' : '')
+       + ' data-val="' + it.id + '"' + (addOff ? ' disabled' : '') + _chipTitle(it.id, addOff ? addWhy : '')
        + ' style="' + style + '">' + it.label + '</button>';
   });
   h += '</div></div>';
@@ -1859,7 +1877,7 @@ function otherPanelHtml(c){
     var style  = active ? ('background:#0f766e;color:#fff;border-color:#0f766e;')
                         : ('border-color:#0f766e;color:#0f766e;');
     h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '"'
-       + ' data-val="' + it.id + '" title="' + it.note + '" style="' + style + '">' + it.label + '</button>';
+       + ' data-val="' + it.id + '"' + _chipTitle(it.id, '') + ' style="' + style + '">' + it.label + '</button>';
   });
   h += '</div>';
   if (kind === 'loanercar'){

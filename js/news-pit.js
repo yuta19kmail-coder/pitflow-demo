@@ -37,6 +37,53 @@
    🔴 新しいものを **配列の先頭** に足すこと（並べ替えはコードがやるが、書く側も上から読める方がよい）。 */
 window.PIT_NEWS = [
 
+/* ────────── 2026-08-25（v2.13.0） ──────────
+   🗣 ゆうた「これを持って**この入庫バッチの新設についてお知らせ**を入れて／
+     　　　　　**同様に非カウント実績もセットで**」
+   🔴 印の意味は**書き写さない**。マスター（state.workTypes / PIT_WORK_SPECIALS /
+      PIT_INTERN_KINDS）の `desc` から、開いた時に組み立てる。
+      ＝ 名前や意味を変えたら、このお知らせも一緒に直る。 */
+{
+  id: 'n-20260825-badges-v2130', version: '2.13.0', date: '2026-08-25',
+  title: '入庫バッジの意味が、押す前に読めるようになりました',
+  body: function () {
+    var esc = function (v) { return String(v == null ? '' : v)
+      .replace(/[&<>]/g, function (m) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]; }); };
+    var G = (window.pitBadgeGroups ? window.pitBadgeGroups() : []);
+    var h = '<p>新規予約と、予約詳細から入る編集の画面で、'
+          + '<b>バッジにマウスを乗せるとその印の意味が出ます</b>。押す前に確かめられます。</p>'
+          + '<p>いま使える印は、つぎの3つの引き出しに分かれています。</p>';
+    G.forEach(function (g) {
+      if (!g.items.length) return;
+      h += '<p><b>▼ ' + esc(g.名) + '</b>'
+         + (g.key === 'work' ? '' : '（「その他」を開くと出てきます）') + '</p><ul>';
+      g.items.forEach(function (it) {
+        h += '<li><b>' + esc(it.label) + '</b>　' + esc(it.desc || '') + '</li>';
+      });
+      h += '</ul>';
+    });
+    h += '<p><b>▼ 社内区分を付けた車は「非カウント実績」に入ります</b></p>'
+       + '<ul>'
+       + '<li><b>中古・代車・内部</b>を付けた車と、<b>「売上なし」</b>で片づけた車は、'
+       +   '<b>売上・作業サマリー・フロントマンのPDF照合には乗りません</b>。</li>'
+       + '<li>消えるわけではありません。'
+       +   '<b>実績カレンダーの「非カウント一覧」</b>に、記録としてそのまま残ります'
+       +   '（実績のページ右上のボタンで行き来できます）。</li>'
+       + '<li>その車には<b>金額・完TEL・洗車・伝票・表紙の印刷がありません</b>。'
+       +   '工程を動かしても素通りします。</li>'
+       + '<li><b>代車</b>だけは、車検・12点・一般・B.P のどれか1つと<b>セットで押します</b>。</li>'
+       + '</ul>'
+       + '<p><b>▼ 押しまちがえると、あとの数字が変わる印</b></p>'
+       + '<ul>'
+       + '<li><b>保証</b>… 売掛が既定で入ります。</li>'
+       + '<li><b>保険</b>… 保険専用の入金日で実績になります（ふつうの返車日ではありません）。</li>'
+       + '<li><b>中古・代車・内部</b>… 売上に数えません。</li>'
+       + '</ul>'
+       + '<p>迷ったら、バッジに乗せて意味を読んでから押してください。</p>';
+    return h;
+  }
+},
+
 /* ────────── 2026-08-24（v2.4.0） ────────── */
 {
   id: 'n-20260824-print-v240', version: '2.4.0', date: '2026-08-24',
@@ -1326,6 +1373,15 @@ window.PIT_NEWS = [
   var _inboxTried = false;   /* 受信箱の描き直しを1回だけにする印 */
 
   function LIST() { return (window.PIT_NEWS || []).slice(); }
+  /* 🏷 v2.13.0 `body` は文字でも**関数**でもよい。
+     ＝ 一覧（作業タイプ・付加・社内区分）から**その場で組み立てる**お知らせが書けるようになった。
+     🔴 印の意味をお知らせに**書き写さない**ため。書き写すと、名前を変えた時に片方だけ古くなる。
+     ⚠ 組み立てで転んでも、お知らせ全体を落とさない（空で出す）。 */
+  function BODY(a) {
+    var b = a && a.body;
+    if (typeof b !== 'function') return b || '';
+    try { return b() || ''; } catch (e) { return ''; }
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -1336,9 +1392,17 @@ window.PIT_NEWS = [
   function myUid() { return cloud() ? window.fb.currentUser.uid : null; }
 
   /* 版くらべ（"1.67.0" > "1.65.1"）。小さいほど古い。 */
+  /* 🔴🔴 v2.13.0 **けたが足りていなかった**（2026-08-25 に見つけた）
+     ----------------------------------------------------------------
+     前は `major*10000 + minor*100 + patch`。**minor が 100 を超えると major に食い込む。**
+       ・v1.185.0 → 1*10000 + 185*100 = 28,500
+       ・v2.13.0  → 2*10000 +  13*100 = 21,300     ← **1.185.0 のほうが大きい**
+     ＝ 受信箱の並びが v1.100.0 のころから狂っていて、**新しいお知らせが下に埋まっていた。**
+     🔴 けたは**あふれない広さ**を取る（minor・patch とも 9999 まで）。
+     ⚠ 版くらべは数で。文字で比べる（`'2.10.0' >= '2.9.6'`）のも同じ穴。 */
   function verNum(v) {
     var p = String(v == null ? '0' : v).split('.').map(function (n) { return parseInt(n, 10) || 0; });
-    return (p[0] || 0) * 10000 + (p[1] || 0) * 100 + (p[2] || 0);
+    return (p[0] || 0) * 100000000 + (p[1] || 0) * 10000 + (p[2] || 0);
   }
   function verCmp(a, b) { return verNum(a) - verNum(b); }
 
@@ -1551,7 +1615,7 @@ window.PIT_NEWS = [
         + '<span class="nw-date">' + esc(a.date || '') + '</span>'
         + '<span class="nw-caret">' + (open ? '▲' : '▼') + '</span>'
         + '</div>'
-        + '<div class="nw-body"' + (open ? '' : ' style="display:none"') + '>' + (a.body || '')
+        + '<div class="nw-body"' + (open ? '' : ' style="display:none"') + '>' + BODY(a)
         + '<div class="nw-foot">'
         + (rd ? '<span class="nw-done"><i data-ic=check data-ics=15></i> 確認済み</span>'
               : '<button type="button" class="nw-ok2" onclick="pitNewsConfirm(\'' + esc(a.id) + '\')">確認する（OK）</button>')
@@ -1600,7 +1664,7 @@ window.PIT_NEWS = [
       +   '<div class="nw-pop-ih">' + (a.version ? '<span class="nw-ver">v' + esc(a.version) + '</span>' : '')
       +     '<span class="nw-pop-it">' + esc(a.title) + '</span>'
       +     '<span class="nw-pop-id">' + esc(a.date || '') + '</span></div>'
-      +   '<div class="nw-pop-ib">' + (a.body || '') + '</div>'
+      +   '<div class="nw-pop-ib">' + BODY(a) + '</div>'
       + '</div>'
       + (last && rest > 0
           ? '<div class="nw-pop-rest">ほかに <b>' + rest + '件</b> の未読があります。左の「お知らせ」から読めます。</div>'

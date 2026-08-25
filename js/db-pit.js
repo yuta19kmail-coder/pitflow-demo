@@ -480,6 +480,10 @@
         if (self._wtDirty) self._shadow.settings = '';
         self._applying = false;
 
+        /* 📣 v2.8.2 読み込み時の合図は「見たこと」にして黙らせる
+           ＝この版を初めて開いた端末が、開いた瞬間にもう1回読み直す、を起こさない。 */
+        if (window.pitForceReloadSeed) { try { pitForceReloadSeed(state.settings); } catch (e) {} }
+
         self._loaded = true;                      // ここから先だけ保存を許す
         console.log('[PitDB] 読み込み完了（' + total + '件）');
         if (window.PitSync) PitSync.connected();
@@ -571,6 +575,9 @@
            揃え直し自体は上の `_mergeSettings` → `_applyWorkTypes` で済んでいて、
            書き戻しが要るぶんは**ふつうの差分保存**（`_cloudFlush`）が拾う。
            ⚠ ここに `_flushWorkTypes()` を戻さないこと。 */
+        /* 📣 v2.8.2 「全端末を今すぐ更新する」の合図（force-reload-pit.js が判断する）。
+           ⚠ ここでは読むだけ。リロードするかどうかの物差しは向こう1本。 */
+        if (window.pitForceReloadCheck) { try { pitForceReloadCheck(state.settings); } catch (e) {} }
         if (window.PitSync) PitSync.received();
         self._afterApply();
       }, function (e) { console.error('[PitDB] 設定の購読に失敗', e); });

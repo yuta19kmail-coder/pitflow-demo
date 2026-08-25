@@ -158,9 +158,17 @@
     /* ---- 🗄 v1.184.0 残したかどうかを、黙らずに言う ---- */
     if (w.PIT_CLOUD){
       h += '<div class="q-saved">'
-         +   (U.savedAt
-              ? 'この結果を残しました（' + esc(U.savedAt) + '）／同じ期間をもう一度やると置きかわります'
-              : '結果を残しています…')
+         +   (U.再生
+              /* 🧾 v2.9.8 PDFを読んだのではなく、**残してある伝票で組み直した**時。
+                 ⚠ 黙ると「いまPDFを読んだ」と勘ちがいされる。どこから来た画面かを必ず言う。 */
+              ? '📄 残してある伝票（' + esc(s(U.再生.at).slice(0, 16).replace('T', ' '))
+                + (U.再生.by ? '・' + esc(U.再生.by) : '')
+                + (U.再生.pdf ? '・' + esc(U.再生.pdf) : '')
+                + '）で組み直しました。PitFlow 側は<b>いまのデータ</b>で数え直しています。'
+                + '<span class="q-saved-n">⚠ 気になる行の刷り込み印刷と原価チェックは、PDFを入れ直すと使えます。</span>'
+              : (U.savedAt
+                 ? 'この結果を残しました（' + esc(U.savedAt) + '）／同じ期間をもう一度やると置きかわります'
+                 : '結果を残しています…'))
          + '</div>';
     }
 
@@ -170,8 +178,59 @@
     /* ---- 🗂 v2.2.0 入り口は4つだけ ---- */
     h += groupBar(R);
     h += '<div class="q-body">' + (U.viewer ? (w.pitQWriteView ? w.pitQWriteView(R, U) : '') : list(R, U.tab)) + '</div>';
+    /* ---- ✅ v2.9.8 4つの箱の下に「チェック済み」 ---- */
+    h += doneBox(U);
     return h;
   };
+
+  /* ================================================================
+     ✅✅ v2.9.8 **チェック済み**（ゆうた 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「チェックしたあとクリックすると消えちゃうのが何をやったかわからなくなるかも」
+     🗣「だからチェック済みみたいな枠をその下に作って、クリックで修正した一覧を開きたい」
+     🗣「グレーアウトの状態でOK　で何を直したかわかると嬉しい」
+     ◎押した行は**直ったので一覧から消える**。それは正しいが、**やった記録が消える**のが困る。
+     🔴 中身は `qmarks` **1か所だけ**を読む。ここで別の記録を作らない。
+        （直した記録も v2.9.8 から同じ場所に入る＝quarter-fix.js の `did`）
+     ⚠ 出すのは**いま見ている期間のぶんだけ**（売上日で絞る）。
+        全部出すと、別のQでやったことが混ざって「この期間で何をしたか」が読めなくなる。
+     ⚠ ふだんは**閉じている**（0件をシンプルに、の邪魔をしない）。押すと開く。
+     ================================================================ */
+  function doneRows(U){
+    var ms = (w._pitQMarks || []);
+    var from = s(U.from), to = s(U.to);
+    if (!from || !to) return [];
+    return ms.filter(function (m) {
+      var d = s(m && m.売上日);
+      return d && d >= from && d <= to;
+    });
+  }
+  function doneBox(U){
+    var rows = doneRows(U);
+    if (!rows.length) return '';
+    var h = '<details class="q-done"><summary><span class="q-done-h">✅ チェック済み</span>'
+          + '<span class="q-done-n">' + rows.length + '件</span>'
+          + '<span class="q-done-t">この期間で「直した」「このままでよい」と決めたもの</span></summary>';
+    h += '<div class="q-done-list">';
+    rows.forEach(function (m) {
+      var 直 = !!m.直した;
+      h += '<div class="q-done-r' + (直 ? ' fixed' : ' kept') + '">'
+         +   '<span class="q-done-b">' + (直 ? '直した' : 'このままでよい') + '</span>'
+         +   '<span class="q-done-w">' + esc(s(m.種類)) + '</span>'
+         +   '<span class="q-done-c">' + esc(s(m.お客様) || '（お名前なし）')
+         +     (m.ナンバー ? ' <em>' + esc(m.ナンバー) + '</em>' : '') + '</span>'
+         +   '<span class="q-done-d">' + esc(s(m.内容) || ('整備ソフト側を直したので、PitFlow はこのまま')) + '</span>'
+         +   '<span class="q-done-m">' + esc(s(m.売上日))
+         +     (m.伝票 ? '・伝票 ' + esc(m.伝票) : '') + '</span>'
+         +   '<span class="q-done-a">' + esc(s(m.at).slice(0, 16).replace('T', ' '))
+         +     (m.by ? '・' + esc(m.by) : '') + '</span>'
+         + '</div>';
+    });
+    h += '</div>';
+    h += '<div class="q-done-note">⚠ ここに出ていても、<b>上の数字（合計・差・検算）は1円も動きません</b>。'
+       + '手元のPDFは直す前のものなので、そこに出ている数字は事実のままです。</div>';
+    return h + '</details>';
+  }
 
   /* ================================================================
      🗂 v2.2.0 入り口は4つだけ（ゆうた 2026-08-24）
@@ -393,6 +452,17 @@
     w.pitQLoadList().then(function (list) {
       var U = Q(); U.list = list || []; U.listBusy = false;
       if (w.renderInspect) renderInspect();
+      /* 🩹 v2.9.8 一覧の取りこぼしを、書類から作り直して足す。
+         ＝ v2.9.8 より前の上書き合戦で消えた Q1 が、開いた時に自分で戻る。
+         ⚠ 読みに行くのは**一覧に無いものだけ**（ふだんは0件＝ただ働きしない）。 */
+      if (!w.pitQRepairList || !w.pitQMonthPlan) return;
+      var plans = w.pitQMonthPlan(U.ym || '', U.list);
+      w.pitQRepairList(plans, U.list).then(function (fixed) {
+        if (!fixed || fixed.length === (U.list || []).length) return;
+        U.list = fixed;
+        if (w.pitToast) pitToast('一覧に載っていなかった突き合わせの結果を、書類から見つけて戻しました');
+        if (w.renderInspect) renderInspect();
+      }).catch(function () {});
     }).catch(function () {
       var U = Q(); U.list = []; U.listBusy = false;
       if (w.renderInspect) renderInspect();
@@ -495,6 +565,7 @@
          + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</span>'
          + '<button class="q-print" onclick="window.print()">印刷</button></div>';
       h += '<div class="q-body">' + list(R4, U.tab, true) + '</div>';
+      h += doneBox(U);   /* ✅ v2.9.8 古い写しの画面にも出す（やったことは同じ場所にある） */
       return h;
     }
     /* 🔴 ここから下は **`_v` が無い＝v2.7.0 より前に残した結果**だけの道。
@@ -510,6 +581,7 @@
     h += '<div class="q-note">残してあるのは<b>これから直すものだけ</b>です'
        +   '（合っていた行は残していません）。' + (R.行を切った ? '⚠ 多すぎたので途中で切っています。' : '') + '</div>';
     h += '<div class="q-body">' + savedBody(R, U.savedTab) + '</div>';
+    h += doneBox(U);
     return h;
   }
 
@@ -987,7 +1059,12 @@
     if (!w.pitQOneMark) return;
     var U = Q();
     U.busy = '印を付けています…'; if (w.renderInspect) renderInspect();
-    w.pitQOneMark(no, +on).then(function (saved) {
+    /* ✅ v2.9.8 その行を一緒に渡す＝チェック済みの一覧に「誰の車か」が出る */
+    var R0 = U.res || {};
+    var row = ((R0.整備ソフトだけ || []).filter(function (x) { return w.pitQSoftNo && w.pitQSoftNo(x) === s(no); })[0])
+           || ((R0.PitFlowだけ   || []).filter(function (x) { return w.pitQPitNo  && w.pitQPitNo(x)  === s(no); })[0])
+           || null;
+    w.pitQOneMark(no, +on, row).then(function (saved) {
       U.busy = '';
       if (w.pitToast) pitToast(saved === false
         ? '練習用サイトなので、この印はこの端末の中だけです'
@@ -1003,17 +1080,58 @@
   /* 🗄 Q1〜Q4 のどれかを押した＝その期間に合わせる。残してあれば、それを開く */
   w.pitQOpenPlan = function (from, to){
     var U = Q();
-    U.from = from; U.to = to; U.res = null; U.saved = null; U.savedId = '';
+    U.from = from; U.to = to; U.res = null; U.saved = null; U.savedId = ''; U.再生 = null;
     /* 🗓 v2.2.0 いま入れているPDFに入っていないQを開いた＝**どのBOXも「開いている」印にしない**。
        ＝ 印だけ残ると、出ている中身と光っている箱がズレる。 */
     U.gi = -1;
     var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
-    var has = (U.list || []).some(function (x) { return x && x.id === id; });
-    if (!has || !w.pitQLoadRun){ if (w.renderInspect) renderInspect(); return; }
+    /* 🩹 v2.9.8 **一覧に載っていなくても、書類があるなら開く。**
+       一覧はただの索引で、本当のことは書類に書いてある。
+       ⚠ 前はここで一覧を信じて止まっていたので、Q1 が「まだ」に見えていた。 */
+    if (!w.pitQLoadRun){ if (w.renderInspect) renderInspect(); return; }
     U.busy = '残してある結果を読んでいます…';
     if (w.renderInspect) renderInspect();
     w.pitQLoadRun(id).then(function (r) {
-      U.busy = ''; U.saved = r || null; U.savedId = id; U.savedTab = '期間の外';
+      U.busy = '';
+      /* ================================================================
+         🧾🧾 v2.9.8（ゆうた 2026-08-25）**伝票の行が残っていたら、もう一度突き合わせる。**
+         ----------------------------------------------------------------
+         🗣「素直に直近のPDF自体を保持する形だとデータ的に大変かな？」
+         ◎これで消える問題（全部おなじ根っこ＝**画面が2つの顔を持っていた**）
+           ・押せるボタンが出ない（あけぼのさんが「グレーで残ったまま」だった）
+           ・OK の行が残っていないので、何が合っていたのか見えない
+           ・分け方を変えるたびに**残す側も直さないと顔が割れる**（v2.8.4 で踏んだ）
+         🔴 ここで新しい判定を**1つも作らない**。走らせた時とまったく同じ道
+            （`pitQCollect` → `pitQMatch` → `applyGroup`）を通すだけ。
+         ⚠ PitFlow 側は**今のデータ**で数え直す。＝ 別の画面で直したぶんは、
+            開き直した時にちゃんと減っている（残ってほしいのは伝票のほうだけ）。
+         ⚠ 元のPDF そのものは持っていない＝**刷り込み印刷と原価チェックは使えない**。
+            その2つは「PDFを入れ直してください」と、それぞれの画面が今までどおり言う。
+         ================================================================ */
+      var 伝票 = (r && Array.isArray(r.伝票)) ? r.伝票 : [];
+      if (伝票.length && w.pitQMatch && w.pitQCollect){
+        U.saved = null; U.savedId = '';
+        U.pdf = s(r.PDF) || '（残してある伝票）';
+        U.元のPDF = null; U.err = '';
+        /* ⚠ 期間の1行（q-term）は出さない。**PDFを読んだ時の話**なので、
+           残してある伝票で組み直した画面に出すと「いまPDFを読んだ」と読めてしまう。
+           どこから来た画面かは、下の断り書きの帯（q-saved）が言う。 */
+        U.term = null; U.termSrc = '';
+        var pit = w.pitQCollect({ from: from, to: to }).明細;
+        var res = w.pitQMatch(伝票, pit, { from: from, to: to });
+        U.groups = [{ no: 1, label: from + '〜' + to, from: from, to: to,
+                      全部: true, soft: 伝票, res: res }];
+        U.gi = 0;
+        applyGroup(U);
+        U.tab = 'data';
+        U.再生 = { at: s(r.走らせた日時), by: s(r.走らせた人), pdf: s(r.PDF) };
+        if (w.renderInspect) renderInspect();
+        return;
+      }
+      /* 🔴 伝票が無い＝v2.9.8 より前に残した結果。今までどおり**写し**で出す
+         （黙って空の画面を出さない）。もう一度PDFを入れれば、次からは上の道になる。 */
+      U.再生 = null;
+      U.saved = r || null; U.savedId = id; U.savedTab = '期間の外';
       if (w.renderInspect) renderInspect();
     }).catch(function () {
       U.busy = ''; if (w.renderInspect) renderInspect();
@@ -1056,6 +1174,7 @@
   function readFile(f){
     var U = Q();
     U.pdf = f.name; U.err = ''; U.res = null; U.saved = null; U.savedId = ''; U.savedAt = '';
+    U.再生 = null;   /* 🧾 v2.9.8 新しいPDFを入れた＝「残してある伝票を読み直した」の断りは消す */
     U.busy = '読んでいます…';
     if (w.renderInspect) renderInspect();
 
@@ -1207,15 +1326,45 @@
   /* 🔴 残すのは「**まるごと**」の組だけ。
      一部の組（端っこの数日）を残すと、Q1〜Q4 の印が「済」になってしまう。
      ＝ そのQをまだ見終わっていないのに済になるのが、いちばん困る。 */
+  /* 🧾🧾 v2.9.8（ゆうた 2026-08-25「リロードした後の挙動がやっぱりへん　Q1が抜けたりする」）
+     ----------------------------------------------------------------
+     🔴 **一覧に触るのは、全部の組を書き終わったあと1回だけ。**
+        前は組ごとに `saveRun` を呼び、その中で一覧を「読む→足す→書く」していた。
+        3つ同時に走ると**最後に書いた人が勝つ**＝Q1が一覧から消えた。
+        （本番で現物を確かめた：書類は3つとも在るのに、一覧には2つしか無かった）
+     🔴 数え方は1つも変えていない。**一覧に書くタイミングを変えただけ。**
+     🧾 伝票の行（`g.soft`）も一緒に渡す＝開き直した時にもう一度突き合わせられる。 */
   function saveAllGroups(U){
-    (U.groups || []).forEach(function (g) {
-      if (!g.全部 || !g.res) return;
-      saveRun({ res: g.res, pdf: U.pdf, list: U.list,
-                _apply: function (d) {
-                  U.savedAt = s(d && d.at).slice(11, 16);
-                  U.list = (U.list || []).filter(function (x) { return x && x.id !== d.id; });
-                  U.list.unshift(d);
-                } });
+    if (!w.PIT_CLOUD) return;
+    /* 🔴 v2.9.8 **0枚の組は残さない**（まだ来ていない Q4 が「済・OK」になるため）。
+       🔴 判定は quarter-store.js の `pitQCanSave` 1本。ここで条件を書き写さない。 */
+    var items = (U.groups || []).filter(function (g) {
+      return g.全部 && g.res && (!w.pitQCanSave || w.pitQCanSave(g.res));
+    })
+      .map(function (g) { return { res: g.res, opt: { pdf: U.pdf, soft: g.soft } }; });
+    if (!items.length) return;
+    if (!w.pitQSaveRuns){
+      items.forEach(function (it) { saveRun({ res: it.res, pdf: U.pdf, soft: it.opt.soft }); });
+      return;
+    }
+    w.pitQSaveRuns(items).then(function (ds) {
+      var bad = (ds || []).filter(function (x) { return x && x.エラー; });
+      (ds || []).forEach(function (d) {
+        if (!d || !d.id) return;
+        U.savedAt = s(d.at).slice(11, 16);
+        U.list = (U.list || []).filter(function (x) { return x && x.id !== d.id; });
+        U.list.unshift(d);
+        if (w.pitLog) pitLog('売上チェックリストと突き合わせた', { kind:'inspect',
+          label: d.from + '〜' + d.to + '　差 ' + (d.差金額 > 0 ? '+' : '') + yen(d.差金額)
+               + '円／直す ' + d.直す件数 + '件' });
+      });
+      /* 🔴 残せなかったものがあれば黙らない（「残った」と思わせない） */
+      if (bad.length && w.pitToast) pitToast('結果を残せなかったQがあります：' + s(bad[0].エラー));
+      if (w.renderInspect) renderInspect();
+    }).catch(function (e) {
+      U.savedAt = '';
+      if (w.pitToast) pitToast('結果は残せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.renderInspect) renderInspect();
     });
   }
 
@@ -1228,6 +1377,7 @@
     U.res = null; U.soft = null; U.groups = null; U.gi = 0; U.term = null; U.termSrc = '';
     U.元のPDF = null; U.印刷中 = '';
     U.saved = null; U.savedId = ''; U.savedAt = '';
+    U.再生 = null;
     if (w.renderInspect) renderInspect();
     if (w.pitToast) pitToast('画面を空にしました（残してある結果はそのままです）');
   };
@@ -1260,7 +1410,8 @@
   function saveRun(U){
     if (!w.pitQSaveRun || !U.res) return;
     if (!w.PIT_CLOUD) return;                     /* 練習用サイトでは残さない（画面にもそう書いてある） */
-    w.pitQSaveRun(U.res, { pdf: U.pdf }).then(function (d) {
+    /* 🧾 v2.9.8 伝票の行も一緒に残す（次に開いた時、また突き合わせられるように） */
+    w.pitQSaveRun(U.res, { pdf: U.pdf, soft: U.soft }).then(function (d) {
       /* ⚠ 組ごとに呼ばれる時は、画面の覚えを触るのは呼んだ側（_apply）に任せる */
       if (U._apply){ U._apply(d); }
       else {

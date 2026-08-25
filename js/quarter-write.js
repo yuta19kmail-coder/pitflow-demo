@@ -66,13 +66,21 @@
         + '<button class="q-wr-b" onclick="pitQWriteSee(1)">書き込んだ内容を見る</button>'
         + '</div>';
     }
+    /* 🧾 v2.9.8 残してある伝票で組み直した画面では、**伝票の中身（明細）は手元に無い**。
+       ＝ 車体番号は書けるが、来店履歴にぶら下げる伝票は書けない。
+       🔴 黙って「0件」と出すと「もう入っている」と読めてしまうので、理由を必ず書く。 */
+    var 再生 = !!(U && U.再生);
+    var 断り = 再生 ? '<span class="q-wr-n">⚠ 伝票の中身は残していないので、'
+                    + '来店履歴にぶら下げるぶんは書けません（PDFを入れ直すと書けます）。</span>' : '';
     if (!c.vin && !c.den){
       return '<div class="q-wr done"><div class="q-wr-l"><b>書き込むものはありません</b>'
-        + '<span>車体番号も伝票も、もう入っています</span></div></div>';
+        + '<span>' + (再生 ? '車体番号はもう入っています' : '車体番号も伝票も、もう入っています') + '</span>'
+        + 断り + '</div></div>';
     }
     return '<div class="q-wr">'
       + '<div class="q-wr-l"><b>この結果を書き込めます</b>'
-      + '<span>車体番号 ' + c.vin + '件／伝票 ' + c.den + '件</span></div>'
+      + '<span>車体番号 ' + c.vin + '件／伝票 ' + c.den + '件</span>'
+      + 断り + '</div>'
       + '<button class="q-wr-b go" onclick="pitQWriteGo()">書き込む</button>'
       + '</div>';
   }

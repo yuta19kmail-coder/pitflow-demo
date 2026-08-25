@@ -250,6 +250,8 @@
         label: t(p.soft.顧客名) + '　' + (b1 || '（なし）') + ' → ' + to });
       if (w.PitDB) PitDB.save();
       if (w.pitToast) pitToast('売上日を ' + to + ' にしました（売上の数字は動いていません）');
+      /* ✅ v2.9.8 何を直したかを残す（チェック済みの枠に出す） */
+      did('売上日', p, '売上日を ' + (b1 || '（なし）') + ' → ' + to + ' にした');
       return Promise.resolve(true);
     }
 
@@ -281,6 +283,7 @@
                  + '　' + yen(amt2) + '円' });
           if (w.PitDB) PitDB.save();
           if (w.pitToast) pitToast('実績日を ' + to + ' にしました');
+          did('実績日', p, '実績日を ' + (from2 || '（なし）') + ' → ' + to + ' にした（返車日も揃えた）');
           return true;
         });
     }
@@ -305,6 +308,7 @@
         label: t(p.soft.顧客名) + '　' + (b4 || '（なし）') + ' → ' + to4 });
       if (w.PitDB) PitDB.save();
       if (w.pitToast) pitToast('フロント担当を ' + to4 + ' にしました（売上の合計は動いていません）');
+      did('担当', p, 'フロント担当を ' + (b4 || '（なし）') + ' → ' + to4 + ' にした');
       return Promise.resolve(true);
     }
 
@@ -328,6 +332,7 @@
             label: t(p.soft.顧客名) + ' 様　' + yen(from3) + '円 → ' + yen(to3) + '円' });
           if (w.PitDB) PitDB.save();
           if (w.pitToast) pitToast('確定金額を ' + yen(to3) + '円 にしました');
+          did('金額', p, '確定金額を ' + yen(from3) + '円 → ' + yen(to3) + '円 にした');
           return true;
         });
     }
@@ -376,10 +381,51 @@
     var k = oneKey(softOnlyNo(x));
     return marks().filter(function (m) { return m && m.key === k; })[0] || null;
   }
-  function oneMark(no, on){
+  /* ⚠ v2.9.8 第3引数（その行）を足した。**チェック済みの一覧に「誰の車か」を出すため。**
+     無くても今までどおり動く（番号だけ残る）。 */
+  function oneMark(no, on, x){
     var k = oneKey(no);
     var list = marks().filter(function (m) { return m && m.key !== k; });
-    if (on) list.unshift({ key: k, 種類: '確認した', 番号: t(no), at: (new Date()).toISOString(), by: me() });
+    if (on) list.unshift({
+      key: k, 種類: '確認した', 番号: t(no),
+      売上日: t((x && x.soft && x.soft.売上日) || (x && x.数える日)),
+      伝票: t(x && x.soft && x.soft.伝票),
+      ナンバー: t((x && x.soft && x.soft.ナンバー) || (x && x.ナンバー)),
+      お客様: t((x && x.soft && x.soft.顧客名) || (x && x.顧客名)),
+      内容: '確認した（片方にしか無いが、見て納得した）',
+      at: (new Date()).toISOString(), by: me()
+    });
+    w._pitQMarks = list;
+    return saveMarks();
+  }
+
+  /* ================================================================
+     ✅✅ v2.9.8 **何を直したかを残す**（ゆうた 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「チェックしたあとクリックすると消えちゃうのが何をやったかわからなくなるかも」
+     🗣「チェック済みみたいな枠をその下に作って、クリックで修正した一覧を開きたい」
+     ◎ボタンを押すと、その行は**直った**のでもう直すものの一覧に出てこない。
+       ＝ 何をやったのかが**画面のどこにも残らなかった**。
+     🔴 だから「直した」も**印と同じ場所（qmarks）に1行残す。**
+        置き場所を増やさない＝チェック済みの一覧を作る時に**1か所を見るだけ**で済む。
+     ⚠ 鍵の頭は `DID|`。印の鍵（`売上日|伝票|カードid|種類`）とは形がちがうので、
+        `markOf` が**まちがって拾うことはない**＝残りの件数は1件も動かない。
+     ⚠ 同じ行の同じ種類を直し直したら**新しいほうで置きかわる**（履歴は積まない）。
+        ここは「いま何が済んでいるか」の板。作業の履歴は pitLog とカードのフローに残る。
+     ================================================================ */
+  function didKey(kind, soft, cardId){ return 'DID|' + markKey(kind, soft, cardId); }
+  function did(kind, p, 内容){
+    var cardId = t(p && p.pit && p.pit.生 && p.pit.生.id);
+    var soft = (p && p.soft) || {};
+    var k = didKey(kind, soft, cardId);
+    var list = marks().filter(function (m) { return m && m.key !== k; });
+    list.unshift({
+      key: k, 種類: t(kind), 直した: true, 内容: t(内容),
+      売上日: t(soft.売上日), 伝票: t(soft.伝票),
+      ナンバー: t(soft.ナンバー), お客様: t(soft.顧客名),
+      カードid: cardId, 番号: pairNo(p),
+      at: (new Date()).toISOString(), by: me()
+    });
     w._pitQMarks = list;
     return saveMarks();
   }
@@ -412,6 +458,7 @@
   w.pitQFixKinds  = fixKinds;
   w.pitQKeepKinds = keepKinds;    /* 🗓 v2.2.0 実績日の「このままでよい」 */
   w.pitQOneMarkOf = oneMarkOf;    /* 🔴 v2.2.0 片方にしか無い行の印（カードが有る行だけ） */
+  w.pitQDid       = did;          /* ✅ v2.9.8 何を直したかを残す（チェック済みの枠） */
   w.pitQOneMark   = oneMark;
   w.pitQFixApply  = apply;
 })(window);

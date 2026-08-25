@@ -450,6 +450,49 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitFinalAmountOf = pitFinalAmountOf;
 
   /* ===================================================================
+     🔧🔧 この車に付いている作業タイプは何か（v2.9.7・ゆうた報告
+          「BPを選択した時に予約詳細カードの表示が　作業　になる」）
+     🔴 **ここが本家。** これから書く所は必ずこの1本を通す。
+
+     ◎ 作業タイプの持ち方は2枠ある（card-detail.js が入れ分けている）
+        c.workType    … **基本**（車検 / 12点 / 一般 / オイル）＝1つだけ
+        c.workAddons  … **併用可**（B.P / 1Y / 3M / 車販依頼）＝いくつでも
+        c.workTypes   … 上の2つを「基本→併用」の順に並べた**表示用の写し**
+                        （card-detail.js の `_syncWorkTypes` が作る）
+
+     ⚠ なぜ事故ったか＝**c.workType だけを見ていた**から。
+        B.P・1Y・3M・車販依頼は combinable:true なので c.workAddons 側に入る。
+        だから「B.Pだけ」の車は c.workType が null → 「作業」という**言い訳の文字**が出て、
+        色まで一般（緑）になっていた。「車検＋B.P」でも B.P が消えていた。
+     ⚠ 写し（c.workTypes）が無い古いカードもいるので、その時は2枠から自分で組み立てる。
+        ここで「拾いこぼさない」ことだけを守る。見た目は呼ぶ側の仕事。
+     ⚠ この関数は**並びを変えない**（基本が先・併用があと）。色は先頭のものを使う約束。
+     見張り＝`test_worktype_label.mjs`
+     =================================================================== */
+  function pitCardWorkIds(c){
+    if (!c) return [];
+    if (Array.isArray(c.workTypes) && c.workTypes.length) return c.workTypes.slice();
+    var out = [];
+    if (c.workType) out.push(c.workType);
+    (Array.isArray(c.workAddons) ? c.workAddons : []).forEach(function (a) {
+      if (a && out.indexOf(a) < 0) out.push(a);
+    });
+    return out;
+  }
+  w.pitCardWorkIds = pitCardWorkIds;
+
+  /* 名前と色まで付けて返す。マスターに無い id（消した型で入っている昔のカード）は
+     id をそのまま名前にして**落とさない**（バッジが消えると「無い」と誤解されるため）。 */
+  function pitCardWorkTypes(c){
+    var master = (w.state && w.state.workTypes) || [];
+    return pitCardWorkIds(c).map(function (id) {
+      for (var i = 0; i < master.length; i++) if (master[i].id === id) return master[i];
+      return { id: id, label: String(id), color: '#84cc16' };
+    });
+  }
+  w.pitCardWorkTypes = pitCardWorkTypes;
+
+  /* ===================================================================
      🔧 車検予定（v1.108.0・ゆうた指示「MHSのTODAYビューの車検予定をPitFlowから引く部分をちゃんと構築して」）
      🔴 **ここが車検予定の本家。** PitFlow の車検予定ボード／MHS の当日ビュー／前日LINEの画像が
         ぜんぶこの1本を通る。直すのはここだけ。

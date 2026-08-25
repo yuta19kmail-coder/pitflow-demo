@@ -726,8 +726,12 @@
     } else {
       h+='<div class="cm-hist">';
       cards.forEach(c=>{
-        const wt=(state.workTypes||[]).find(w=>w.id===c.workType);
-        const wl=wt?wt.label:(c.workType||'—');
+        /* 🔧 v2.9.7 作業タイプの拾い方は `pit-share.js` の `pitCardWorkTypes` 1本。
+           ⚠ 昔は `c.workType`（基本）だけを見ていたので、B.P・1Y・3M・車販依頼だけの車が
+              「—」になっていた（＝作業タイプが無い車に見えた）。併用は「車検＋B.P」と並べる。 */
+        const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
+        const wt=_wts[0]||null;
+        const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
         /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の `pitCardStatusText` 1本。
            ⚠ 来店履歴には**人が押した予約キャンセル**が並ぶ（v1.101.0）。
               ここに状態の文字だけを渡していたので、その行に**英語で「cancelled」**と出ていた。 */
@@ -1046,8 +1050,13 @@
     if(histN){
       h+='<div class="cd-hist">';
       cards.slice(0,12).forEach(function(c){
-        const wt=(state.workTypes||[]).find(w=>w.id===c.workType);
-        const wl=wt?wt.label:(c.workType||'—'); const wc=wt?wt.color:'#64748b';
+        /* 🔧 v2.9.7 作業タイプの拾い方は `pit-share.js` の `pitCardWorkTypes` 1本。
+           ⚠ 昔は `c.workType`（基本）だけを見ていたので、B.P・1Y・3M・車販依頼だけの車が
+              「—」になっていた（＝作業タイプが無い車に見えた）。併用は「車検＋B.P」と並べる。 */
+        const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
+        const wt=_wts[0]||null;
+        const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
+        const wc=wt?wt.color:'#64748b';
         const amt=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(c.estAmount!=null&&c.estAmount!==''?Number(c.estAmount):null);
         /* 🔴 v1.99.0（ゆうた確定）売上なしは **¥0 ではなく「売上なし」**と書く。
            0円と書くと「金額の入れ忘れ」と見分けがつかないため。 */

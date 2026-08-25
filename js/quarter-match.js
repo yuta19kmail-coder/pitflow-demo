@@ -273,10 +273,39 @@
   function normCar(v){
     return toHalf(s(v)).replace(/[\s　・]/g, '').toUpperCase();
   }
+  /* ⚠ 「0」「なし」「未定」「仮登録車両」などは**番号として使えない**。
+     🔴 物差しは customers.js の `pitIsRealPlate` 1本。ここで一覧を書き写さない。 */
+  function realPlate(v){
+    if (w.pitIsRealPlate) { try { return !!w.pitIsRealPlate(v); } catch (e) {} }
+    return t(v).length >= 3;
+  }
+
   function sameCar(pair){
     var sv = t(pair && pair.soft && pair.soft.車体番号).toUpperCase();
     var pv = t(pair && pair.pit && pair.pit.車体番号).toUpperCase();
     if (sv && pv) return (sv === pv) ? 'vinOK' : 'vinNG';
+
+    /* 🔵🔵 v2.9.2（ゆうた 2026-08-25・Q-932548）
+       🗣「これは**ナンバーと客名がしっかり適合してたら、車種表示の揺れは気にしないでほしい**。
+       　　**逆にナンバーが読めないとかだったら要注意**ではある」
+       ◎実データ（伝票0676／石合仁之／名古屋 376 る 703）
+         ナンバー一致・客名一致。**車種だけ「ＷＲＸ」vs「インプレッサ」**。車体番号は片方だけ。
+         ＝ 車種のフォールバックに落ちて「別の車かも」🔴 になっていた。同じ車なのに。
+       🔴 **ナンバーと客名の2つがそろって一致していれば、それが答え。車種は見ない。**
+          車体番号ほど強くはないが、車種の呼び方より**はるかに確か**。 */
+    var okPlate = realPlate(pair && pair.soft && pair.soft.ナンバー)
+               && realPlate(pair && pair.pit && pair.pit.ナンバー)
+               && normPlate(pair.soft.ナンバー) === normPlate(pair.pit.ナンバー);
+    var sn = normName(pair && pair.soft && pair.soft.顧客名);
+    var pn = normName(pair && pair.pit && pair.pit.顧客名);
+    var okName = !!(sn && pn && sn === pn);
+    if (okPlate && okName) return 'plateOK';
+
+    /* 🟡 ナンバーが読めない（「仮登録車両」・空など）＝**結びつけの根拠が弱い。要注意。**
+       ⚠ 「別の車だ」とは言っていない。**人が見て確かめて**という札。 */
+    if (!realPlate(pair && pair.soft && pair.soft.ナンバー)
+     || !realPlate(pair && pair.pit && pair.pit.ナンバー)) return 'plateNG';
+
     var sc = normCar(pair && pair.soft && pair.soft.車種);
     var pc = normCar(pair && pair.pit && pair.pit.車種);
     if (!sc || !pc) return 'ok';                       /* 片方が空＝言わない */
@@ -374,6 +403,8 @@
 
   function crossOnly(pair){
     if (!pair || !pair.期間の外) return false;
+    /* ⚠ v2.9.2 ナンバーが読めない組は、そもそも結びつけを確かめてもらう側。お知らせにしない */
+    if (pair.同一性 === 'plateNG') return false;
     /* 🛡🛡 v2.9.0 **保険だけは月またぎでも「直す先が無い」**（ゆうた指定 2026-08-25）。
        🗣「保険が付いたものは返車と入金が大きくずれる。……各データチェックやPDFチェックでも
        　　このフローはOKとする」
@@ -401,6 +432,8 @@
   function groupOf(pair){
     var id = sameCar(pair);
     if (id === 'vinNG' || id === 'carNG') return 'data';   /* 別の車かも＝結びつけが怪しい */
+    /* 🟡 v2.9.2 ナンバーが読めない＝結びつけの根拠が弱い。**人に見てもらう** */
+    if (id === 'plateNG') return 'data';
     /* 🔔 v2.8.3 直す先が無いもの＝OK（お知らせは画面が1行出す）。⚠ 期間の外の判定より先 */
     if (crossOnly(pair))                   return 'ok';
     if (pair.期間の外)                     return 'date';   /* お金は動くが、原因は日付 */
@@ -499,6 +532,8 @@
          🔴 判定は**この物差し1本**。画面（quarter.js）で綴り直さないこと。 */
       var _p = pairs[pairs.length - 1];
       _p.同一性 = sameCar(_p);
+      /* ⚠ v2.9.2 `plateNG`（ナンバーが読めない）は**「別の車」とは言い切らない**。
+         下の `groupOf` が「データがちがう」へ入れて、人に見てもらう。 */
       _p.同じ車 = (_p.同一性 !== 'vinNG' && _p.同一性 !== 'carNG');
       _p.売上日差 = salesGap(_p);
       _p.効き = effect(_p);

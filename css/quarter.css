@@ -541,6 +541,12 @@
 .vw-t3 tr.hd b{ font-size:12.5px; color:var(--text); }
 .vw-t3 tr.hd span{ font-size:10.5px; color:var(--text3); margin-left:9px; }
 .vw-t3 tr.mi td, .vw-t3 tr.mi .g{ color:var(--ins-c,#f59e0b); }
+/* 🗒 v2.12.3 フロントマンのコメント行。
+   🔴 v2.12.4（ゆうた「└ とかは要らない　そのまんまにしてほしい」）
+      **飾りを足さない。** 紙に打ってある字を、打ってある所にそのまま置く。
+   ⚠ 金額の仲間に見えないよう、字の濃さだけ落とす（数字の列は空のまま）。 */
+.vw-t3 tr.cm td{ color:var(--text2); font-size:11.5px; padding:4px 8px;
+  border-bottom:1px solid var(--border2,#232c34); white-space:normal; }
 .vw-t3 tfoot th{ border-top:1px solid var(--border); border-bottom:none; font-size:12.5px; color:var(--text); padding-top:8px; }
 .vw-t3 tfoot th.g{ color:var(--green); }
 .vw-t3 tfoot th.c{ color:var(--text3); }

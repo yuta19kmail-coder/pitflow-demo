@@ -210,7 +210,15 @@
         v:eff(G.データ) + softAmt - pitAmt, note:'片方にしか無い／別の車かも／担当がちがう' },
       { id:'money', l:'金額がちがう',   n:G.金額.length, v:eff(G.金額), note:'伝票と確定金額がちがう' },
       { id:'date',  l:'日付がちがう',   n:G.日付.length, v:eff(G.日付), note:'売上日のズレ／返車日が期間の外' },
-      { id:'ok',    l:'OK',            n:G.OK.length,   v:0,           note:'直すところがありません' }
+      /* 🔔 v2.8.3 OK にも「返車日だけQをまたいだ（正常）」が入るようになった。
+         🔴 だから **0円と決め打ちしない**。決め打ちのままだと「4つを足すと差になる」が崩れる。
+         ⚠ v2.8.3 より前は OK の効きは必ず0だったので、`eff(G.OK)` は昔の結果でも同じ0になる。 */
+      { id:'ok',    l:'OK',            n:G.OK.length,   v:eff(G.OK),
+        note: (function () {
+          var k = G.OK.filter(function (p) { return p.正常なQまたぎ; }).length;
+          return k ? '直すところがありません（うち' + k + '件は返車日が期間の外・お知らせ）'
+                   : '直すところがありません';
+        })() }
     ];
     var h = '<div class="q-gr">';
     GS.forEach(function (x) {
@@ -575,10 +583,13 @@
     var sg = p.売上日差 || { kind:'', label:'' };
     var sdCls = sg.kind === 'none' ? 'miss' : (sg.kind === 'same' ? '' : 'bad');
     var idNg = !p.同じ車;
-    return '<div class="q-c' + (left ? '' : ' is-done') + (p.期間の外 ? ' out' : '') + (idNg ? ' mism' : '') + '">'
+    /* 🔔 v2.8.3 直す先が無いものは、左の帯も黄ではなく青（見るだけ、と分かるように） */
+    return '<div class="q-c' + (left ? '' : ' is-done')
+         + (p.期間の外 ? (p.正常なQまたぎ ? ' note' : ' out') : '') + (idNg ? ' mism' : '') + '">'
       + '<div class="q-c-h">' + noBtn(w.pitQRowNo ? w.pitQRowNo(p) : '')
       +   '<span class="q-c-how">' + esc(p.結び方) + '</span>'
-      +   (p.期間の外 ? '<span class="q-c-out">この期間の外</span>' : '')
+      +   (p.期間の外 ? '<span class="q-c-' + (p.正常なQまたぎ ? 'note' : 'out') + '">'
+                      + (p.正常なQまたぎ ? '🔔 お知らせ' : 'この期間の外') + '</span>' : '')
       +   (idNg ? '<span class="q-c-warn">⚠ 別の車かも</span>' : '')
       + '</div>'
       + '<div class="q-c-body"><div class="q-c-main">'
@@ -610,6 +621,12 @@
       +   '<span class="q-c-g">実績日 ' + esc(p.pit.数える日) + (p.期間の外 ? '・この期間の外' : '') + '</span>'
       +   '<span class="q-c-g ' + (p.金額一致 ? 'ok' : 'bad') + '">'
       +     (p.差 === 0 ? '金額はぴったり' : ('金額 ' + (p.差 > 0 ? '+' : '') + yen(p.差) + '円')) + '</span>'
+      /* 🔔 v2.8.3 直す先が無いことを、はっきり書く（ゆうた「あくまでお知らせで、扱いはOK」）。
+         ⚠ 判定は書き写さない。`pitQMatch` が貼った `正常なQまたぎ` を読むだけ。 */
+      +   (p.正常なQまたぎ
+          ? '<span class="q-c-g cross">🔔 伝票を切った日と車を返した日でQがまたがっただけです。'
+            + '金額・車・売上日は合っています＝<b>直すところはありません</b></span>'
+          : '')
       + '</div>'
       + '<div class="q-c-st' + (p.担当一致 ? '' : ' bad') + '">フロントマン <b>' + esc(p.soft.受付担当 || '—') + '</b>'
       +   '<span>／</span>PitFlow <b>' + esc(p.pit.フロント担当 || '—') + '</b>'

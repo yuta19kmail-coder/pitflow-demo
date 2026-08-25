@@ -243,40 +243,60 @@
 .cd-hnosale{ font-size:11.5px; font-weight:800; color:var(--text3); }
 .cd-hst.nosale{ color:var(--text3); border-style:dashed; }
 
+/* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベル付き・読める大きさに */
+.cd-vvin{ margin-top:7px; display:flex; align-items:baseline; gap:7px;
+  font-family:Consolas,Menlo,"Courier New",monospace; font-size:14px; font-weight:700;
+  letter-spacing:.01em; color:var(--text); word-break:break-all; }
+.cd-vvin i{ font-style:normal; font-family:inherit; font-size:10px; font-weight:700;
+  color:var(--text3); letter-spacing:.04em; flex:0 0 auto; }
+
 /* ================================================================
-   🕘 v2.11.0 来店履歴の行＝2段（ゆうた 2026-08-25）
+   🕘 v2.11.0／v2.11.1 来店履歴の行（ゆうた 2026-08-25）
    1段目 … 車種・担当・代車　2段目 … 札（返車済み・保険・社内区分・予約番号）
-   右 …… 金額 ＋「履歴」ボタン（前は「返車済み」を押させていた）
+   右 …… 金額 ＋ ボタン（履歴／実績ボード／予約詳細）
+   🔴 v2.11.1「もうちょい綺麗に」＝**縦をそろえる。札の大きさをそろえる。**
+      ・行は grid。日付・作業タイプ・金額・ボタンは**すべて中央そろえ**
+      ・札は1つの形（`.cd-htag`）だけ。押させない（飛び先はボタン）
    ================================================================ */
-.cd-hrow{ align-items:flex-start; }
-.cd-hl1{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; font-size:13.5px; }
+.cd-hist{ background:var(--bg2); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.cd-hrow{ display:grid; grid-template-columns:96px auto minmax(0,1fr) 108px auto;
+  align-items:center; gap:14px; padding:12px 16px; border-bottom:1px solid var(--border); }
+.cd-hrow:last-child{ border-bottom:none; }
+.cd-hdt{ font-size:12px; color:var(--text2); font-weight:700; font-variant-numeric:tabular-nums; }
+.cd-hwt{ justify-self:start; font-size:11px; font-weight:800; color:#fff; padding:3px 10px; border-radius:7px;
+  line-height:1.5; white-space:nowrap; }
+.cd-hmid{ min-width:0; }
+.cd-hl1{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; font-size:13.5px; }
 .cd-hl1 b{ font-size:14px; }
 .cd-hstaff{ font-size:11.5px; color:var(--text2); }
-.cd-loa{ font-size:11.5px; color:var(--green); display:inline-flex; align-items:center; gap:3px; }
-.cd-htags{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:5px; }
-.cd-htag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;
+.cd-loa{ font-size:11.5px; color:var(--green); display:inline-flex; align-items:center; gap:4px; }
+.cd-hsub{ font-size:11.5px; color:var(--text3); margin-top:3px; }
+.cd-htags{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:6px; }
+.cd-hamt{ font-size:14px; font-weight:800; text-align:right; font-variant-numeric:tabular-nums; }
+.cd-hnosale{ font-size:11.5px; font-weight:700; color:var(--text3); }
+
+/* 🏷 札＝1つの形だけ（大きさをそろえる。前は状態と予約番号で高さが違った） */
+.cd-htag{ display:inline-flex; align-items:center; height:19px; padding:0 9px;
+  font-size:10.5px; font-weight:700; line-height:1; border-radius:999px;
   border:1px solid var(--border2); color:var(--text3); background:var(--bg1); white-space:nowrap; }
 .cd-htag.st{ color:var(--text2); }
 .cd-htag.st.nosale{ color:var(--text3); border-style:dashed; }
-.cd-htag.st.clickable{ cursor:pointer; }
-.cd-htag.st.clickable:hover{ border-color:var(--brand); color:var(--brand); background:var(--brand-soft); }
-.cd-htag.no{ font-family:Consolas,Menlo,monospace; letter-spacing:-.02em; }
-.cd-hhist{ flex:0 0 auto; display:inline-flex; align-items:center; gap:5px;
-  font-size:11.5px; font-weight:700; color:var(--text2);
-  background:var(--bg1); border:1px solid var(--border2); border-radius:8px;
-  padding:5px 11px; cursor:pointer; }
-.cd-hhist:hover{ border-color:var(--brand); color:var(--brand); background:var(--brand-soft); }
-.cd-hamt{ align-self:center; }
+.cd-htag.no{ font-family:Consolas,Menlo,monospace; font-size:10px; letter-spacing:-.02em; }
+
+/* 🔘 行の右のボタン（履歴／実績ボード／予約詳細）＝どの画面でも同じ形 */
+.cd-hbtns,.ch-btns{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.cd-b{ display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px;
+  font-size:11.5px; font-weight:700; line-height:1; white-space:nowrap;
+  color:var(--text2); background:var(--bg1); border:1px solid var(--border2); border-radius:8px; cursor:pointer; }
+.cd-b:hover{ border-color:var(--brand); color:var(--brand); background:var(--brand-soft); }
 
 /* ================================================================
-   🕘🕘 v2.11.0 来店履歴の画面（広く・左にサイドバー）
-   ゆうた「ワイドがかなりなくてスクロールが入っちゃってる。もっと広げてほしい」
-        「左側にサイドバーを付けて履歴全体を横断できるように」
+   🕘🕘 v2.11.0／v2.11.1 来店履歴の画面（広く・左サイドバー・伝票は開いたまま）
    ================================================================ */
 .cm-box.ch-box{ width:1240px; max-width:calc(100vw - 40px); }
 .ch-wrap{ display:grid; grid-template-columns:236px minmax(0,1fr); gap:0; align-items:stretch; }
 .ch-side{ border-right:1px solid var(--border); background:var(--bg1);
-  padding:12px; display:flex; flex-direction:column; gap:10px; max-height:70vh; }
+  padding:12px; display:flex; flex-direction:column; gap:10px; max-height:74vh; }
 .ch-mode{ display:grid; grid-template-columns:1fr 1fr; gap:5px; }
 .ch-mb{ font-size:11.5px; font-weight:700; padding:7px 4px; border-radius:8px; cursor:pointer;
   border:1px solid var(--border2); background:var(--bg2); color:var(--text3); }
@@ -295,61 +315,46 @@
   font-size:11px; font-weight:800; color:var(--text3);
   background:var(--bg3); border-radius:10px; padding:1px 8px; }
 .ch-sum{ font-size:11px; color:var(--text3); border-top:1px solid var(--border); padding-top:9px; }
-.ch-main{ padding:14px 16px; max-height:70vh; overflow:auto; min-width:0; }
-.ch-list{ display:flex; flex-direction:column; gap:8px; }
-.ch-row{ display:flex; align-items:flex-start; gap:13px;
-  background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px 13px; }
-.ch-dt{ flex:0 0 88px; font-size:12px; font-weight:700; color:var(--text2); padding-top:2px; }
-.ch-wt{ flex:0 0 auto; font-size:11px; font-weight:800; color:#fff; padding:3px 10px; border-radius:7px; }
-.ch-mid{ flex:1; min-width:0; }
-.ch-l1{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; font-size:13.5px; }
+.ch-main{ padding:14px 16px; max-height:74vh; overflow:auto; min-width:0; }
+.ch-list{ display:flex; flex-direction:column; gap:10px; }
+
+/* 1件＝上の行 ＋ 下の伝票（伝票は**最初から開いている**） */
+.ch-item{ border:1px solid var(--border); border-radius:11px; background:var(--bg); overflow:hidden; }
+.ch-item.is-here{ border-color:var(--brand); box-shadow:0 0 0 2px var(--brand-soft); }
+.ch-row{ display:grid; grid-template-columns:92px auto minmax(0,1fr) 108px auto;
+  align-items:center; gap:13px; padding:11px 14px; }
+.ch-dt{ font-size:12px; font-weight:700; color:var(--text2); font-variant-numeric:tabular-nums; }
+.ch-wt{ justify-self:start; font-size:11px; font-weight:800; color:#fff; padding:3px 10px; border-radius:7px;
+  line-height:1.5; white-space:nowrap; }
+.ch-mid{ min-width:0; }
+.ch-l1{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; font-size:13.5px; }
 .ch-l1 b{ font-size:14px; }
 .ch-plate{ font-size:11.5px; color:var(--text2); }
 .ch-st2{ font-size:11.5px; color:var(--text2); }
-.ch-loa{ font-size:11.5px; color:var(--green); display:inline-flex; align-items:center; gap:3px; }
+.ch-loa{ font-size:11.5px; color:var(--green); display:inline-flex; align-items:center; gap:4px; }
 .ch-sub{ font-size:11.5px; color:var(--text3); margin-top:3px; }
 .ch-tags{ display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-top:6px; }
-.ch-tag{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px;
+.ch-tag{ display:inline-flex; align-items:center; height:19px; padding:0 9px;
+  font-size:10.5px; font-weight:700; line-height:1; border-radius:999px;
   border:1px solid var(--border2); color:var(--text3); background:var(--bg1); white-space:nowrap; }
 .ch-tag.st{ color:var(--text2); }
-.ch-tag.no{ font-family:Consolas,Menlo,monospace; letter-spacing:-.02em; }
-.ch-den-h{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:7px;
-  border-top:1px dashed var(--border); padding-top:7px; cursor:pointer; }
+.ch-tag.no{ font-family:Consolas,Menlo,monospace; font-size:10px; letter-spacing:-.02em; }
+.ch-amt{ font-size:14px; font-weight:800; text-align:right; font-variant-numeric:tabular-nums; }
+.ch-den{ border-top:1px solid var(--border); background:var(--bg1); padding:10px 14px 12px; }
+.ch-den-h{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
 .ch-den-h b{ font-size:15px; color:var(--text); font-variant-numeric:tabular-nums; }
 .ch-den-h span{ font-size:11px; color:var(--text3); }
 .ch-den-h em{ font-style:normal; font-size:12px; font-weight:800; color:var(--green); }
-.ch-den-h i{ font-style:normal; font-size:10.5px; color:var(--brand); margin-left:auto; }
+.ch-den-h i{ font-style:normal; font-size:10.5px; color:var(--text3); margin-left:auto; }
 .ch-den-hou{ color:var(--orange) !important; }
-.ch-amt{ flex:0 0 auto; font-size:14px; font-weight:800; padding-top:2px; }
-.ch-open{ flex:0 0 auto; font-size:11px; font-weight:700; color:var(--text3);
-  background:var(--bg1); border:1px solid var(--border2); border-radius:8px;
-  padding:5px 10px; cursor:pointer; }
-.ch-open:hover{ border-color:var(--brand); color:var(--brand); background:var(--brand-soft); }
 @media (max-width:980px){
   .ch-wrap{ grid-template-columns:1fr; }
   .ch-side{ border-right:none; border-bottom:1px solid var(--border); max-height:none; }
   .ch-cars{ flex-direction:row; overflow-x:auto; }
   .ch-car{ flex:0 0 200px; }
+  .ch-row,.cd-hrow{ grid-template-columns:1fr auto; }
+  .ch-dt,.cd-hdt{ grid-column:1; }
+  .ch-mid,.cd-hmid{ grid-column:1 / -1; }
 }
-
-
-/* ================================================================
-   🚗🧾 v2.2.0 車体番号／来店履歴にぶら下がる伝票
-   ⚠ 伝票の表そのものは quarter.css（`.vw-t3` ほか）の1本を借りる。見た目を2つ持たない。
-   ================================================================ */
-/* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベル付き・読める大きさに */
-.cd-vvin{ margin-top:7px; display:flex; align-items:baseline; gap:7px;
-  font-family:Consolas,Menlo,"Courier New",monospace; font-size:14px; font-weight:700;
-  letter-spacing:.01em; color:var(--text); word-break:break-all; }
-.cd-vvin i{ font-style:normal; font-family:inherit; font-size:10px; font-weight:700;
-  color:var(--text3); letter-spacing:.04em; flex:0 0 auto; }
-.cm-hrow.has-den{ cursor:pointer; }
-.cm-hrow.has-den:hover{ background:var(--bg3); }
-.cm-den-h{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:4px; }
-.cm-den-h b{ font-size:15px; color:var(--text); font-variant-numeric:tabular-nums; }
-.cm-den-h span{ font-size:11px; color:var(--text3); }
-.cm-den-h em{ font-style:normal; font-size:12px; font-weight:800; color:var(--green); }
-.cm-den-h i{ font-style:normal; font-size:10.5px; color:var(--brand); margin-left:auto; }
-.cm-den-hou{ color:var(--orange) !important; }
-.cm-den{ border:1px solid var(--border); border-radius:10px; background:var(--bg1);
-  padding:10px 12px; margin:0 0 8px; }
+/* 🕘 v2.11.1 予約詳細の引継ぎメモの下＝この車の来店履歴へ */
+.cv-histbtn{ display:flex; }

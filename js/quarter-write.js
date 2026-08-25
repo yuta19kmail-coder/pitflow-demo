@@ -265,16 +265,14 @@
       + '<th class="n">' + yen(m.金額) + '</th><th class="n c">' + yen(m.原価) + '</th>'
       + '<th class="n g">' + yen(ara) + '</th></tr></tfoot></table></div>';
     if (hou){
-      h += '<div class="vw-hou"><div class="vw-hou-t">法定費用（非課税）'
-         + '<span>お客様から預かって、そのまま納めるお金です。<b>売上にも粗利にも入りません</b></span></div>'
+      /* ✂️ v2.11.1（ゆうた「この辺りも要らない」）説明の2文を消した。
+         「法定費用（非課税）」という見出しと、売上の表と別枠になっている作りで意味は通る。 */
+      h += '<div class="vw-hou"><div class="vw-hou-t">法定費用（非課税）</div>'
          + '<div class="vw-hou-b">';
       (m.法定 || []).forEach(function (x) {
         h += '<div class="vw-hou-r"><span>' + esc(x.名) + '</span><b>' + yen(x.金額) + '円</b></div>';
       });
-      h += '<div class="vw-hou-r sum"><span>合計</span><b>' + yen(hou) + '円</b></div></div>'
-         + '<div class="vw-hou-n">お客様の請求書は ' + yen(m.金額) + '円 ＋ 消費税 ' + yen(m.消費税)
-         + '円 ＋ 法定費用 ' + yen(hou) + '円 ＝ <b>' + yen(m.伝票計) + '円</b>。'
-         + 'PitFlow が売上として数えるのは <b>' + yen(m.金額) + '円</b> だけです。</div>';
+      h += '<div class="vw-hou-r sum"><span>合計</span><b>' + yen(hou) + '円</b></div></div></div>';
     }
     return h;
   }

@@ -703,10 +703,8 @@
     if(!res) return null;
     return a.find(x=>x&&String(x.予約番号||'').trim()===res)||null;
   }
-  window.custDenToggle=function(id){
-    const e=document.getElementById(id); if(!e) return;
-    e.hidden=!e.hidden;
-  };
+  /* ✂️ v2.11.1 伝票の開け閉め（custDenToggle）は消した。
+     ゆうた「伝票は直近のを開いた形で最初から出して。**閉じておくっていう動作は要らない**」 */
   /* ================================================================
      🕘🕘 v2.11.0 **来店履歴の画面**（ゆうた指定 2026-08-25）
      ----------------------------------------------------------------
@@ -775,26 +773,57 @@
     });
     if (c.earlyDiscount) tags += '<span class="ch-tag">早期割</span>';
     if (c.resNo) tags += '<span class="ch-tag no">'+esc(c.resNo)+'</span>';
-    return '<div class="ch-row'+(den?' has-den':'')+'">'
-      + '<div class="ch-dt">'+esc(dt)+'</div>'
-      + '<div class="ch-wt" style="background:'+wc+'">'+esc(wl)+'</div>'
-      + '<div class="ch-mid">'
-      +   '<div class="ch-l1"><b>'+esc(c.car||'—')+'</b>'
-      +     (showCar && c.plate ? '<span class="ch-plate">'+esc(c.plate)+'</span>' : '')
-      +     (c.frontStaff?'<span class="ch-st2">担当 '+esc(c.frontStaff)+'</span>':'')
-      +     loa + '</div>'
-      +   (c.menu?'<div class="ch-sub">'+esc(String(c.menu).split('\n')[0])+'</div>':'')
-      +   '<div class="ch-tags">'+tags+'</div>'
-      +   (den?'<div class="ch-den-h" onclick="custDenToggle(\''+oid+'\')"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
+    /* 🧾 v2.11.1（ゆうた）**伝票は最初から開いた形で出す。畳む動作は要らない。** */
+    return '<div class="ch-item'+(den?' has-den':'')+'" id="'+oid+'">'
+      + '<div class="ch-row">'
+      +   '<div class="ch-dt">'+esc(dt)+'</div>'
+      +   '<div class="ch-wt" style="background:'+wc+'">'+esc(wl)+'</div>'
+      +   '<div class="ch-mid">'
+      +     '<div class="ch-l1"><b>'+esc(c.car||'—')+'</b>'
+      +       (showCar && c.plate ? '<span class="ch-plate">'+esc(c.plate)+'</span>' : '')
+      +       (c.frontStaff?'<span class="ch-st2">担当 '+esc(c.frontStaff)+'</span>':'')
+      +       loa + '</div>'
+      +     (c.menu?'<div class="ch-sub">'+esc(String(c.menu).split('\n')[0])+'</div>':'')
+      +     '<div class="ch-tags">'+tags+'</div>'
+      +   '</div>'
+      +   '<div class="ch-amt">'+esc(amt)+'</div>'
+      +   '<div class="ch-btns">'+_histBtns(c)+'</div>'
+      + '</div>'
+      + (den?'<div class="ch-den">'
+             + '<div class="ch-den-h"><b>'+Number(den.金額||0).toLocaleString()+'円</b>'
              + '<span>原価 '+Number(den.原価||0).toLocaleString()+'円</span>'
              + '<em>粗利 '+ara.toLocaleString()+'円（'+pct+'%）</em>'
              + (hou?'<span class="ch-den-hou">＋法定費用 '+hou.toLocaleString()+'円</span>':'')
-             + '<i>伝票 '+esc(den.伝票番号||'')+' ▼</i></div>':'')
-      + '</div>'
-      + '<div class="ch-amt">'+esc(amt)+'</div>'
-      + '<button class="ch-open" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')">予約詳細</button>'
-      + '</div>'
-      + (den?'<div class="cm-den" id="'+oid+'" hidden>'+(window.pitQDenTable?pitQDenTable(den):'')+'</div>':'');
+             + '<i>伝票 '+esc(den.伝票番号||'')+'</i></div>'
+             + (window.pitQDenTable?pitQDenTable(den):'')
+           + '</div>':'')
+      + '</div>';
+  }
+
+  /* ================================================================
+     🔘 v2.11.1 行の右のボタン（ゆうた「実績ボードは別途ボタンにして履歴と並べて」）
+     ----------------------------------------------------------------
+     🔴 **状態は押させない。** 「返車済み」は**ただの札**にして、
+        飛び先は**ボタン**として並べる（押せる所と、読む所を混ぜない）。
+     ⚠ 作り方はここ1本。顧客詳細の行も、履歴の画面の行も同じ形を使う。
+     ================================================================ */
+  function _histBtns(c, custId, vehId){
+    const isNS = _cardNoSale(c) || _cardCancelled(c);
+    let h = '';
+    if (custId != null){
+      h += '<button class="cd-b" onclick="event.stopPropagation();custHistory(\''+custId+'\',\''+esc(vehId||'')+'\',\''+esc(c.id)+'\')">'
+         +   '<i data-ic=clock data-ics=14></i> 履歴</button>';
+    }
+    if (c.status === 'reserved'){
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoReserveDate(\''+esc(c.reserveDate||'')+'\')">'
+         +   '<i data-ic=calendar data-ics=14></i> 予約表</button>';
+    } else if (c.status === 'returned' && !isNS){
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoResultMonth(\''+esc(c.returnDate||c.reserveDate||'')+'\')">'
+         +   '<i data-ic=chart data-ics=14></i> 実績ボード</button>';
+    }
+    h += '<button class="cd-b" onclick="event.stopPropagation();pitOpenCardDetail(\''+esc(c.id)+'\')">'
+       +   '<i data-ic=file data-ics=14></i> 予約詳細</button>';
+    return h;
   }
 
   function _histHtml(){
@@ -858,14 +887,37 @@
 
   /* ⚠ アイコンを埋める入口は `pit-icons.js` の **`icoBoot`**（`pitIcons` という名前は無い）。
      見張っている MutationObserver でも埋まるが、**開いた瞬間に**埋めたいのでここでも呼ぶ。 */
+  /* ⚠ アイコンを埋める入口は `pit-icons.js` の **`icoBoot`**（`pitIcons` という名前は無い）。 */
   function _histOpen(){
     openModal(_histHtml(), 'ch-box');
-    if (window.icoBoot) { try { icoBoot(document.getElementById('cust-modal')); } catch(e){} }
+    const box = document.getElementById('cust-modal');
+    if (window.icoBoot) { try { icoBoot(box); } catch(e){} }
+    /* 🔴 v2.11.1 その行から来たなら、**そこまで動かす**（ゆうた「該当の履歴をクリックした場合はそこから」）。
+       ⚠ 伝票はもう開いているので、探して読むだけでいい。 */
+    if (_hist.cardId && box){
+      const el = box.querySelector('#dn'+_hist.cardId);
+      if (el){
+        el.classList.add('is-here');
+        const main = box.querySelector('.ch-main');
+        if (main) main.scrollTop = Math.max(0, el.offsetTop - main.offsetTop - 8);
+      }
+    }
   }
 
-  window.custHistory = function(custId, vehId){
-    _hist = { custId: custId, vehId: vehId || '', mode: 'veh' };
+  window.custHistory = function(custId, vehId, cardId){
+    _hist = { custId: custId, vehId: vehId || '', mode: 'veh', cardId: String(cardId || '') };
     _histOpen();
+  };
+  /* 🔘 v2.11.1（ゆうた「アーカイブ済みのカード詳細の引継ぎメモの下にも履歴ボタンが欲しい」）
+     カードからは**ナンバーしか手元に無い**ので、ここで顧客と車を引いて開く。
+     🔴 引き方は `vehByPlate` 1本（ほかで `vehicles` を舐め直さない）。 */
+  window.custHistoryByPlate = function(plate, cardId){
+    const h = vehByPlate(plate);
+    if (!h || !h.cust){
+      if (window.pitToast) pitToast('この車はお客様に登録されていません');
+      return;
+    }
+    window.custHistory(h.cust.id, (h.veh && h.veh.id) || '', cardId || '');
   };
   window.custHistMode = function(m){ _hist.mode = (m==='cust'?'cust':'veh'); _histOpen(); };
   window.custHistVeh  = function(id){ _hist.vehId = id; _hist.mode = 'veh'; _histOpen(); };
@@ -1174,17 +1226,15 @@
         // ステータスバッジ：予約→予約カレンダー／返車済み→実績カレンダー（行クリックは予約詳細）
         /* 売上なしの車は実績カレンダーに載っていないので、バッジから飛ばさない（飛んでも無い） */
         const isNS=_cardNoSale(c)||_cardCancelled(c);
-        const isResv=(c.status==='reserved'), isRet=(c.status==='returned'&&!isNS);
-        const stClick=isResv?("event.stopPropagation();pitGotoReserveDate('"+esc(c.reserveDate||'')+"')")
-                    :isRet?("event.stopPropagation();pitGotoResultMonth('"+esc(c.returnDate||c.reserveDate||'')+"')"):'';
         /* ================================================================
-           🕘 v2.11.0（ゆうた 2026-08-25）行の作りを変えた。
+           🕘 v2.11.0／v2.11.1（ゆうた 2026-08-25）行の作りを変えた。
            ・**ナンバーは出さない**（車種・担当・代車でいい。この画面は同じお客様の中なので）
            ・状態などの札は**2行目にまとめて並べる**
-           ・右の押せる所は「返車済み」ではなく **「履歴」ボタン**
+           🔴 v2.11.1 **「返車済み」はただの札にする。押させない。**
+              飛び先（実績ボード／予約表）は**ボタン**にして「履歴」と並べる
+              ＝ 読む所と押す所を混ぜない。札の大きさも全部そろう。
            ================================================================ */
-        const stBadge='<span class="cd-htag st'+(isNS?' nosale':'')+((isResv||isRet)?' clickable':'')+'"'+(stClick?(' onclick="'+stClick+'" title="'+(isResv?'予約カレンダーへ':'実績カレンダーへ')+'"'):'')+'>'+esc(_statusLbl(c))+(isResv?' <i data-ic=calendar data-ics=15></i>':isRet?' <i data-ic=chart data-ics=15></i>':'')+'</span>';
-        let tags=stBadge;
+        let tags='<span class="cd-htag st'+(isNS?' nosale':'')+'">'+esc(_statusLbl(c))+'</span>';
         if(window.pitCardIntern&&pitCardIntern(c)) tags+='<span class="cd-htag">'+esc(pitInternLabel(c))+'</span>';
         (Array.isArray(c.workSpecials)?c.workSpecials:[]).forEach(function(id){
           const lb=window.pitSpecialLabel?pitSpecialLabel(id):''; if(lb) tags+='<span class="cd-htag">'+esc(lb)+'</span>';
@@ -1193,14 +1243,14 @@
         if(c.resNo) tags+='<span class="cd-htag no">'+esc(c.resNo)+'</span>';
         /* この行の車＝ナンバーで引く（履歴ボタンの飛び先） */
         const _hv=(cust.vehicles||[]).find(function(x){ return x&&isRealPlate(x.plate)&&norm(x.plate)===norm(c.plate||''); });
-        h+='<div class="cd-hrow clickable" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
+        h+='<div class="cd-hrow">'+
            '<div class="cd-hdt">'+esc(_doneDate(c)||'日付未定')+'</div>'+
            '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+
            '<div class="cd-hmid"><div class="cd-hl1"><b>'+esc(c.car||'—')+'</b>'+(c.frontStaff?'<span class="cd-hstaff">担当 '+esc(c.frontStaff)+'</span>':'')+loa+'</div>'+
              (menuTxt?'<div class="cd-hsub">'+menuTxt+'</div>':'')+
              '<div class="cd-htags">'+tags+'</div></div>'+
            '<div class="cd-hamt">'+amtStr+'</div>'+
-           '<button class="cd-hhist" onclick="event.stopPropagation();custHistory(\''+cust.id+'\',\''+esc(_hv?(_hv.id||''):'')+'\')" title="この車の来店履歴"><i data-ic=clock data-ics=15></i> 履歴</button>'+
+           '<div class="cd-hbtns">'+_histBtns(c, cust.id, (_hv?(_hv.id||''):''))+'</div>'+
            '</div>';
       });
       h+='</div>';

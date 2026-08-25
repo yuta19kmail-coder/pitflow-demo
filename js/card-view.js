@@ -362,6 +362,15 @@
        + '<textarea class="cv-hoinput cv-grow" placeholder="引継ぎ・伝達を入力（自動で保存されます）"'
        +   ' oninput="cvGrow(this);cvHandoff(this.value)" onchange="cvHandoffSave(this.value)">'
        +   esc(c.handoffMemo||'')+'</textarea></div>';
+    /* 🕘 v2.11.1（ゆうた「引継ぎメモの下にも履歴ボタンが欲しいかも」）
+       ＝ この車の来店履歴を、そのままここから開く。アーカイブ済みのカードでも同じ。
+       🔴 開くのは `customers.js` の `custHistoryByPlate` 1本（ここで顧客を探さない）。
+       ⚠ ナンバーが無いカード（仮登録など）では出さない＝押せて効かないボタンを作らない。 */
+    if (window.custHistoryByPlate && window.pitIsRealPlate && pitIsRealPlate(c.plate)){
+      h += '<div class="cv-wsec cv-histbtn">'
+         +   '<button class="cd-b" onclick="custHistoryByPlate(\''+esc(c.plate)+'\',\''+esc(c.id)+'\')">'
+         +     '<i data-ic=clock data-ics=14></i> この車の来店履歴</button></div>';
+    }
     return h + '</div>';
   }
 

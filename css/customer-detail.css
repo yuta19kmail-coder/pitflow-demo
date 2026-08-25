@@ -259,10 +259,15 @@
       ・札は1つの形（`.cd-htag`）だけ。押させない（飛び先はボタン）
    ================================================================ */
 .cd-hist{ background:var(--bg2); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
-.cd-hrow{ display:grid; grid-template-columns:96px auto minmax(0,1fr) 108px auto;
+.cd-hrow{ display:grid; grid-template-columns:96px auto minmax(0,1fr) 108px 122px;
   align-items:center; gap:14px; padding:12px 16px; border-bottom:1px solid var(--border); }
 .cd-hrow:last-child{ border-bottom:none; }
+.cd-hrow.clickable{ cursor:pointer; }
+.cd-hrow.clickable:hover{ background:var(--bg3); }
+/* 🕘 v2.11.2 日付の下に予約番号 */
 .cd-hdt{ font-size:12px; color:var(--text2); font-weight:700; font-variant-numeric:tabular-nums; }
+.cd-hres{ display:block; margin-top:3px; font-family:Consolas,Menlo,monospace; font-size:10.5px;
+  font-weight:700; letter-spacing:-.02em; color:var(--text3); }
 .cd-hwt{ justify-self:start; font-size:11px; font-weight:800; color:#fff; padding:3px 10px; border-radius:7px;
   line-height:1.5; white-space:nowrap; }
 .cd-hmid{ min-width:0; }
@@ -283,8 +288,11 @@
 .cd-htag.st.nosale{ color:var(--text3); border-style:dashed; }
 .cd-htag.no{ font-family:Consolas,Menlo,monospace; font-size:10px; letter-spacing:-.02em; }
 
-/* 🔘 行の右のボタン（履歴／実績ボード／予約詳細）＝どの画面でも同じ形 */
-.cd-hbtns,.ch-btns{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+/* 🔘 行の右のボタン。
+   顧客詳細＝**上下に積む**（ゆうた「右端に上下に並べる」）／履歴の画面＝横に並べる */
+.cd-hbtns{ display:flex; flex-direction:column; align-items:stretch; gap:5px; }
+.cd-hbtns .cd-b{ justify-content:center; }
+.ch-btns{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
 .cd-b{ display:inline-flex; align-items:center; gap:5px; height:28px; padding:0 11px;
   font-size:11.5px; font-weight:700; line-height:1; white-space:nowrap;
   color:var(--text2); background:var(--bg1); border:1px solid var(--border2); border-radius:8px; cursor:pointer; }

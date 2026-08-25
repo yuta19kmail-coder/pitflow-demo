@@ -540,7 +540,7 @@
   function list(R, tab){
     var G = R.グループ || { データ:[], 金額:[], 日付:[], OK:[] };
     if (tab === 'ok'){
-      return G.OK.length ? '<div class="q-cards">' + G.OK.map(card).join('') + '</div>'
+      return G.OK.length ? '<div class="q-cards">' + G.OK.map(one).join('') + '</div>'
                          : '<div class="q-none">0件です。</div>';
     }
     if (tab === 'data'){
@@ -553,7 +553,7 @@
       if (!ones.length && !mid.length) return '<div class="q-none">0件です。</div>';
       return '<div class="q-cards">'
         + ones.map(function (o) { return oneCard(o.x, o.k); }).join('')
-        + mid.map(card).join('')
+        + mid.map(one).join('')
         + '</div>';
     }
     var rows = (tab === 'money') ? G.金額 : G.日付;
@@ -564,7 +564,7 @@
       var lb = w.pitQRowLeft ? (w.pitQRowLeft(b) > 0 ? 0 : 1) : 0;
       return la - lb;
     });
-    return '<div class="q-cards">' + rows.map(card).join('') + '</div>';
+    return '<div class="q-cards">' + rows.map(one).join('') + '</div>';
   }
 
   /* 🔴 赤＝本当にどちらか片方にしか無い（カードすら無い／伝票が無い）
@@ -584,6 +584,15 @@
      ・管理番号の右に**車体番号**
      ・左が見くらべ、右が片づけ（横スクロールは1つも出さない）
      ================================================================ */
+  /* 🔴🔴 v2.8.5（ゆうた報告 2026-08-25）**`.map(card)` と裸で書かないこと。**
+     `Array.map` は2つ目に**添え字**を渡すので、`card(p, saved)` の `saved` に 0,1,2… が入る。
+     ＝ 1枚目（添え字0＝偽）だけ直すボタンが出て、**2枚目以降は「残した結果」として描かれ、
+        ボタンが丸ごと消える**。押すと並び替えで次が1枚目に来るので「1つずつしか押せない」に見えた。
+     🗣「売上日を変えるボタンとかが一番上にしか出ないで、クリックすると次のが上がって押せるようになる」
+     ⚠ v2.7.0 で `card(p, saved)` に2つ目の引数を足した時に生まれた。**引数を増やしたら map を疑う。**
+     ⚠ だから包む関数を1つ置いて、**map から card を直接呼ばせない。** */
+  function one(p){ return card(p); }
+
   function card(p, saved){
     /* 🃏 v2.7.0 saved=true ＝ 残した結果として描く。
        ⚠ 「直す」ボタンは出さない。直す処理（pitQDo / pitQMk）は

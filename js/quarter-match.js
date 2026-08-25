@@ -35,6 +35,7 @@
    ◎ここが返すもの
      pitQCollect(opt)          … PitFlow 側の材料を state から集める（**読むだけ**）
      pitQMatch(soft, pit, opt) … 突き合わせて、内訳と検算まで入った結果を返す
+     pitQCrossLink(groups)     … 🔗 v2.8.0 **組をまたいで**名札を貼り直す（数字はさわらない）
      pitQNormPlate / pitQNormName / pitQStaffName / pitQDateGap … ならしの物差し
 
    ⚠ 読み込みは sales.js（pitQuarterOf）／sales-count.js（pitSalesCountDate）より後ろ。
@@ -197,12 +198,19 @@
      3. PitFlow 側の材料を集める（**読むだけ・1バイトも書き換えない**）
      ----------------------------------------------------------------
      🔴 期間の判定・数える日・確度は **PitFlow の物差しをそのまま借りる**（写しを作らない）。
-     🔴 集める窓は、比べたい期間より**前後に広い**（既定 14日）。
+     🔴 集める窓は、比べたい期間より**前後に広い**。
         ＝ 日付がズレている車を「無い車」に化けさせないため（2026-08-08 の教訓）。
+
+     🔴🔴 v2.8.0（ゆうた 2026-08-25）**窓は2つある。混ぜないこと。**
+        | ① 見える窓（ここ・既定 **45日**） | 「カードが有るかどうか」を**言うため**だけ |
+        | ② 結ぶ窓（`match` の `結ぶ幅`・**14日**） | **お金を結ぶ**ため。ここは1ミリも緩めない |
+        ＝ 窓を広げても **`pairs` は1件も変わらない → 検算は1円も動かない。**
+        ⚠ ①だけ広げるのが肝。①②を一緒に広げると、
+           「1か月半おきに来る同じ車」の**別の入庫**と結んで、金額の嘘が出る。
      ================================================================ */
   function collect(opt){
     opt = opt || {};
-    var from = t(opt.from), to = t(opt.to), padDays = (opt.pad == null ? 14 : +opt.pad);
+    var from = t(opt.from), to = t(opt.to), padDays = (opt.pad == null ? 45 : +opt.pad);
     var wFrom = shift(from, -padDays), wTo = shift(to, padDays);
     var cards = opt.cards || (w.state && w.state.cards) || [];
     var countDate = w.pitSalesCountDate || function (c) { return s(c.completedAt || c.returnDateFinal || c.returnDate); };
@@ -411,6 +419,30 @@
       _p.組 = groupOf(_p);
     }
 
+    /* 🔴🔴 v2.8.0 **結ぶ窓（既定＝期間の前後14日）**。ここが「お金を結んでよい範囲」。
+       ⚠ 集める窓（`pitQCollect` の前後45日）を広げたのは**カードが有ると言うため**であって、
+          結ぶためではない。結ぶ側まで広げると、1か月半おきに来る同じ車の
+          **別の入庫**と結んで、金額の嘘が出る（2026-08-08 の教訓と同じ道）。
+       🔴 既定の 14 は **v2.8.0 より前の「集める窓」と1日も違わない**。
+          ＝ 窓を広げても `pairs` は1件も変わらない ＝ **検算は1円も動かない。**
+       ⚠ ①-a（ナンバー＋売上日がぴったり同じ）だけは窓で切らない。
+          **同じ日に同じナンバーで伝票が立っている＝同じ車**で、迷いようがない。 */
+    var LINKPAD = (opt.結ぶ幅 == null ? 14 : +opt.結ぶ幅);
+    var lFrom = shift(from, -LINKPAD), lTo = shift(to, LINKPAD);
+    /* ⚠ 見る日は **v2.8.0 より前の `pitQCollect` が窓に当てていた日と同じ4つ**
+       （売上日／数える日／返車日／入庫日）。1つでも窓に入っていれば結んでよい。
+          ここを減らすと、前は結べていた車が結べなくなる＝**直したつもりで壊す。** */
+    function near(p){
+      if (!lFrom || !lTo) return true;          /* 期間が読めない時は今までどおり全部 */
+      var g = p.生 || {};
+      var ds = [p.売上日, p.数える日, p.返車日, t(g.入庫日), t(g.返車日 || g.確定返車日)];
+      for (var i = 0; i < ds.length; i++){
+        var d = t(ds[i]);
+        if (d && d >= lFrom && d <= lTo) return true;
+      }
+      return false;
+    }
+
     /* ①-a ナンバー＋**カードの売上日**（💴 v1.185.0）
        🔴 ここがいちばん確か＝**同じ「売上日」どうし**をくらべている。
        ⚠ 売上日を持っていないカード（この仕組みより前に返した車）は空なので、ここには当たらない。
@@ -426,10 +458,10 @@
       var hit = act.filter(function (p) { return !p._used && p._plate === sr._plate && p.数える日 === sr.売上日; })[0];
       if (hit) take(sr, hit, 'ナンバー＋日付');
     });
-    /* ② ナンバーだけ（いちばん日が近いもの） */
+    /* ② ナンバーだけ（いちばん日が近いもの）。⚠ v2.8.0 **結ぶ幅の中だけ** */
     softRows.forEach(function (sr) {
       if (!sr._plate || pairs.some(function (p) { return p.soft.i === sr.i; })) return;
-      var cand = act.filter(function (p) { return !p._used && p._plate === sr._plate; });
+      var cand = act.filter(function (p) { return !p._used && p._plate === sr._plate && near(p); });
       if (!cand.length) return;
       /* 💴 v1.185.0 「いちばん日が近い」の測り方＝**カードの売上日があればそちら**で測る。
          ＝ 同じナンバーの車が窓の中に2台いる時、返車日ではなく売上日で近いほうを選ぶ。 */
@@ -445,7 +477,7 @@
       if (pairs.some(function (p) { return p.soft.i === sr.i; })) return;
       if (!sr._name) return;
       var cand = act.filter(function (p) {
-        return !p._used && p._name && p._name === sr._name && Math.abs(p.確定金額 - sr.金額) <= 1;
+        return !p._used && p._name && p._name === sr._name && Math.abs(p.確定金額 - sr.金額) <= 1 && near(p);
       });
       if (cand.length) take(sr, cand[0], '顧客名＋金額');
     });
@@ -472,6 +504,55 @@
         return { soft: sr, カード: card };
       });
     var pitOnly = act.filter(function (p) { return !p._used && p.対象期間内; });
+
+    /* ================================================================
+       🔗 v2.8.0（ゆうた報告 2026-08-25）**Qをまたいだ車を、二度言わない**
+       ----------------------------------------------------------------
+       🗣「今PitFlowとフロントマンのそれぞれにデータがないが量産される。
+       　　多分Qまたぎの車両を紐づけられてないんだと思う。
+       　　例 Q1 フロントマンになし／Q2 PitFlowになし → セットの車では？」
+
+       ◎起きていたこと（手元で組んで再現した）
+         伝票 8/10（Q2）・カードの数える日 8/5（Q1）の車を、8/1〜8/15 のPDFで見ると
+         　Q2 … 伝票と結ばれる（期間の外）  ← 正しい
+         　Q1 … **PitFlowだけ**に出る       ← 嘘。伝票はちゃんと在る（隣のQに）
+         `pitQMatch` は**1組ぶんしか知らない**ので、隣の組で結ばれたことが見えていなかった。
+         月まるごとのPDF（4組）だと、Qの境目の車が全部これをやる＝**量産**。
+
+       🔴🔴 直し方の決めごと ── **金額は1円も動かさない。**
+         `内訳` も `検算` もそのまま。**名札（`別のQ`）を1枚貼るだけ。**
+         ＝ 検算がこの並びのまま生きる。赤が「本当に無い車」だけになる。
+
+       ここでは**自分の組だけで分かること**を貼る（＝カード自身の売上日）。
+       組をまたいで見るのは下の `crossLink`（呼ぶのは quarter.js が全組を数え終わったあと）。
+       ================================================================ */
+    function qLabel(dateStr){
+      var q = qOf(t(dateStr));
+      return q ? q.label : '';
+    }
+    /* 🟡 カードが自分の売上日を持っていて、それがこの期間の外＝**伝票は別のQに立っている。** */
+    pitOnly.forEach(function (p) {
+      p.別のQ = '';
+      var sd = t(p.売上日);
+      if (!sd || !from || !to) return;
+      if (sd >= from && sd <= to) return;
+      p.別のQ = 'このカードの売上日は ' + sd + '（' + (qLabel(sd) || '別のQ') + '）です';
+    });
+    /* 🟡 伝票のほうは、カードが**この期間の外の実績**なら、それを言う。
+       ⚠ 「結ぶ」話ではない（お金は1円も動かない）。**言うだけ。**
+       🔴 言い方に気をつけること。**「同じナンバーのカード」**であって
+          「この伝票の相手」とは言わない（同じ車が2回入庫していることがある）。
+          だから**確定金額もいっしょに出す**＝目で見て別の入庫だと分かる。 */
+    softOnly.forEach(function (x) {
+      x.カード別Q = '';
+      var c = x.カード; if (!c) return;
+      var cd = t(c.数える日);
+      if (!cd || !from || !to) return;
+      if (cd >= from && cd <= to) return;
+      x.カード別Q = '同じナンバーのカードは ' + cd + '（' + (qLabel(cd) || '別のQ') + '）の実績です'
+                  + '（確定 ' + num(c.確定金額).toLocaleString('ja-JP') + '円'
+                  + (Math.abs(num(c.確定金額) - num(x.soft.金額)) <= 1 ? '・伝票と同じ金額' : '・伝票とちがう金額') + '）';
+    });
 
     /* ================================================================
        5. 合計と検算（🔴 合わなければ数字を出さない）
@@ -546,6 +627,49 @@
     };
   }
 
+  /* ================================================================
+     🔗 v2.8.0 組をまたいで見る（**1回のPDFの中だけ**）
+     ----------------------------------------------------------------
+     ◎もらうもの … quarter.js が作る組の配列 `[{ label, from, to, res }, ...]`
+     ◎やること   … ある組で「PitFlowだけ」に落ちたカードが、
+                    **別の組で伝票と結ばれていたら**、その事実で名札を上書きする。
+     🔴 **数字には一切さわらない。** `内訳`・`検算`・`結びついた` は読むだけ。
+     ⚠ 呼ぶのは**全部の組を数え終わったあと**（1組だけ数えた時点では意味がない）。
+     ⚠ 何度呼んでも同じ結果になるように書く（直すたびに呼ばれる）。
+     ================================================================ */
+  function cardIdOf(x){
+    if (!x) return '';
+    return t((x.生 && x.生.id) || x.id);
+  }
+  function crossLink(groups){
+    groups = (groups || []).filter(function (g) { return g && g.res; });
+    if (groups.length < 2) return groups;
+    /* ① どのカードが、どの組で、どの伝票と結ばれたか */
+    var byCard = {};
+    groups.forEach(function (g) {
+      (g.res.結びついた || []).forEach(function (p) {
+        var id = cardIdOf(p.pit);
+        if (id) byCard[id] = { label: t(g.label), 売上日: t(p.soft.売上日), 伝票: t(p.soft.伝票) };
+      });
+    });
+    /* ② 名札を貼り直す */
+    groups.forEach(function (g) {
+      (g.res.PitFlowだけ || []).forEach(function (x) {
+        var m = byCard[cardIdOf(x)];
+        if (!m || m.label === t(g.label)) return;
+        x.別のQ = '伝票は ' + m.label + '（' + m.売上日 + '・' + (m.伝票 || '伝票番号なし') + '）にあります';
+        x.別のQ確定 = true;                     /* 🔴 実際に結ばれた＝いちばん強い証拠 */
+      });
+      (g.res.整備ソフトだけ || []).forEach(function (x) {
+        var m = byCard[cardIdOf(x.カード)];
+        /* ⚠ そのカードが**別の伝票**と結ばれているなら、この伝票の相手ではない。
+           ＝「カードは別のQにあります」と言ってはいけない。今までどおり黄のまま置く。 */
+        if (m && m.伝票 !== t(x.soft.伝票)) x.カード別Q = '';
+      });
+    });
+    return groups;
+  }
+
   w.pitQNormPlate = normPlate;
   w.pitQNormName  = normName;
   w.pitQStaffName = staffName;
@@ -553,6 +677,7 @@
   w.pitQCollect   = collect;
   w.pitQSplit     = splitByQuarter;   /* 🗓 v2.0.0 PDF の期間をクォーターごとに割る */
   w.pitQMatch     = match;
+  w.pitQCrossLink = crossLink;    /* 🔗 v2.8.0 組をまたいで見る（Qまたぎの車を二度言わない） */
   w.pitQSameCar   = sameCar;      /* 🚗 v2.2.0 同じ車か（車体番号→無ければ車種） */
   w.pitQSalesGap  = salesGap;     /* 📅 v2.2.0 売上日どうしのズレ */
   w.pitQEffect    = effect;       /* 🗂 v2.2.0 その1件が差にいくら効くか */

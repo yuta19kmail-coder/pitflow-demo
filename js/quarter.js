@@ -194,7 +194,9 @@
     (R.整備ソフトだけ || []).forEach(function (x) {
       if (!x.カード || !(w.pitQOneMarkOf && w.pitQOneMarkOf(x))) n++;
     });
-    n += (R.PitFlowだけ || []).length;
+    /* 🔗 v2.8.0 **伝票が別のQに在ることが分かっているものは、残りに数えない。**
+       ＝ Qの境目の車は、伝票が在るほうのQで1回見れば済む（二度追いかけない）。 */
+    n += (R.PitFlowだけ || []).filter(function (x) { return !x.別のQ; }).length;
     return n;
   }
   w.pitQNokori = nokoriOf;
@@ -469,7 +471,8 @@
       soft: { 顧客名: r.お客様, ナンバー: r.ナンバー, 車種: r.車種, 売上日: r.売上日,
               金額: r.金額, 伝票: r.伝票, 車体番号: r.車体番号, 受付担当: r.受付担当 },
       カード: r.カードid ? { 状態: r.カード状態, 返車日: r.カード返車日,
-                            予約番号: r.カード予約番号, 生: { id: r.カードid } } : null
+                            予約番号: r.カード予約番号, 生: { id: r.カードid } } : null,
+      カード別Q: r.カード別Q                       /* 🔗 v2.8.0 */
     };
   }
   /* ⚠ 対応は `slimPitOnly` と1対1 */
@@ -477,7 +480,8 @@
     return {
       顧客名: r.お客様, ナンバー: r.ナンバー, 車種: r.車種, 数える日: r.数える日,
       確定金額: r.金額, 予約番号: r.予約番号, 車体番号: r.車体番号,
-      フロント担当: r.フロント, 生: { id: r.カードid }
+      フロント担当: r.フロント, 生: { id: r.カードid },
+      別のQ: r.別のQ                                /* 🔗 v2.8.0 */
     };
   }
 
@@ -548,7 +552,10 @@
   /* 🔴 赤＝本当にどちらか片方にしか無い（カードすら無い／伝票が無い）
      🟡 黄＝カードは有る。まだ返車済みにしていないだけ＝作業を進めれば消える */
   function oneLevel(o){
-    if (o.k === 'pit') return 'red';
+    /* 🔗 v2.8.0 **伝票が別のQに在ることが分かっているものは、赤にしない。**
+       ＝ Qの境目の車が「伝票が無い車」として毎回赤で出るのを止める（ゆうた 2026-08-25）。
+       ⚠ 判定は書き写さない。`pitQMatch` / `pitQCrossLink` が貼った名札を読むだけ。 */
+    if (o.k === 'pit') return (o.x && o.x.別のQ) ? 'yellow' : 'red';
     return (o.x && o.x.カード) ? 'yellow' : 'red';
   }
 
@@ -639,8 +646,10 @@
     var soft = (kind === 'soft');
     var c = soft ? x.カード : null;
     var lv = oneLevel({ x:x, k:kind });
-    var head = soft ? (c ? 'まだ実績になっていない' : 'PitFlow にカードが無い')
-                    : 'フロントマンに伝票が無い';
+    /* 🔗 v2.8.0 Qの境目の車＝「無い」ではなく「**別のQに在る**」 */
+    var 別Q = soft ? s(x.カード別Q) : s(x.別のQ);
+    var head = soft ? (c ? (別Q ? 'このQでは実績になっていない' : 'まだ実績になっていない') : 'PitFlow にカードが無い')
+                    : (別Q ? '伝票は別のQにあります' : 'フロントマンに伝票が無い');
     var no = soft ? (w.pitQSoftNo ? w.pitQSoftNo(x) : '') : (w.pitQPitNo ? w.pitQPitNo(x) : '');
     var mk = w.pitQOneMarkOf ? w.pitQOneMarkOf(x) : null;
     var S = soft ? x.soft : x;
@@ -674,7 +683,9 @@
           ? (c ? '<span class="q-c-g">カードは有る（' + esc(STATE_JA[c.状態] || c.状態) + '）'
                  + (c.返車日 ? '・返車 ' + esc(c.返車日) : '・まだ返車済みにしていない') + '</span>'
                : '<span class="q-c-g bad">PitFlow にカードそのものがありません</span>')
-          : '<span class="q-c-g">PDF に伝票が載っていません</span>')
+          : (別Q ? '' : '<span class="q-c-g">PDF に伝票が載っていません</span>'))
+      /* 🔗 v2.8.0 別のQに在るなら、**どこに在るか**をそのまま出す（物差しの言葉のまま） */
+      + (別Q ? '<span class="q-c-g cross">' + esc(別Q) + '</span>' : '')
       + '</div>'
       + '<div class="q-c-st">' + (soft ? 'フロントマン <b>' + esc(S.受付担当 || '—') + '</b>'
                                        : 'PitFlow <b>' + esc(S.フロント担当 || '—') + '</b>') + '</div>'
@@ -902,6 +913,11 @@
         var pit = w.pitQCollect({ from: g.from, to: g.to }).明細;
         g.res = w.pitQMatch(g.soft, pit, { from: g.from, to: g.to });
       });
+      /* 🔗 v2.8.0（ゆうた報告 2026-08-25）**組をまたいで見る。**
+         🔴 **全部の組を数え終わったあと**でないと意味がない（隣の組の結果を読むため）。
+         ＝ Q1で「PitFlowだけ」に落ちた車が、Q2で伝票と結ばれていたら、そう言い直す。
+         ⚠ 数字は1つも動かない。名札を貼るだけ。 */
+      if (w.pitQCrossLink) w.pitQCrossLink(U.groups);
       /* 🔴 はじめに選ぶのは「**まるごとで、いちばん枚数が多い**」組。
          ＝ ふだんは1つしか無いので今までどおり。ズレて出た端っこの数枚を先に見せない。 */
       U.gi = 0;
@@ -964,6 +980,8 @@
     U.res = w.pitQMatch(U.soft, pit, { from: U.from, to: U.to });
     /* 🗓 v2.0.0 いま見ている組にも書き戻す（別のQに切り替えて戻ってきた時に、直したぶんが消えないように） */
     if (U.groups && U.groups[U.gi]) U.groups[U.gi].res = U.res;
+    /* 🔗 v2.8.0 直したら組をまたぐ名札も貼り直す（何度呼んでも同じ結果になる作り） */
+    if (w.pitQCrossLink && U.groups && U.groups.length > 1) w.pitQCrossLink(U.groups);
     if (U.saveTimer) clearTimeout(U.saveTimer);
     U.saveTimer = setTimeout(function () { U.saveTimer = 0; saveRun(Q()); }, 2500);
     if (w.renderInspect) renderInspect();

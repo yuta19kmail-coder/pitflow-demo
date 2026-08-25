@@ -322,12 +322,13 @@
       + '</div>';
   }
 
+  /* 🗓 v2.9.4 最終入庫は **customers.js の `pitCustLastVisit` 1本**を借りる。
+     ⚠ ここで `updatedAt`（レコードを触った時刻）を「最終入庫」として出さないこと。
+        それをやっていたので「入庫していないのに最終入庫 8/20」が出ていた（ゆうた 2026-08-25）。 */
   function custLastVisit(cust) {
-    let last = cust.updatedAt || 0;
-    (cust.vehicles || []).forEach(v => { if ((v.updatedAt || 0) > last) last = v.updatedAt || 0; });
-    if (!last) return '';
-    const d = new Date(last);
-    return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+    if (!window.pitCustLastVisit) return '';
+    var d = String(window.pitCustLastVisit(cust) || '').trim();
+    return d ? d.replace(/-/g, '/') : '';
   }
   // 顧客（人）1件の結果行：上＝名前・車種・ナンバー／下＝電話・最終入庫。右に操作ボタン
   function custRow(cust) {

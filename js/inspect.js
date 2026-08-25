@@ -152,6 +152,7 @@
   window.pitInspectGoYm = function (y){
     y = String(y == null ? '' : y).slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(y)) return;
+    if (UI.q && UI.q.ym && UI.q.ym !== y && window.pitQClearForMonth) window.pitQClearForMonth(y);
     UI.ym = y;
     if (UI.q){ UI.q.ym = y; UI.q.saved = null; UI.q.savedId = ''; }
   };
@@ -162,7 +163,13 @@
       var d = new Date(+p[0], (+p[1]) - 1 + (+n), 1);
       UI.ym = d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
     }
-    /* クォーターチェックの画面も同じ月を見る（覚えは1つ） */
+    /* クォーターチェックの画面も同じ月を見る（覚えは1つ）
+       🔴 v2.10.0（ゆうた「PDFを読み込むまで古いデータが出てたりもしてる」）
+          **月が変わったら、前の月の結果は捨てる。** 数字が残っていると、
+          それを今月のものだと思ってしまう。入れたPDFも一緒に捨てる（別の月の話なので）。
+       ⚠ 捨てるのは quarter.js の `pitQClearForMonth` 1本。ここで項目を並べない
+          （並べると、項目が増えた時にここだけ古くなる）。 */
+    if (window.pitQClearForMonth) window.pitQClearForMonth(UI.ym);
     if (UI.q) { UI.q.ym = UI.ym; UI.q.saved = null; UI.q.savedId = ''; }
     renderInspect();
   };

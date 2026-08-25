@@ -69,17 +69,18 @@ function renderResult(){
   if (lab) lab.textContent = y + '年 ' + (mo + 1) + '月';
   /* 段のボタン＝いま出ていない方の名前を出す（押したらそっちへ行く） */
   const btn = document.getElementById('result-mode-btn');
-  if (btn) btn.textContent = nc ? '数える側へ' : '数えない側へ';
+  /* 🏷 v2.9.6（ゆうた 2026-08-25）名前を変えた。**押したら行く先の名前**を出す。
+     「数える側／数えない側」→「**実績カウント一覧／非カウント一覧**」 */
+  if (btn) btn.textContent = nc ? '実績カウント一覧' : '非カウント一覧';
   const sec = document.getElementById('view-result');
   if (sec) sec.classList.toggle('result-nocount', nc);
   cal.innerHTML =
-    '<div class="result-bar' + (nc ? ' nc' : '') + '">'
-      + (nc
-         ? '<b>数えない側</b>：社内車両（中古・代車・内部）と「売上なし」で片づけた車。'
-           + '<span>売上・作業サマリー・フロントマンのPDFには乗りません。記録として残しています。</span>'
-         : '<b>数える側</b>：売上に数えている実績。'
-           + '<span>社内車両と「売上なし」は「数えない側へ」で見られます。</span>')
-    + '</div>'
+    /* 🏷 v2.9.6 ふつうの実績側には**何も書かない**（ゆうた「はいらない」）。
+       ⚠ 非カウント側だけは、なぜここに居るのかが分からないと困るので1行だけ残す。 */
+    (nc
+      ? '<div class="result-bar nc"><b>非カウント一覧</b>：社内車両（中古・代車・内部）と「売上なし」で片づけた車。'
+        + '<span>売上・作業サマリー・フロントマンのPDFには乗りません。記録として残しています。</span></div>'
+      : '')
     + '<div class="reserve-month">' + _resultMonthCells(y, mo) + '</div>';
 }
 
@@ -163,7 +164,7 @@ window.pitResultDayPopup = function(dateStr){
   const d = new Date(dateStr + 'T00:00:00');
   const dow = '日月火水木金土'[d.getDay()];
   const head = (d.getMonth() + 1) + '月' + d.getDate() + '日（' + dow + '）　実績'
-             + (state.resultMode === 'nocount' ? '（数えない）' : '') + '　' + cards.length + '件';
+             + (state.resultMode === 'nocount' ? '（非カウント）' : '') + '　' + cards.length + '件';
   const body = cards.length
     ? cards.map(function(c){ return (typeof cardHtml === 'function') ? cardHtml(c, { compact: true })
         : ('<div>' + ((window.pitCustName ? pitCustName(c) : (c.customer || '')) || '') + '</div>'); }).join('')

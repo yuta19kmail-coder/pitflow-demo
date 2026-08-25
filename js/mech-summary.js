@@ -235,7 +235,7 @@
     var txt = window.pitInternCountText ? pitInternCountText(_refNoCount(moS, moE)) : '';
     if (!txt) return '';
     return '<div class="sv-refnc"><i data-ic=info data-ics=14></i> ' + txt
-         + '<span>作業サマリーの配分には入っていません（実績ビューの「数えない側」で見られます）</span></div>';
+         + '<span>作業サマリーの配分には入っていません（実績ビューの「非カウント一覧」で見られます）</span></div>';
   }
 
   function renderMonth(wrap){

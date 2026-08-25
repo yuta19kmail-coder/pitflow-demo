@@ -23,12 +23,33 @@
    ⚠ 段の状態（`state.resultMode`）は画面の都合なので保存しない。
    =================================================================== */
 function _resultNoCount(c){ return !!(window.pitCardNoSale && pitCardNoSale(c)); }
+/* 🗓🗓 v2.9.5（ゆうた 2026-08-25「実績の数えない側のカレンダーに反映されない」）
+   ----------------------------------------------------------------
+   ◎正体 …… ここは `c.completedAt !== dateStr` だけで日を決めていた。
+     ところが**売上なしアーカイブは `completedAt` を入れない**（v1.99.0 の決めごと。
+     実績・売上に乗る道を塞ぐための二重の守り）。
+     ＝ **数えない側のカレンダーにも、永久に1台も出てこない。**
+     v2.6.0 で「数えない側」を作った時に、日付をどこから取るかを見落としていた。
+   🔴 数える側は今までどおり `completedAt` **だけ**（ここを緩めると実績の日がブレる）。
+   🔴 数えない側は **`completedAt` があればそれ。無ければ**来店履歴と同じ落とし方
+      （`pitCardDoneDate`＝customers.js の1本）に落とす。
+      ⚠⚠ 順番が肝。**社内車両（中古・代車・内部）は `pitInternReturn` が `completedAt` を入れている。**
+         いきなり `pitCardDoneDate` に投げると、あちらは「売上なし＝来た日」と決めているので
+         社内車両の日が空になって**逆に消える**（試験がこれを捕まえた）。 */
+function _resultDateOf(c, nc){
+  var done = String(c.completedAt || '');
+  if (!nc) return done;
+  if (done) return done;
+  if (window.pitCardDoneDate) { try { return String(window.pitCardDoneDate(c) || ''); } catch (e) {} }
+  return String(c.returnDateFinal || c.returnDate || c.reserveDate || '');
+}
 function _resultDayCards(dateStr){
   var nc = (state.resultMode === 'nocount');
   return (state.cards || []).filter(function(c){
-    if (!c || c.completedAt !== dateStr) return false;
+    if (!c) return false;
     if (c.status !== 'workDone' && c.status !== 'returned') return false;
-    return _resultNoCount(c) === nc;
+    if (_resultNoCount(c) !== nc) return false;
+    return _resultDateOf(c, nc) === dateStr;
   });
 }
 

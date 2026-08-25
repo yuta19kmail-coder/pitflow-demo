@@ -570,9 +570,10 @@
 .q-diff.zero b{ color:var(--green,#1db97a); }
 
 /* ================================================================
-   ✅ v2.9.8 チェック済み（4つの箱の下・ふだんは閉じている）
-   ゆうた「チェック済みみたいな枠をその下に作って、クリックで修正した一覧を開きたい」
-   🔴 グレー基調。ここは**もう済んだこと**の板なので、赤や黄で目を引かせない。
+   ✅ v2.9.9 チェック済み（4つの箱の下・ふだんは閉じている）
+   ゆうた「チェック済みは**元のカード表示がいい。グレーアウトはした状態で**」
+   🔴 中身は走らせた直後と**同じカード**（`q-c`）。ここで別の見た目を作らない。
+      灰色は**包み（.q-done-i）に着せる**＝カードの中は1文字も変えない。
    ================================================================ */
 .q-done{ margin:14px 0 4px; border:1px solid var(--border); border-radius:11px;
   background:var(--bg2); overflow:hidden; }
@@ -584,23 +585,28 @@
 .q-done > summary:hover{ background:var(--bg3); }
 .q-done-h{ font-weight:700; }
 .q-done-n{ font-size:11px; color:var(--text3); background:var(--bg3); border-radius:10px; padding:1px 9px; }
+.q-done-v{ font-size:11px; color:var(--text3); font-variant-numeric:tabular-nums; }
 .q-done-t{ font-size:10.5px; color:var(--text3); }
-.q-done-list{ border-top:1px solid var(--border); padding:6px 8px; display:flex; flex-direction:column; gap:5px;
-  max-height:340px; overflow-y:auto; }
-.q-done-r{ display:grid; grid-template-columns:auto auto 1fr; gap:3px 10px; align-items:baseline;
-  padding:7px 10px; border-radius:8px; background:var(--bg); border:1px solid var(--border);
-  /* 🔴 済んだ行なので**うすく**出す。ホバーで濃くなる＝読みたい時は読める */
-  opacity:.62; transition:opacity .12s; }
-.q-done-r:hover{ opacity:1; }
+.q-done-list{ border-top:1px solid var(--border); padding:10px; display:flex; flex-direction:column; gap:10px;
+  max-height:520px; overflow-y:auto; }
+
+/* 🔴 灰色は包みに着せる。ホバーで濃くなる＝読みたい時はちゃんと読める */
+.q-done-i{ opacity:.55; filter:grayscale(.85); transition:opacity .12s, filter .12s; }
+.q-done-i:hover{ opacity:1; filter:none; }
+/* すでに押した札が二重に薄くならないように、包みの中では素の濃さに戻す */
+.q-done-i .q-c.is-done{ opacity:1; }
+
+/* 何をしたか（カードのすぐ下・1つの記録＝1行） */
+.q-done-what{ display:flex; flex-direction:column; gap:3px;
+  margin:-2px 0 0; padding:6px 12px 7px; border:1px solid var(--border); border-top:0;
+  border-radius:0 0 10px 10px; background:var(--bg); }
+.q-done-w1{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
 .q-done-b{ font-size:10px; font-weight:800; border-radius:6px; padding:1px 7px; letter-spacing:.02em; }
-.q-done-r.fixed .q-done-b{ background:rgba(29,185,122,.16); color:var(--green,#1db97a); }
-.q-done-r.kept  .q-done-b{ background:var(--bg3); color:var(--text3); }
-.q-done-w{ font-size:11px; font-weight:700; color:var(--text2); }
-.q-done-c{ font-size:12px; color:var(--text); }
-.q-done-c em{ font-style:normal; font-size:10.5px; color:var(--text3); }
-.q-done-d{ grid-column:1 / -1; font-size:11px; color:var(--text2); }
-.q-done-m,.q-done-a{ grid-column:1 / -1; font-size:10px; color:var(--text3); }
-.q-done-note{ border-top:1px solid var(--border); padding:8px 13px; font-size:10.5px; color:var(--text3); }
+.q-done-b.fixed{ background:rgba(29,185,122,.18); color:var(--green,#1db97a); }
+.q-done-b.kept { background:var(--bg3); color:var(--text3); }
+.q-done-d{ font-size:11px; color:var(--text2); }
+.q-done-a{ font-size:10px; color:var(--text3); margin-left:auto; }
+.q-done-note{ border-top:1px solid var(--border); padding:8px 13px; font-size:10.5px; color:var(--text3); line-height:1.8; }
 .q-done-note b{ color:var(--text2); }
 /* 🧾 v2.9.8 残してある伝票で組み直した時の断り書き */
 .q-saved-n{ display:block; font-size:10px; color:var(--text3); margin-top:2px; }

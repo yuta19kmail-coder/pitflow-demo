@@ -39,6 +39,26 @@
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]; }); }
   function Q(){ return (w._insp && w._insp.q) || {}; }
 
+  /* ================================================================
+     🗂🗂 v2.10.1 **書き込みは「いま見ているQ」ごと**（ゆうた 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「また書き込みがPDF全体でQごとに書き込めない。
+        **書き込みはPDFが範囲が広くてもQごと**」
+     ◎何が起きていたか＝**書き込んだ印を、画面（U）に1つしか持っていなかった。**
+       1枚のPDFが Q1〜Q3 に分かれている時、Q1 で書き込むと
+       `U.書き込んだ` が立つので、**Q2 と Q3 でも「書き込みました」**になり、
+       ボタンが出てこなかった。＝ Q2・Q3 は永久に書き込めない。
+     🔴 書き込むもの（`R`）は前から**その組だけ**なので、**書く中身は正しかった**。
+        まちがっていたのは「済んだ印の置き場所」だけ。
+     🔴 だから印は**組（`U.groups[U.gi]`）に持たせる**。組が無い時だけ U に置く
+        （＝古い保存を写しで開いた画面。あそこには組が無い）。
+     ================================================================ */
+  function G(){
+    var U = Q();
+    var g = (U.groups || [])[U.gi];
+    return g || U;          /* 組が無い画面では、今までどおり U に置く */
+  }
+
   /* 書ける行＝結びついていて、伝票の中身が合っているもの */
   function rows(R){
     return (R && R.結びついた ? R.結びついた : []).filter(function (p) {
@@ -60,9 +80,11 @@
     if (!R || !R.検算 || !R.検算.合う) return '';
     if (!w.pitQNokori || w.pitQNokori(R) > 0) return '';
     var c = count(R);
-    if (U && U.書き込んだ){
+    /* 🔴 v2.10.1 済んだ印は**その組のもの**を見る（Qごとに書き込めるようにするため） */
+    var g = G();
+    if (g && g.書き込んだ){
       return '<div class="q-wr done">'
-        + '<div class="q-wr-l"><b>書き込みました</b><span>' + esc(U.書き込んだ) + '</span></div>'
+        + '<div class="q-wr-l"><b>書き込みました</b><span>' + esc(g.書き込んだ) + '</span></div>'
         + '<button class="q-wr-b" onclick="pitQWriteSee(1)">書き込んだ内容を見る</button>'
         + '</div>';
     }
@@ -96,21 +118,23 @@
       return;
     }
     var c = count(R);
-    var det = ['・車の情報に <車体番号> を ' + c.vin + '件 入れます',
-               '・来店履歴に <この時の伝票> を ' + c.den + '件 ぶら下げます',
-               '・1つの予約に 1つの伝票。前に入れたものがあれば置きかえます',
-               '・すでに別の車体番号が入っている車には書きません（あとで知らせます）',
-               '・伝票は読むだけです。PitFlow からは直せません',
-               '・原価もそのまま入ります（全員に見えます）'];
+    /* 🔴 v2.10.1（ゆうた）**余計な文言は要らない。**
+       🗣「原価が見えます とか余計な文言は要らない。
+          **作業内容の履歴と車体番号を書き込みます** だけでOK」
+       ⚠ 決めごと（1予約1伝票・上書きしない・読むだけ）は**コードとメモに残す**。
+          押す前の確認は、やることを1行で言うだけにする。 */
+    var det = ['・作業内容の履歴と車体番号を書き込みます'];
     var ask = w.pitAsk ? pitAsk('この結果を書き込みますか？', { detail: det, ok: '書き込む' })
                        : Promise.resolve(true);
     ask.then(function (yes) {
       if (!yes) return;
       var out = write(R);
-      U.書き込んだ = (new Date()).toISOString().slice(0, 16).replace('T', ' ')
+      /* 🔴 v2.10.1 済んだ印は**この組に**置く（ほかのQは書き込めるまま） */
+      var g = G();
+      g.書き込んだ = (new Date()).toISOString().slice(0, 16).replace('T', ' ')
                    + '　車体番号 ' + out.vin + '件／伝票 ' + out.den + '件'
                    + (out.ちがう.length ? '　⚠ 別の番号が入っていた車が ' + out.ちがう.length + '件' : '');
-      U.書き込み結果 = out;
+      g.書き込み結果 = out;
       if (w.PitDB && w.PitDB.saveCustomers) { try { w.PitDB.saveCustomers(); } catch (e) {} }
       else if (w.PitDB && w.PitDB.save) { try { w.PitDB.save(); } catch (e) {} }
       if (w.pitToast) pitToast('書き込みました');
@@ -179,7 +203,7 @@
   function view(R, U){
     var a = rows(R).filter(canDen);
     if (!a.length) return '<div class="q-none">見るものがありません。</div>';
-    var cur = t(U.見る) || t(a[0].soft.伝票);
+    var cur = t(G().見る) || t(a[0].soft.伝票);
     var p = a.filter(function (x) { return t(x.soft.伝票) === cur; })[0] || a[0];
     var m = p.soft;
     var ara = num(m.金額) - num(m.原価);
@@ -261,5 +285,5 @@
   w.pitQWriteGo    = go;
   w.pitQDenTable   = denTable;      /* 🧾 顧客詳細からも同じものを呼ぶ */
   w.pitQWriteSee   = function (v){ Q().viewer = !!+v; if (w.renderInspect) renderInspect(); };
-  w.pitQWritePick  = function (d){ Q().見る = d; if (w.renderInspect) renderInspect(); };
+  w.pitQWritePick  = function (d){ G().見る = d; if (w.renderInspect) renderInspect(); };
 })(window);

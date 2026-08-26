@@ -815,7 +815,8 @@
       h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
       h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
          + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
-      h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line');
+      h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line',
+                   (window.pitThanksLineWhy ? pitThanksLineWhy(c) : ''));
       h += '<div class="cv-hint">※ パターン（型）で選ぶ方式。選択肢は将来 <i data-ic=settings data-ics=16></i>設定で増減できる想定。</div></div>';
     }
     return h;
@@ -1019,7 +1020,10 @@
     rows += row('洗車', c.needWash
       ? '要 '+done(c.washSalesDone)+(c.washNote?' <span class="cv-asub">'+esc(c.washNote)+'</span>':'')
       : '<span class="cv-amuted">不要</span>');
-    rows += row('お礼LINE', c.noThanksLine ? '<span class="cv-amuted">不要</span>' : '要');
+    /* 💬 v2.13.3 LINEが繋がっていない車は「要／不要」ではなく**なぜ無いか**を出す */
+    var _lw = (window.pitThanksLineWhy ? pitThanksLineWhy(c) : '');
+    rows += row('お礼LINE', _lw ? ('<span class="cv-amuted">' + esc(_lw) + '</span>')
+                                : (c.noThanksLine ? '<span class="cv-amuted">不要</span>' : '要'));
     var sales = [];
     if (csShaken && c.headlight) sales.push('ヘッドライト磨き'+(c.headlightDone?'（済）':''));
     if (csCoat && c.coatingOK)  sales.push('コーティング受注'+(c.coatingDone?'（済）':''));
@@ -1051,7 +1055,8 @@
     h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
     h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
        + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
-    h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line');
+    h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line',
+                 (window.pitThanksLineWhy ? pitThanksLineWhy(c) : ''));
     if (csShaken) h += pickRow('車検ライト磨き', [['1','する'],['0','しない']], c.headlight?'1':'0', 'headlight');
     if (csCoat)   h += pickRow('コーティング受注', [['1','OK'],['0','—']], c.coatingOK?'1':'0', 'coatingok');
     h += pickRow('車販依頼', [['1','あり'],['0','なし']], c.salesReq?'1':'0', 'salesreq');
@@ -1093,11 +1098,16 @@
     return h + '</div>';
   }
   function opt(v,label,c){ return '<option value="'+v+'"'+(c.inspSchedule.mode===v?' selected':'')+'>'+label+'</option>'; }
-  function pickRow(label, opts, cur, group){
+  /* 💬 v2.13.3 `why` を渡すと**灰色にして、なぜ押せないかを横に出す**（ゆうた指定）。
+     ⚠ ボタンごと消さない＝「無い」のか「押せない」のかが分からなくなる（v1.170.0 と同じ決めごと）。 */
+  function pickRow(label, opts, cur, group, why){
     let chips = opts.map(function(o){
+      if (why) return '<span class="cv-chip is-off">'+esc(o[1])+'</span>';
       return '<span class="cv-chip'+(String(cur)===String(o[0])?' on':'')+'" onclick="cvPick(\''+group+'\',\''+o[0]+'\',this)">'+esc(o[1])+'</span>';
     }).join('');
-    return '<div class="cv-pickrow"><span class="cv-pk">'+esc(label)+'</span><div class="cv-chips">'+chips+'</div></div>';
+    return '<div class="cv-pickrow'+(why?' is-off':'')+'"><span class="cv-pk">'+esc(label)+'</span>'
+         + '<div class="cv-chips">'+chips
+         + (why ? '<span class="cv-offwhy">'+esc(why)+'</span>' : '')+'</div></div>';
   }
 
   /* 🔴 v1.43.0 ゆうた指定＝**用件を足すのはこの「カード詳細」のフロー欄**。
@@ -1893,7 +1903,8 @@
     if(group==='call'){ _c.coverCall.done = (val==='done'); if(_c.coverCall.done && !_c.coverCall.at){ const d=new Date(); _c.coverCall.at = (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); _c.coverCall.staff = (window.pitFlowMe?pitFlowMe():''); } }   /* 🔴 v1.55.0 ここも同じ死んだ変数を見ていて、ずっと空だった */
     else if(group==='wash'){ _c.needWash = (val==='1'); }
     else if(group==='handover'){ _c.handover = val; }
-    else if(group==='line'){ _c.noThanksLine = (val==='0'); }   // 要='1'→false／不要='0'→true
+    /* 🔴 v2.13.3 画面で灰色にするだけにしない。**書き込む所でも同じ物差しで止める。** */
+    else if(group==='line'){ if (window.pitThanksLineOK && !pitThanksLineOK(_c)) return; _c.noThanksLine = (val==='0'); }
     else if(group==='headlight'){ _c.headlight = (val==='1'); }
     else if(group==='coatingok'){ _c.coatingOK = (val==='1'); }
     else if(group==='salesreq'){ _c.salesReq = (val==='1'); }

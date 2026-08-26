@@ -69,16 +69,26 @@
     if(!due) return null;
     return daysBetween(isoToday(), due);
   };
-  function payMethods(){ return state.paymentMethods || state.paymentTypes || [
-    {id:'cash',label:'現金'},{id:'card',label:'カード'},{id:'transfer',label:'振込'},
-    {id:'collect',label:'集金'},{id:'finance',label:'ローン'},{id:'later',label:'後払い'}]; }
+  /* ================================================================
+     ✂️✂️ v2.13.1 **「支払い（現金・カード…）」の行を丸ごと外した**（ゆうた 2026-08-25）
+     ----------------------------------------------------------------
+     🗣「カード詳細の支払い（現金 カード）などが選べる部分は**丸ごとカット**してほしい。
+     　　多分今どこかにデータを使ってはいないと思う」
+     ◎調べた結果、そのとおりだった。`c.payment` は
+       **この画面で選んで、この画面で出すだけ**。売上・実績・作業サマリー・
+       フロントマンPDFの突合・データチェック・MHS のどこからも読んでいなかった。
+       （`card-detail.js` の `paymentSelect()` は定義だけで、呼び出しも無かった）
+     🔴🔴 名前が似ている **`c.paymentDate` / `c.paymentSeparate`（入金日）は別物。触らない。**
+        あれは `insurance-pit.js` の「保険は入金日で実績に乗せる」の要。
+     ⚠ **入っている値は消さない。** 画面から出さないだけ（クラウドにそのまま残る）。
+        消すのは戻せない。出さないのは戻せる。
+     ================================================================ */
 
   // 新フィールド フォールバック（旧 localStorage データ対策）
   function ensure(c){
     if(!c.inspSchedule || typeof c.inspSchedule!=='object') c.inspSchedule = { mode:'manual', slots:{}, cutBefore:'' };
     if(!c.inspSchedule.slots) c.inspSchedule.slots = {};
     if(!c.coverCall || typeof c.coverCall!=='object') c.coverCall = { done:false, at:'', staff:'' };
-    if(c.payment == null) c.payment = '';
     if(c.handover == null) c.handover = 'store';
     if(c.handoffMemo == null) c.handoffMemo = '';
     if(c.returnDateFinal === undefined) c.returnDateFinal = null;
@@ -799,11 +809,9 @@
     }
     // 表紙チェック（編集式）＝実績（returned）では上の「完了アーカイブ」に集約済みなので出さない v0.120.0
     if (c.status !== 'returned'){
-      const pm = payMethods();
       h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=phone data-ics=16></i> 表紙チェック（手書き表紙のデジタル版）</div>';
       h += pickRow('完TEL', [['done','済'],['ng','未']], c.coverCall.done?'done':'ng', 'call')
          + (c.coverCall.done && c.coverCall.at ? '<div class="cv-callat">'+esc(c.coverCall.at)+(c.coverCall.staff?'・'+esc(c.coverCall.staff):'')+'</div>' : '');
-      h += pickRow('支払い', pm.map(function(p){return [p.id,p.label];}), c.payment, 'pay');
       h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
       h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
          + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
@@ -1003,14 +1011,11 @@
   function archiveHtml(c, csShaken, csCoat){
     function row(label, valueHtml){ return '<div class="cv-arow"><span class="cv-ak">'+esc(label)+'</span><span class="cv-av">'+valueHtml+'</span></div>'; }
     function done(on){ return on ? '<span class="cv-adone">済</span>' : ''; }
-    var pm = payMethods();
-    var pobj = pm.find(function(x){ return x.id === c.payment; });
     var rows = '';
     var cc = c.coverCall || {};
     rows += row('完TEL', cc.done
       ? '<b class="cv-aok">済</b>'+(cc.at?' <span class="cv-asub">'+esc(cc.at)+(cc.staff?'・'+esc(cc.staff):'')+'</span>':'')
       : '<span class="cv-amuted">未</span>');
-    if (pobj) rows += row('支払い', esc(pobj.label));
     rows += row('洗車', c.needWash
       ? '要 '+done(c.washSalesDone)+(c.washNote?' <span class="cv-asub">'+esc(c.washNote)+'</span>':'')
       : '<span class="cv-amuted">不要</span>');
@@ -1035,7 +1040,6 @@
      ⚠ 確定金額・実績カウント日・確定返車日は**この枠に入れない**。
         あれは上のロック行（`resultDateRow` / 確定売上）で、これまで通り管理だけ。 */
   function archiveEditHtml(c, csShaken, csCoat){
-    var pm = payMethods();
     var cc = c.coverCall || {};
     var h = '<div class="cv-sec cv-archedit"><div class="cv-sect cv-sect-arch"><i data-ic=box data-ics=16></i> 完了アーカイブ '
           + '<span class="cv-asect-note">（返車済み・記録を編集中）</span>'
@@ -1044,7 +1048,6 @@
        + '確定金額・実績カウント日・確定返車日は上の欄で直してください。</div>';
     h += pickRow('完TEL', [['done','済'],['ng','未']], cc.done?'done':'ng', 'call')
        + (cc.done && cc.at ? '<div class="cv-callat">'+esc(cc.at)+(cc.staff?'・'+esc(cc.staff):'')+'</div>' : '');
-    h += pickRow('支払い', pm.map(function(p){return [p.id,p.label];}), c.payment, 'pay');
     h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
     h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
        + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
@@ -1846,15 +1849,14 @@
     return false;
   }
   /* 表紙チェックの「いまの値」を人の言葉で（記録に残すため）。⚠ 選択肢の文字は pickRow と同じもの。 */
-  var ARCH_W = { call:'完TEL', pay:'支払い', wash:'洗車', line:'お礼LINE',
+  /* ✂️ v2.13.1 `pay`（支払い）はこの表からも外した＝**選ぶ所が無くなったので、記録する所も無い。**
+     ⚠「◯◯ごと」の機能は済んだ印も◯◯ごとに置く、の裏返し。
+        入口を消したら、その入口のための道具も一緒に消す（残すと次の人が「まだ使う」と思う）。 */
+  var ARCH_W = { call:'完TEL', wash:'洗車', line:'お礼LINE',
                  headlight:'車検ライト磨き', coatingok:'コーティング受注', salesreq:'車販依頼' };
   function _archVal(group){
     if (!_c) return '';
     if (group === 'call') return (_c.coverCall && _c.coverCall.done) ? '済' : '未';
-    if (group === 'pay'){
-      var o = payMethods().filter(function(x){ return x.id === _c.payment; })[0];
-      return o ? o.label : '';
-    }
     if (group === 'wash') return _c.needWash ? '要' : '不要';
     if (group === 'line') return _c.noThanksLine ? '不要' : '要';
     if (group === 'headlight') return _c.headlight ? 'する' : 'しない';
@@ -1886,7 +1888,6 @@
     var _aFrom = _archWord(group);
     el.parentNode.querySelectorAll('.cv-chip').forEach(function(s){s.classList.remove('on');}); el.classList.add('on');
     if(group==='call'){ _c.coverCall.done = (val==='done'); if(_c.coverCall.done && !_c.coverCall.at){ const d=new Date(); _c.coverCall.at = (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); _c.coverCall.staff = (window.pitFlowMe?pitFlowMe():''); } }   /* 🔴 v1.55.0 ここも同じ死んだ変数を見ていて、ずっと空だった */
-    else if(group==='pay'){ _c.payment = val; }
     else if(group==='wash'){ _c.needWash = (val==='1'); }
     else if(group==='handover'){ _c.handover = val; }
     else if(group==='line'){ _c.noThanksLine = (val==='0'); }   // 要='1'→false／不要='0'→true

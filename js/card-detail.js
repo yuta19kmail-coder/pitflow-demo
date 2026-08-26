@@ -2396,16 +2396,9 @@ function loanerSelect(c, key){
   return h;
 }
 
-function paymentSelect(c, key){
-  let h = '<select class="cf-input" data-key="' + key + '">';
-  h += '<option value="">―</option>';
-  state.paymentMethods.forEach(p => {
-    const sel = c[key] === p.id ? ' selected' : '';
-    h += '<option value="' + p.id + '"' + sel + '>' + p.label + '</option>';
-  });
-  h += '</select>';
-  return h;
-}
+/* ✂️ v2.13.1 `paymentSelect()` を消した（ゆうた「支払いは丸ごとカット」）。
+   ⚠ **定義してあるだけで、どこからも呼んでいなかった。** 支払いの行を外したので一緒に片づけた。
+      呼ばれない関数を残すと、次に読む人が「まだ使う所がある」と思って調べ直す。 */
 
 function conditionChips(c){
   const arr = c.loanerConditions || [];

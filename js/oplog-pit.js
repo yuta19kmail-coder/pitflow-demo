@@ -181,6 +181,8 @@
   function visibleList() {
     var q = _q.trim().toLowerCase();
     return (_cache || []).filter(function (e) {
+      /* 🗑 v2.13.2 もう無い機能の記録は出さない（記録は消さない）。物差しは `pitLogGone` 1本。 */
+      if (window.pitLogGone && pitLogGone((e.action || '') + '：' + (e.label || ''))) return false;
       if (!q) return true;
       return (e.userName + ' ' + e.action + ' ' + e.label).toLowerCase().indexOf(q) >= 0;
     });

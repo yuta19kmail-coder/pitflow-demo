@@ -803,7 +803,7 @@
        　（消すだけだと「壊れた？」に見えるので、なぜ無いかを1行置く） */
     if (window.pitCardIntern && pitCardIntern(c)){
       h += '<div class="cv-sec cv-intern-note"><div class="cv-sect"><i data-ic=info data-ics=16></i> 表紙チェック</div>'
-         + '<div class="cv-hint">' + esc(pitInternLabel(c)) + '（社内車両）は、完TEL・支払い・洗車・お礼LINE・伝票がありません。'
+         + '<div class="cv-hint">' + esc(pitInternLabel(c)) + '（社内車両）は、完TEL・洗車・お礼LINE・伝票がありません。'
          + '完TEL済／完TEL依頼へドラッグすると、そのまま実績になります。</div></div>';
       return h;
     }
@@ -1103,7 +1103,10 @@
   /* 🔴 v1.43.0 ゆうた指定＝**用件を足すのはこの「カード詳細」のフロー欄**。
      （「予約を編集」の方のフローは、すでに入っている記録の日時・担当を直す“本当の編集”に回した） */
   function flowTab(c){
-    const log = c.log || [];
+    /* 🗑 v2.13.2 もう無い機能の記録は出さない（記録は消さない）。物差しは `pitLogGone` 1本。 */
+    const log = (c.log || []).filter(function(e){
+      return !(window.pitLogGone && pitLogGone(e && (e.label || e.text)));
+    });
     let h = '<div class="cv-sec"><div class="cv-sect"><i data-ic=clock data-ics=16></i> フロー（進捗ログ）</div><div class="cv-flow">';
     if (!log.length){ h += '<div class="cv-wl cv-muted">記録はまだありません。</div>'; }
     else log.map(function(e,i){ return {e:e,i:i}; }).reverse().forEach(function(r){
@@ -1837,7 +1840,7 @@
   };
   function _archDeny(){
     if (window.UI && UI.alert){
-      UI.alert('返車済みの記録（完TEL・支払い・洗車・お礼LINE・車販依頼）を直せるのは、設定権限（管理）のある人だけです。',
+      UI.alert('返車済みの記録（完TEL・洗車・お礼LINE・車販依頼）を直せるのは、設定権限（管理）のある人だけです。',
                { title:'変更できません', code:'PF-0021' });
     }
   }

@@ -67,7 +67,10 @@ function cfFlowHtml(c){
     h += '<div class="cf-flow">';
     if (c.bookedAt)    h += _flowRow('予約受付', c.bookedAt);
     if (c.reserveDate) h += _flowRow('入庫予定', c.reserveDate + (c.reserveTime ? ' ' + c.reserveTime : ''));
-    (c.log || []).forEach(function(l){
+    /* 🗑 v2.13.2 もう無い機能の記録は出さない。見分けは pit-share.js の `pitLogGone` 1本。 */
+    (c.log || []).filter(function(l){
+      return !(window.pitLogGone && pitLogGone(l && (l.label || l.text)));
+    }).forEach(function(l){
       const _t = window.PitFlowLog ? PitFlowLog.atText(l) : fmtFlowTime(l.at);
       const _w = window.PitFlowLog ? PitFlowLog.byOf(l) : (l.staff || '');
       /* 🔴 工程の記録は label/text を持っていない＝titleOf を通さないと**見出しが空**になる */

@@ -39,12 +39,12 @@
     A: {
       name:'案A：受付・フロントだけ（最小）',
       tag:'整備チェックは紙ハンコのまま。PitFlowは受付〜進捗だけ。',
-      holds:['お客様・連絡先・車・ナンバー','入庫/返車の日程','作業タイプ・整備内容（自由記入）','担当・代車・支払・メモ'],
+      holds:['お客様・連絡先・車・ナンバー','入庫/返車の日程','作業タイプ・整備内容（自由記入）','担当・代車・メモ'],
       pros:['シンプルで受付が迷わない','整備ソフトと完全にすみ分け','作るのが一番早い'],
       cons:['整備の「やったか」がPitFlowに出ない＝進捗が受付で止まる','紙ハンコの抜け漏れは防げないまま'],
       mock:function(){
         return baseSections()
-          + sec('<i data-ic=van data-ics=16></i> 代車・<i data-ic=money data-ics=16></i> 支払・<i data-ic=pencil data-ics=16></i> メモ', row(fld('代車','不要'), fld('支払','現金')) + row(fld('メモ','—')))
+          + sec('<i data-ic=van data-ics=16></i> 代車・<i data-ic=pencil data-ics=16></i> メモ', row(fld('代車','不要')) + row(fld('メモ','—')))
           + '<div class="sp-paper"><i data-ic=sticky data-ics=16></i> オイル・空気圧などの作業チェックは <b>紙のハンコ＋✓</b> のまま（この案では取り込まない）</div>';
       }
     },
@@ -64,7 +64,7 @@
           + '</div>';
         return baseSections()
           + sec('<i data-ic=check data-ics=16></i> 作業チェック（車検タイプの定番項目）', checks + '<div class="sp-hint">タップでチェック。項目は作業タイプごとに設定で編集できる想定。</div>')
-          + sec('<i data-ic=van data-ics=16></i> 代車・<i data-ic=money data-ics=16></i> 支払', row(fld('代車','不要'), fld('支払','現金')));
+          + sec('<i data-ic=van data-ics=16></i> 代車', row(fld('代車','不要')));
       }
     },
     C: {

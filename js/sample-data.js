@@ -97,7 +97,6 @@
       returnDateFinal: (o.returnDateFinal !== undefined) ? o.returnDateFinal : null,
       inspSchedule: o.inspSchedule || { mode:'manual', slots:{}, cutBefore:'' },
       coverCall: o.coverCall || { done:false, at:'', staff:'' },
-      payment: o.payment || '',
       handover: o.handover || 'store',
       handoffMemo: o.handoffMemo || '',
     };

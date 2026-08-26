@@ -145,14 +145,11 @@ window.state = {
     { id: 'div2', label: '2課', color: '#ec4899' },   // 輸入＝ピンク
   ],
 
-  paymentMethods: [
-    { id: 'cash',     label: '現金' },
-    { id: 'card',     label: 'カード' },
-    { id: 'transfer', label: '振込' },
-    { id: 'collect',  label: '集金' },
-    { id: 'finance',  label: 'ローン' },
-    { id: 'later',    label: '後払い' },
-  ],
+  /* ✂️ v2.13.1 `paymentMethods`（現金・カード・振込・集金・ローン・後払い）を消した。
+     🗣 ゆうた「カード詳細の支払い（現金 カード）などが選べる部分は**丸ごとカット**してほしい」
+     ⚠ 読んでいる所は**1つも無かった**（選んで、出すだけ）。MHS も見ていない
+        （MHS が読むのは `settings.workTypes`。こちらは `state` 直下で、そこには乗らない）。
+     🔴 **入っている値（`c.payment`）は消していない。** 画面から出さないだけ。 */
 
   loanerConditions: [
     { id: 'etc',    label: 'ETC' },

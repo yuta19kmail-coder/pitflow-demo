@@ -85,10 +85,11 @@
       + '      <button type="button" class="rp-chip" id="rp-wash-0" onclick="PitReturnPopup.onWash(\'0\')">不要</button></div>'
       + '    <input class="rp-text" id="rp-washnote" type="text" placeholder="洗車の備考（1行・任意）" style="margin-top:6px">'
       + '  </div>'
-      + '  <div class="pp-field">'
+      + '  <div class="pp-field" id="rp-line-field">'
       + '    <label class="pp-lb">お礼LINE</label>'
       + '    <div class="rp-chips"><button type="button" class="rp-chip" id="rp-line-1" onclick="PitReturnPopup.onLine(\'1\')">要</button>'
-      + '      <button type="button" class="rp-chip" id="rp-line-0" onclick="PitReturnPopup.onLine(\'0\')">不要</button></div>'
+      + '      <button type="button" class="rp-chip" id="rp-line-0" onclick="PitReturnPopup.onLine(\'0\')">不要</button>'
+      + '      <span class="rp-offwhy" id="rp-line-why"></span></div>'
       + '  </div>'
       + '  <div class="pp-actions">'
       + '    <button class="vh-btn" onclick="PitReturnPopup.close(false)">キャンセル</button>'
@@ -106,6 +107,7 @@
     if (a) a.classList.toggle('on', !!on);
     if (b) b.classList.toggle('on', !on);
   }
+  var _lineWhy = '';      /* 💬 v2.13.3 押せない理由（空＝押せる） */
   function setLine(on){   // on=お礼LINE「要」
     var a = el('rp-line-1'), b = el('rp-line-0');
     if (a) a.classList.toggle('on', !!on);
@@ -187,6 +189,14 @@
     setWash(card.returnStage ? (card.needWash !== false) : true);
     el('rp-washnote').value = card.washNote || '';
     setLine(card.returnStage ? !card.noThanksLine : true);
+    /* 💬 v2.13.3 LINEが繋がっていないお客様には**聞かない**（ゆうた指定）。
+       ⚠ 欄ごと消さない＝「無い」のか「押せない」のか分からなくなる。灰色にして理由を出す。
+       🔴 物差しは pit-share.js の `pitThanksLineWhy` 1本。ここで lineStatus を直に見ない。 */
+    _lineWhy = (window.pitThanksLineWhy ? pitThanksLineWhy(card) : '');
+    var _lf = el('rp-line-field'), _lwy = el('rp-line-why');
+    if (_lf) _lf.classList.toggle('is-off', !!_lineWhy);
+    if (_lwy) _lwy.textContent = _lineWhy || '';
+    if (_lineWhy) setLine(false);
 
     el('rp-backdrop').classList.add('show');
     setTimeout(function(){ try{ el('rp-amt').focus(); }catch(e){} }, 30);
@@ -325,7 +335,9 @@
       c.needWash = !!(el('rp-wash-1') && el('rp-wash-1').classList.contains('on'));
       c.washNote = (el('rp-washnote') && el('rp-washnote').value.trim()) || '';
       // お礼LINE（要/不要）。要=on → noThanksLine=false
-      c.noThanksLine = !(el('rp-line-1') && el('rp-line-1').classList.contains('on'));
+      /* 🔴 画面で灰色にするだけにしない。**閉じる時も同じ物差しで止める。** */
+      if (!(window.pitThanksLineOK && !pitThanksLineOK(c)))
+        c.noThanksLine = !(el('rp-line-1') && el('rp-line-1').classList.contains('on'));
 
       /* 💴 v1.185.0 売上日＝**3つの道（実績化／完TEL済／完TEL依頼）すべてで同じように入れる。**
          🔴 書き込みは sales-date.js の1本を通す。ここで `c.salesDate = …` と書かない。

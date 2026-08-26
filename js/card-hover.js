@@ -110,6 +110,8 @@
         var on = b.getAttribute('data-w') === '1'; c.needWash = on;
         el.querySelectorAll('.ph-rt-wash').forEach(function(x){ x.classList.toggle('on', (x.getAttribute('data-w')==='1') === on); });
       } else {
+        /* 🔴 書き込む所でも同じ物差しで止める（画面から消しただけにしない） */
+        if (window.pitThanksLineOK && !pitThanksLineOK(c)) return;
         var lon = b.getAttribute('data-l') === '1'; c.noThanksLine = !lon;
         el.querySelectorAll('.ph-rt-line').forEach(function(x){ x.classList.toggle('on', (x.getAttribute('data-l')==='1') === lon); });
       }
@@ -410,6 +412,8 @@
       var _amtStr = (c.amountFinal!=null && c.amountFinal!=='') ? Number(c.amountFinal).toLocaleString() : '';
       var _washOn = (c.needWash !== false);
       var _lineOn = !c.noThanksLine;
+      /* 💬 v2.13.3 LINEが繋がっていない車は聞かない（物差しは `pitThanksLineWhy` 1本） */
+      var _lineWhy = (window.pitThanksLineWhy ? pitThanksLineWhy(c) : '');
       h += '<div class="ph-sec ph-rt">';
       h += '<div class="ph-sec-lb"><i data-ic=phone data-ics=16></i> 完TEL / 返車 <small>（ここで入力できます）</small></div>';
       h += '<div class="ph-rt-row"><span class="ph-rt-k">確定金額</span><span class="ph-rt-in"><span class="ph-rt-yen">¥</span><input class="ph-rt-amt" inputmode="numeric" value="'+esc(_amtStr)+'"></span></div>';
@@ -428,7 +432,11 @@
          + '</span></div>';
       h += '<div class="ph-rt-row"><span class="ph-rt-k">洗車</span><span class="ph-rt-chips"><button type="button" class="ph-rt-wash'+(_washOn?' on':'')+'" data-w="1">要</button><button type="button" class="ph-rt-wash'+(!_washOn?' on':'')+'" data-w="0">不要</button></span></div>';
       h += '<input class="ph-rt-washnote" type="text" placeholder="洗車の備考（1行）" value="'+esc(c.washNote||'')+'">';
-      h += '<div class="ph-rt-row"><span class="ph-rt-k">お礼LINE</span><span class="ph-rt-chips"><button type="button" class="ph-rt-line'+(_lineOn?' on':'')+'" data-l="1">要</button><button type="button" class="ph-rt-line'+(!_lineOn?' on':'')+'" data-l="0">不要</button></span></div>';
+      h += '<div class="ph-rt-row'+(_lineWhy?' is-off':'')+'"><span class="ph-rt-k">お礼LINE</span><span class="ph-rt-chips">'
+         + (_lineWhy
+            ? '<span class="ph-rt-offwhy">'+esc(_lineWhy)+'</span>'
+            : '<button type="button" class="ph-rt-line'+(_lineOn?' on':'')+'" data-l="1">要</button><button type="button" class="ph-rt-line'+(!_lineOn?' on':'')+'" data-l="0">不要</button>')
+         + '</span></div>';
       h += '</div>';
     }
 

@@ -19,10 +19,21 @@
    ◎保存
      🔴 **全員で共有**＝`state.settings.boardLines` に入れて `pitSettings/main` へ保存される
         （課ごとの共通認識に使うものなので、自分の端末だけに置かない）。
-     形＝ { id, boardId, status, after, label, color }
+     形＝ { id, boardId, status, order, after, label, color }
        color … 色の**名前**（'orange'/'red'/… ＝ COLORS のキー）。無ければ 'orange'（昔のライン）
-       after … そのラインが「どのカードの下」にあるか。列の先頭は '__top'。
-               ⚠ カードが工程を移ったり消えたりして相手が居なくなったら、**列の末尾に寄せて残す**（黙って消さない）。
+       🔴 order … **v2.15.0 からはこれが位置の正**（カードの `boardOrder` と同じ数直線）。
+       　 after … 「どのカードの下に置いたか」の**控え**。v2.14.0 までの位置の正。
+
+     🔴🔴 v2.15.0（2026-08-27・ゆうた報告）**位置の持ち方を変えた。**
+       🗣「並びが強制的に動かされる」「ラインが一番下に来ている時に、ラインの下にカードを配置できない」
+       ◎正体＝位置が `after`（どのカードの下か）**だけ**だった。
+         ・線の直上の車を次の工程へ送る → 相手を失った線が**列の末尾へ落ちる**
+         ・末尾へ落ちた線は「どのカードよりも下」の扱い → **その下に一生カードを置けない**
+       ◎これから＝**線にも並び番号（order）を持たせて、カードと1本の物差しで並べる。**
+         ・相手のカードが動いても・消えても、**線はその場に残る**
+         ・「いちばん下へ」（board-order.js の `moveToEnd`）が**線の番号も見る**ので、線の下に置ける
+       ⚠ 昔の線（order が無いもの）は、初めて描く時に `after` から自動で番号に直す（下の `ensureOrder`）。
+       ⚠ `after` は**消さずに書き続ける**＝コードを戻せば元の動きに戻せる。
 
    ◎作りの決めごと
      🔴 **既存の JS は触っていない。** 差し込み口は task.js の1行（`PitBoardLine.html(...)`）と
@@ -48,6 +59,53 @@
     return state.settings.boardLines;
   }
   function save(){ try { if (w.PitDB) PitDB.save(); } catch(e){} }
+
+  /* ---------- 🔴 v2.15.0 位置の正＝並び番号（order） ---------- */
+  var ORD = 'order';
+  function lord(l){
+    var v = l ? l[ORD] : null;
+    return (typeof v === 'number' && isFinite(v)) ? v : null;
+  }
+  function lset(l, v){ if (l) l[ORD] = v; }
+  /* カードの番号。持っていないカードは**いちばん下**扱い（board-order.js と同じ決めごと）。 */
+  function cord(c){
+    var v = (w.PitBoardOrder && c) ? PitBoardOrder.orderOf(c) : null;
+    return (typeof v === 'number' && isFinite(v)) ? v : Infinity;
+  }
+  function colLines(boardId, status){
+    return lines().filter(function(l){ return l && l.boardId === boardId && l.status === status; });
+  }
+  /* 🔴 board-order.js に「カード以外の、列に並ぶもの」として自分を登録する。
+     ⚠ 番号を**書く**のは board-order.js だけ、という決めごと（v1.140.0）は変えない。
+        こちらは「どれが並ぶか」と「読み書きの口」を渡すだけ。 */
+  if (w.PitBoardOrder && w.PitBoardOrder.useExtra){
+    w.PitBoardOrder.useExtra({ list: colLines, orderOf: lord, setOrder: lset });
+  }
+
+  /* 昔の線（order が無い）を `after` から番号に直す。**描く直前に1回だけ**。
+     ⚠ 相手のカードが居ない線（迷子）は列の末尾。ただし番号を持つので、
+        **そのあと落としたカードは線の下に入る**（ここが今回の直しの肝）。 */
+  function ensureOrder(boardId, status, full){
+    var mine = colLines(boardId, status);
+    var miss = mine.filter(function(l){ return lord(l) == null; });
+    if (!miss.length) return false;
+    var pos = {};
+    (full || []).forEach(function(c){ if (c) pos[c.id] = cord(c); });
+    var maxv = 0;
+    (full || []).forEach(function(c){ var v = cord(c); if (isFinite(v) && v > maxv) maxv = v; });
+    mine.forEach(function(l){ var v = lord(l); if (v != null && v > maxv) maxv = v; });
+    var minv = Infinity;
+    (full || []).forEach(function(c){ var v = cord(c); if (isFinite(v) && v < minv) minv = v; });
+    miss.forEach(function(l){
+      var v;
+      if (l.after === TOP) v = (isFinite(minv) ? minv : 10) - 5;
+      else if (pos[l.after] != null && isFinite(pos[l.after])) v = pos[l.after] + 5;
+      else { maxv += 10; v = maxv + 5; }          /* 迷子＝末尾（今の見え方のまま） */
+      lset(l, v);
+    });
+    save();
+    return true;
+  }
   function rerender(){
     try {
       if (w._rerenderActiveBoard) return _rerenderActiveBoard();
@@ -141,30 +199,28 @@
            いま出ているカードのあいだに落とし込む。
            隠れたカードは**バーの上下から消えるだけ**で、バーは同じ場所に残る。 */
   function renderColumn(boardId, status, cards, cardHtmlFn, allCards){
-    var mine = lines().filter(function(l){ return l.boardId === boardId && l.status === status; });
+    var mine = colLines(boardId, status);
     if (!mine.length) return cards.map(cardHtmlFn).join('');
 
     var full = (allCards && allCards.length) ? allCards : cards;
-    var pos = {};                                  /* カードid → 絞り込む前の並びでの位置 */
-    full.forEach(function(c, i){ if (c) pos[c.id] = i; });
-    var END = full.length + 1;                     /* 相手が居なくなったライン＝末尾 */
+    ensureOrder(boardId, status, full);                 /* 🔴 v2.15.0 昔の線を番号に直す */
 
-    function at(l){
-      if (l.after === TOP) return -1;              /* 列の先頭 */
-      return (pos[l.after] != null) ? pos[l.after] : END;
-    }
-    var sorted = mine.slice().sort(function(a, b){ return at(a) - at(b); });
+    /* 🔴 v2.15.0 並べる物差しは**番号1本**。
+       ⚠ v1.69.0 の決めごと（担当車両で隠れたカードがあってもバーの位置は動かさない）は
+          番号で並べると**自然に守られる**＝隠れたカードは番号の列から抜けるだけで、
+          線の番号は動かないので、線は同じすき間に出る。 */
+    var sorted = mine.slice().sort(function(a, b){ return (lord(a) || 0) - (lord(b) || 0); });
 
     var out = '', li = 0;
 
     /* 🔴 v1.140.0 一時並び替え中（board-sort.js）は、カードの並びが**マスター並びとは別物**になる。
-       「どのカードの下か」で置くと、線が意味のない所へ飛ぶ。
+       「番号のすき間」で置くと、線が意味のない所へ飛ぶ。
        ⚠ そこで **「上から何枚目か」だけを守って**置く＝マスター並びで3枚目の下にあった線は、
           並び替えて見ている間も3枚目の下に出る。位置の意味は薄れるので**薄く**出す（lineHtml）。 */
     if (tmpOn()){
       var slot = sorted.map(function(l){
-        var a = at(l);
-        var n = (a < 0) ? 0 : (a + 1);
+        var n = 0, lv = lord(l) || 0;
+        full.forEach(function(c){ if (cord(c) < lv) n++; });
         return Math.min(n, cards.length);
       });
       cards.forEach(function(c, i){
@@ -176,28 +232,39 @@
     }
 
     cards.forEach(function(c){
-      var ci = (pos[c.id] != null) ? pos[c.id] : END;
-      /* このカードより前に来るラインを先に出す（同じ位置＝そのカードの「下」なので出さない） */
-      while (li < sorted.length && at(sorted[li]) < ci){ out += lineHtml(sorted[li]); li++; }
+      var cv = cord(c);
+      /* このカードより前に来るラインを先に出す */
+      while (li < sorted.length && (lord(sorted[li]) || 0) < cv){ out += lineHtml(sorted[li]); li++; }
       out += cardHtmlFn(c);
     });
-    /* ⚠ 残り＝いちばん下のライン、相手のカードが居なくなったライン。**黙って消さない**。 */
+    /* ⚠ 残り＝いちばん下のライン。**黙って消さない**。 */
     while (li < sorted.length){ out += lineHtml(sorted[li]); li++; }
     return out;
   }
 
   /* ---------- 入れる・動かす・消す ---------- */
 
+  /* 🔴 v2.15.0 「このカードの下」を**番号**に直す。振り直しは board-order.js の1本に任せる。
+     ⚠ `after` も一緒に書いておく＝コードを戻した時に元の動きに戻せる（控え）。 */
+  function place(l, after){
+    if (!l) return;
+    l.after = after || TOP;
+    if (w.PitBoardOrder && w.PitBoardOrder.placeExtraAfter){
+      PitBoardOrder.placeExtraAfter(l, l.boardId, l.status, l.after);
+    }
+  }
   function put(boardId, status, after, label, color){
     var l = { id: newId(), boardId: boardId, status: status, after: after || TOP,
               label: label || '', color: color || DEFCOLOR };
     lines().push(l);
+    place(l, after);
     save();
     return l;
   }
   function moveTo(id, boardId, status, after){
     var l = byId(id); if (!l) return;
-    l.boardId = boardId; l.status = status; l.after = after || TOP;
+    l.boardId = boardId; l.status = status;
+    place(l, after);
     save();
   }
   function remove(id){

@@ -803,14 +803,19 @@
 
 /* ===== side列（廃車・外注）の縦積み ===== */
 .kanban-side-stack{ display:flex; flex-direction:column; gap:8px; flex:0 0 220px; min-width:0; margin-left:8px; align-self:stretch; min-height:0; }
-/* ★中身が増えたら「列の中で」スクロールさせる（v2.9.6）
-   0 0 auto だと中身の高さのまま伸びて枠の外へはみ出す＝スクロールバーが出ない。
-   0 1 auto ＋ 親の min-height:0 で「枠の高さで止まる」ようにする。
-   ⚠ 1 1 auto にしない＝2列とも空のときに、からっぽの箱が画面いっぱいに伸びてしまうから。
-      0 1 auto なら「中身が少ないときは今までどおりの高さ・多いときだけ縮んでスクロール」。
-   min-height:120px は、片方が長いときにもう片方が潰れて見えなくならないための下限。 */
-.kanban-side-stack .kanban-col.side{ margin-left:0; flex:0 1 auto; min-height:120px; max-height:100%; }
-.kanban-side-stack .kanban-col.side .kanban-col-body{ min-height:0; }
+/* ★2つの箱の高さの決め方（v2.14.0・ゆうた指定）
+   ねらい＝**どちらも入りきらないほど積まれたら、まん中で半分ずつに割る。**
+     flex:1 1 0            高さの取り合いを「中身の量」ではなく **等分** から始める
+     max-height:max-content 中身より大きくはならない
+                           ＝片方が少ない時はその高さで止まり、余りはもう片方が全部もらう
+     min-height:120px      片方が山盛りでも、もう片方が潰れて消えない下限
+   ⚠ max-content を外すと、空の箱が画面いっぱいに伸びる（v2.9.6 で 1 1 auto を避けた理由がこれ）。
+     伸び止めが max-content なので、1 1 0 でも空の箱は「なし」の高さで止まる。
+   ⚠ この2列だけ body を flex:0 1 auto に戻す。flex:1（basis 0）のままだと
+     列の max-content が「中身の高さ」にならず、上の max-content が効かない。
+   （v2.9.6 の 0 1 auto ＋ max-height:100% は、中身の多い側だけが大きくなる＝半分にならなかった） */
+.kanban-side-stack .kanban-col.side{ margin-left:0; flex:1 1 0; min-height:120px; max-height:max-content; }
+.kanban-side-stack .kanban-col.side .kanban-col-body{ min-height:0; flex:0 1 auto; }
 
 /* ===== 外注ビュー（外注先ごとの俯瞰） ===== */
 .os-row{ background:var(--bg2); border:1px solid var(--border); border-radius:10px; margin-bottom:12px; overflow:hidden; }

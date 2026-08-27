@@ -59,12 +59,21 @@
      ⚠ この決め方は `anchorFromPoint` が元から持っていた（列の余白に落とした時だけ使っていた）。
         **カードの上に落とした時にも同じ道を通す**＝決め方を2つに割らない。
      ⚠ 覚えるのは**その1回のドロップのあいだだけ**。使ったらすぐ捨てる（次のドロップに持ち越さない）。 */
-  var _dropBefore = null;   /* 「このカードの手前に入れる」カードID。null＝いちばん下 */
+  var _dropBefore = null;   /* 「この手前に入れる」目印。{card:id} / {extra:線id} / null＝いちばん下 */
   /* 🔴 v2.0.1 **`_dropBefore` が null なのは「いちばん下」という答え**であって、
      「読めなかった」ではない。読めたかどうかは、こちらの旗で見分ける。
      ⚠ ここを一緒くたにすると、**いちばん下へ落としたのに1つ上に入る**（実際に踏んだ）。 */
   var _dropInBoard = false;
+  /* 🔴🔴 v2.15.1（ゆうた報告 2026-08-27）**読む時に区切りラインも数える。**
+     🗣「線をまたいでないのに、その下の線がさらに下に行っちゃったりする」
+     ◎正体＝ここが**カードしか数えていなかった**。
+       `A B —線— C D` で **B と 線 のあいだ**に落としても、いちばん近いカードは C なので
+       「Cの手前」＝**線の下**と読まれていた（＝またいでいないのにまたいだ扱い）。
+     🔴 数え方は board-order.js の `anchorAt` 1本に置いた。ここは呼ぶだけ。
+     ⚠ 部品が無い時の保険として、今までどおりカードだけで読む道を残す。 */
   function anchorFromPoint(body, y, dragId) {
+    var skip = dragId ? body.querySelector('[data-card-id="' + String(dragId).replace(/"/g, '') + '"]') : null;
+    if (window.PitBoardOrder && PitBoardOrder.anchorAt) return PitBoardOrder.anchorAt(body, y, skip);
     var kids = Array.prototype.filter.call(body.children, function (el) {
       return el.hasAttribute && el.hasAttribute('data-card-id');
     });
@@ -72,9 +81,13 @@
       var id = kids[i].getAttribute('data-card-id');
       if (id === dragId) continue;                    /* 自分は数えない */
       var r = kids[i].getBoundingClientRect();
-      if (y < r.top + r.height / 2) return id;        /* まん中より上＝このカードの手前 */
+      if (y < r.top + r.height / 2) return { card: id };   /* まん中より上＝これの手前 */
     }
-    return null;                                      /* どのカードより下＝いちばん下 */
+    return null;                                      /* どれより下＝いちばん下 */
+  }
+  /* 目印を「カードの実物」に戻す（state.cards の並べ替えに使うだけ。番号は board-order.js） */
+  function _anchorCard(a){
+    return (a && a.card) ? state.cards.find(function (x) { return x.id === a.card; }) : null;
   }
 
   function applyCardDrop(cardId, kind, val) {
@@ -98,17 +111,15 @@
          ⚠ 下の `_commitStatus` は、工程のポップアップを挟むと**あとから**走る。
             その時にはドロップの後始末で `_dropBefore` が null に戻っているので、
             **ポップアップが出る列へドラッグすると必ずいちばん下に入っていた**（v1.140.1 の取り残し）。 */
-      var _anchorS = _dropBefore ? state.cards.find(function (x) { return x.id === _dropBefore; }) : null;
+      var _anchorS = _dropBefore;
       // 移動の本処理（ポップアップ確定後 or ポップアップ不要時に実行）
       var _commitStatus = function(){
         c.status = val;
         c.testDrive = false;   // メイン領域に置く＝試運転フラグOFF（試運転ゾーンから戻した時も解除）
         /* 🔴 v1.140.1 **落とした場所に入れる**（board-order.js）。余白の下の方に落とせば今までどおり末尾。
            ⚠ 番号を書くのは board-order.js だけ。ここで boardOrder を直接いじらない。 */
-        if (window.PitBoardOrder){
-          var _bf = _anchorS;
-          PitBoardOrder.insertAt(c, (_bf && _bf !== c && _bf.status === val && _bf.boardId === c.boardId) ? _bf : null);
-        }
+        /* 🔴 v2.15.1 列ちがいの目印を弾くのも board-order.js の `insertAtAnchor` の中でやる（物差しを2つ書かない） */
+        if (window.PitBoardOrder) PitBoardOrder.insertAtAnchor(c, _anchorS);
         if (_changed){
           if (window.logPhaseMove) logPhaseMove(c, _fromStatus, val);
           else if (window.logFlow && typeof statusLabel === 'function') logFlow(c, statusLabel(val) + 'へ');
@@ -145,16 +156,17 @@
          ⚠ `t`（落とした先のカード）は**行き先の列を決めるためだけ**に使う。
             位置を `t` で決めると、下へ動かした時に必ず元の位置へ戻る（上のコメント参照）。
          ⚠ 高さが読めなかった時（部品が無い・列の外）は、今までどおり `t` の手前に入れる。 */
-      var _anchor = _dropBefore ? state.cards.find(function (x) { return x.id === _dropBefore; }) : null;
+      var _anchor = _dropBefore;
       var _hadAnchor = _dropInBoard;   /* 🔴 v2.0.1 null＝いちばん下、なので旗で見分ける */
       var _fromR = c.status;
       var _changedR = (c.status !== t.status);
       var _doReorder = function () {
         c.status = t.status;
         c.testDrive = !!t.testDrive;
-        /* 落とし先の列に合う目印だけ使う（列をまたいだ時に、よその列のカードを目印にしない） */
-        var _bf = (_anchor && _anchor !== c && _anchor.status === c.status && _anchor.boardId === c.boardId)
-                ? _anchor : null;
+        /* 落とし先の列に合う目印だけ使う（列をまたいだ時に、よその列のカードを目印にしない）。
+           ⚠ ここで作る `_bf` は **state.cards の並べ替え用**。番号は下の board-order.js が決める。 */
+        var _bfc = _anchorCard(_anchor);
+        var _bf = (_bfc && _bfc !== c && _bfc.status === c.status && _bfc.boardId === c.boardId) ? _bfc : null;
         var ci = state.cards.indexOf(c); if (ci >= 0) state.cards.splice(ci, 1);
         var _tt = _bf || (_hadAnchor ? null : t);
         var ti = _tt ? state.cards.indexOf(_tt) : -1;
@@ -166,7 +178,7 @@
            ⚠ 番号を書くのは board-order.js だけ。ここで boardOrder を直接いじらない。 */
         if (window.PitBoardOrder){
           /* 高さが読めた＝その目印の手前（目印が無い＝いちばん下）。読めなかった＝今までどおり t の手前。 */
-          if (_hadAnchor) PitBoardOrder.insertAt(c, _bf);
+          if (_hadAnchor) PitBoardOrder.insertAtAnchor(c, _anchor);
           else PitBoardOrder.moveBefore(c, t);
         }
         if (_changedR && window.logPhaseMove) logPhaseMove(c, _fromR, c.status);

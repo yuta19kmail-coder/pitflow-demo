@@ -95,6 +95,42 @@
   }
   function eOrder(x){ try { return _extra ? _extra.orderOf(x) : null; } catch(e){ return null; } }
   function eSet(x, v){ try { if (_extra) _extra.setOrder(x, v); } catch(e){} }
+  function eById(id){ try { return (_extra && _extra.byId) ? _extra.byId(id) : null; } catch(e){ return null; } }
+
+  /* ---------- 🔴🔴 v2.15.1 落とした高さから「何の手前に入れるか」を読む ----------
+     🗣 ゆうた「線をまたいでないのに、その下の線がさらに下に行っちゃったりする」
+     ◎正体＝**読む時にカードしか数えていなかった**（dnd.js の anchorFromPoint）。
+       `A B —線— C D` で **B と 線 のあいだ**に落としても、
+       いちばん近い**カード**は C なので「Cの手前」＝**線の下**と読まれていた。
+     🔴 **カードと区切りラインを同じ列で数える。物差しはここ1本。**
+        返すもの … { card:'カードid' } / { extra:'線id' } / null（＝いちばん下）
+     ⚠ 掴んでいる本人（skipEl）は数えない。 */
+  function anchorAt(body, y, skipEl){
+    if (!body) return null;
+    var kids = Array.prototype.filter.call(body.children, function(el){
+      return el.getAttribute && (el.getAttribute('data-card-id') || el.getAttribute('data-lineid'));
+    });
+    for (var i = 0; i < kids.length; i++){
+      var el = kids[i];
+      if (skipEl && el === skipEl) continue;
+      var r = el.getBoundingClientRect();
+      if (y < r.top + r.height / 2){
+        var cid = el.getAttribute('data-card-id');
+        return cid ? { card: cid } : { extra: el.getAttribute('data-lineid') };
+      }
+    }
+    return null;
+  }
+  /* 目印（上の形）を、実物（カード or 線）に戻す。列が違うものは目印にしない。 */
+  function resolveAnchor(a, boardId, status){
+    if (!a) return null;
+    var t = null;
+    if (a.card)  t = cards().find(function(x){ return x && x.id === a.card; }) || null;
+    else if (a.extra) t = eById(a.extra);
+    if (!t) return null;
+    if (boardId !== undefined && (t.boardId !== boardId || t.status !== status)) return null;
+    return t;
+  }
 
   /* カードと「カード以外」を1本に混ぜて、番号の順に並べる。
      ⚠ 番号を持っていないものは**いちばん下**（今までのカードの決めごとと同じ）。 */
@@ -139,10 +175,18 @@
     if (!c || !target || c === target) return false;
     var items = colItems(target.boardId, target.status, c);
     var i = -1;
-    for (var k = 0; k < items.length; k++){ if (items[k].k === 'c' && items[k].o === target){ i = k; break; } }
+    /* 🔴 v2.15.1 目印は**カードでも区切りラインでもよい**（線の手前に落とせるように） */
+    for (var k = 0; k < items.length; k++){ if (items[k].o === target){ i = k; break; } }
     if (i < 0) i = items.length;
     items.splice(i, 0, { k:'c', o:c });
     return renumberItems(items) > 0;
+  }
+  /* 🔴 v2.15.1 dnd.js はこれ1本を呼ぶ。列が違う目印・目印が無い＝いちばん下。 */
+  function insertAtAnchor(c, a){
+    if (!c) return false;
+    var t = resolveAnchor(a, c.boardId, c.status);
+    if (!t || t === c) return moveToEnd(c);
+    return moveBefore(c, t);
   }
   /* 🔴 v1.140.1（ゆうた指定）**ドラッグで持ってきた時は「落とした場所」に入れる。**
      　 「ドラッグで並び変える時は一番下ではなくてドラッグしたところに初期にいれてほしい」
@@ -171,6 +215,18 @@
     if (c[KEY] === v) return false;
     c[KEY] = v;
     return true;
+  }
+
+  /* 🔴 v2.15.1 カード以外のもの（区切りライン）を「この目印の手前」へ置く。
+     目印＝anchorAt() が返すもの。null なら列のいちばん下。 */
+  function placeExtraBefore(x, boardId, status, a){
+    if (!x) return false;
+    var items = colItems(boardId, status, x);
+    var t = resolveAnchor(a, boardId, status);
+    var idx = items.length;
+    if (t){ for (var i = 0; i < items.length; i++){ if (items[i].o === t){ idx = i; break; } } }
+    items.splice(idx, 0, { k:'e', o:x });
+    return renumberItems(items) > 0;
   }
 
   /* 🔴 v2.15.0 カード以外のもの（区切りライン）を「このカードの下」へ置く。
@@ -236,7 +292,9 @@
     KEY: KEY, STEP: STEP, sort: sort, orderOf: orderOf, ensure: ensure,
     moveBefore: moveBefore, moveToEnd: moveToEnd, insertAt: insertAt, onBoard: onBoard,
     /* 🔴 v2.15.0 カード以外の「列に並ぶもの」（区切りライン） */
-    useExtra: useExtra, placeExtraAfter: placeExtraAfter, colItems: colItems
+    useExtra: useExtra, placeExtraAfter: placeExtraAfter, colItems: colItems,
+    /* 🔴 v2.15.1 落とした場所の読み方は、カードも線も**ここ1本** */
+    anchorAt: anchorAt, insertAtAnchor: insertAtAnchor, placeExtraBefore: placeExtraBefore
   };
   console.log('[board-order] ready（タスクボードのマスター並び）');
 })(window);

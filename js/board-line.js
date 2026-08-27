@@ -79,7 +79,7 @@
      ⚠ 番号を**書く**のは board-order.js だけ、という決めごと（v1.140.0）は変えない。
         こちらは「どれが並ぶか」と「読み書きの口」を渡すだけ。 */
   if (w.PitBoardOrder && w.PitBoardOrder.useExtra){
-    w.PitBoardOrder.useExtra({ list: colLines, orderOf: lord, setOrder: lset });
+    w.PitBoardOrder.useExtra({ list: colLines, orderOf: lord, setOrder: lset, byId: byId });
   }
 
   /* 昔の線（order が無い）を `after` から番号に直す。**描く直前に1回だけ**。
@@ -253,18 +253,29 @@
       PitBoardOrder.placeExtraAfter(l, l.boardId, l.status, l.after);
     }
   }
-  function put(boardId, status, after, label, color){
+  /* 🔴 v2.15.1 落とした高さから直に置く。**カードも、ほかの線も数えた上での位置**。
+     ⚠ `after`（どのカードの下か）は控えとして書き続ける＝コードを戻せば元の動きに戻る。 */
+  function placeAt(l, anchor, after){
+    if (!l) return;
+    l.after = after || TOP;
+    if (w.PitBoardOrder && w.PitBoardOrder.placeExtraBefore){
+      PitBoardOrder.placeExtraBefore(l, l.boardId, l.status, anchor);
+    } else {
+      place(l, after);
+    }
+  }
+  function put(boardId, status, after, label, color, anchor){
     var l = { id: newId(), boardId: boardId, status: status, after: after || TOP,
               label: label || '', color: color || DEFCOLOR };
     lines().push(l);
-    place(l, after);
+    if (anchor !== undefined) placeAt(l, anchor, after); else place(l, after);
     save();
     return l;
   }
-  function moveTo(id, boardId, status, after){
+  function moveTo(id, boardId, status, after, anchor){
     var l = byId(id); if (!l) return;
     l.boardId = boardId; l.status = status;
-    place(l, after);
+    if (anchor !== undefined) placeAt(l, anchor, after); else place(l, after);
     save();
   }
   function remove(id){
@@ -275,7 +286,15 @@
     return false;
   }
 
-  /* 落とした位置（マウスのY）から「どのカードの下か」を決める。
+  /* 🔴 v2.15.1 落とした高さから「何の手前か」を読む。物差しは board-order.js の1本。
+     ⚠ 掴んでいる線そのものは数えない（自分の位置に自分を入れようとして動かなくなる）。 */
+  function anchorAt(body, y){
+    if (!(w.PitBoardOrder && PitBoardOrder.anchorAt)) return null;
+    var skip = dragging ? body.querySelector('[data-lineid="' + String(dragging.id).replace(/"/g, '') + '"]') : null;
+    return PitBoardOrder.anchorAt(body, y, skip);
+  }
+
+  /* 落とした位置（マウスのY）から「どのカードの下か」を決める（`after` の控え用）。
      ⚠ カードの**まん中より上**なら「そのカードの上」＝ひとつ前のカードの下、という数え方。 */
   function afterFromPoint(body, y){
     var kids = Array.prototype.filter.call(body.children, function(el){
@@ -363,16 +382,17 @@
   function ghostOff(){
     if (ghost && ghost.parentNode) ghost.parentNode.removeChild(ghost);
   }
-  /* 落とし位置（after）に合わせてゴーストを差し込む */
-  function ghostTo(body, after){
+  /* 落とし位置に合わせてゴーストを差し込む。
+     🔴 v2.15.1 **目印の「手前」に出す**（目印＝カード or ほかの線 or 無し＝いちばん下）。
+     ⚠ こうしないと、離した時に入る場所とゴーストの場所がズレる（線のあいだで1つ下にズレていた）。 */
+  function ghostTo(body, anchor){
     var g = ghostEl();
-    if (after === TOP){
-      if (body.firstChild !== g) body.insertBefore(g, body.firstChild);
-      return;
-    }
-    var host = body.querySelector('[data-card-id="' + String(after).replace(/"/g, '') + '"]');
-    if (!host){ ghostOff(); return; }
-    if (host.nextSibling !== g) body.insertBefore(g, host.nextSibling);
+    var host = null;
+    if (anchor && anchor.card) host = body.querySelector('[data-card-id="' + String(anchor.card).replace(/"/g, '') + '"]');
+    else if (anchor && anchor.extra) host = body.querySelector('[data-lineid="' + String(anchor.extra).replace(/"/g, '') + '"]');
+    if (anchor && !host){ ghostOff(); return; }
+    if (host){ if (host.previousSibling !== g) body.insertBefore(g, host); }
+    else { if (body.lastChild !== g) body.appendChild(g); }
   }
 
   /* 🔴🔴 v1.159.1（ゆうた報告）**列のいちばん下の「ここにドラッグ」にも落とせるようにする。**
@@ -408,7 +428,7 @@
     body.classList.add('kb-line-over');
     /* ⚠ 「ここにドラッグ」の上にいる時は、マウスのYが列の下にあるので
           afterFromPoint はそのまま**いちばん下**を返す＝ゴーストも列のいちばん下に出る。 */
-    ghostTo(body, afterFromPoint(body, e.clientY));
+    ghostTo(body, anchorAt(body, e.clientY));
   }, true);
 
   d.addEventListener('drop', function (e) {
@@ -425,9 +445,10 @@
       return;
     }
     var info = colInfoOf(body);
-    var after = afterFromPoint(body, e.clientY);
-    if (draggingNew) put(info.boardId, info.status, after, '');
-    else moveTo(dragging.id, info.boardId, info.status, after);
+    var anchor = anchorAt(body, e.clientY);              /* 🔴 v2.15.1 カードも線も数えた位置 */
+    var after  = afterFromPoint(body, e.clientY);        /* 控え（どのカードの下か） */
+    if (draggingNew) put(info.boardId, info.status, after, '', null, anchor);
+    else moveTo(dragging.id, info.boardId, info.status, after, anchor);
     dragging = null; draggingNew = false;
     rerender();
   }, true);

@@ -73,6 +73,92 @@
 :root[data-theme="light-liquid"] #topbar,
 :root[data-theme="light-liquid"] #sidebar { background: rgba(250,251,253,0.72) !important; }
 
+/* ============================================================================
+   🟨🟨 付箋（.bn-card）のリキッド表示 ＝ **CarFlow から丸ごと写したもの**
+   （2026-08-27・PitFlow v2.16.0・ゆうた指定「CarFlow見て。リキッドだけ特殊な付箋表示を
+     使ってる。それを参考にして**完全に同じ**にして」）
+
+   ◎なにが起きていたか
+     上のガラス（`.bn-card` を `--panel-bg-overlay` で塗る）が、付箋の**5色を丸ごと消していた**。
+     CarFlow は同じ所で色を消したうえで、**同色のネオン枠＋左上の色タブ**で色を戻している。
+     PitFlow にはその戻しが無かった＝**色が完全になくなる**。
+
+   🔴 出どころ＝`CarFlow\carflow\css\base.css` の「v2.18.20 付箋リキッド確定版」。
+      **1文字も変えずに写している。** 直す時は CarFlow 側を直して、ここへ写し直すこと
+      （片方だけ直すと、次に見比べた日にどちらが正か分からなくなる）。
+   ⚠ `.bn-created` / `.bn-carlink` は PitFlow の付箋にはまだ無い（当たらないだけ・害はない）。
+      **消さない**＝あとで付いた日に、CarFlow と同じ見た目で出るように。
+   ⚠ このファイル（topbar.css）は board-notes.css より後ろに読む。ここが崩れると色が戻らない。
+   ============================================================================ */
+
+/* v2.18.20: 付箋リキッド確定版＝G-NEON「ガラス本体＋同色ネオン枠＋左上の無地色タブ」（ゆうた選定）。 */
+/*   本体＝ガラス／色＝不透明（濁らない）。ダーク＝本物のネオン発光／ライト＝濃色＋色付き影の擬似ネオン。 */
+/*   タブの底辺は枠線にピッタリ密着（top:-12.5px + height:14px ＝ 1.5px枠を覆う）。 */
+:root[data-theme$="-liquid"] .bn-card.bn-color-red,
+:root[data-theme$="-liquid"] .bn-card.bn-color-orange,
+:root[data-theme$="-liquid"] .bn-card.bn-color-yellow,
+:root[data-theme$="-liquid"] .bn-card.bn-color-green,
+:root[data-theme$="-liquid"] .bn-card.bn-color-blue{
+  background: var(--panel-bg-overlay) !important;
+  border-radius: 0 10px 10px 10px;   /* 左上はタブが座るので角丸なし */
+  margin-top: 13px;                  /* タブの頭ぶんの余白 */
+}
+:root[data-theme$="-liquid"] .bn-card.bn-color-red::before,
+:root[data-theme$="-liquid"] .bn-card.bn-color-orange::before,
+:root[data-theme$="-liquid"] .bn-card.bn-color-yellow::before,
+:root[data-theme$="-liquid"] .bn-card.bn-color-green::before,
+:root[data-theme$="-liquid"] .bn-card.bn-color-blue::before{
+  content: "";
+  position: absolute;
+  top: -12.5px; left: -1.5px;
+  width: 48px; height: 14px;
+  border-radius: 7px 7px 0 0;
+  pointer-events: none;
+}
+/* ---- ダーク：本物のネオン ---- */
+:root[data-theme="dark-liquid"] .bn-card.bn-color-red{ border: 1.5px solid rgba(255,122,122,.9) !important; box-shadow: 0 0 14px rgba(255,90,90,.45), inset 0 0 10px rgba(255,90,90,.12); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-red::before{ background: #ff7a7a; box-shadow: 0 0 10px rgba(255,90,90,.9), 0 0 20px rgba(255,90,90,.4); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-orange{ border: 1.5px solid rgba(255,176,86,.9) !important; box-shadow: 0 0 14px rgba(255,165,70,.45), inset 0 0 10px rgba(255,165,70,.12); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-orange::before{ background: #ffb056; box-shadow: 0 0 10px rgba(255,165,70,.9), 0 0 20px rgba(255,165,70,.4); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-yellow{ border: 1.5px solid rgba(255,229,102,.9) !important; box-shadow: 0 0 14px rgba(255,220,70,.4), inset 0 0 10px rgba(255,220,70,.1); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-yellow::before{ background: #ffe566; box-shadow: 0 0 10px rgba(255,220,70,.9), 0 0 20px rgba(255,220,70,.4); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-green{ border: 1.5px solid rgba(138,212,134,.9) !important; box-shadow: 0 0 14px rgba(120,210,120,.45), inset 0 0 10px rgba(120,210,120,.12); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-green::before{ background: #8ad486; box-shadow: 0 0 10px rgba(120,210,120,.9), 0 0 20px rgba(120,210,120,.4); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-blue{ border: 1.5px solid rgba(147,194,250,.9) !important; box-shadow: 0 0 14px rgba(110,170,255,.45), inset 0 0 10px rgba(110,170,255,.12); }
+:root[data-theme="dark-liquid"] .bn-card.bn-color-blue::before{ background: #93c2fa; box-shadow: 0 0 10px rgba(110,170,255,.9), 0 0 20px rgba(110,170,255,.4); }
+/* ---- ライト：濃色＋色付き影（白地に発光は乗らないため） ---- */
+:root[data-theme="light-liquid"] .bn-card.bn-color-red{ border: 1.5px solid #e85555 !important; box-shadow: 0 2px 10px rgba(232,85,85,.45); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-red::before{ background: #e85555; box-shadow: 0 2px 8px rgba(232,85,85,.5); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-orange{ border: 1.5px solid #e0883a !important; box-shadow: 0 2px 10px rgba(224,136,58,.45); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-orange::before{ background: #e0883a; box-shadow: 0 2px 8px rgba(224,136,58,.5); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-yellow{ border: 1.5px solid #d4b820 !important; box-shadow: 0 2px 10px rgba(212,184,32,.45); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-yellow::before{ background: #d4b820; box-shadow: 0 2px 8px rgba(212,184,32,.5); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-green{ border: 1.5px solid #5aa856 !important; box-shadow: 0 2px 10px rgba(90,168,86,.45); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-green::before{ background: #5aa856; box-shadow: 0 2px 8px rgba(90,168,86,.5); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-blue{ border: 1.5px solid #4f8fe0 !important; box-shadow: 0 2px 10px rgba(79,143,224,.45); }
+:root[data-theme="light-liquid"] .bn-card.bn-color-blue::before{ background: #4f8fe0; box-shadow: 0 2px 8px rgba(79,143,224,.5); }
+
+/* ダーク・リキッド：ガラス上で黒文字が沈むためカード内文字を明色化（白チップ系＝ラベル/返信バブルはそのまま） */
+:root[data-theme="dark-liquid"] .bn-card{ color: #eef2f7; }
+:root[data-theme="dark-liquid"] .bn-card .bn-title{ color: #f8fafc; }
+:root[data-theme="dark-liquid"] .bn-card .bn-empty-title{ color: rgba(255,255,255,.5); }
+:root[data-theme="dark-liquid"] .bn-card .bn-body{ color: rgba(255,255,255,.85); }
+:root[data-theme="dark-liquid"] .bn-card .bn-deadline{ color: rgba(255,255,255,.8); }
+:root[data-theme="dark-liquid"] .bn-card .bn-author{ color: rgba(255,255,255,.65); }
+:root[data-theme="dark-liquid"] .bn-card .bn-created{ color: rgba(255,255,255,.5); }
+:root[data-theme="dark-liquid"] .bn-card .bn-no-member{ color: rgba(255,255,255,.55); }
+:root[data-theme="dark-liquid"] .bn-card .bn-menu-btn{ color: rgba(255,255,255,.8); }
+:root[data-theme="dark-liquid"] .bn-card .bn-menu-btn:hover,
+:root[data-theme="dark-liquid"] .bn-card .bn-menu-btn:active{ background: rgba(255,255,255,.18); }
+:root[data-theme="dark-liquid"] .bn-card .bn-carlink{ color: #8ec2ff; }
+:root[data-theme="dark-liquid"] .bn-card .bn-carlink:hover{ color: #b3d6ff; }
+
+/* 期限切れ：赤枠＋赤発光を優先（従来の意味を維持・タブは付箋色のまま） */
+:root[data-theme$="-liquid"] .bn-card.is-overdue{
+  border-color: #d32f2f !important;
+  box-shadow: 0 0 16px rgba(211,47,47,.55) !important;
+}
+
 /* ===== トップバー要素（CarFlow準拠） ===== */
 /* 畳むボタン（CarFlow .sidebar-toggle 準拠：透明＋枠） */
 #topbar .tb-toggle {

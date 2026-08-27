@@ -93,7 +93,7 @@
 
 /* v2.18.20: 付箋リキッド確定版＝G-NEON「ガラス本体＋同色ネオン枠＋左上の無地色タブ」（ゆうた選定）。 */
 /*   本体＝ガラス／色＝不透明（濁らない）。ダーク＝本物のネオン発光／ライト＝濃色＋色付き影の擬似ネオン。 */
-/*   タブの底辺は枠線にピッタリ密着（top:-12.5px + height:14px ＝ 1.5px枠を覆う）。 */
+/*   タブの底辺は枠線にピッタリ密着（bottom:100% ＝ 枠の内側で止まる。枠の太さが変わってもズレない）。 */
 :root[data-theme$="-liquid"] .bn-card.bn-color-red,
 :root[data-theme$="-liquid"] .bn-card.bn-color-orange,
 :root[data-theme$="-liquid"] .bn-card.bn-color-yellow,
@@ -110,7 +110,15 @@
 :root[data-theme$="-liquid"] .bn-card.bn-color-blue::before{
   content: "";
   position: absolute;
-  top: -12.5px; left: -1.5px;
+  /* 🔴 2026-08-27（ゆうた指摘「タブがちょっとだけ中にはみ出てる」）
+     前は `top:-12.5px` ＝ **枠が 1.5px ちょうど**である前提で置いていた。
+     ところが 1.5px の枠は端末（画面の細かさ）によって **1px に丸められる**ので、
+     そのぶんタブの底辺が **枠を越えてカードの中へ 1.5px 入り込んで**いた。
+     ＝ `bottom:100%` にすると、底辺が**枠の内側の線にピッタリ**で止まる。
+        枠が 1px でも 1.5px でも 2px でも、**中には一切入らない**。
+     ⚠ `left:0` も同じ理由（-1.5px だと枠が 1px の端末で 0.5px だけ左へはみ出す）。
+        枠と同じ色なので、枠の線がタブの左に見えても継ぎ目には見えない。 */
+  top: auto; bottom: 100%; left: 0;
   width: 48px; height: 14px;
   border-radius: 7px 7px 0 0;
   pointer-events: none;

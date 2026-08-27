@@ -27,6 +27,16 @@
      ⚠ 番号を振るのは **いま盤面に乗っているカードだけ**（返車済み・アーカイブ・下書きには振らない）。
         全カードに振ると、何千件ものクラウド書き込みが一度に飛ぶ。
 
+   ◎🔴 v2.15.0（2026-08-27・ゆうた報告）**区切りラインも、この番号の列に並ぶ。**
+     🗣「並びが強制的に動かされる」「ラインが一番下に来ている時に、ラインの下にカードを配置できない」
+     ＝ ラインの位置が「**どのカードの下か**」だけで保存されていたのが正体。
+        相手のカードが工程を移る・返車になると相手を失い、**列の末尾に落ちて**、
+        そこから先は**どのカードよりも下**の扱い＝二度と下に置けなくなっていた。
+     🔴 直し＝**ラインにも同じ並び番号を持たせて、カードと1本の物差しで並べる。**
+        ここは「カード」と「カード以外のもの（＝区切りライン）」をまとめて番号を振る。
+        ⚠ カード以外のものは `useExtra()` で**登録してもらう**＝このファイルは
+           「区切りライン」という言葉を知らないままでいる（board-line.js の都合を持ち込まない）。
+
    ◎初回（2026-08-18 ゆうた指定「とりあえずいまの並びのまま振って」）
      `ensure()` が、番号を持っていないカードに **いま出ている順のまま** 10, 20, 30 … と振る。
      ⚠ 読み込み直後の並びは Firestore のドキュメントID順＝**どの端末でも同じ**なので、
@@ -74,35 +84,65 @@
     });
   }
 
+  /* ---------- 🔴 v2.15.0 カード以外の「列に並ぶもの」（＝区切りライン） ----------
+     board-line.js が起動時に登録する。登録が無ければ今までどおりカードだけを見る。
+     形 … { list(boardId,status) → 配列, orderOf(x) → 番号 or null, setOrder(x, v) } */
+  var _extra = null;
+  function useExtra(o){ _extra = o; }
+  function extras(boardId, status){
+    if (!_extra) return [];
+    try { return _extra.list(boardId, status) || []; } catch(e){ return []; }
+  }
+  function eOrder(x){ try { return _extra ? _extra.orderOf(x) : null; } catch(e){ return null; } }
+  function eSet(x, v){ try { if (_extra) _extra.setOrder(x, v); } catch(e){} }
+
+  /* カードと「カード以外」を1本に混ぜて、番号の順に並べる。
+     ⚠ 番号を持っていないものは**いちばん下**（今までのカードの決めごとと同じ）。 */
+  function merged(boardId, status, cardList){
+    var items = [];
+    (cardList || []).forEach(function(c, i){ items.push({ k:'c', o:c, v:orderOf(c), i:i }); });
+    extras(boardId, status).forEach(function(x, i){ items.push({ k:'e', o:x, v:eOrder(x), i:1e6 + i }); });
+    return items.sort(function(a, b){
+      if (a.v == null && b.v == null) return a.i - b.i;
+      if (a.v == null) return 1;
+      if (b.v == null) return -1;
+      return (a.v - b.v) || (a.i - b.i);
+    });
+  }
+  /* その列を 10, 20, 30 … で振り直す。渡した並びがそのままマスター並びになる。
+     🔴 v2.15.0 カードも区切りラインも**同じ数直線**に乗せる。 */
+  function renumberItems(items){
+    var n = 0;
+    (items || []).forEach(function(it, i){
+      var v = (i + 1) * STEP;
+      if (it.k === 'e'){ if (eOrder(it.o) !== v){ eSet(it.o, v); n++; } }
+      else            { if (it.o[KEY]  !== v){ it.o[KEY] = v;  n++; } }
+    });
+    return n;
+  }
+
   /* ---------- 書く（人が動かした時だけ） ---------- */
   function group(c){
     return cards().filter(function(x){ return x && onBoard(x) && gkey(x) === gkey(c); });
   }
-  /* その列を 10, 20, 30 … で振り直す。渡した並びがそのままマスター並びになる。 */
-  function renumber(list){
-    var n = 0;
-    (list || []).forEach(function(x, i){
-      var v = (i + 1) * STEP;
-      if (x[KEY] !== v){ x[KEY] = v; n++; }
-    });
-    return n;
-  }
-  function maxOf(c){
-    var m = 0;
-    group(c).forEach(function(x){ var o = orderOf(x); if (o != null && o > m) m = o; });
-    return m;
+  function colItems(boardId, status, exclude){
+    var list = sort(cards().filter(function(x){
+      return x && onBoard(x) && x.boardId === boardId && x.status === status;
+    }));
+    return merged(boardId, status, list).filter(function(it){ return it.o !== exclude; });
   }
 
   /* 🔴 人が掴んで、別のカードの上に落とした＝そのカードの**手前**に入れる。
-     ⚠ 工程（status）は呼ぶ側が先に決めてから渡すこと（dnd.js がそうしている）。 */
+     ⚠ 工程（status）は呼ぶ側が先に決めてから渡すこと（dnd.js がそうしている）。
+     ⚠ v2.15.0 振り直すのは**区切りラインも入れた1本の並び**＝線の位置がずれない。 */
   function moveBefore(c, target){
     if (!c || !target || c === target) return false;
-    var list = sort(group(target)).filter(function(x){ return x !== c; });
-    var i = list.indexOf(target);
-    if (i < 0) i = list.length;
-    list.splice(i, 0, c);
-    var n = renumber(list);
-    return n > 0;
+    var items = colItems(target.boardId, target.status, c);
+    var i = -1;
+    for (var k = 0; k < items.length; k++){ if (items[k].k === 'c' && items[k].o === target){ i = k; break; } }
+    if (i < 0) i = items.length;
+    items.splice(i, 0, { k:'c', o:c });
+    return renumberItems(items) > 0;
   }
   /* 🔴 v1.140.1（ゆうた指定）**ドラッグで持ってきた時は「落とした場所」に入れる。**
      　 「ドラッグで並び変える時は一番下ではなくてドラッグしたところに初期にいれてほしい」
@@ -114,13 +154,42 @@
     if (!before || before === c) return moveToEnd(c);
     return moveBefore(c, before);
   }
-  /* 列のいちばん下へ。新しく来たカード・◀▶で工程を送ったカードはこれ。 */
+  /* 列のいちばん下へ。新しく来たカード・◀▶で工程を送ったカードはこれ。
+     🔴 v2.15.0 **区切りラインの番号も見る。** 見ないと、いちばん下に線がある列では
+        「いちばん下へ」が**線の1つ上**にしかならない＝ゆうた報告の
+        「ラインの下にカードを配置できない」がここ。 */
+  function maxOf(c){
+    var m = 0;
+    colItems(c.boardId, c.status, c).forEach(function(it){
+      if (it.v != null && it.v > m) m = it.v;
+    });
+    return m;
+  }
   function moveToEnd(c){
     if (!c || !onBoard(c)) return false;
     var v = maxOf(c) + STEP;
     if (c[KEY] === v) return false;
     c[KEY] = v;
     return true;
+  }
+
+  /* 🔴 v2.15.0 カード以外のもの（区切りライン）を「このカードの下」へ置く。
+     afterId … カードのid。空・'__top' なら列の先頭。**そのカードが列に居なければ末尾。**
+     ⚠ 置いたあと列ぜんぶを振り直す＝番号がぶつからない・すき間の計算が要らない。 */
+  function placeExtraAfter(x, boardId, status, afterId){
+    if (!x) return false;
+    var items = colItems(boardId, status, x);
+    var idx;
+    if (!afterId || afterId === '__top') idx = 0;
+    else {
+      var j = -1;
+      for (var i = 0; i < items.length; i++){
+        if (items[i].k === 'c' && items[i].o && items[i].o.id === afterId) j = i;
+      }
+      idx = (j < 0) ? items.length : (j + 1);
+    }
+    items.splice(idx, 0, { k:'e', o:x });
+    return renumberItems(items) > 0;
   }
 
   /* ---------- 初回・取りこぼしの番号ふり ----------
@@ -145,9 +214,14 @@
       var list = by[k];
       var miss = list.filter(function(c){ return orderOf(c) == null; });
       if (!miss.length) return;
-      /* 既にある番号の最大値の続きから、**いまの並びのまま**振る */
+      /* 既にある番号の最大値の続きから、**いまの並びのまま**振る
+         🔴 v2.15.0 区切りラインの番号も最大値に入れる
+            ＝いちばん下に線がある列に新しいカードが来ても、**線の下**に付く。 */
       var m = 0;
       list.forEach(function(c){ var o = orderOf(c); if (o != null && o > m) m = o; });
+      extras(list[0].boardId, list[0].status).forEach(function(x){
+        var o = eOrder(x); if (o != null && o > m) m = o;
+      });
       miss.forEach(function(c){ m += STEP; c[KEY] = m; changed++; });
     });
     _busy = false;
@@ -159,8 +233,10 @@
   }
 
   w.PitBoardOrder = {
-    KEY: KEY, sort: sort, orderOf: orderOf, ensure: ensure,
-    moveBefore: moveBefore, moveToEnd: moveToEnd, insertAt: insertAt, onBoard: onBoard
+    KEY: KEY, STEP: STEP, sort: sort, orderOf: orderOf, ensure: ensure,
+    moveBefore: moveBefore, moveToEnd: moveToEnd, insertAt: insertAt, onBoard: onBoard,
+    /* 🔴 v2.15.0 カード以外の「列に並ぶもの」（区切りライン） */
+    useExtra: useExtra, placeExtraAfter: placeExtraAfter, colItems: colItems
   };
   console.log('[board-order] ready（タスクボードのマスター並び）');
 })(window);

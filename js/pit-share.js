@@ -525,6 +525,51 @@ w.pitDivisionColor = pitDivisionColor;
   }
   w.pitTeamColor = pitTeamColor;
 
+  /* ===================================================================
+     🗓 v2.21.2 **予約・返車の「月ビューの1行」＝ここ1本。**
+     -------------------------------------------------------------------
+     🗣 ゆうた 2026-08-28「**カードの表示は予約の月ビューと同じものを使って**ほしい。
+     　　長い場合は…の省略ありでOK」
+     ＝ 一覧に車を並べる所は**全部この形**。画面ごとに組み立て直さない。
+
+       ┌ 左ライン＝国産グリーン／輸入ピンク（pitTeamColor）
+       │ <b>09:30</b> 池田 様 スイフト   [代][車検]
+       └ 押すとカード詳細／ホバーで車両情報カード（card-hover.js の .rml-ev）
+
+     opt … { cls:追加のclass, time:先頭の太字（false で出さない）, drag:false で掴めない,
+             sideBefore:札の前に足すHTML, tail:右端に足すHTML, onclick:差し替え }
+     ⚠ 中の言葉（「様」「代」）と並び（代→作業種別）は**ここでしか決めない**。
+     =================================================================== */
+  function esc(v){
+    return String(v == null ? '' : v).replace(/[&<>"']/g, function (m) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m];
+    });
+  }
+  function pitMonthRowWt(c){
+    var id = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
+    return ((w.state && w.state.workTypes) || []).find(function (x) { return x.id === id; });
+  }
+  function pitMonthRow(c, opt){
+    if (!c) return '';
+    opt = opt || {};
+    var wt = pitMonthRowWt(c);
+    var side = (opt.sideBefore || '')
+             + (c.needLoaner ? '<span class="rme-loaner">代</span>' : '')
+             + (wt ? '<span class="rme-wt" style="color:' + wt.color + '">' + esc(wt.label) + '</span>' : '');
+    var nm = (w.pitCustSurname ? w.pitCustSurname(c) : (c.customer || '')) || '（未入力）';
+    return '<div class="rml-ev' + (opt.cls ? ' ' + opt.cls : '') + (c.urgent ? ' urgent' : '') + '"'
+         + ' draggable="' + (opt.drag === false ? 'false' : 'true') + '"'
+         + ' data-card-id="' + esc(c.id) + '"'
+         + ' style="border-left-color:' + pitTeamColor(c) + '"'
+         + ' onclick="' + (opt.onclick || ('openDetail(\'' + esc(c.id) + '\')')) + '">'
+         + (opt.time === false ? '' : '<b>' + esc(opt.time || '--:--') + '</b> ')
+         + esc(nm) + ' 様' + (c.car ? ' ' + esc(c.car) : '')
+         + (side ? '<span class="rml-side">' + side + '</span>' : '')
+         + (opt.tail || '')
+         + '</div>';
+  }
+  w.pitMonthRow = pitMonthRow;
+
   function pitThanksNeeded(c){
     if (!c) return false;
     if (w.pitCardNoSale && w.pitCardNoSale(c)) return false;

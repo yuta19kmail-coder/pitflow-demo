@@ -466,8 +466,10 @@
         確定（fixed）・未完（pending）・待や当（sameday）・未定（tbd）は入れない。
         物差しは共通部品 `coreflow-return-plan.js` の `pitReturnPlanKind` / `pitReturnPlanDate` **1本**。
         ⚠ ここに「日付があれば暫定」と書き写さないこと（v1.153.0 の線引きが崩れる）。
-     ⚠ **昨日のマスは斜線で無効**にするが、**中の車は消さない**
-        （過ぎたのに約束のままの車＝いちばん見たいもの。黙って隠さない）。
+     ⚠ **昨日のマスは斜線＋空白**（v2.21.2 ゆうた指定「**前日を空白にする**」）。
+        ＝ 曜日を7つそろえるための**場所取り**であって、中身は出さない・数にも入れない。
+        だから **数えているのは「今日〜5日先」の6日分**。
+     ⚠ **定休日のマスは他の日と同じ広さ**（v2.21.2）。細くしない。
      ========================================================= */
   function rpDays() {
     var out = [];
@@ -484,9 +486,11 @@
       return c && !mdNoSale(c) && pitReturnPlanKind(c) === 'plan';
     });
   }
+  /* 🔴 v2.21.2 **昨日（i<0）は場所取りだけ。** 車も入れないし、総件数にも数えない。
+     　 ここで昨日を混ぜると「18台」と出ているのにマスの中は17台、になる。 */
   function rpByDay() {
     var days = rpDays(), map = {}, n = 0;
-    days.forEach(function (x) { map[x.d] = []; });
+    days.forEach(function (x) { if (x.i >= 0) map[x.d] = []; });
     rpAll().forEach(function (c) {
       var d = pitReturnPlanDate(c);
       if (map[d]) { map[d].push(c); n++; }
@@ -494,39 +498,31 @@
     return { days: days, map: map, n: n };
   }
   /* 1台ぶんの見た目。
-     🔴 v2.21.1（ゆうた 2026-08-28）🗣「**左側のグリーン、ピンク線とか、バッチとか
-        マウスオーバー車両情報とかは、これまで培ってきたものを載せて**」
-        ＝ **返車カレンダーの月リスト（`.rml-ev`）と同じ形**にそろえた。覚え直しが要らない。
-          ・左ライン＝国産グリーン／輸入ピンク（`pitTeamColor` 1本）
-          ・代車あり＝「代」／作業種別＝色つきの言葉（`wtChip` 1本）
-          ・`data-card-id` を付けると **card-hover.js のホバー情報カードがそのまま出る**
-            （`HOVER_SEL` に `.rp-car` を足しただけ。ここで別の tooltip を作らない）
+     🔴 v2.21.2（ゆうた 2026-08-28）🗣「**カードの表示は予約の月ビューと同じものを使って**ほしい。
+        長い場合は…の省略ありでOK」
+        ＝ **自分で組み立てない。** `pit-share.js` の `pitMonthRow` を**そのまま呼ぶ**。
+          左ライン（国産グリーン／輸入ピンク）・「代」・作業種別・`data-card-id`（ホバー情報カード）が
+          全部そのまま付いてくる。狭いので**時刻は出さず**、はみ出しは CSS で「…」にする。
      ⚠ **暫定の札は付けない。** このBOXは全部が暫定＝全部に同じ札が並ぶのは邪魔なだけ（文言は減らす）。 */
   function rpCar(c) {
-    return '<div class="rp-car md-int" data-card-id="' + esc(c.id) + '"'
-         + ' style="border-left-color:' + teamColor(c) + '"'
-         + ' onclick="event.stopPropagation();openDetail(\'' + esc(c.id) + '\')">'
-         + '<span class="rp-n">' + esc(nm(c)) + (c.needLoaner ? '<i class="rp-lo">代</i>' : '') + '</span>'
-         + '<span class="rp-c">' + (carOf(c) ? esc(carOf(c)) : '') + wtChip(c) + '</span>'
-         + '</div>';
+    return window.pitMonthRow
+      ? pitMonthRow(c, { cls: 'rp-car md-int', drag: false, time: false,
+                         onclick: "event.stopPropagation();openDetail('" + esc(c.id) + "')" })
+      : '';
   }
   function rpCalHtml(sz) {
     var R = rpByDay();
     var lim = (sz === 'xl') ? 8 : (sz === 'l') ? 4 : 2;
-    var cells = new Array(7), cols = new Array(7);  /* 月=0 … 日=6 の固定の並び */
+    var cells = new Array(7);                       /* 月=0 … 日=6 の固定の並び */
     R.days.forEach(function (x) {
       var col = (x.dow + 6) % 7;
+      /* 🔴 v2.21.2 🗣「**前日を空白にする**」／「**定休日は元の広さで**」
+         ＝ 昨日のマスは**斜線のからっぽ**。曜日を7つそろえるための場所取り。
+         　 定休日は他の日と**同じ広さ**（v2.21.1 の細い帯はやめた）。 */
       var list = R.map[x.d] || [];
-      /* 🔴 v2.21.1 🗣「**水曜の定休日を挟む場合は隙間は空けなくてOK**」
-         ＝ 定休日は**細い帯**にして、空いた分を他の日が広く使う。
-         ⚠ ただし **定休日に暫定返車が入っている日は細くしない**。
-            細めると中の車が読めなくなる＝**いちばん気づかせたい車を隠す**ことになる。 */
-      var slim = x.closed && !list.length;
-      cols[col] = slim ? '22px' : 'minmax(0,1fr)';
       var dd = +x.d.split('-')[2];
       var h = '<div class="rp-cell' + (x.i < 0 ? ' past' : '') + (x.i === 0 ? ' today' : '')
-            + (x.closed ? ' closed' : '') + (slim ? ' slim' : '') + '"'
-            + (slim ? ' title="' + esc(fmd(x.d)) + ' は定休日です"' : '') + '>'
+            + (x.closed ? ' closed' : '') + '">'
             + '<div class="rp-d">' + (x.i === 0 ? '<b>今</b>' : '') + dd + (x.closed ? '<i>休</i>' : '') + '</div>';
       h += list.slice(0, lim).map(rpCar).join('');
       if (list.length > lim) h += '<div class="rp-more">+' + (list.length - lim) + '</div>';
@@ -534,11 +530,10 @@
       cells[col] = h;
     });
     var head = ['月','火','水','木','金','土','日'].map(function (w, i) {
-      return '<div class="rp-h' + (i === 5 ? ' sat' : i === 6 ? ' sun' : '')
-           + (cols[i] === '22px' ? ' slim' : '') + '">' + w + '</div>';
+      return '<div class="rp-h' + (i === 5 ? ' sat' : i === 6 ? ' sun' : '') + '">' + w + '</div>';
     }).join('');
     return lnum(R.n, '台', '暫定の返車予定')
-         + '<div class="rp-cal" style="grid-template-columns:' + cols.join(' ') + '">'
+         + '<div class="rp-cal">'
          + head + cells.map(function (h) { return h || '<div class="rp-cell"></div>'; }).join('') + '</div>';
   }
 

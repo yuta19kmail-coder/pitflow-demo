@@ -40,11 +40,45 @@
   function pad(n){ return (n < 10 ? '0' : '') + n; }
   function today(){ var t = new Date(); t.setHours(0,0,0,0); return t.getFullYear() + '-' + pad(t.getMonth()+1) + '-' + pad(t.getDate()); }
   function cards(){ return (w.state && Array.isArray(state.cards)) ? state.cards : []; }
-  function flow(c, txt){ try { if (w.logFlow) logFlow(c, txt); } catch(e){} }
+  /* 🔴 v2.22.0 **自動でやったことに人の名前を押さない。**（card-tabs.js の `logFlowAuto` 1本）
+     ⚠ 自動処理は「画面を開いた端末」で走る。今までは、その端末にたまたまログインしていた人の
+        名前がフローに残っていた＝**やっていない人がやったことになっていた**（実際に起きた）。 */
+  function flow(c, txt){ try { if (w.logFlowAuto) logFlowAuto(c, txt); else if (w.logFlow) logFlow(c, txt); } catch(e){} }
+  /* 操作ログ（車ごとのフローとは別の、全体の記録）。こちらも「自動」で残す。 */
+  function op(action, c, why){
+    try {
+      if (!w.pitLog) return;
+      var tag = w.pitCardTag ? w.pitCardTag(c) : ((c && c.customer) || '');
+      w.pitLog(action, { auto: true, cardId: c && c.id, kind: 'auto',
+        label: tag + (why ? ' / ' + why : '') });
+    } catch(e){}
+  }
 
-  /* ===== ① 入庫の期限切れ ===== */
+  /* ===== ① 入庫の期限切れ =====
+     🔴🔴 v2.22.0（2026-08-28・**事故を受けて**・ゆうた確定）
+     -------------------------------------------------------------------
+     ◎なにが起きたか
+       予約 C63175 が**タスクボードから消えて未入庫にいた**（入庫した実績ごと消えていた）。
+       操作ログには**人が動かした記録が1行も無い**＝**人は押していない**。
+       残っていたのは自動処理の1行だけだった。
+       🗣 ゆうた「**このカードがなくなったり、勝手に動いたり（タスクボード以外で）は
+       　　マジでわからなくなるし、下手したら探し出せないからマジでなくしてほしい**」
+     ◎正体
+       ここは `status === 'reserved'` **だけ**を見ていて、
+       **その車が本当に入庫したかどうか（`actualInAt`）を見ていなかった。**
+       何かの拍子に status が 'reserved' に巻き戻ると（端末どうしの行き違い・
+       入庫の保存がクラウドに届かなかった等）、**入庫済みの車まで未入庫へ落ちる。**
+       しかも落ちた先で `bayId` も消すので、盤面から本当に見えなくなる。
+     ◎決めごと（ゆうた確定）
+       🔴 **実入庫日（`actualInAt`）がある車は、入庫日が過ぎていても絶対に自動で動かさない。**
+       　 原因が何であっても、**盤面から車が消える事故はここで止まる。**
+       🔴 黙って見逃さない＝そういう車は**データチェックに赤で出す**（inspect-rules.js の F11）。
+       ⚠ 「入庫を取り消して予約に戻す」は `actualInAt` も消す（card-view.js）＝
+       　 本当に入庫を取り消した車は、今までどおりちゃんと未入庫へ落ちる。
+     ===================================================================== */
   function pitIntakeOverdue(c, td){
     if (!c || c.status !== 'reserved') return false;   /* 入庫済み以降はそもそも対象外 */
+    if (c.actualInAt)      return false;               /* 🔴 v2.22.0 入庫した実績がある＝動かさない */
     if (c.tentative)       return false;               /* 🔴 仮予約は動かさない（ゆうた指定） */
     if (c.approvalPending) return false;               /* 🔴 承認待ちも動かさない（ゆうた指定） */
     if (c.intakeTbd)       return false;               /* 入庫日がまだ決まっていない＝過ぎようがない */
@@ -94,6 +128,9 @@
           var _lo = (w.pitLoanerPlanOf ? w.pitLoanerPlanOf(c.id) : { n: 0, text: '' });
           flow(c, '入庫日（' + was + '）を過ぎたので未入庫へ（自動）'
                 + (_lo.n ? '（代車の予定はそのまま：' + _lo.text + '）' : ''));
+          /* 🔴 v2.22.0 **操作ログにも残す。** ここが空だったせいで「ログには残ってない」になり、
+             　 誰が動かしたのか（本当は誰も動かしていないのか）が分からなかった。 */
+          op('未入庫へ自動で移動', c, '入庫日 ' + was + ' を過ぎたため');
           n++;
           return;
         }
@@ -103,6 +140,7 @@
           else { c.returnDate = ''; c.returnTime = ''; }
           c.returnDateFinal = null;      /* 確定返車日も過ぎている＝もう確定ではない */
           flow(c, '返車予定日（' + wasR + '）を過ぎたので返車日未定へ（自動）');
+          op('返車日未定へ自動で移動', c, '返車予定日 ' + wasR + ' を過ぎたため');
           n++;
         }
       });

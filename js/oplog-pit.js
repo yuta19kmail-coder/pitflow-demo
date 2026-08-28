@@ -92,10 +92,16 @@
   window.pitLog = function (action, opt) {
     if (!action) return;
     opt = opt || {};
+    /* 🔴🔴 v2.22.0（2026-08-28・事故を受けて）**アプリが勝手にやったことに人の名前を押さない。**
+       自動処理は「画面を開いた端末」で走るので、たまたまログインしていた人の名前が残る＝濡れ衣。
+       ⚠ どの端末が走らせたかは `dev` に残す（追える）。**`userName` には入れない。** */
+    var _auto = !!opt.auto;
     var entry = {
       at: Date.now(),
       timeStr: nowStr(),
-      userName: opt.user || meName(),
+      userName: _auto ? '自動' : (opt.user || meName()),
+      auto: _auto || undefined,
+      dev: _auto ? meName() : undefined,
       action: String(action),
       label: opt.label || '',
       cardId: opt.cardId || '',
@@ -108,6 +114,8 @@
         timeStr: entry.timeStr,
         uid: window.fb.currentUser.uid,
         userName: entry.userName,
+        auto: !!entry.auto,
+        dev: entry.dev || '',
         action: entry.action,
         label: entry.label,
         cardId: entry.cardId,
@@ -184,7 +192,11 @@
       /* 🗑 v2.13.2 もう無い機能の記録は出さない（記録は消さない）。物差しは `pitLogGone` 1本。 */
       if (window.pitLogGone && pitLogGone((e.action || '') + '：' + (e.label || ''))) return false;
       if (!q) return true;
-      return (e.userName + ' ' + e.action + ' ' + e.label).toLowerCase().indexOf(q) >= 0;
+      /* 🔴 v2.22.0 **予約番号でも探せるように**（人は番号で車を呼ぶ）。
+         ⚠ 番号は label の中に `[C63175]` の形で入る（物差し＝pit-share.js の `pitCardTag`）。
+            それでも古い記録には入っていないので、カードIDも干し草に混ぜておく。 */
+      return (e.userName + ' ' + e.action + ' ' + e.label + ' ' + (e.cardId || ''))
+             .toLowerCase().indexOf(q) >= 0;
     });
   }
 

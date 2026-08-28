@@ -551,6 +551,120 @@
     renderMyDash();
   };
 
+  /* =========================================================
+     🩺🩺 v2.22.0 データチェック（ゆうた 2026-08-28）
+     ---------------------------------------------------------
+     🗣「データチェックのBOXは作ろう」
+
+     ◎なぜ要るか（調べて分かったこと）
+       `inspect-rules.js` に **判定が49本**もう入っていて、ちゃんと動いている。
+       なのに **サイドメニューの「データチェック」を自分で開きに行かないと1件も目に入らない。**
+       ナビに数のバッジも無い。＝ **見つかっているのに、誰も見ていない。**
+
+     ◎このBOXが出すもの
+       🔴 **「いま動いている車」の要対応だけ**を主役にする（`scope === 'live'`）。
+       　 終わった記録（`past`）は、今日の段取りを変えない＝**数だけ小さく添える**。
+       ⚠ 判定そのものは**1文字も書かない**。`pitInspectRun()` を呼ぶだけ。
+       　 ここに条件を書き写すと、データチェックの画面と**答えが違う**という最悪の形になる。
+
+     ◎重さ
+       49本 × カード全部 を回す（見本400枚で 約12ms）。ダッシュボードは何度も描き直すので、
+       **10秒だけ答えを取っておく**（カードの枚数が変わったら作り直す）。
+       ⚠ 取っておくのは**画面の都合**。押した時は必ず本物のデータチェックへ飛ばす。
+     ========================================================= */
+  var _INS = { at: 0, n: -1, res: null };
+  function insRun() {
+    if (!window.pitInspectRun) return null;
+    var n = (C.cards || []).length, now = Date.now();
+    if (_INS.res && _INS.n === n && (now - _INS.at) < 10000) return _INS.res;
+    var r = null;
+    try { r = pitInspectRun(); } catch (e) { return null; }
+    _INS = { at: now, n: n, res: r };
+    return r;
+  }
+  /* いま動いている車の所見だけ。重い順（要対応→確認→気づき）に並べる */
+  var INS_ORDER = { red: 0, amber: 1, gray: 2 };
+  /* 🔴 **`INS_ORDER[lv] || 9` と書かないこと。** 要対応は 0 なので `0 || 9` が **9** になり、
+     　 いちばん重い指摘が**いちばん下**に並ぶ（実際にそうなった）。 */
+  function insWeight(lv) { var n = INS_ORDER[lv]; return (n == null) ? 9 : n; }
+  var INS_LABEL = { red: '要対応', amber: '確認', gray: '気づき' };
+  var INS_COLOR = { red: 'var(--red,#ef4444)', amber: 'var(--orange,#f59e0b)', gray: 'var(--text3,#94a3b8)' };
+  var INS_CLS   = { red: 'rd', amber: 'og', gray: '' };
+  function insLive() {
+    var r = insRun(); if (!r) return [];
+    return (r.findings || [])
+      .filter(function (f) { return f && f.scope === 'live'; })
+      .sort(function (a, b) { return insWeight(a.level) - insWeight(b.level); });
+  }
+  function insStat() {
+    var live = insLive(), o = { red: 0, amber: 0, gray: 0, n: live.length, past: 0 };
+    live.forEach(function (f) { if (o[f.level] != null) o[f.level]++; });
+    var r = insRun();
+    o.past = (r && r.byScope && r.byScope.past && r.byScope.past.open) || 0;
+    return o;
+  }
+  /* 🔴 **規則ごとにまとめる。** 同じ指摘が7行も並ぶと、何種類あるのかが読めない
+     　 （実際、見本で「受注金額が空」だけで7行・「代車の車検」で4行になった）。
+     ＝ 1行＝1つの規則。右に台数、下に車の名前を並べる。
+     ⚠ **1台しか無い時は、その車をそのまま開く**（わざわざ一覧へ行かせない）。 */
+  function insGroups() {
+    var g = {}, out = [];
+    insLive().forEach(function (f) {
+      var k = f.ruleId || f.title;
+      if (!g[k]) { g[k] = { rule: k, level: f.level, title: f.title, items: [] }; out.push(g[k]); }
+      /* 同じ規則の中に重さが混ざることは無いが、混ざったら重いほうに寄せる */
+      if (insWeight(f.level) < insWeight(g[k].level)) g[k].level = f.level;
+      g[k].items.push(f);
+    });
+    return out.sort(function (a, b) {
+      var d = insWeight(a.level) - insWeight(b.level);
+      return d || (b.items.length - a.items.length);
+    });
+  }
+  function insWho(f) { return [f.name, f.car].filter(Boolean).join(' '); }
+  /* 1つの規則ぶん */
+  function insRow(g, nameLim) {
+    var one = (g.items.length === 1) ? g.items[0] : null;
+    var oc = (one && one.kind === 'card' && one.refId)
+      ? "event.stopPropagation();openDetail('" + esc(one.refId) + "')"
+      : "event.stopPropagation();mydGo('inspect')";
+    var lim = nameLim || 3;
+    var names = g.items.slice(0, lim).map(insWho).filter(Boolean).join('・');
+    var more = g.items.length > lim ? ' ほか' + (g.items.length - lim) + '台' : '';
+    return '<div class="md-card md-int md-click ins-row" style="border-left-color:' + (INS_COLOR[g.level] || INS_COLOR.gray) + '"'
+         + ' onclick="' + oc + '" title="' + esc((g.items[0] && g.items[0].why) || '') + '">'
+         + '<div class="md-c1"><span class="ins-lv ins-' + esc(g.level) + '">' + esc(INS_LABEL[g.level] || '') + '</span>'
+         + '<span class="ins-t">' + esc(g.title || '') + '</span>'
+         + '<span class="ins-n">' + g.items.length + '台</span></div>'
+         + (names ? '<div class="md-c2">' + esc(names) + esc(more) + '</div>' : '')
+         + '</div>';
+  }
+  function insHead(o) {
+    return '<div class="md-inline">'
+      + kpi(o.red, '件', '要対応', o.red ? 'r' : 'g')
+      + kpi(o.amber, '件', '確認', o.amber ? 'o' : 'g')
+      + kpi(o.gray, '件', '気づき', 'b')
+      + '</div>';
+  }
+  /* 終わった記録は「今日の段取り」を変えない＝小さく添えるだけ */
+  function insPast(o) {
+    return o.past ? '<div class="ins-past md-int" onclick="event.stopPropagation();mydGo(\'inspect\')">'
+                  + '終わった記録にも ' + o.past + '件（返車が済んだ車・アーカイブ）</div>' : '';
+  }
+  function insCatHtml() {
+    var r = insRun(); if (!r || !r.byCat) return '';
+    var NAME = { money:'お金', flow:'日付・進行', resv:'予約', loaner:'代車',
+                 shaken:'車検', data:'データの抜け', state:'状態の矛盾' };
+    var live = insLive(), by = {};
+    live.forEach(function (f) { by[f.cat] = (by[f.cat] || 0) + 1; });
+    var ks = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; });
+    if (!ks.length) return '';
+    return '<div class="md-tiny" style="margin-top:8px">区分ごと（いま動いている車）</div>'
+      + '<div class="ins-cats">' + ks.map(function (k) {
+          return '<span class="ins-cat"><b>' + by[k] + '</b>' + esc(NAME[k] || k) + '</span>';
+        }).join('') + '</div>';
+  }
+
   // ---------------------------------------------------------
   // 要素レジストリ（データBOX）
   //   dv … 既定の見せ方（'num'＝数字／'list'＝中身）。ゆうたと決めた割り振り。
@@ -671,6 +785,31 @@
               : empty('この日のお礼LINEはありません'))
           + thxBackHtml(d, sz);
       }
+    },
+
+    /* 🩺 v2.22.0 データチェック（見つかっているのに誰も見ていなかった） */
+    inspect: {
+      /* 🔴 `pick` は持たない＝いつでも `body` で描く。
+         チップの一覧に切り替えられると「どの規則に引っかかったか」が消えて、用が足りなくなる。 */
+      title: 'データチェック', icon: '🩺', jump: 'inspect', sizes: ['s', 'm', 'l', 'xl'],
+      body: function (sz) {
+        if (!window.pitInspectRun) return empty('データチェックが読み込まれていません');
+        var o = insStat(), live = insLive();
+        if (sz === 's') return kpi(o.red, '件', '要対応', o.red ? 'r' : 'g');
+        if (!o.n) return insHead(o) + empty('いま動いている車に、直すところはありません') + insPast(o);
+        /* ⚠ `live` は数を出すのに使う。並べるのは規則ごとにまとめた `insGroups()` */
+        var gs = insGroups();
+        var lim = (sz === 'xl') ? 12 : (sz === 'l') ? 6 : 2;
+        var nameLim = (sz === 'xl') ? 5 : 3;
+        return insHead(o)
+          + '<div class="md-cards ins-list">'
+          + gs.slice(0, lim).map(function (g) { return insRow(g, nameLim); }).join('') + '</div>'
+          + (gs.length > lim ? '<div class="md-more-n">ほか ' + (gs.length - lim) + '種類</div>' : '')
+          + (sz === 'xl' ? insCatHtml() : '')
+          + insPast(o)
+          + (sz === 'l' || sz === 'xl' ? openFoot('inspect', 'データチェック') : '');
+      },
+      more: function () { return openFoot('inspect', 'データチェック'); }
     },
 
     /* 📅 v2.21.0 今週の返車予定（暫定だけ・7日カレンダー） */
@@ -1213,6 +1352,11 @@
     renderFlow();
   }
   window.renderMyDash = renderMyDash;
+  /* 🔴 v2.22.0 BOXの一覧を外へ出す。
+     ・**見張り**が「全部のBOXを全部の大きさで描いてエラーが出ないか」を回せるようにする
+     ・**BOXカタログ**（全部盛りの見本ページ）を、本物のBOXから作れるようにする
+     ⚠ 中身は**読むだけ**。外から書き換えないこと（BOXを足すのは必ずこのファイルの中）。 */
+  window.PIT_DASH_EL = EL;
 
   function renderPresets() {
     var host = $('myd-presets'); if (!host) return;

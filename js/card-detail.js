@@ -21,6 +21,7 @@ function _cardTitleHtml(card){
 }
 
 /* mode: 'page'＝全画面（新規入庫予約） / 'modal'＝ポップアップ（各ビューから開く） */
+var _openSnap = null;   /* 🔴 v2.22.0 開いた時のカードの姿（編集の記録を作るため） */
 function openCard(cardId, mode){
   const card = state.cards.find(c => c.id === cardId);
   if (!card) return;
@@ -29,6 +30,11 @@ function openCard(cardId, mode){
      ⚠ 中身は触らない。外す時に1回保存されるので、打ったものは残る。 */
   if (window.pitCardEditRelease) pitCardEditRelease();
   _editingCardId = cardId;
+  /* 🔴 v2.22.0（ゆうた「予約カード内部の操作も履歴に残る？」→ 残っていなかった）
+     **開いた時の姿を控える。** 閉じる時にこれと見くらべて、変わった欄を記録に残す。
+     ⚠ 新しく持つデータではない（閉じたら捨てる）。 */
+  try { if (window.pitCardEnsure) pitCardEnsure(card); } catch (e) {}   /* 先に下ごしらえ（既定値）を済ませる */
+  try { _openSnap = JSON.parse(JSON.stringify(card)); } catch (e) { _openSnap = null; }
   _cardTab = 'basic';
   _cardCheckOn = false;   // 開いた直後は赤枠なし
   _cardMode = (mode === 'page') ? 'page' : 'modal';
@@ -71,6 +77,13 @@ function closeDetail(){
   // 閉じる前に、このカードから顧客控えを更新（入力補助用）。
   // ★サンプル生成カード（_sample）は書き戻さない＝顧客控えが二重化するのを防ぐ。
   const _c = state.cards.find(x => x.id === _editingCardId);
+  /* 🔴 v2.22.0 **閉じる前に、開いた時の姿と見くらべて記録を残す。**
+     🗣 ゆうた「結局こういう時に追えないのがやだなと思う」
+     ⚠ 見くらべるのは**人が入力する欄だけ**（pit-share.js の `pitCardDiff` 1本）。
+        状態・フェーズはドラッグ側がすでに記録しているので入れない＝同じことが2回残らない。
+     ⚠ ここが**唯一の出口**（「保存する」も「予約を編集」も、別の画面へ行く時も必ずここを通る）。 */
+  try { if (_c && _openSnap && window.pitLogCardEdit) pitLogCardEdit(_c, _openSnap); } catch (e) {}
+  _openSnap = null;
   if (_c && !_c._sample && window.upsertCustomerFromCard) upsertCustomerFromCard(_c);
   _editingCardId = null;
   if (window.pitSyncLoanerAssigns) pitSyncLoanerAssigns();   // 代車を入れた予約を代車カレンダーへ同期（v0.100.2）

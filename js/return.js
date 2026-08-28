@@ -262,22 +262,15 @@ function _rmlRowsReturn(from, to){
       cardsOfDay.forEach(c => {
         /* 🔴 v1.150.0 返車時間が無い車を**入庫時刻で代用しない**（言葉は return-slot.js の1本） */
         const tt = (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || '')) || '--:--';
-        const _wid = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
-        const wt = state.workTypes.find(w => w.id === _wid);
-        const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';
-        const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
         /* 🆕 v1.149.0 未完＝盤面のまま確定返車日だけ入っている車。判定は return-slot.js の1本 */
         const _pd = !!(window.pitReturnIsPending && pitReturnIsPending(c));
-        let side = '';
-        if (_pd && window.pitPendingBadge) side += pitPendingBadge('mini');
-        if (c.needLoaner) side += '<span class="rme-loaner">代</span>';
-        if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
-        html += '<div class="rml-ev return' + (c.urgent ? ' urgent' : '') + (_pd ? ' is-retpend' : '') + '" draggable="' + (_pd ? 'false' : 'true') + '" data-card-id="' + c.id + '"'
-             + ' style="border-left-color:' + teamColor + '"'
-             + ' onclick="openDetail(\'' + c.id + '\')">'
-             + '<b>' + tt + '</b> ' + nm + ' 様' + (c.car ? ' ' + c.car : '')
-             + (side ? '<span class="rml-side">' + side + '</span>' : '')
-             + '</div>';
+        /* 🔴 v2.21.2 1行の形は pit-share.js の `pitMonthRow` 1本 */
+        html += pitMonthRow(c, {
+          cls: 'return' + (_pd ? ' is-retpend' : ''),
+          drag: !_pd,
+          time: tt,
+          sideBefore: (_pd && window.pitPendingBadge) ? pitPendingBadge('mini') : ''
+        });
       });
     }
     html += '</div></div>';

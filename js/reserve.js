@@ -283,21 +283,12 @@ function _rmlRows(from, to){
       html += '<span class="rml-empty">' + (isClosed ? '休' : '—') + '</span>';
     } else {
       cardsOfDay.forEach(c => {
-        const _wid = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
-        const wt = state.workTypes.find(w => w.id === _wid);
-        const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';   // 左ライン＝国産緑/輸入ピンク
-        const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
-        let side = '';
-        if (c.needLoaner) side += '<span class="rme-loaner">代</span>';   // 2ヶ月と同じ並び＝代→作業
-        if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
-        html += '<div class="rml-ev' + (c.urgent ? ' urgent' : '') + '" draggable="true" data-card-id="' + c.id + '"'
-             + ' style="border-left-color:' + teamColor + '"'
-             + ' onclick="openDetail(\'' + c.id + '\')">'
-             + '<b>' + (c.reserveTime || '--:--') + '</b> ' + nm + ' 様' + (c.car ? ' ' + c.car : '')
-             + (side ? '<span class="rml-side">' + side + '</span>' : '')
-             + (c.tentative ? '<span class="kari-edge" title="仮予約">仮</span>' : '')   // 仮は右端に小さく（v0.100.1）
-             + (window.pitApprovalBadge ? pitApprovalBadge(c, 'edge') : '')                // 🔵 v1.74.0 承認待ちの「承」
-             + '</div>';
+        /* 🔴 v2.21.2 1行の形は pit-share.js の `pitMonthRow` **1本**。ここで組み立て直さない */
+        html += pitMonthRow(c, {
+          time: c.reserveTime || '--:--',
+          tail: (c.tentative ? '<span class="kari-edge" title="仮予約">仮</span>' : '')   /* 仮は右端に小さく（v0.100.1） */
+              + (window.pitApprovalBadge ? pitApprovalBadge(c, 'edge') : '')             /* 🔵 v1.74.0 承認待ちの「承」 */
+        });
       });
     }
     html += '</div></div>';

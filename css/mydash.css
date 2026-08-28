@@ -277,3 +277,23 @@ body.md-edit .md-bh h3 { max-width: none; }
   .md-cards { flex-direction: column; }
   .md-cards .pit-card.pcm { flex: 1 1 auto; width: 100%; max-width: none; }
 }
+
+/* 💬 v2.18.0 お礼LINE 送信リスト（日付の切り替え・チェックボックス・未送の続き） */
+.thx-bar{ display:flex; align-items:center; gap:6px; margin:0 0 6px; }
+.thx-bar .thx-nav{ display:flex; align-items:center; justify-content:center; width:22px; height:22px;
+  border:1px solid var(--border); border-radius:6px; background:var(--bg3); color:var(--text2); cursor:pointer; padding:0; }
+.thx-bar .thx-nav:hover{ border-color:var(--brand); color:var(--text); }
+.thx-bar .thx-day{ font-size:12px; font-weight:700; color:var(--text); }
+.thx-bar .thx-today{ margin-left:auto; border:1px solid var(--border); border-radius:6px; background:var(--bg3);
+  color:var(--text2); font-size:11px; padding:2px 8px; cursor:pointer; }
+.thx-bar .thx-today:hover{ border-color:var(--brand); color:var(--text); }
+.thx-row .thx-cb{ flex:0 0 auto; width:18px; height:18px; border:1.5px solid var(--border2); border-radius:5px;
+  display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800;
+  color:transparent; background:var(--bg2); cursor:pointer; }
+.thx-row .thx-cb:hover{ border-color:var(--brand); }
+.thx-row .thx-cb.on{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.thx-row.on .md-row-m{ color:var(--text3); text-decoration:line-through; }
+.thx-row .thx-sub{ font-style:normal; margin-left:6px; font-size:11px; color:var(--text3); }
+.thx-row .thx-at{ font-size:11px; color:var(--text3); }
+.thx-back{ margin-top:8px; padding-top:6px; border-top:1px dashed var(--border); display:flex; flex-direction:column; gap:4px; }
+.thx-back-h{ font-size:11px; font-weight:700; color:var(--orange,#f59e0b); }

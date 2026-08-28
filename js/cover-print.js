@@ -44,8 +44,23 @@
      ⚠ 折り返した2行目以降は少し右に下げる（MEMO_IND）＝どこからが続きか分かるように。 */
   var MEMO_X = 28, MEMO_FS = 11.5;   // 書き始めを全角スペース1個ぶん右へ
   var MEMO_W = 208, MEMO_IND = 10;   // 折り返す幅／続き行の下げ幅
-  /* ---- フロント／予約担当：セルからはみ出す長い苗字はフォント縮小（中央そろえ維持） ---- */
-  var FIT_BOX = { 'pcv-front': 48, 'pcv-resStaff': 48, 'pcv-time': 88 };
+  /* ---- フロント／予約担当：セルからはみ出す長い苗字はフォント縮小（中央そろえ維持） ----
+     🔴 v2.20.0 受付タイプ（待/当/預＝最大2つ）と代車の期間もここで縮める。
+        ・受付タイプのマス＝x334.76〜414.47（様式SVGの縦線とマスの端）＝約79.7。詰まらないよう 74 で見る。
+        ・代車の期間のマス＝x255.06〜414.47。曜日を入れたぶん長くなるので 150 で見る。 */
+  var FIT_BOX = { 'pcv-front': 48, 'pcv-resStaff': 48, 'pcv-time': 88, 'pcv-drop': 74, 'pcv-loanerSpan': 150 };
+  /* ---- 🔴 v2.20.0（ゆうた報告）**月が2桁（11月・12月）だと「/」に被る** ----
+     様式の「/」は入庫日＝(367.34,38.88)→(332.97,73.25)、予約受付日＝(405.56,444.45)→(386.67,463.34) の斜め棒。
+     月の字は左から書き始めるので、**2桁になったぶんだけ右へ伸びて棒に刺さる**。
+     🔴 直し方＝**2桁の時だけ右そろえ**にして、左へ伸ばす（1桁の時は今までと1pxも変えない）。
+     ⚠ 縮小は最後の手段（右そろえで入らない時だけ）。数字を小さくすると日付だけ字が揃わなくなる。 */
+  var DATE_FIT = {
+    'pcv-m':  { right: 345,   min: 320   },   /* 入庫日の月（「/」の左端 ≒347・箱の左 316.6） */
+    'pcv-bm': { right: 394,   min: 379.5 }    /* 予約受付日の月（「/」の左端 ≒396・箱の左 378.5） */
+  };
+  /* ---- 🔴 v2.20.0（ゆうた指定）入庫日ボックスの右上に予約番号を**すごく小さく** ----
+     箱＝x316.58〜413.96 / y17.84〜107.72（様式SVGの rect）。「入庫日」の札は左上なので右上は空いている。 */
+  var RESNO = { x: 411, y: 25.6, fs: 6 };
 
   /* ================= ヘルパー ================= */
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -65,7 +80,10 @@
     return String(l.model==null?'':l.model).trim() || String(l.name==null?'':l.name).trim();
   }
 
-  var DROP_FULL = { wait:'待ち', sameDay:'当日返し', drop:'預かり' };
+  /* 🔴 v2.20.0（ゆうた指定 2026-08-28）**紙の受付タイプは短い言葉**＝「預かり→預／当日→当返／待ち→待」。
+     ⚠ 画面のマスター（`state.dropTypes`）は **待／当／預**。紙だけ「当返」なので、**ここが紙の言い方の表**。
+        画面の言い方を変えたくなった時に、こちらを一緒に直すかどうかは**その時に決める**（別物として持つ）。 */
+  var DROP_PRINT = { wait:'待', sameDay:'当返', drop:'預' };
   /* 🔴 v1.92.0 課は**予約画面のボタン（c.division）だけ**を見る。
      ⚠ 前は課が空だと国産／輸入（＝車）から 1課／2課 を作って刷っていた（ゆうた報告）。
         名前も直書きだったので、課の名前を変えると紙だけ食い違った。物差しは state.js の1本。 */
@@ -116,9 +134,12 @@
     var name = loanerName(c.loanerId);
     return '有' + (name ? '（'+name+'）' : '');
   }
+  /* 🔴 v2.20.0（ゆうた指定）代車の期間に**曜日**を入れる（例：8/28(金) 〜 8/29(土)）。
+     ⚠ 日付が入っていない側は曜日も出さない（無いものを「(　)」で埋めない）。 */
+  function mdDow(s){ var t = md(s); return t ? (t + '(' + dows(s) + ')') : ''; }
   function loanerSpanVal(c){
     if (!c.needLoaner) return '';
-    return (c.loanerFrom||c.loanerTo) ? ((md(c.loanerFrom)||'')+' 〜 '+(md(c.loanerTo)||'')) : '';
+    return (c.loanerFrom||c.loanerTo) ? ((mdDow(c.loanerFrom)||'')+' 〜 '+(mdDow(c.loanerTo)||'')) : '';
   }
   function loanerCondVal(c){
     if (!c.needLoaner) return '';
@@ -166,7 +187,12 @@
       plateA:     pl.a,
       plateB:     pl.b,
       repeat:     repeatLabel(c),
-      drop:       DROP_FULL[c.dropType] || '',
+      /* 🔴 v2.20.0（ゆうた報告「待or当のように複数チェックが入っている場合に1個しか印刷されない」）
+         受付タイプは**主（dropType）＋副（dropType2）の最大2つ**（v0.85.0）。紙にも両方出す。
+         ⚠ 画面の短い言い方（待or預）ではなく、紙は今までどおり**そのままの言葉**（預かり・当日返し）。
+         　 入り切らない時は `fitBox('pcv-drop')` が字を縮める。 */
+      drop:       [c.dropType, c.dropType2].filter(Boolean)
+                    .map(function(id){ return DROP_PRINT[id] || ''; }).filter(Boolean).join('・'),
       loaner:     loanerVal(c),
       loanerSpan: loanerSpanVal(c),
       loanerCond: loanerCondVal(c),
@@ -214,6 +240,12 @@
     /* 🔴 v1.33.0 時間欄は「10:00」だけでなく「朝一」「決まり次第」などの**文字がそのまま入る**。
        入庫日ボックス（x316.6〜414.0）からはみ出さないよう、入り切らない時だけ字を小さくする。 */
     s = s.replace(/<text\b((?:(?!<\/text>)[\s\S])*?\{\{time\}\})/,  function(m,rest){ return '<text id="pcv-time"'+rest; });
+    /* 🔴 v2.20.0 月（2桁で「/」に被る）・受付タイプ（2つ）・代車の期間（曜日つき）にも印を付ける */
+    s = s.replace(/<text\b((?:(?!<\/text>)[\s\S])*?\{\{m\}\})/,     function(m,rest){ return '<text id="pcv-m"'+rest; });
+    s = s.replace(/<text\b((?:(?!<\/text>)[\s\S])*?\{\{bm\}\})/,    function(m,rest){ return '<text id="pcv-bm"'+rest; });
+    s = s.replace(/<text\b((?:(?!<\/text>)[\s\S])*?\{\{d\}\})/,     function(m,rest){ return '<text id="pcv-d"'+rest; });   /* 日は動かさない。見張りが「今までどおり」を測るため */
+    s = s.replace(/<text\b((?:(?!<\/text>)[\s\S])*?\{\{drop\}\})/,  function(m,rest){ return '<text id="pcv-drop"'+rest; });
+    s = s.replace(/<text\b((?:(?!<\/text>)[\s\S])*?\{\{loanerSpan\}\})/, function(m,rest){ return '<text id="pcv-loanerSpan"'+rest; });
     return s;
   }
 
@@ -247,6 +279,16 @@
     return svg.replace(/<\/svg>\s*$/,
       '<path id="pcv-loanerfee" d="' + dpath + '" fill="none" stroke="#111" stroke-width="1.4" '
       + 'stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  }
+
+  /* 🔴 v2.20.0（ゆうた指定）入庫日ボックスの右上に予約番号を小さく。
+     ⚠ 予約番号が無いカード（下書き等）には何も出さない＝空の札を刷らない。 */
+  function injectResNo(svg, c){
+    var no = String((c && c.resNo) || '').trim();
+    if (!no) return svg;
+    return svg.replace(/<\/svg>\s*$/,
+      '<text id="pcv-resno" x="' + RESNO.x + '" y="' + RESNO.y + '" text-anchor="end" '
+      + 'font-size="' + RESNO.fs + '" fill="#666">' + esc(no) + '</text></svg>');
   }
 
   /* 早割スタンプ <image> を </svg> 直前に注入 */
@@ -287,6 +329,14 @@
         + 'var t=tot();if(t>maxW&&t>0){var sc=maxW/t;if(mk)mk.style.fontSize=(mkFs*sc)+"px";cr.style.fontSize=(crFs*sc)+"px";t=tot();}'
         + 'var sx=cx-t/2;if(mk)mk.setAttribute("transform","translate("+sx+" "+mkY+")");'
         + 'cr.setAttribute("transform","translate("+(sx+mw()+g2())+" "+crY+")");}'
+      /* 🔴 v2.20.0 月が2桁（11・12）だと様式の「/」に刺さる。**2桁の時だけ右そろえ**にして左へ伸ばす。
+         ⚠ 1桁の時は**今までと1pxも変えない**（触らずに帰る）。
+         ⚠ 右そろえでも左の枠に当たる時だけ、最後の手段で字を縮める。 */
+      + 'function fitDate(id,rightX,minX){var el=document.getElementById(id);if(!el||!el.getComputedTextLength)return;'
+        + 'var s=(el.textContent||"").trim();if(s.length<2)return;'
+        + 'el.setAttribute("text-anchor","end");el.setAttribute("transform","translate("+rightX+" "+ty(el)+")");'
+        + 'var f=parseFloat(getComputedStyle(el).fontSize)||12,g=0;'
+        + 'while(el.getComputedTextLength()>(rightX-minX)&&f>6&&g<120){f-=0.5;el.style.fontSize=f+"px";g++;}}'
       + 'function fitBox(id,maxW){var el=document.getElementById(id);if(!el||!el.getComputedTextLength)return;'
         + 'var f=parseFloat(getComputedStyle(el).fontSize)||13;el.style.fontSize=f+"px";var g=0;'
         + 'while(el.getComputedTextLength()>maxW&&f>6&&g<120){f-=0.5;el.style.fontSize=f+"px";g++;}}'
@@ -358,7 +408,11 @@
           + 't.setAttribute("font-size",fs);t.setAttribute("font-weight","700");t.setAttribute("fill","#111");'
           + 't.textContent=o.t;g.appendChild(t);li++;});'
         + 'g.removeChild(meas);}'
-      + 'function run(){try{centerName('+NAME_C.cx+','+NAME_C.maxW+','+NAME_C.fs+');centerVeh('+VEH_C.cx+','+VEH_C.maxW+','+VEH_C.makerFs+','+VEH_C.carFs+','+VEH_C.gap+');centerPlate('+NUM_C.cx+','+NUM_C.maxW+','+NUM_C.gap+');fitBox("pcv-front",'+FIT_BOX['pcv-front']+');fitBox("pcv-resStaff",'+FIT_BOX['pcv-resStaff']+');fitBox("pcv-time",'+FIT_BOX['pcv-time']+');badges();memo();}catch(e){}'
+      + 'function run(){try{centerName('+NAME_C.cx+','+NAME_C.maxW+','+NAME_C.fs+');centerVeh('+VEH_C.cx+','+VEH_C.maxW+','+VEH_C.makerFs+','+VEH_C.carFs+','+VEH_C.gap+');centerPlate('+NUM_C.cx+','+NUM_C.maxW+','+NUM_C.gap+');fitBox("pcv-front",'+FIT_BOX['pcv-front']+');fitBox("pcv-resStaff",'+FIT_BOX['pcv-resStaff']+');fitBox("pcv-time",'+FIT_BOX['pcv-time']+');'
+        + 'fitBox("pcv-drop",'+FIT_BOX['pcv-drop']+');fitBox("pcv-loanerSpan",'+FIT_BOX['pcv-loanerSpan']+');'
+        + 'fitDate("pcv-m",'+DATE_FIT['pcv-m'].right+','+DATE_FIT['pcv-m'].min+');'
+        + 'fitDate("pcv-bm",'+DATE_FIT['pcv-bm'].right+','+DATE_FIT['pcv-bm'].min+');'
+        + 'badges();memo();}catch(e){}'
         + (noPrint?'' : 'setTimeout(function(){try{window.focus();window.print();}catch(e){}},250);')
         + '}'
       + 'if(document.readyState==="complete")run();else window.addEventListener("load",run);'
@@ -377,6 +431,7 @@
     svg = injectBadgePlaceholder(svg, badges);
     svg = injectMemoPlaceholder(svg, c);
     svg = injectLoanerFeeCheck(svg, c);   /* v1.40.0 代車ありなら管理費の四角にチェック */
+    svg = injectResNo(svg, c);            /* v2.20.0 入庫日ボックスの右上に予約番号（小さく） */
     if (c.earlyDiscount && opts.stampUri) svg = injectStamp(svg, opts.stampUri);
 
     var vmark = opts.vmark ? '<div style="position:fixed;top:6px;left:8px;z-index:9999;background:#e11d48;color:#fff;font:700 12px/1.3 sans-serif;padding:3px 9px;border-radius:5px" data-noprint="1">'+esc(opts.vmark)+'</div><style>@media print{[data-noprint]{display:none!important}}</style>' : '';

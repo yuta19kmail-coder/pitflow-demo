@@ -563,6 +563,223 @@ w.pitDivisionColor = pitDivisionColor;
   }
   w.pitCardTag = pitCardTag;
 
+  /* ===================================================================
+     📝📝 v2.22.0（2026-08-28・ゆうた指定）**予約カードの中身を直したら、記録に残す。**
+     -------------------------------------------------------------------
+     🗣「予約カード内部の操作も履歴に残る？」→ **残っていなかった。**
+        客名・車種・TEL・受注金額・入庫日・フロント担当を全部書き換えて保存しても、
+        **フロー0行・操作ログ0件**。＝ 誰がいつ何を何に変えたのか、まったく追えなかった。
+        （記録が残るのは「状態が変わる操作」＝入庫・完TEL・返車・キャンセル…の20種類だけだった）
+     🗣「結局こういう時に追えないのがやだなと思う」
+
+     ◎やり方＝**開いた時の姿と、保存する時の姿を見くらべるだけ。** 新しく持つデータは無い。
+        （控えは card-view.js の `editBegin` が前から取っている＝キャンセルで戻すため）
+
+     🔴 **見くらべる欄は「人が入力する欄」だけ**（`PIT_FIX_FIELDS` の31個＋下の EXTRA）。
+        ⚠ `status` / `returnStage` / `bayId` などは**入れない**。
+           あれはフェーズ移動・ドラッグ側が**すでに記録している**ので、入れると同じことが2回残る。
+     🔴 **欄の名前は `PIT_FIX_FIELDS`（inspect-fix.js）の1本から借りる。** ここで訳語を書き写さない。
+     ⚠ 金額は「12万」ではなく**そのままの数字**で残す（あとで検算できるように）。
+        長い文章（作業内容・メモ）は **30文字で切る**（記録が読めなくなるため。中身はカードにある）。
+     =================================================================== */
+  /* 🔴🔴 v2.22.0（ゆうた「**詳細はかなり細かいところまで拾ってくれるとうれしい**」）
+     カードが持つ欄を**ぜんぶ**人の言葉にする表。`PIT_FIX_FIELDS`（31個）に無いものはここ。
+     ⚠ ここに無い欄も**記録は出る**（生の名前のまま）＝ **黙って落とさない**。
+     　 見かけたらこの表に足すこと。 */
+  var _DIFF_EXTRA = {
+    /* お客様・車 */
+    sei:'姓', mei:'名', seiKana:'姓（カナ）', meiKana:'名（カナ）',
+    contacts:'連絡先', customerId:'顧客控えの紐づけ', vehId:'車両の紐づけ',
+    karteNo:'カルテ番号', lineStatus:'LINEの状態', lstepId:'Lステップ',
+    perVisit:'来店ごとのメモ', drive:'車両の注意（左ハンドル・M/T など）',
+    /* 受付・段取り */
+    dropType2:'受付タイプ2', workTypes:'作業タイプ（複数）',
+    workAddons:'追加の作業', workSpecials:'特別な作業', chipGroups:'作業内容の組',
+    division:'課', taskStaff:'作業担当', callStaff:'完TEL担当', resvStaff:'予約担当',
+    pic:'担当', picId:'担当ID', staff:'担当（旧）', mechanics:'メカニック',
+    inspectors:'検査員', consult:'相談', memo:'メモ', todayNote:'当日メモ',
+    tentative:'仮予約', urgent:'急ぎ', codeRed:'クレーム', intakeTbd:'入庫日 未定',
+    approvalPending:'承認待ち', internKind:'社内車両の区分',
+    /* 作業・整備 */
+    maint:'整備チェック', parts:'部品', office:'バックオフィス後処理',
+    coverCall:'完TELの印', inspSchedule:'車検の日取り', rules:'規則',
+    coatingOK:'コーティング', headlight:'ヘッドライト', testDrive:'試乗',
+    needWash:'洗車', washNote:'洗車の備考', handoffMemo:'引継ぎメモ', handover:'引き渡し',
+    /* 代車 */
+    needLoaner:'代車', loanerId:'使用代車', loanerFixed:'代車 確定',
+    loanerOther:'代車（その他）', loanerReturned:'代車 返却済み',
+    /* 返車・実績 */
+    returnDatePlan:'返車予定日（暫定）', returnTbd:'返車日 未定',
+    completeCallAt:'完TELの日', orderedAt:'受注日',
+    noThanksLine:'お礼LINE 不要', thanksLineSent:'お礼LINE 送った',
+    thanksLineSentAt:'お礼LINE 送った日時', thanksLineSentBy:'お礼LINE 送った人',
+    /* お金 */
+    estHoldDays:'概算 預かり日数', paymentSeparate:'支払い分割',
+    earlyDiscount:'早期割', amountInsurance:'保険', insurancePaidAt:'保険の入金日',
+    noSale:'売上なし', noSaleAt:'売上なしにした日', noSaleBy:'売上なしにした人',
+    salesReq:'車販依頼', salesReqMemo:'車販依頼メモ',
+    /* 外注 */
+    outsourceNote:'外注メモ'
+  };
+  /* 🔴 記録に出さない欄＝**人が触らないもの／画面の都合のもの**。
+     ⚠ ここを増やす時は「本当に人が触らないか」を確かめること。**迷ったら出す。** */
+  var _DIFF_HIDE = {
+    id:1, log:1, phaseAt:1, updatedAt:1, savedAt:1, checked:1,
+    innerHTML:1, scrollTop:1, ruleDict:1,
+    /* 状態・置き場所＝フェーズ移動やドラッグが**すでに記録している** */
+    status:1, returnStage:1, bayId:1, baySlot:1,
+    archived:1, cancelled:1, cancelledAt:1, cancelledBy:1, cancelReason:1,
+    noShow:1, noShowAt:1, actualInAt:1
+  };
+  /* 入れ子の中の項目名（整備チェックの7項目・バックオフィスの締め・完TELの印 …）。
+     ⚠ 名前が引けないものは**生の名前のまま出す**（黙って落とさない）。 */
+  var _DIFF_SUB = {
+    maint:   { oil:'オイル入れ', rotate:'タイヤローテーション', air:'エア調整', llc:'LLC補充',
+               torque:'増締め', light:'ライト', slip:'サイドスリップ', checks:'チェック' },
+    office:  { invoice:'請求発行', paid:'入金確認', cost:'原価チェック', checks:'チェック' },
+    coverCall:{ done:'完TEL 済', at:'完TELの日時', staff:'完TELの担当' },
+    inspSchedule:{ decided:'行く日', decidedSlot:'午前／午後', cands:'候補' }
+  };
+  function _diffLabel(k, parent){
+    if (parent && _DIFF_SUB[parent] && _DIFF_SUB[parent][k]) return _DIFF_SUB[parent][k];
+    var t = (w.PIT_FIX_FIELDS || []).filter(function (f) { return f && f.id === k; })[0];
+    return (t && t.label) || _DIFF_EXTRA[k] || k;
+  }
+  /* 🔴 **ここに入れない欄**＝すでに自分の記録を持っているもの。
+     　 入れると同じことが2行になって、フローが読めなくなる。
+     　 ・実績カウント日・確定返車日・売上日 … 直した時に専用の記録が出る（card-view.js / sales-date.js）
+     　 ・返車予定日・返車時間 … 返車の予定を動かすと return-slot.js が記録する */
+  var _DIFF_SKIP = {
+    /* 直した時に専用の記録が出るもの */
+    completedAt:1, returnDateFinal:1, salesDate:1, returnDate:1, returnTime:1, amountFinal:1,
+    /* 🔴 **操作ボタンが書き込む「印」**。人が欄に打ち込むものではない。
+       　 ＝ その操作自身が「売上なしでアーカイブした」「承認予約にした」と**もう記録している**。
+       ⚠ ここを入れると、押した操作の記録のすぐ下に
+       　 「編集：売上なしにした日 （空）→ 2026-08-28」のような**言い直しの行**が並ぶ（実際に並んだ）。 */
+    noSale:1, noSaleAt:1, noSaleBy:1,
+    thanksLineSent:1, thanksLineSentAt:1, thanksLineSentBy:1,
+    approvalPending:1, tentative:1, coverCall:1,
+    completeCallAt:1, orderedAt:1, loanerReturned:1
+  };
+  /* 🔴 v2.22.0 **決め打ちの一覧ではなく、そのカードが実際に持っている欄を全部見る。**
+     　 （表に足し忘れた欄が黙って追えなくなるのを防ぐ＝いちばんやりたくないこと） */
+  function _diffKeys(before, after){
+    var out = {};
+    [before, after].forEach(function (o) {
+      Object.keys(o || {}).forEach(function (k) {
+        if (k.charAt(0) === '_') return;          /* 画面の都合（_draft / _sample …） */
+        if (_DIFF_HIDE[k]) return;
+        if (_DIFF_SKIP[k]) return;
+        out[k] = 1;
+      });
+    });
+    return Object.keys(out);
+  }
+  /* 🔴 「空っぽ」の書き方は3通りある（`undefined` / `''` / `false`）。
+     　 カードを開くと既定値が入るので、**書き方が変わっただけ**で「変更」に見えてしまう
+     　 （実際に「お礼LINE不要 （空）→ なし」のような無意味な行が7本出た）。
+     　 ＝ **どれも「空っぽ」として同じに扱う。** */
+  function _emptyish(v){ return v == null || v === '' || v === false; }
+  /* 相手が○×の欄なら、空っぽも「なし」と書く（（空）→ あり は読みにくい） */
+  function _diffVal(v, other){
+    if (typeof v === 'boolean' || typeof other === 'boolean') return v === true ? 'あり' : 'なし';
+    if (v == null || v === '') return '（空）';
+    if (v === true)  return 'あり';
+    if (v === false) return 'なし';
+    if (Array.isArray(v)) {
+      if (!v.length) return '（空）';
+      /* 中身がオブジェクトの並び（連絡先・部品・候補）は、字にすると読めない＝**件数**で出す */
+      if (v.some(function (x) { return x && typeof x === 'object'; })) return v.length + '件';
+      var t2 = v.join('・');
+      return t2.length > 30 ? t2.slice(0, 30) + '…' : t2;
+    }
+    if (typeof v === 'object') { try { return JSON.stringify(v).slice(0, 30); } catch (e) { return '（中身）'; } }
+    var t = String(v);
+    return t.length > 30 ? t.slice(0, 30) + '…' : t;
+  }
+  function _same(a, b){
+    if (_emptyish(a) && _emptyish(b)) return true;   /* 🔴 空っぽどうしは「変わっていない」 */
+    if (Array.isArray(a) || Array.isArray(b)) {
+      var x = a || [], y = b || [];
+      if (x.length !== y.length) return false;
+      /* 並びが違うだけ＝**変わっていない**（作業タイプの順番を入れ替えただけで記録が出ない） */
+      var prim = function (arr) { return arr.every(function (v) { return !v || typeof v !== 'object'; }); };
+      if (prim(x) && prim(y)) {
+        try {
+          return JSON.stringify(x.slice().map(String).sort()) === JSON.stringify(y.slice().map(String).sort());
+        } catch (e) { return false; }
+      }
+      try { return JSON.stringify(x) === JSON.stringify(y); } catch (e) { return false; }
+    }
+    if (a == null && b === '') return true;
+    if (b == null && a === '') return true;
+    if (typeof a === 'object' || typeof b === 'object') {
+      try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
+    }
+    return String(a == null ? '' : a) === String(b == null ? '' : b);
+  }
+  /* 開いた時の姿(before) と いまの姿(after) を見くらべて、変わった欄だけ返す。
+     🔴 v2.22.0 **入れ子も1段おりる**（ゆうた「かなり細かいところまで拾ってくれるとうれしい」）
+     　 整備チェック・バックオフィス・完TELの印・車検の日取り・連絡先は
+     　 中身がオブジェクトなので、そのままだと「整備チェック {…} → {…}」としか出せない。
+     　 ＝ **中の項目ごとに1行**にする： `整備チェック・オイル入れ なし → あり`
+     ⚠ 配列（作業タイプ・部品など）は**入っているものを並べて**見くらべる（順番だけの入れ替えは無視）。 */
+  function _isPlainObj(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
+  function pitCardDiff(before, after){
+    if (!before || !after) return [];
+    var out = [];
+    _diffKeys(before, after).forEach(function (k) {
+      var a = before[k], b = after[k];
+      if (_same(a, b)) return;
+      if (_isPlainObj(a) || _isPlainObj(b)) {
+        var sub = {};
+        Object.keys(a || {}).forEach(function (kk) { sub[kk] = 1; });
+        Object.keys(b || {}).forEach(function (kk) { sub[kk] = 1; });
+        var kids = Object.keys(sub).filter(function (kk) {
+          return kk.charAt(0) !== '_' && !_same((a || {})[kk], (b || {})[kk]);
+        });
+        if (kids.length) {
+          kids.forEach(function (kk) {
+            out.push({ key: k + '.' + kk, label: _diffLabel(k) + '・' + _diffLabel(kk, k),
+                       from: _diffVal((a || {})[kk], (b || {})[kk]),
+                       to:   _diffVal((b || {})[kk], (a || {})[kk]) });
+          });
+          return;
+        }
+      }
+      out.push({ key: k, label: _diffLabel(k),
+                 from: _diffVal(a, b), to: _diffVal(b, a) });
+    });
+    return out;
+  }
+  /* 記録に書く1行： 受注金額 120000 → 150000 */
+  function pitCardDiffText(d){ return d.label + ' ' + d.from + ' → ' + d.to; }
+  w.pitCardDiff     = pitCardDiff;
+  w.pitCardDiffText = pitCardDiffText;
+
+  /* 見くらべて、記録まで書く（呼ぶ側はこれ1本でよい）。戻り値＝変わった欄の数 */
+  function pitLogCardEdit(card, before, opt){
+    if (!card || !before) return 0;
+    var ds = pitCardDiff(before, card);
+    if (!ds.length) return 0;
+    var auto = !!(opt && opt.auto);
+    ds.forEach(function (d) {
+      var txt = '編集：' + pitCardDiffText(d);
+      if (auto && w.logFlowAuto) w.logFlowAuto(card, txt);
+      else if (w.logFlow) w.logFlow(card, txt);
+    });
+    try {
+      if (w.pitLog) {
+        w.pitLog('予約を編集（' + ds.length + 'か所）', {
+          auto: auto, cardId: card.id, kind: 'edit',
+          label: pitCardTag(card) + ' / ' + ds.map(pitCardDiffText).join('、')
+        });
+      }
+    } catch (e) {}
+    return ds.length;
+  }
+  w.pitLogCardEdit = pitLogCardEdit;
+
   function pitMonthRowWt(c){
     var id = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
     return ((w.state && w.state.workTypes) || []).find(function (x) { return x.id === id; });

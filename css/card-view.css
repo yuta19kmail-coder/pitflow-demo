@@ -342,6 +342,32 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-ft{ font-size:14px; font-weight:700; } .cv-fd{ font-size:11.5px; color:var(--text3); margin-top:1px; }
 /* v1.43.0 手で足した記録を消す ✕（自動の工程記録には出さない） */
 .cv-fmain{ flex:1; min-width:0; }
+
+/* 🪜🪜 v2.22.0（ゆうた指定）**フローは大きい節目が主役。あいだの細かい記録は畳む。**
+   🗣「大きなところフェーズ移動とかを表示して、その中で起きた細かいところは
+   　　そのフロー部分を展開できるようにしたい」
+   ⚠ 畳むだけで1行も捨てない。**畳んでいる時も「何件あるか」は必ず見せる**
+   　（数が見えないと「無い」と読まれる）。 */
+.cv-fsub{ margin:0 0 2px 24px; }                     /* 節目の丸の下にぶら下がる位置 */
+.cv-fsub .cv-fmore{
+  display:inline-flex; align-items:center; gap:6px;
+  border:1px dashed var(--border2); border-radius:999px; background:transparent;
+  color:var(--text3); font-size:11.5px; font-weight:700; line-height:1;
+  padding:4px 10px; cursor:pointer;
+}
+.cv-fsub .cv-fmore:hover{ border-color:var(--brand); color:var(--text2); }
+.cv-fsub .cv-fcar{                                   /* ▸／▾ の三角 */
+  width:0; height:0; border-style:solid; border-width:4px 0 4px 6px;
+  border-color:transparent transparent transparent currentColor;
+  transition:transform .12s;
+}
+.cv-fsub.open .cv-fcar{ transform:rotate(90deg); }
+.cv-fkids{ margin:2px 0 4px 4px; padding-left:12px; border-left:2px dotted var(--border2); }
+.cv-fkids .cv-frow{ padding:4px 0; }
+.cv-fkids .cv-fdot{ flex:0 0 8px; width:8px; height:8px; margin-top:5px; background:var(--border2) !important; }
+.cv-fkids .cv-frow .cv-fdot:after{ display:none; }   /* 子は縦線を引かない（親の点線で足りる） */
+.cv-fkids .cv-ft{ font-size:12px; color:var(--text2); }
+.cv-fkids .cv-fd{ font-size:10.5px; }
 .cv-fdel{ flex:0 0 auto; align-self:center; background:transparent; border:none; color:var(--text3); cursor:pointer; padding:2px 5px; border-radius:6px; display:inline-flex; align-items:center; opacity:0; transition:opacity .12s,color .12s,background .12s; }
 .cv-frow:hover .cv-fdel{ opacity:1; }
 .cv-fdel:hover{ background:var(--bg3); color:#ef4444; }

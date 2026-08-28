@@ -85,6 +85,9 @@
      ================================================================ */
 
   // 新フィールド フォールバック（旧 localStorage データ対策）
+  /* 🔴 v2.22.0 外からも呼べるようにした（card-detail.js が**控えを取る前に**呼ぶ）。
+     　 既定値を入れるのはカードを開いた時の下ごしらえであって、**人の操作ではない**。
+     　 控えを取る前に済ませておかないと、「（空）→ store」のような**意味のない編集記録**が出る。 */
   function ensure(c){
     if(!c.inspSchedule || typeof c.inspSchedule!=='object') c.inspSchedule = { mode:'manual', slots:{}, cutBefore:'' };
     if(!c.inspSchedule.slots) c.inspSchedule.slots = {};
@@ -1112,15 +1115,24 @@
 
   /* 🔴 v1.43.0 ゆうた指定＝**用件を足すのはこの「カード詳細」のフロー欄**。
      （「予約を編集」の方のフローは、すでに入っている記録の日時・担当を直す“本当の編集”に回した） */
+  /* 🪜 v2.22.0 どの束を開いているか（画面の都合＝**保存しない**。開き直せば畳んだ姿に戻る） */
+  var _cvFlowOpen = {};
+  window.pitFlowToggle = function(gid){
+    _cvFlowOpen[gid] = !_cvFlowOpen[gid];
+    if (window.cvFlowRepaint) cvFlowRepaint();
+  };
   function flowTab(c){
     /* 🗑 v2.13.2 もう無い機能の記録は出さない（記録は消さない）。物差しは `pitLogGone` 1本。 */
     const log = (c.log || []).filter(function(e){
       return !(window.pitLogGone && pitLogGone(e && (e.label || e.text)));
     });
     let h = '<div class="cv-sec"><div class="cv-sect"><i data-ic=clock data-ics=16></i> フロー（進捗ログ）</div><div class="cv-flow">';
-    if (!log.length){ h += '<div class="cv-wl cv-muted">記録はまだありません。</div>'; }
-    else log.map(function(e,i){ return {e:e,i:i}; }).reverse().forEach(function(r){
-      var e = r.e, _i = r.i;
+    /* 🪜 v2.22.0（ゆうた指定）**大きい節目を主役にして、そのあいだの細かい記録は畳む。**
+       🗣「大きなところフェーズ移動とかを表示して、その中で起きた細かいところは
+       　　そのフロー部分を展開できるようにしたい」
+       ⚠ 大きい／細かいの物差しは flow-pit.js の `pitFlowIsMajor` 1本（ここで文字列判定しない）。
+       ⚠ **畳むだけで、1行も捨てない。** 開けば必ず全部出る。 */
+    var _rowOf = function(e, _i){
       var pad=function(n){return(n<10?'0':'')+n;};
       // 時刻：数値タイムスタンプは M/D HH:MM に整形（旧ログ対策）
       // ⚠ v1.43.0 読み方は PitFlowLog.atText に一本化（記録の形が3通りあるため）
@@ -1141,8 +1153,28 @@
       /* 手で足した記録だけ ✕ を付ける＝打ち間違いをその場で消せる（自動の工程記録は残す） v1.43.0 */
       var del = (window.PitFlowLog && PitFlowLog.isManual(e))
         ? '<button type="button" class="cv-fdel" title="この記録を消す" onclick="pitFlowDel(\''+esc(c.id)+'\','+_i+')">'+(window.ico?ico('close',15):'×')+'</button>' : '';
-      h += '<div class="cv-frow done"><span class="cv-fdot"></span><div class="cv-fmain"><div class="cv-ft">'+title+(amtTxt?'<span class="cv-famt">'+esc(amtTxt)+'</span>':'')+'</div><div class="cv-fd">'+esc(String(when)+(who?' ・ '+who:''))+'</div></div>'+del+'</div>';
-    });
+      return '<div class="cv-frow done"><span class="cv-fdot"></span><div class="cv-fmain"><div class="cv-ft">'+title+(amtTxt?'<span class="cv-famt">'+esc(amtTxt)+'</span>':'')+'</div><div class="cv-fd">'+esc(String(when)+(who?' ・ '+who:''))+'</div></div>'+del+'</div>';
+    };
+    if (!log.length){ h += '<div class="cv-wl cv-muted">記録はまだありません。</div>'; }
+    else {
+      var _groups = (window.pitFlowGroup ? pitFlowGroup(log)
+                    : log.map(function(e,i){ return { head:e, i:i, kids:[] }; })).slice().reverse();
+      _groups.forEach(function (g, gi) {
+        var gid = 'cvfg-' + esc(c.id) + '-' + g.i;
+        if (g.head) h += _rowOf(g.head, g.i);
+        if (!g.kids.length) return;
+        var open = !!_cvFlowOpen[gid];
+        /* ⚠ 畳んでいる時も**何件あるか**は必ず見せる。数が見えないと「無い」と読まれる。 */
+        h += '<div class="cv-fsub' + (open ? ' open' : '') + '">'
+           + '<button type="button" class="cv-fmore" onclick="pitFlowToggle(\'' + gid + '\')">'
+           + '<i class="cv-fcar"></i>' + (open ? 'この間の記録を閉じる' : 'この間の記録 ' + g.kids.length + '件')
+           + '</button>'
+           + (open ? '<div class="cv-fkids">'
+                   + g.kids.slice().reverse().map(function (k) { return _rowOf(k.e, k.i); }).join('')
+                   + '</div>' : '')
+           + '</div>';
+      });
+    }
     h += '</div>';
     /* === 用件を足す（チップ／自由入力）＝ここが入口 v1.43.0 === */
     if (window.PitFlowLog) h += PitFlowLog.addHtml(c, 'cv');
@@ -1526,6 +1558,7 @@
     if (had){ try { if (window.PitDB) PitDB.save(true); } catch(e){} }
   }
   window.pitCardEditRelease = editRelease;
+  window.pitCardEnsure = ensure;      /* 🔴 v2.22.0 下ごしらえ（既定値入れ）を外へ */
 
   /* 予約詳細に戻る（ポップアップは開けたまま） */
   function backToView(card){

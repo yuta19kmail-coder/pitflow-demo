@@ -332,3 +332,37 @@ body.md-edit .md-bh h3 { max-width: none; }
 .rp-cal .rp-car .rml-side{ margin-left:4px; }
 .rp-cal .rp-car .rme-wt, .rp-cal .rp-car .rme-loaner{ font-size:9px; }
 .rp-more{ font-size:9.5px; color:var(--text3); text-align:right; }
+
+
+/* =========================================================
+   🩺 v2.22.0 データチェックBOX（ゆうた 2026-08-28）
+   ---------------------------------------------------------
+   ⚠ 色は既にある3段（要対応＝赤／確認＝橙／気づき＝灰）をそのまま借りる。
+   　 新しい色を増やさない（データチェックの画面と同じ読み方にする）。
+   ========================================================= */
+/* ⚠ `.md-cards` は flex（チップを横に並べる器）。ここは**1行1規則の縦並び**なので block に戻す。
+   　 戻さないと題名と車名が同じ行に押し込まれて、**いちばん大事な題名が「…」で切れる**（実際に切れた）。 */
+.ins-list{ display:block; }
+.ins-row{ display:block !important; border-left-width:3px;
+  width:100%; box-sizing:border-box; min-width:0; max-width:100%; margin-bottom:5px; }
+.ins-row .md-c1, .ins-row .md-c2{ max-width:100%; }
+.ins-row .md-c1{ display:flex; align-items:center; gap:6px; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ins-row .md-c2{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ins-lv{ flex:0 0 auto; font-size:9.5px; font-weight:800; line-height:1;
+  padding:2px 5px; border-radius:999px; border:1px solid currentColor; }
+.ins-lv.ins-red{   color:var(--red,#ef4444); }
+.ins-lv.ins-amber{ color:var(--orange,#f59e0b); }
+.ins-lv.ins-gray{  color:var(--text3,#94a3b8); }
+.ins-no{ font-style:normal; font-size:10px; color:var(--text3); }
+.ins-row .ins-t{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.ins-row .ins-n{ flex:0 0 auto; margin-left:auto; font-size:11px; font-weight:800; color:var(--text2);
+  background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:1px 6px; }
+/* 終わった記録＝今日の段取りを変えない。小さく添えるだけ（消さない＝黙って隠さない） */
+.ins-past{ margin-top:6px; font-size:11px; color:var(--text3); cursor:pointer;
+  border-top:1px dashed var(--border); padding-top:6px; }
+.ins-past:hover{ color:var(--text2); }
+.ins-cats{ display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+.ins-cat{ display:inline-flex; align-items:center; gap:4px; font-size:10.5px; color:var(--text3);
+  background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+.ins-cat b{ color:var(--text); font-size:11.5px; }

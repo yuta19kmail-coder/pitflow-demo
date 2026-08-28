@@ -85,11 +85,29 @@ function pitGotoReserveDate(dateStr){
 }
 window.pitGotoReserveDate = pitGotoReserveDate;
 
-/* 📊 実績カレンダー（その月）へ飛ぶ（返車済みから） */
-function pitGotoResultMonth(dateStr){
+/* 📊 実績カレンダー（その月）へ飛ぶ（返車済みから）
+   🔎 v2.17.0 カードidを渡すと、飛んだ先で**その日とそのカードを光らせる**
+      （ゆうた 2026-08-28「来店履歴から実績をクリックして飛んだ時も同様に」）。
+   🔴 月は「返車日」ではなく**実績の日**（`pitResultDateOf`）で決める。
+      ここを返車日のままにすると、実績の日が別の月の車で
+      **月は動いたのに光る日が無い＝行き止まり**になる。
+   🔴 段（実績カウント／非カウント）も、そのカードが居る方へ合わせる。
+      合わせないと「飛んだのに1台も居ない」＝黙って嘘をつく。 */
+function pitGotoResultMonth(dateStr, cardId){
   if (window.custCloseModal) custCloseModal();
   if (window.pitSearchClose) pitSearchClose();
-  const d = dateStr ? new Date(String(dateStr) + 'T00:00:00') : new Date();
+  let base = dateStr;
+  state.resultHit = null;
+  if (cardId){
+    const c = (state.cards || []).find(x => x && x.id === cardId);
+    if (c){
+      if (window.pitResultModeOf) state.resultMode = pitResultModeOf(c);
+      if (window.pitResultDateOf){ const rd = pitResultDateOf(c); if (rd) base = rd; }
+      state.resultHit = cardId;
+      state.resultQ = '';                     /* 別の探し物なので、前の検索は持ち込まない */
+    }
+  }
+  const d = base ? new Date(String(base) + 'T00:00:00') : new Date();
   if (!isNaN(d)) state.resultMonth = new Date(d.getFullYear(), d.getMonth(), 1);
   showView('result');
 }
@@ -358,6 +376,8 @@ function goToday(){
 function addBoard(){    pitAlert('看板の追加は次フェーズで実装予定です', { code:'PF-0030' }); }
 function editBays(){    pitAlert('PIT枠の編集は次フェーズで実装予定です', { code:'PF-0031' }); }
 function editLoaners(){ pitAlert('代車の編集は次フェーズで実装予定です', { code:'PF-0032' }); }
-function prevMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()-1); renderResult(); }
-function nextMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()+1); renderResult(); }
+/* ⚠ 月を送ったら、光らせていた1件は外す（別の月に居るものを光らせ続けない）。
+   検索の語はそのまま＝月を送りながら探せる（v2.17.0） */
+function prevMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()-1); state.resultHit = null; renderResult(); }
+function nextMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()+1); state.resultHit = null; renderResult(); }
 function closeMonth(){  pitAlert('月次集計締めは次フェーズで実装予定です', { code:'PF-0033' }); }

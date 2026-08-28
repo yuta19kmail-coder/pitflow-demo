@@ -77,6 +77,9 @@ window.state = {
   resultMonth: new Date(),
   /* 🔢 v2.6.0 実績ビューの段（'count'＝売上に数える実績／'nocount'＝社内車両・売上なし）。保存しない */
   resultMode: 'count',
+  /* 🔎 v2.17.0 実績ビューの検索（打った字／光らせている1件のカードid）。どちらも画面の都合＝保存しない */
+  resultQ: '',
+  resultHit: null,
 
   loaners: [
     { id: 'L01', name: '代車1',  model: 'タント',     plate: '○○ 0001', shakenDate: '2026-09-14', tenkenDate: '2026-07-10' },

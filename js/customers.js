@@ -837,7 +837,8 @@
       h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoReserveDate(\''+esc(c.reserveDate||'')+'\')">'
          +   ic('calendar') + '予約表</button>';
     } else if (c.status === 'returned' && !isNS){
-      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoResultMonth(\''+esc(c.returnDate||c.reserveDate||'')+'\')">'
+      /* 🔎 v2.17.0 カードidも渡す＝飛んだ先でその日とそのカードが光る（探し直さなくていい） */
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoResultMonth(\''+esc(c.returnDate||c.reserveDate||'')+'\',\''+esc(c.id)+'\')">'
          +   ic('chart') + '実績ボード</button>';
     }
     if (opt.detail){

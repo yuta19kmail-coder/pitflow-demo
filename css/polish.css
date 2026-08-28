@@ -786,7 +786,11 @@
 .cf-plate-grid > div{ flex:0 0 auto; }
 /* v0.87.2 受付タイプ2つ選択の「待預」＝小さいバッジ2個を詰めて並べる（固定枠でも崩れない・どの表示エリアでも共通） */
 .dbpair{ display:inline-flex; gap:1px; align-items:center; vertical-align:middle; }
-.dbpair > span{ font-size:9px !important; padding:1px 3px !important; line-height:1.5 !important; border-radius:5px !important; }
+/* 🔴 v2.20.1（ゆうた 2026-08-28「2つ以上になると凄く小さくなっちゃう」）
+   **字は小さくしない。** 詰めるのは余白と角丸だけ。
+   ⚠ 前は `font-size:9px !important` で、どの画面でも2つ目が出た瞬間に豆粒になっていた。
+   ⚠ 当日ビュー（固定枠）だけは views.css で「枠を2つで分け合う」形にしている。 */
+.dbpair > span{ padding:1px 4px !important; line-height:1.5 !important; border-radius:5px !important; }
 
 /* v0.84.0 新規予約・右パネル：選んだ日の入庫/返車ミニ一覧（時間提案用） */
 .dl{background:var(--bg);border:1px solid var(--border2);border-radius:10px;overflow:hidden;margin-top:8px}

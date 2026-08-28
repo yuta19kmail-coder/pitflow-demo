@@ -236,7 +236,7 @@
   // =========================================
   function settingsCardHtml() {
     return '<div class="ps-card"><div class="ps-h"><i data-ic=briefcase data-ics=16></i> 作業内容テンプレート（症状ホイール）</div>'
-      + '<div class="ps-desc">新規予約の「内容」で使う <b>部位・症状・補足</b>（時計式ホイール）と <b>各チップ</b> を編集します。症状は「対象部位」を限定でき、変な組み合わせ（例：エンジンに冷風が出ない）を自動で出さなくできます。<br><b>カプセルはつまんで動かすと並び替えできます</b>（よく使うものを前へ）。並びはそのまま新規予約の画面に出ます。</div>'
+      + '<div class="ps-desc">新規予約の「内容」で使う <b>部位・症状・補足</b>（時計式ホイール）と <b>各チップ</b> を編集します。症状は「対象部位」を限定でき、変な組み合わせ（例：エンジンに冷風が出ない）を自動で出さなくできます。<br><b>カプセルはつまんで動かすと並び替えできます</b>（よく使うものを前へ）。<b>ラベル（🔧作業・依頼〜🚗車両情報）はつまむと組ごと動きます。</b>並びはそのまま新規予約の画面に出ます。</div>'
       + '<div id="wc-settings"></div></div>';
   }
   function inp(val, ph, oninput, cls, w) {
@@ -270,15 +270,22 @@
     });
     h += '</div>';
 
-    // チップ群
+    /* チップ群＝**ラベルごと1つの組**（v2.19.0）。ラベルをつまむと組ごと動く。
+       ⚠ 部位・症状の見出しは `wc-s-gh` を付けない＝**動くのはチップ群のラベルだけ**。 */
+    h += '<div id="wc-groups">';
     c.chipGroups.forEach(function (g, gi) {
-      h += '<div class="wc-s-h" style="margin-top:14px">' + escI(g.label) + '<button class="wc-s-add" onclick="WorkContent.wcAddChip(' + gi + ')">＋ 追加</button></div>';
+      h += '<div class="wc-s-grp" data-wc-gi="' + gi + '">';
+      h += '<div class="wc-s-h wc-s-gh" title="ラベルをつまむと、この組ごと動かせます">'
+         + '<span class="wc-s-grip"><i data-ic=grip data-ics=16></i></span>'
+         + escI(g.label)
+         + '<button class="wc-s-add" onclick="WorkContent.wcAddChip(' + gi + ')">＋ 追加</button></div>';
       h += '<div class="wc-s-chips" data-wc-grp="chip:' + gi + '">';
       g.items.forEach(function (it, ii) {
         h += '<span class="wc-s-chip" data-wc-i="' + ii + '" title="つまんで動かすと並び替えできます">' + esc(it) + '<button onclick="WorkContent.wcDelChip(' + gi + ',' + ii + ')"><i data-ic=close data-ics=16></i></button></span>';
       });
-      h += '</div>';
+      h += '</div></div>';
     });
+    h += '</div>';
 
     box.innerHTML = h;
   }
@@ -296,24 +303,36 @@
      ⚠ 4px 動かすまでは始めない＝軽く触っただけで並びが変わらない。
      ⚠ **同じグループの中だけ**で動く（部位を「作業・依頼」の列へは移せない）。
      ⚠ 動かしている間はDOMを入れ替えて見せ、離した時に**その並びを設定へ書き戻す**。 */
+  /* 🔀 v2.19.0（ゆうた指定 2026-08-28）**ラベルごと（組ごと）も動かせる。**
+     🗣「設定の作業内容テンプレートの、作業依頼〜車両情報 までのラベル全体を並び替えられるようにしたい」
+     🔴 つまむ所は2種類だが、**動かす仕掛けは1本**（下の _wcDown / _wcMove / _wcUp）。
+        ・カプセル（`.wc-s-chip`）… その組の中だけで動く（v1.30.0 のまま）
+        ・ラベル（`.wc-s-gh`）　 … その組ごと（`.wc-s-grp`）上下に動く
+     ⚠ ＋追加・×の上から始めた時は動かさない（押したいのに動くと困る）。 */
   var _wcDrag = null;
   function _wcDown(e){
     if (e.button != null && e.button !== 0) return;                 /* 右クリック等は無視 */
     var t = e.target;
     if (!t || !t.closest) return;
-    if (t.closest('button')) return;                                /* ×は削除のまま */
+    if (t.closest('button')) return;                                /* ×・＋追加は押すまま */
     var el = t.closest('.wc-s-chip');
-    if (!el) return;
-    var row = el.parentElement;
-    if (!row || !row.getAttribute('data-wc-grp')) return;
-    _wcDrag = { el: el, row: row, x: e.clientX, y: e.clientY, on: false };
+    if (el){
+      var row = el.parentElement;
+      if (!row || !row.getAttribute('data-wc-grp')) return;
+      _wcDrag = { kind: 'chip', sel: '.wc-s-chip', el: el, row: row, x: e.clientX, y: e.clientY, on: false };
+    } else if (t.closest('.wc-s-gh')){
+      var blk = t.closest('.wc-s-grp');
+      var host = blk && blk.parentElement;
+      if (!blk || !host || host.id !== 'wc-groups') return;
+      _wcDrag = { kind: 'grp', sel: '.wc-s-grp', el: blk, row: host, x: e.clientX, y: e.clientY, on: false };
+    } else return;
     window.addEventListener('pointermove', _wcMove);
     window.addEventListener('pointerup', _wcUp);
     window.addEventListener('pointercancel', _wcUp);
   }
-  function _wcAt(row, x, y){
+  function _wcAt(row, x, y, sel){
     var hit = null;
-    Array.prototype.forEach.call(row.querySelectorAll('.wc-s-chip'), function (el){
+    Array.prototype.forEach.call(row.querySelectorAll(sel || '.wc-s-chip'), function (el){
       var r = el.getBoundingClientRect();
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = el;
     });
@@ -324,11 +343,11 @@
     if (!d.on){
       if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) < 4) return;
       d.on = true;
-      d.el.classList.add('wc-s-drag');
+      d.el.classList.add(d.kind === 'grp' ? 'wc-s-gdrag' : 'wc-s-drag');
       document.body.classList.add('wc-s-dragging');
     }
     if (e.cancelable) e.preventDefault();                           /* 画面のスクロールに持っていかれないように */
-    var over = _wcAt(d.row, e.clientX, e.clientY);
+    var over = _wcAt(d.row, e.clientX, e.clientY, d.sel);
     if (!over || over === d.el) return;
     /* いま掴んでいるものより後ろにあるものへ重ねたら「その後ろ」へ、前なら「その前」へ */
     var after = !!(d.el.compareDocumentPosition(over) & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -341,9 +360,23 @@
     window.removeEventListener('pointercancel', _wcUp);
     if (!d) return;
     d.el.classList.remove('wc-s-drag');
+    d.el.classList.remove('wc-s-gdrag');
     document.body.classList.remove('wc-s-dragging');
     if (!d.on) return;                                              /* 動かしていない＝ただのタップ */
-    _wcCommit(d.row);
+    if (d.kind === 'grp') _wcCommitGroups(d.row);
+    else _wcCommit(d.row);
+  }
+  /* 画面の並び（data-wc-gi＝もとの番号）を、そのまま chipGroups に写す。
+     🔴 中身（items）は1文字も触らない＝組ごと入れ替えるだけ。 */
+  function _wcCommitGroups(host){
+    var order = Array.prototype.map.call(host.querySelectorAll('.wc-s-grp'), function (el){ return +el.getAttribute('data-wc-gi'); });
+    var c = cfg();
+    var out = order.map(function (i){ return c.chipGroups[i]; }).filter(function (x){ return x !== undefined; });
+    if (out.length !== c.chipGroups.length) return;                 /* 数が合わない時は触らない（安全側） */
+    c.chipGroups = out;
+    save();
+    renderEditor();
+    if (window.pitToast) pitToast('並び順を保存しました');
   }
   /* 画面の並び（data-wc-i＝もとの番号）を、そのまま設定の配列に写す。 */
   function _wcCommit(row){
@@ -366,6 +399,7 @@
   }
   /* テスト用に外へ出す（画面からは使わない） */
   window.WorkContent._wcCommit = _wcCommit;
+  window.WorkContent._wcCommitGroups = _wcCommitGroups;
 
   // ---- 編集操作（すべて cfg() を書き換え→保存→再描画）----
   const W = window.WorkContent;

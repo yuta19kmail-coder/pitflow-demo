@@ -380,6 +380,85 @@
     return s.unsetList.concat(s.candList, s.decidedList);
   }
   function fmd(d) { return d ? (window.fmtMD ? fmtMD(d) : d) : ''; }
+  function mdShift(dstr, n) {
+    var d = new Date(String(dstr) + 'T00:00:00'); if (isNaN(d)) return dstr;
+    d.setDate(d.getDate() + n); return ymd(d);
+  }
+  /* 🔴 v2.18.0 「その日に返した車」＝**ここ1本**。
+     ⚠ 返車BOX（returnout）が同じ数え方を2か所に書いていたので、そちらもこれを呼ぶ形に寄せた。 */
+  function mdReturnedOn(dstr) {
+    return C.cards.filter(function (c) {
+      return !mdNoSale(c) && c.status === 'returned' && (c.completedAt === dstr || c.returnDate === dstr);
+    });
+  }
+
+  /* =========================================================
+     💬💬 v2.18.0 今日のお礼LINE 送信リスト（ゆうた 2026-08-28）
+     ---------------------------------------------------------
+     🗣「完TEL関門時にLINEありになっている人で、今日返車した人の一覧。
+     　　難しいカウント式は要らなくて、**チェックボックスで送ったか送ってないか**が分かれば」
+     🗣「（日をまたいだら）**未送は残す**」／🗣「**日づけで切り替えができるか**」
+     🔴 誰が対象か・送った印を書くのは **pit-share.js の1本**（`pitThanksNeeded` / `pitThanksSetSent`）。
+        ここで条件を書き写さない。
+     ⚠ 見ている日（`THX.day`）は**画面の都合＝保存しない**。BOXを置き直せば今日に戻る。
+     ========================================================= */
+  var THX = { day: null };                         /* null＝今日 */
+  function thxDay() { return THX.day || C.tStr; }
+  function thxList(dstr) {
+    return mdReturnedOn(dstr).filter(function (c) { return window.pitThanksNeeded ? pitThanksNeeded(c) : false; });
+  }
+  function thxSent(c) { return !!(window.pitThanksSent && pitThanksSent(c)); }
+  function thxLeft(list) { return (list || []).filter(function (c) { return !thxSent(c); }); }
+  /* その日より前で、**まだ送っていない**人（3日分）＝夜中に送り忘れが黙って消えないため */
+  function thxBack(dstr) {
+    var out = [];
+    for (var i = 1; i <= 3; i++) {
+      var d = mdShift(dstr, -i);
+      thxList(d).forEach(function (c) { if (!thxSent(c)) out.push({ c: c, d: d }); });
+    }
+    return out;
+  }
+  function thxRow(c, sub) {
+    var on = thxSent(c);
+    return '<div class="md-row md-int md-click thx-row' + (on ? ' on' : '') + '"'
+      + ' onclick="event.stopPropagation();openDetail(\'' + esc(c.id) + '\')">'
+      + '<span class="thx-cb' + (on ? ' on' : '') + '" onclick="event.stopPropagation();mydThanksToggle(\'' + esc(c.id) + '\')">'
+      + (on ? '✓' : '') + '</span>'
+      + '<span class="md-row-m">' + esc(nm(c)) + ' 様 ' + esc(carOf(c))
+      + (sub ? '<i class="thx-sub">' + esc(sub) + '</i>' : '') + '</span>'
+      + (on ? '<span class="md-row-r thx-at">' + esc(c.thanksLineSentAt || '') + '</span>' : '')
+      + '</div>';
+  }
+  function thxBar(d) {
+    var isT = (d === C.tStr);
+    return '<div class="thx-bar md-int">'
+      + '<button class="thx-nav" onclick="event.stopPropagation();mydThanksDay(-1)"><i data-ic=chevLeft data-ics=14></i></button>'
+      + '<span class="thx-day">' + esc(fmd(d)) + (isT ? '（今日）' : '') + '</span>'
+      + '<button class="thx-nav" onclick="event.stopPropagation();mydThanksDay(1)"><i data-ic=chevRight data-ics=14></i></button>'
+      + (isT ? '' : '<button class="thx-today" onclick="event.stopPropagation();mydThanksDay(0)">今日へ</button>')
+      + '</div>';
+  }
+  function thxBackHtml(d, sz) {
+    var b = thxBack(d); if (!b.length) return '';
+    var lim = (sz === 'l') ? 8 : 4;
+    return '<div class="thx-back"><div class="thx-back-h">まだ送っていない（' + b.length + '件）</div>'
+      + b.slice(0, lim).map(function (x) { return thxRow(x.c, fmd(x.d)); }).join('')
+      + (b.length > lim ? '<div class="md-more-n">ほか ' + (b.length - lim) + '件</div>' : '')
+      + '</div>';
+  }
+  /* 押した時＝送った／送っていない を入れ替える。書き込みは pit-share.js の1本を通す */
+  window.mydThanksToggle = function (id) {
+    var c = (state.cards || []).find(function (x) { return x && x.id === id; });
+    if (!c || !window.pitThanksSetSent) return;
+    pitThanksSetSent(c, !thxSent(c));
+    renderMyDash();
+  };
+  window.mydThanksDay = function (n) {
+    if (!C) buildCtx();
+    THX.day = (n === 0) ? null : mdShift(thxDay(), n);
+    if (THX.day === C.tStr) THX.day = null;
+    renderMyDash();
+  };
 
   // ---------------------------------------------------------
   // 要素レジストリ（データBOX）
@@ -468,19 +547,39 @@
       title: '今日の返車', icon: '📤', jump: 'return', sizes: ['s', 'm', 'l'], dv: 'list',
       pick: pickReturnOut,
       head: function (list) {
-        var done = C.cards.filter(function (c) { return !mdNoSale(c) && c.status === 'returned' && (c.completedAt === C.tStr || c.returnDate === C.tStr); }).length;
+        var done = mdReturnedOn(C.tStr).length;      /* 🔴 v2.18.0 数え方は mdReturnedOn 1本（写しをやめた） */
         return lnum(list.length + done, '台', '返車済 ' + done + '台');
       },
       chip: function (c) { return cp(c.id, cpT(c.returnTime) + cpWho(c) + wtChip(c)); },
       none: '本日の返車待ちはありません',
       body: function (sz) {
         var pend = pickReturnOut();
-        var done = C.cards.filter(function (c) { return !mdNoSale(c) && c.status === 'returned' && (c.completedAt === C.tStr || c.returnDate === C.tStr); }).length;
+        var done = mdReturnedOn(C.tStr).length;      /* 🔴 v2.18.0 同上 */
         if (sz === 's') return kpi(pend.length + done, '台', '返車済 ' + done + '台', 'b');
         if (!pend.length) return empty('本日の返車待ちはありません');
         return '<div class="md-list">' + pend.slice(0, 8).map(function (c) { return rowCard(c.id, (c.returnTime ? '<b>' + esc(c.returnTime) + '</b> ' : '') + esc(nm(c)) + ' ' + esc(carOf(c)), wtChip(c)); }).join('') + '</div>' + (sz === 'l' ? openFoot('return', '返車') : '');
       },
       more: function () { return openFoot('return', '返車'); }
+    },
+
+    /* 💬 v2.18.0 今日のお礼LINE（送信リスト・チェックだけ） */
+    thanksLine: {
+      /* 🔴 `pick`（チップの一覧）を**わざと持たない**。
+         持たせると「中身」の見せ方に切り替えられて、**チェックボックスの無いチップ**が出る＝
+         このBOXの用が足りなくなる。`pick` が無いBOXは常に `body` で描かれる（`viewOf`）。 */
+      title: 'お礼LINE', icon: '💬', jump: null, sizes: ['s', 'm', 'l'],
+      body: function (sz) {
+        var d = thxDay(), list = thxList(d), left = thxLeft(list);
+        if (sz === 's') return kpi(left.length, '件', 'お礼LINE 未送', left.length ? 'o' : 'g');
+        var lim = (sz === 'l') ? 14 : 6;
+        return lnum(left.length, '件', 'まだ送っていない')
+          + thxBar(d)
+          + (list.length
+              ? '<div class="md-list">' + list.slice(0, lim).map(function (c) { return thxRow(c); }).join('') + '</div>'
+                + (list.length > lim ? '<div class="md-more-n">ほか ' + (list.length - lim) + '件</div>' : '')
+              : empty('この日のお礼LINEはありません'))
+          + thxBackHtml(d, sz);
+      }
     },
 
     telwait: {

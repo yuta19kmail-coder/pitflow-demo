@@ -490,6 +490,53 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitThanksLineWhy = pitThanksLineWhy;
 
   /* ===================================================================
+     💬💬 v2.18.0 **お礼LINEを送ったか**（ゆうた 2026-08-28・ダッシュボードの送信リスト）
+     -------------------------------------------------------------------
+     🗣「完TEL関門時にLINEありになっている人で、今日返車した人の一覧。
+     　　特に難しいカウント式みたいのは要らなくて、**チェックボックスで送ったか
+     　　送ってないか確認できるぐらい**でOK」
+     ◎今まで持っていたのは **要／不要（`noThanksLine`）だけ**。
+       「送ったかどうか」はどこにも残っていなかった＝人の記憶頼み。
+     🔴 だから印を1つだけ増やした＝**`thanksLineSent`（送った日時・押した人）**。
+        要／不要とは**別物**。混ぜないこと（不要にして片づけると「送った」と読めてしまう）。
+     🔴 **送る相手かどうかの物差しはここ1本**（`pitThanksNeeded`）。画面で条件を書き写さない。
+        ・社内車両・売上なし … 対象外（お礼LINE そのものが無い）
+        ・「不要」を選んだ人 … 対象外
+        ・LINEが繋がっていない人（未案内・お断り）… 対象外
+          ⚠ 完TELの窓は**初めは必ず「要」**なので、`noThanksLine` だけで拾うと
+             LINEを持っていない人まで全員並ぶ（＝毎日素通りするリストになる）。
+     ⚠ 書き込みは `pitThanksSetSent` 1本。押した記録はフローに残す（あとで誰がいつ、が要る）。
+        MHS からは呼ばれない（`PitDB` が無ければ何もしない）。
+     =================================================================== */
+  function pitThanksNeeded(c){
+    if (!c) return false;
+    if (w.pitCardNoSale && w.pitCardNoSale(c)) return false;
+    if (c.noThanksLine) return false;
+    return pitThanksLineOK(c);
+  }
+  function pitThanksSent(c){ return !!(c && c.thanksLineSent); }
+  function pitThanksSetSent(c, on){
+    if (!c) return false;
+    if (on && !pitThanksNeeded(c)) return false;      /* 画面で消すだけにしない＝書く所でも止める */
+    if (on){
+      var d = new Date();
+      c.thanksLineSent   = true;
+      c.thanksLineSentAt = (d.getMonth()+1) + '/' + d.getDate() + ' '
+                         + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+      c.thanksLineSentBy = (w.pitFlowMe ? w.pitFlowMe() : '');
+    } else {
+      c.thanksLineSent = false;
+      c.thanksLineSentAt = ''; c.thanksLineSentBy = '';
+    }
+    try { if (w.logFlow) w.logFlow(c, on ? 'お礼LINEを送った' : 'お礼LINEの「送った」を外した'); } catch(e){}
+    try { if (w.PitDB && w.PitDB.save) w.PitDB.save(); } catch(e){}
+    return true;
+  }
+  w.pitThanksNeeded  = pitThanksNeeded;
+  w.pitThanksSent    = pitThanksSent;
+  w.pitThanksSetSent = pitThanksSetSent;
+
+  /* ===================================================================
      🚪 返車済みにしてよいか（v1.97.0 の関門）
      🗣 ゆうた「当日返車の場合…クリックして返車済みの表示をグレーアウトしてほしい」
      🔴 **押せる条件はたった1つ＝完TELを通ったか（`returnStage` が付いているか）。**

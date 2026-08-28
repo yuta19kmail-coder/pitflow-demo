@@ -86,6 +86,20 @@
 body.wc-s-dragging{ cursor:pointer; }
 body.wc-s-dragging .wc-s-chip{ transition:transform .12s ease; }
 
+/* ===== 🔀 v2.19.0 ラベルごと（組ごと）の並び替え =====
+   ⚠ つまめるのは**チップ群のラベル（.wc-s-gh）だけ**。部位・症状の見出しは今までどおり動かない。
+   ⚠ ＋追加のボタンの上は押すまま（touch-action:auto） */
+.wc-s-grp + .wc-s-grp{ margin-top:14px; }
+.wc-s-grp:first-child .wc-s-h{ margin-top:14px; }
+.wc-s-gh{ cursor:pointer; touch-action:none; user-select:none; -webkit-user-select:none;
+  padding:4px 6px; margin-left:-6px; margin-right:-6px; border-radius:8px; }
+.wc-s-gh:hover{ background:var(--bg3); }
+.wc-s-gh .wc-s-add{ touch-action:auto; }
+.wc-s-grip{ display:inline-flex; align-items:center; color:var(--text3); margin-right:-4px; }
+.wc-s-gh:hover .wc-s-grip{ color:var(--brand); }
+.wc-s-grp.wc-s-gdrag{ opacity:.6; outline:2px solid var(--brand); outline-offset:4px; border-radius:10px; }
+body.wc-s-dragging .wc-s-grp{ transition:transform .12s ease; }
+
 .wc-s-syms{ display:flex; flex-direction:column; gap:8px; }
 .wc-s-sym{ background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:9px 11px; }
 .wc-s-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }

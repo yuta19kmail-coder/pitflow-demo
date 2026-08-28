@@ -297,3 +297,28 @@ body.md-edit .md-bh h3 { max-width: none; }
 .thx-row .thx-at{ font-size:11px; color:var(--text3); }
 .thx-back{ margin-top:8px; padding-top:6px; border-top:1px dashed var(--border); display:flex; flex-direction:column; gap:4px; }
 .thx-back-h{ font-size:11px; font-weight:700; color:var(--orange,#f59e0b); }
+
+/* 📅 v2.21.0 今週の返車予定（暫定だけ）＝曜日は固定、日付だけがずれていく7マス */
+.rp-cal{ display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-top:6px; }
+.rp-h{ font-size:10px; font-weight:800; color:var(--text3); text-align:center; padding:1px 0; }
+.rp-h.sat{ color:var(--blue,#3b82f6); }
+.rp-h.sun{ color:var(--red,#ef4444); }
+.rp-cell{ min-height:52px; background:var(--bg3); border:1px solid var(--border); border-radius:7px;
+  padding:3px; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.rp-cell .rp-d{ font-size:10px; font-weight:800; color:var(--text2); display:flex; align-items:center; gap:2px; }
+.rp-cell .rp-d b{ font-size:9px; color:var(--brand); font-weight:800; }
+.rp-cell .rp-d i{ font-style:normal; font-size:9px; color:var(--text3); margin-left:auto; }
+.rp-cell.today{ border-color:var(--brand); background:rgba(29,185,122,.08); }
+.rp-cell.today .rp-d{ color:var(--brand); }
+.rp-cell.closed{ background:repeating-linear-gradient(45deg,var(--bg3),var(--bg3) 7px,var(--bg2) 7px,var(--bg2) 14px); }
+/* 🔴 昨日＝斜線で無効あつかい。ただし**中の車は消さない**（過ぎたのに約束のままの車がいちばん見たい） */
+.rp-cell.past{ background:repeating-linear-gradient(-45deg,var(--bg2),var(--bg2) 5px,rgba(120,120,120,.16) 5px,rgba(120,120,120,.16) 10px);
+  border-style:dashed; opacity:.72; }
+.rp-cell.past .rp-d{ color:var(--text3); text-decoration:line-through; }
+.rp-car{ font-size:10.5px; line-height:1.35; background:var(--bg2); border:1px solid var(--border2);
+  border-left:3px solid var(--orange,#f59e0b); border-radius:4px; padding:1px 3px; cursor:pointer;
+  overflow:hidden; min-width:0; }
+.rp-car:hover{ border-color:var(--brand); }
+.rp-car .rp-n{ font-weight:800; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rp-car .rp-c{ color:var(--text3); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rp-more{ font-size:9.5px; color:var(--text3); text-align:right; }

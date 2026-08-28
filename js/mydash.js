@@ -20,7 +20,8 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function teamOf(c) { return c && c.boardId === 'import' ? 'import' : 'default'; }
-  function teamColor(c) { return teamOf(c) === 'import' ? '#ec4899' : '#1db97a'; }
+  /* 🔴 v2.21.1 左ラインの色は pit-share.js の `pitTeamColor` 1本（ここで色を書かない） */
+  function teamColor(c) { return window.pitTeamColor ? pitTeamColor(c) : (teamOf(c) === 'import' ? '#ec4899' : '#1db97a'); }
   function nm(c) { return (window.pitCustSurname ? pitCustSurname(c) : (c && c.customer)) || '（未入力）'; }
   function carOf(c) { return c && c.car ? String(c.car) : ''; }
   function amt(c) {
@@ -409,14 +410,18 @@
   }
   function thxSent(c) { return !!(window.pitThanksSent && pitThanksSent(c)); }
   function thxLeft(list) { return (list || []).filter(function (c) { return !thxSent(c); }); }
-  /* その日より前で、**まだ送っていない**人（3日分）＝夜中に送り忘れが黙って消えないため */
+  /* その日より前の3日ぶん。
+     🔴 v2.21.1（ゆうた 2026-08-28）🗣「**お礼LINEは消えないで。チェックで打ち消し線グレーアウトで**」
+        ＝ 送ったら**消す**のをやめた。**送った人も打ち消し線で残す。**
+        押し間違えても取り消せる（消えると外しに行けない）／「今日はここまでやった」が目で残る。
+     ⚠ 並びは**未送が先**。送ったものは下にたまる。 */
   function thxBack(dstr) {
     var out = [];
     for (var i = 1; i <= 3; i++) {
       var d = mdShift(dstr, -i);
-      thxList(d).forEach(function (c) { if (!thxSent(c)) out.push({ c: c, d: d }); });
+      thxList(d).forEach(function (c) { out.push({ c: c, d: d }); });
     }
-    return out;
+    return out.sort(function (a, b) { return (thxSent(a.c) ? 1 : 0) - (thxSent(b.c) ? 1 : 0); });
   }
   function thxRow(c, sub) {
     var on = thxSent(c);
@@ -440,8 +445,10 @@
   }
   function thxBackHtml(d, sz) {
     var b = thxBack(d); if (!b.length) return '';
+    var left = b.filter(function (x) { return !thxSent(x.c); }).length;
     var lim = (sz === 'l') ? 8 : 4;
-    return '<div class="thx-back"><div class="thx-back-h">まだ送っていない（' + b.length + '件）</div>'
+    return '<div class="thx-back"><div class="thx-back-h' + (left ? '' : ' done') + '">前の3日ぶん'
+      + (left ? '（まだ ' + left + '件）' : '（ぜんぶ送りました）') + '</div>'
       + b.slice(0, lim).map(function (x) { return thxRow(x.c, fmd(x.d)); }).join('')
       + (b.length > lim ? '<div class="md-more-n">ほか ' + (b.length - lim) + '件</div>' : '')
       + '</div>';
@@ -486,31 +493,53 @@
     });
     return { days: days, map: map, n: n };
   }
+  /* 1台ぶんの見た目。
+     🔴 v2.21.1（ゆうた 2026-08-28）🗣「**左側のグリーン、ピンク線とか、バッチとか
+        マウスオーバー車両情報とかは、これまで培ってきたものを載せて**」
+        ＝ **返車カレンダーの月リスト（`.rml-ev`）と同じ形**にそろえた。覚え直しが要らない。
+          ・左ライン＝国産グリーン／輸入ピンク（`pitTeamColor` 1本）
+          ・代車あり＝「代」／作業種別＝色つきの言葉（`wtChip` 1本）
+          ・`data-card-id` を付けると **card-hover.js のホバー情報カードがそのまま出る**
+            （`HOVER_SEL` に `.rp-car` を足しただけ。ここで別の tooltip を作らない）
+     ⚠ **暫定の札は付けない。** このBOXは全部が暫定＝全部に同じ札が並ぶのは邪魔なだけ（文言は減らす）。 */
+  function rpCar(c) {
+    return '<div class="rp-car md-int" data-card-id="' + esc(c.id) + '"'
+         + ' style="border-left-color:' + teamColor(c) + '"'
+         + ' onclick="event.stopPropagation();openDetail(\'' + esc(c.id) + '\')">'
+         + '<span class="rp-n">' + esc(nm(c)) + (c.needLoaner ? '<i class="rp-lo">代</i>' : '') + '</span>'
+         + '<span class="rp-c">' + (carOf(c) ? esc(carOf(c)) : '') + wtChip(c) + '</span>'
+         + '</div>';
+  }
   function rpCalHtml(sz) {
     var R = rpByDay();
     var lim = (sz === 'xl') ? 8 : (sz === 'l') ? 4 : 2;
-    var cells = new Array(7);                       /* 月=0 … 日=6 の固定の並び */
+    var cells = new Array(7), cols = new Array(7);  /* 月=0 … 日=6 の固定の並び */
     R.days.forEach(function (x) {
       var col = (x.dow + 6) % 7;
       var list = R.map[x.d] || [];
+      /* 🔴 v2.21.1 🗣「**水曜の定休日を挟む場合は隙間は空けなくてOK**」
+         ＝ 定休日は**細い帯**にして、空いた分を他の日が広く使う。
+         ⚠ ただし **定休日に暫定返車が入っている日は細くしない**。
+            細めると中の車が読めなくなる＝**いちばん気づかせたい車を隠す**ことになる。 */
+      var slim = x.closed && !list.length;
+      cols[col] = slim ? '22px' : 'minmax(0,1fr)';
       var dd = +x.d.split('-')[2];
       var h = '<div class="rp-cell' + (x.i < 0 ? ' past' : '') + (x.i === 0 ? ' today' : '')
-            + (x.closed ? ' closed' : '') + '">'
+            + (x.closed ? ' closed' : '') + (slim ? ' slim' : '') + '"'
+            + (slim ? ' title="' + esc(fmd(x.d)) + ' は定休日です"' : '') + '>'
             + '<div class="rp-d">' + (x.i === 0 ? '<b>今</b>' : '') + dd + (x.closed ? '<i>休</i>' : '') + '</div>';
-      h += list.slice(0, lim).map(function (c) {
-        return '<div class="rp-car md-int" onclick="event.stopPropagation();openDetail(\'' + esc(c.id) + '\')">'
-             + '<span class="rp-n">' + esc(nm(c)) + '</span>'
-             + (carOf(c) ? '<span class="rp-c">' + esc(carOf(c)) + '</span>' : '') + '</div>';
-      }).join('');
+      h += list.slice(0, lim).map(rpCar).join('');
       if (list.length > lim) h += '<div class="rp-more">+' + (list.length - lim) + '</div>';
       h += '</div>';
       cells[col] = h;
     });
     var head = ['月','火','水','木','金','土','日'].map(function (w, i) {
-      return '<div class="rp-h' + (i === 5 ? ' sat' : i === 6 ? ' sun' : '') + '">' + w + '</div>';
+      return '<div class="rp-h' + (i === 5 ? ' sat' : i === 6 ? ' sun' : '')
+           + (cols[i] === '22px' ? ' slim' : '') + '">' + w + '</div>';
     }).join('');
     return lnum(R.n, '台', '暫定の返車予定')
-         + '<div class="rp-cal">' + head + cells.map(function (h) { return h || '<div class="rp-cell"></div>'; }).join('') + '</div>';
+         + '<div class="rp-cal" style="grid-template-columns:' + cols.join(' ') + '">'
+         + head + cells.map(function (h) { return h || '<div class="rp-cell"></div>'; }).join('') + '</div>';
   }
 
   /* 押した時＝送った／送っていない を入れ替える。書き込みは pit-share.js の1本を通す */
@@ -653,7 +682,9 @@
     returnPlanWeek: {
       /* 🔴 `pick` は持たない＝いつでも `body`（カレンダー）で描く。
          チップの一覧に切り替えられると「どの日か」が消えて、このBOXの用が足りなくなる。 */
-      title: '今週の返車予定', icon: '📅', jump: 'return', sizes: ['s', 'm', 'l', 'xl'],
+      /* 🔴 v2.21.1 ゆうた指定でタイトルを言い切りに変えた。
+         「返車予定」だと**確定返車と見分けがつかない**＝返車カレンダーと同じものだと思われる。 */
+      title: '今週の暫定返車予定（確定返車以外）', icon: '📅', jump: 'return', sizes: ['s', 'm', 'l', 'xl'],
       body: function (sz) {
         if (sz === 's') { var R = rpByDay(); return kpi(R.n, '台', '暫定の返車予定', R.n ? 'o' : 'g'); }
         return rpCalHtml(sz) + (sz === 'l' || sz === 'xl' ? openFoot('return', '返車') : '');

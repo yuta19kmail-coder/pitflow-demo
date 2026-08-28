@@ -446,6 +446,73 @@
       + (b.length > lim ? '<div class="md-more-n">ほか ' + (b.length - lim) + '件</div>' : '')
       + '</div>';
   }
+  /* =========================================================
+     📅📅 v2.21.0 今週の返車予定（**暫定だけ**）（ゆうた 2026-08-28）
+     ---------------------------------------------------------
+     🗣「確定返車ではなくて **暫定返車予定が今週になっている車**を一覧表示するBOX」
+     🗣「1週間分のカレンダーで**常に先の6日分**出るイメージ。**昨日だけ斜線で無効扱い**」
+     🗣「チェックなどはいらない／**国産車輸入車関係なく一覧**で／上部に**総件数**」
+     ◎かたち
+       曜日の見出しは **月火水木金土日 で固定**。そこへ **昨日〜5日先の7日**を置く
+       ＝ 7日は必ず全部の曜日に1つずつ入るので、**日付だけが日々ずれていく**（ゆうたの絵のとおり）。
+     🔴 **拾うのは `plan`（＝受注のときのお客様への約束）だけ。**
+        確定（fixed）・未完（pending）・待や当（sameday）・未定（tbd）は入れない。
+        物差しは共通部品 `coreflow-return-plan.js` の `pitReturnPlanKind` / `pitReturnPlanDate` **1本**。
+        ⚠ ここに「日付があれば暫定」と書き写さないこと（v1.153.0 の線引きが崩れる）。
+     ⚠ **昨日のマスは斜線で無効**にするが、**中の車は消さない**
+        （過ぎたのに約束のままの車＝いちばん見たいもの。黙って隠さない）。
+     ========================================================= */
+  function rpDays() {
+    var out = [];
+    for (var i = -1; i <= 5; i++) {
+      var d = mdShift(C.tStr, i);
+      out.push({ d: d, i: i, dow: new Date(d + 'T00:00:00').getDay(),
+                 closed: !!(window.PitCal && PitCal.isClosed(d)) });
+    }
+    return out;
+  }
+  function rpAll() {
+    if (!window.pitReturnPlanKind || !window.pitReturnPlanDate) return [];
+    return C.cards.filter(function (c) {
+      return c && !mdNoSale(c) && pitReturnPlanKind(c) === 'plan';
+    });
+  }
+  function rpByDay() {
+    var days = rpDays(), map = {}, n = 0;
+    days.forEach(function (x) { map[x.d] = []; });
+    rpAll().forEach(function (c) {
+      var d = pitReturnPlanDate(c);
+      if (map[d]) { map[d].push(c); n++; }
+    });
+    return { days: days, map: map, n: n };
+  }
+  function rpCalHtml(sz) {
+    var R = rpByDay();
+    var lim = (sz === 'xl') ? 8 : (sz === 'l') ? 4 : 2;
+    var cells = new Array(7);                       /* 月=0 … 日=6 の固定の並び */
+    R.days.forEach(function (x) {
+      var col = (x.dow + 6) % 7;
+      var list = R.map[x.d] || [];
+      var dd = +x.d.split('-')[2];
+      var h = '<div class="rp-cell' + (x.i < 0 ? ' past' : '') + (x.i === 0 ? ' today' : '')
+            + (x.closed ? ' closed' : '') + '">'
+            + '<div class="rp-d">' + (x.i === 0 ? '<b>今</b>' : '') + dd + (x.closed ? '<i>休</i>' : '') + '</div>';
+      h += list.slice(0, lim).map(function (c) {
+        return '<div class="rp-car md-int" onclick="event.stopPropagation();openDetail(\'' + esc(c.id) + '\')">'
+             + '<span class="rp-n">' + esc(nm(c)) + '</span>'
+             + (carOf(c) ? '<span class="rp-c">' + esc(carOf(c)) + '</span>' : '') + '</div>';
+      }).join('');
+      if (list.length > lim) h += '<div class="rp-more">+' + (list.length - lim) + '</div>';
+      h += '</div>';
+      cells[col] = h;
+    });
+    var head = ['月','火','水','木','金','土','日'].map(function (w, i) {
+      return '<div class="rp-h' + (i === 5 ? ' sat' : i === 6 ? ' sun' : '') + '">' + w + '</div>';
+    }).join('');
+    return lnum(R.n, '台', '暫定の返車予定')
+         + '<div class="rp-cal">' + head + cells.map(function (h) { return h || '<div class="rp-cell"></div>'; }).join('') + '</div>';
+  }
+
   /* 押した時＝送った／送っていない を入れ替える。書き込みは pit-share.js の1本を通す */
   window.mydThanksToggle = function (id) {
     var c = (state.cards || []).find(function (x) { return x && x.id === id; });
@@ -579,6 +646,17 @@
                 + (list.length > lim ? '<div class="md-more-n">ほか ' + (list.length - lim) + '件</div>' : '')
               : empty('この日のお礼LINEはありません'))
           + thxBackHtml(d, sz);
+      }
+    },
+
+    /* 📅 v2.21.0 今週の返車予定（暫定だけ・7日カレンダー） */
+    returnPlanWeek: {
+      /* 🔴 `pick` は持たない＝いつでも `body`（カレンダー）で描く。
+         チップの一覧に切り替えられると「どの日か」が消えて、このBOXの用が足りなくなる。 */
+      title: '今週の返車予定', icon: '📅', jump: 'return', sizes: ['s', 'm', 'l', 'xl'],
+      body: function (sz) {
+        if (sz === 's') { var R = rpByDay(); return kpi(R.n, '台', '暫定の返車予定', R.n ? 'o' : 'g'); }
+        return rpCalHtml(sz) + (sz === 'l' || sz === 'xl' ? openFoot('return', '返車') : '');
       }
     },
 

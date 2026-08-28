@@ -2365,6 +2365,57 @@ th.cfs-lg-d{ z-index:3; }
 .result-bar span{ color:var(--text3); margin-left:8px; }
 .result-bar.nc{ background:rgba(15,118,110,.10); border-color:#0f766e55; }
 
+/* 🔎 v2.17.0 実績ビューの検索（箱／ヒット一覧／光らせる）
+   🔴 色はこの1か所。JSに書き写さない（v1.159.0 の決めごと） */
+.rs-bar{ display:flex; align-items:center; gap:8px; margin:0 0 10px; padding:6px 10px;
+  border:1px solid var(--border); border-radius:8px; background:var(--bg2); }
+.rs-bar > i{ color:var(--text3); flex:0 0 auto; display:flex; }
+.rs-bar input{ flex:1 1 auto; min-width:0; border:0; background:transparent; outline:none;
+  font-size:13px; color:var(--text); padding:2px 0; }
+.rs-bar input::placeholder{ color:var(--text3); }
+.rs-bar .rs-x{ flex:0 0 auto; display:none; align-items:center; justify-content:center;
+  width:22px; height:22px; border:0; border-radius:50%; background:var(--bg4); color:var(--text2); cursor:pointer; }
+.rs-bar.on .rs-x{ display:flex; }
+.rs-bar.on{ border-color:var(--brand); }
+
+.rs-hits{ margin:0 0 10px; border:1px solid var(--border); border-radius:8px; background:var(--bg2); overflow:hidden; }
+.rs-head{ padding:6px 10px; background:var(--bg3); font-size:12px; color:var(--text2); display:flex; align-items:center; gap:10px; }
+.rs-head b{ color:var(--text); font-size:13px; }
+.rs-head span{ color:var(--text3); }
+.rs-none{ padding:10px; font-size:12px; color:var(--text3); }
+.rs-other{ padding:7px 10px; font-size:12px; color:var(--text2); border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+.rs-other .rs-go{ border:1px solid var(--border2); background:var(--bg3); color:var(--text); border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; }
+.rs-hit{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; cursor:pointer;
+  border:0; border-top:1px solid var(--border); background:transparent; color:var(--text);
+  padding:6px 10px; font-size:12px; line-height:1.5; }
+.rs-hit:hover{ background:var(--bg3); }
+.rs-hit.now .rs-d{ color:var(--brand); }                 /* いま見ている月のもの */
+.rs-hit.sel{ background:rgba(29,185,122,.12); }          /* いま光らせている1件 */
+.rs-hit .rs-d{ flex:0 0 auto; min-width:58px; font-weight:700; color:var(--text2); }
+.rs-hit .rs-d em{ font-style:normal; font-weight:400; color:var(--text3); margin-left:2px; }
+.rs-hit .rs-n{ flex:0 0 auto; font-weight:700; }
+.rs-hit .rs-c, .rs-hit .rs-p{ flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text2); }
+.rs-hit .rs-p{ font-family:ui-monospace,Menlo,Consolas,monospace; }
+.rs-hit .rs-where{ flex:0 0 auto; margin-left:auto; padding-left:8px; font-size:11px; color:var(--text3); white-space:nowrap; }
+.rs-hit mark, .reserve-month-event mark{ background:rgba(250,204,21,.45); color:inherit; border-radius:2px; padding:0 1px; }
+
+/* 当たりのある日＝枠と日付の数字。1件を選んだ日はもっと強く */
+.reserve-month-cell.rs-day{ background:rgba(250,204,21,.10); box-shadow:inset 0 0 0 2px rgba(250,204,21,.55); }
+/* 🔴 数字は「今日」と同じ**塗りの丸**にする。字の色だけだと、暗い画面でも明るい画面でも
+   どちらかで沈む（今日＝ブランド色の丸・当たり＝黄・選んだ1件＝緑、で見分ける）。 */
+.reserve-month-cell.rs-day .day-num,
+.reserve-month-cell.rs-day-one .day-num{
+  width:22px; height:22px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-weight:800;
+}
+.reserve-month-cell.rs-day .day-num{ background:#eab308; color:#1c1300; }
+.reserve-month-cell.rs-day-one{ background:rgba(29,185,122,.12); box-shadow:inset 0 0 0 2px var(--brand); }
+.reserve-month-cell.rs-day-one .day-num{ background:var(--brand); color:#fff; }
+.reserve-month-event.rs-ev{ border-color:rgba(250,204,21,.9); background:rgba(250,204,21,.16); }
+.reserve-month-event.rs-ev-one{ border-color:var(--brand); background:rgba(29,185,122,.18); }
+/* その日の全件ポップアップでも、当たったものが分かるように */
+.pdp-hit{ box-shadow:inset 0 0 0 2px rgba(250,204,21,.65); border-radius:8px; }
+
 /* 🏢 売上ビュー・作業サマリーの「参考：数えていない台数」1行
    （数字が届かなかった月に、その裏付けをすぐ脇に置く・ゆうた 2026-08-24） */
 .sv-refnc{ margin:-2px 0 12px; padding:7px 12px; border-radius:8px; background:rgba(15,118,110,.10); border:1px solid #0f766e44; color:#0f766e; font-size:12px; font-weight:700; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }

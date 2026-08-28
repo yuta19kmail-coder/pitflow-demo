@@ -189,6 +189,10 @@
   function cardBlob(c) {
     return norm(cardFields(c).map(f => f.text).join(' '));
   }
+  /* 🔎 v2.17.0 実績ビューの検索も**この表を借りる**（あちらに探し方を書き写さない）。
+     🔴 ここに欄を足す＝上の検索も実績の検索も一緒に広がる、ということ。 */
+  window.pitCardFields = cardFields;
+  window.pitCardBlob   = cardBlob;
 
   // 顧客台帳（人＋車両）の検索用テキスト
   function custPrimaryTel(cust) {
@@ -301,7 +305,8 @@
            + actBtn('新規予約', "custNewReserveForCardId('" + id + "')");
     } else if (c.status === 'returned') {
       acts = actBtn('予約詳細', "pitOpenCardDetail('" + id + "')")
-           + actBtn('実績カレンダー', "pitGotoResultMonth('" + esc(c.returnDate || c.reserveDate || '') + "')")
+           /* 🔎 v2.17.0 カードidも渡す＝飛んだ先でその日とそのカードが光る（来店履歴からと同じ形） */
+           + actBtn('実績カレンダー', "pitGotoResultMonth('" + esc(c.returnDate || c.reserveDate || '') + "','" + id + "')")
            + actBtn('顧客情報', "custOpenForCard('" + id + "')");
     } else {
       acts = actBtn('予約詳細', "pitOpenCardDetail('" + id + "')")

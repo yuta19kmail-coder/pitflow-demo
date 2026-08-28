@@ -508,6 +508,23 @@ w.pitDivisionColor = pitDivisionColor;
      ⚠ 書き込みは `pitThanksSetSent` 1本。押した記録はフローに残す（あとで誰がいつ、が要る）。
         MHS からは呼ばれない（`PitDB` が無ければ何もしない）。
      =================================================================== */
+  /* ===================================================================
+     🎨 v2.21.1 **左ラインの色＝国産グリーン／輸入ピンク。物差しはここ1本。**
+     -------------------------------------------------------------------
+     🗣 ゆうた 2026-08-28「左側のグリーン、ピンク線とか、バッチとか
+     　　マウスオーバー車両情報とかは**これまで培ってきたもの**を載せて」
+     ＝ 画面ごとに色を決め直さない。**同じ車はどこでも同じ色**。
+     ⚠ カードでも 'import'/'default' の文字でも受ける（呼び方が画面ごとに違うため）。
+     📌 **宿題**：この色は 2026-08-28 時点で **19か所に書き写されている**
+     　 （avail / card-detail / card-view / loaner / pit-floor / reserve / result /
+     　　 return / search / today / undetermined）。新しく増やさない。触った時にここへ寄せる。
+     =================================================================== */
+  function pitTeamColor(c){
+    var t = (c && typeof c === 'object') ? (c.boardId || '') : String(c == null ? '' : c);
+    return (t === 'import') ? '#ec4899' : '#1db97a';
+  }
+  w.pitTeamColor = pitTeamColor;
+
   function pitThanksNeeded(c){
     if (!c) return false;
     if (w.pitCardNoSale && w.pitCardNoSale(c)) return false;

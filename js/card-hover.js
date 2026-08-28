@@ -494,8 +494,10 @@
 
   // 出す対象：タスクボードのコンパクト（.pit-card.pcm）／PITリスト枠内（.pfv-card）／
   //   予約・返車の 月リスト(.rml-ev)・2ヶ月チップ(.reserve-month-event)・週ミニ(.rwk-card)。
+  //   ダッシュボードの今週の暫定返車予定(.rp-car) v2.21.1。
+  //   🔴 **ホバー情報カードを出す所はこの1行だけ。** 画面ごとに別の tooltip を作らない（二重に出る）。
   //   予約(status:reserved)は fill() 側で「予約専用（予約日だけ）」表示になる。
-  var HOVER_SEL = '.pit-card.pcm, .pfv-card, .rml-ev, .reserve-month-event, .rwk-card, .lo-badge, .shk-chip, .shk-bar, .shk-gcar, .shk-uchip, .skl-chip';
+  var HOVER_SEL = '.pit-card.pcm, .pfv-card, .rml-ev, .reserve-month-event, .rwk-card, .lo-badge, .shk-chip, .shk-bar, .shk-gcar, .shk-uchip, .skl-chip, .rp-car';
   document.addEventListener('mouseover', function(e){
     if (window.pitDragging){ hide(); return; }   // ドラッグ中は他カードのホバー詳細を出さない v0.124.3
     var card = e.target.closest && e.target.closest(HOVER_SEL);

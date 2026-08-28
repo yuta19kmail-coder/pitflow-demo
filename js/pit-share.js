@@ -545,6 +545,24 @@ w.pitDivisionColor = pitDivisionColor;
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m];
     });
   }
+  /* ===================================================================
+     🏷 v2.22.0（2026-08-28・ゆうた指定）**記録に「どの車か」を書く時の1行＝ここ1本。**
+     -------------------------------------------------------------------
+     🗣「予約 C63175 がタスクボードに入れて置いたのになくなる」
+     ＝ 人は**予約番号で車を呼ぶ**。記録に番号が入っていないと、
+        操作ログを番号で検索しても**その車の行が1つも出てこない**。
+     　 かたち： [C63175] 山田 様 / タント
+     ⚠ 記録（pitLog / logFlow）に車を書く時は、画面ごとに組み立てず必ずここを通すこと。
+     =================================================================== */
+  function pitCardTag(c){
+    if (!c) return '';
+    var who = (w.pitCustName ? w.pitCustName(c) : (c.customer || '')) || '';
+    return (c.resNo ? '[' + c.resNo + '] ' : '')
+         + (who ? who + ' 様' : '')
+         + (c.car ? ' / ' + c.car : '');
+  }
+  w.pitCardTag = pitCardTag;
+
   function pitMonthRowWt(c){
     var id = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
     return ((w.state && w.state.workTypes) || []).find(function (x) { return x.id === id; });

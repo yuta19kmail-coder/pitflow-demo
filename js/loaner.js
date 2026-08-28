@@ -1278,7 +1278,9 @@ window.pitLoanerPlanOf = function(cardId){
   return { n: list.length, names: names, text: names.join('／') };
 };
 /* 実際に外す。why＝理由の1行（フローと操作ログに残す） */
-window.pitLoanerReleaseForCard = function(cardId, why){
+/* 🔴 v2.22.0 第3引数 opt.auto＝**アプリが勝手にやった時**は記録に人の名前を押さない
+   （自動処理は「画面を開いた端末」で走るので、たまたま居た人の名前が残る＝濡れ衣） */
+window.pitLoanerReleaseForCard = function(cardId, why, opt){
   var plan = pitLoanerPlanOf(cardId);
   if (!plan.n) return plan;                       /* 返却済みしか無い／もともと無い＝触らない */
   state.loanerAssigns = (state.loanerAssigns || []).filter(function(a){
@@ -1289,10 +1291,14 @@ window.pitLoanerReleaseForCard = function(cardId, why){
     /* 🔴 カード側の設定も空にする＝`loCancelLoaner`（手で押す代車キャンセル）と**同じ答え**にする。
        ⚠ 片方だけ残すと「代車 必要なのにカレンダーに居ない」という食い違いができる。 */
     card.needLoaner = false; card.loanerId = ''; card.loanerFrom = ''; card.loanerTo = ''; card.loanerFixed = false;
-    if (window.logFlow) logFlow(card, '代車の予定も一緒にキャンセル（' + plan.text + '）' + (why ? '＝' + why : ''));
+    var _auto = !!(opt && opt.auto);
+    var _txt = '代車の予定も一緒にキャンセル（' + plan.text + '）' + (why ? '＝' + why : '');
+    if (_auto && window.logFlowAuto) logFlowAuto(card, _txt);
+    else if (window.logFlow) logFlow(card, _txt);
   }
   if (window.pitLog) pitLog('代車の予定をキャンセル（予約のキャンセルに合わせて）',
-    { cardId: cardId, kind: 'delete', label: plan.text + (why ? ' / ' + why : '') });
+    { cardId: cardId, kind: 'delete', auto: !!(opt && opt.auto),
+      label: plan.text + (why ? ' / ' + why : '') });
   return plan;
 };
 

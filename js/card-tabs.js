@@ -178,13 +178,36 @@ function cfOfficeToggle(i){
 }
 
 /* ===== 工程ログ記録（task.js / dnd.js / views.js から呼ぶ） =====
-   🔴 v1.55.0（ゆうた指定）**自動で入る記録にも、操作した人の名前を入れる。**
-      ⚠ 名前の作り方は flow-pit.js の `pitFlowMe()` に一本化（呼び名を使う）。ここで組み立てない。 */
-window.logFlow = function(card, label){
+   🔴 v1.55.0（ゆうた指定）**人が動かした記録には、操作した人の名前を入れる。**
+      ⚠ 名前の作り方は flow-pit.js の `pitFlowMe()` に一本化（呼び名を使う）。ここで組み立てない。
+
+   🔴🔴 v2.22.0（2026-08-28・事故を受けて）**アプリが勝手にやったことに、人の名前を押さない。**
+      ◎なにが起きたか
+        予約 C63175 が盤面から消えて未入庫にいた。フローには
+        「入庫日（2026-08-25）を過ぎたので未入庫へ（自動）  8/28 13:37 ・ 髙橋 裕斗」。
+        🗣 ゆうた「**自動処理にもかかわらず高橋が動かしたことになっている。
+        　　高橋はログインできるがデザイナーなので実務的に動かすことは絶対にない**」
+      ◎正体
+        自動処理（overdue-pit.js）は**画面を開いた端末**で走る。その端末に**たまたま
+        ログインしていた人**の名前が、`pitFlowMe()` でそのまま押されていた。
+      ◎決めごと
+        🔴 **`auto` を渡した記録は `staff` を空にして `auto:true` を立てる。**
+        　 人の名前の代わりに「自動」と出す（誰の仕業か探す時間を1秒も使わせない）。
+        🔴 どの端末が走らせたかは `dev` に残す＝同じ事故が起きた時に追える。
+        　 ⚠ **`by` には入れない。** `by` は「やった人」を出す欄なので、入れると画面にまた名前が出る。
+        ⚠ 人が押した操作は今までどおり名前が入る。**ここを混ぜないこと。**
+   ⚠ 出す側（card-view.js のフロー表示）は `staff` が空なら「自動」と出す。 */
+window.logFlow = function(card, label, opt){
   if (!card) return;
   if (!Array.isArray(card.log)) card.log = [];
-  card.log.push({ label: label, at: Date.now(), staff: (window.pitFlowMe ? pitFlowMe() : '') });
+  var auto = !!(opt && opt.auto);
+  var me   = (window.pitFlowMe ? pitFlowMe() : '');
+  card.log.push(auto
+    ? { label: label, at: Date.now(), staff: '', auto: true, dev: me }
+    : { label: label, at: Date.now(), staff: me });
 };
+/* 自動でやったこと専用の入口（呼び間違いを防ぐ）。中身は上の1本を通る。 */
+window.logFlowAuto = function(card, label){ return window.logFlow(card, label, { auto: true }); };
 
 /* ===== フェーズ移動ログ（誰が・いつ・どこから→どこへ）＋ phaseAt 更新 =====
    dnd.js（ドラッグ）／task.js（<i data-ic=chevLeft data-ics=16></i><i data-ic=chevRight data-ics=16></i>）から status を変える時に呼ぶ。

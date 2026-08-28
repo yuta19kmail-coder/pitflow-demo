@@ -192,8 +192,10 @@
     } else if (kind === 'bay') {
       const nv = val || null;
       if (c.bayId === nv) return;
+      const _wasBay = c.bayId;
       c.bayId = nv;
       c.baySlot = null;                       // 枠の空きエリアへ落とした＝末尾扱い
+      _logBayMove(c, _wasBay, nv);            // 🔴 v2.22.0 記録を残す（下の1本）
     } else if (kind === 'baycell') {
       const p = val.split('|');               // "bayId|スロット番号"
       reorderIntoBay(c, p[0], parseInt(p[1], 10));
@@ -255,6 +257,30 @@
   }
   window.applyCardDrop = applyCardDrop;
 
+  /* 🔴🔴 v2.22.0（2026-08-28・ゆうた指定）**PIT配置図の出し入れも記録を残す。**
+     🗣「このカードが**なくなったり、勝手に動いたり（タスクボード以外で）**は
+     　　マジでわからなくなるし、下手したら探し出せないから」
+     🗣「ついでに**操作ログと車ごとのログをもっと細かく**取れる？ **自動系も全部**」
+     ここは長いあいだ **どこにも1行も残していなかった**＝
+     「さっきまで1PITにあった車が消えた」が**まったく追えなかった**。
+     ⚠ 枠の名前は state.bays から引く（id のままでは人が読めない）。 */
+  function _bayName(id){
+    if (!id) return '枠の外';
+    var b = ((window.state && state.bays) || []).find(function (x) { return x && x.id === id; });
+    return (b && (b.name || b.id)) || String(id);
+  }
+  function _logBayMove(c, from, to){
+    if (!c || from === to) return;
+    var txt = 'PIT配置図：' + _bayName(from) + ' → ' + _bayName(to);
+    try { if (window.logFlow) logFlow(c, txt); } catch (e) {}
+    try {
+      if (window.pitLog) {
+        pitLog(txt, { cardId: c.id, kind: 'bay',
+          label: (window.pitCardTag ? pitCardTag(c) : (c.customer || '')) });
+      }
+    } catch (e) {}
+  }
+
   /* 同じPIT枠内の並べ替え／別枠からの差し込み。idx＝落としたスロット位置に入れて baySlot を振り直す */
   function reorderIntoBay(c, bid, idx) {
     if (!bid) return;
@@ -263,7 +289,9 @@
       .filter(function (x) { return x !== c && x.bayId === bid && statuses.indexOf(x.status) >= 0; })
       .sort(function (a, b) { return (a.baySlot == null ? 1e9 : a.baySlot) - (b.baySlot == null ? 1e9 : b.baySlot); });
     if (isNaN(idx) || idx < 0 || idx > list.length) idx = list.length;  // 空きスロット等は末尾へ
+    var _wasBay = c.bayId;
     c.bayId = bid;
+    _logBayMove(c, _wasBay, bid);      /* 🔴 v2.22.0 別の枠から入った時だけ1行（同じ枠の並べ替えは残さない） */
     list.splice(idx, 0, c);
     list.forEach(function (x, i) { x.baySlot = i; });                   // 0,1,2… で確定
   }

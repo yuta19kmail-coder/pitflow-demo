@@ -23,13 +23,26 @@ function pitAutoArchive(){
       const days = Math.floor((today - cd) / 86400000);
       if (days >= UNDET_ARCHIVE_DAYS){
         c.archived = true; changed = true;
+        /* 🔴🔴 v2.22.0（2026-08-28・ゆうた指定）**自動でやったことも必ず記録に残す。**
+           🗣「結局こういう時に追えないのがやだなと思う」
+           ここは長いあいだ **フローにも操作ログにも1行も残していなかった**＝
+           カードが30日後に黙ってアーカイブされ、**あとから誰も追えなかった。**
+           ⚠ 記録は「自動」で残す（人の名前を押さない＝ card-tabs.js の `logFlowAuto`）。 */
+        try {
+          if (window.logFlowAuto) logFlowAuto(c, UNDET_ARCHIVE_DAYS + '日たったので自動アーカイブ（未入庫 ' + c.cancelledAt + ' から）');
+          if (window.pitLog) {
+            pitLog('未入庫を自動アーカイブ', { auto: true, cardId: c.id, kind: 'auto',
+              label: (window.pitCardTag ? pitCardTag(c) : (c.customer || ''))
+                   + ' / 未入庫 ' + c.cancelledAt + ' から ' + days + '日' });
+          }
+        } catch (e) {}
         /* 🔴 v1.155.0（ゆうた確定）**ここで代車の予定も一緒に消す。**
            🗣「もしくは30日後、消去したタイミングで同時にスケジュールも消滅するって流れでいいでしょ？」
            ＝ 未入庫に入った時点では残す（あとから連絡が来ることがよくあるため）。
               30日たって自動アーカイブまで来たら**もう戻らない**ので、そこで外す。
            🔴 中身は loaner.js の `pitLoanerReleaseForCard` 1本（返却済みの貸出には触らない）。 */
         if (window.pitLoanerReleaseForCard){
-          try { pitLoanerReleaseForCard(c.id, UNDET_ARCHIVE_DAYS + '日たって自動アーカイブ'); } catch (e) {}
+          try { pitLoanerReleaseForCard(c.id, UNDET_ARCHIVE_DAYS + '日たって自動アーカイブ', { auto: true }); } catch (e) {}
         }
       }
     }
@@ -364,6 +377,12 @@ window.pitUndRestoreGo = function(id, forced){
   c.reserveDate = d;
   c.intakeTbd = false;
   if (window.logFlow) logFlow(c, '未入庫から予約に復帰（入庫日 ' + d + '）');
+  /* 🔴 v2.22.0 操作ログにも残す（人が押した操作なので名前は入る）。
+     ⚠ ここが無いと「未入庫に落ちた → 誰かが戻した」の**戻した側だけ追えなかった**。 */
+  if (window.pitLog) {
+    pitLog('未入庫から予約に戻した', { cardId: c.id, kind: 'phase',
+      label: (window.pitCardTag ? pitCardTag(c) : (c.customer || '')) + ' / 入庫日 ' + d });
+  }
   if (window.PitDB) PitDB.save();
   pitUndRestoreClose();
   renderReserveTbd();

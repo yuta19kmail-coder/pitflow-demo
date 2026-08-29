@@ -89,8 +89,14 @@
   }
 
   /* ===== ② 返車の期限切れ（完TELを通った車＝日付を持っている車） =====
+     🔴🔴🔴 v2.25.0（2026-08-29・ゆうた指定）**ここでデータを書き換えるのをやめた。**
+       それまでは returnDate を空にしていた＝**人が入れた返車日を、入れた1秒後に消していた**
+       （予約 J32544。8/25 と入れる→消される→データチェックが「空」と赤→また入れる、の無限ループ）。
+       🗣「返車日が決まる→来ない→**これは残した状態で**また未定に戻る→決める→返す」
+       ＝ いまは **`return-slot.js` の `pitReturnPlace`（出す側）が未定の箱に出す。**
+          データは1文字も触らない。**この関数は判定としてだけ残してある。**
      ⚠ 待ち・当日返しで完TEL前の車はここでは触らない（データを書き換えられないため）。
-        あちらは pitReturnPlace が「返車日未定」に出す。 */
+        あちらも pitReturnPlace が「返車日未定」に出す。＝**いまは全部この道1本。** */
   function pitReturnOverdue(c, td){
     if (!c) return false;
     if (!c.returnStage) return false;
@@ -125,22 +131,13 @@
        　 誰が動かしたのか（本当は誰も動かしていないのか）が分からなかった。 */
     op('未入庫へ自動で移動', c, '入庫日 ' + was + ' を過ぎたため');
   }
-  function 返車日未定へ(c){
-    var wasR = c.returnDate;
-    if (w.pitReturnSetDateTime) pitReturnSetDateTime(c, '', '');
-    else { c.returnDate = ''; c.returnTime = ''; }
-    c.returnDateFinal = null;      /* 確定返車日も過ぎている＝もう確定ではない */
-    flow(c, '返車予定日（' + wasR + '）を過ぎたので返車日未定へ（自動）');
-    op('返車日未定へ自動で移動', c, '返車予定日 ' + wasR + ' を過ぎたため');
-  }
 
   /* 手元の写しで、動かす候補を拾う（ここではまだ動かさない） */
   function 候補を拾う(td){
     var out = [];
     cards().forEach(function (c) {
       if (!c || !c.id) return;
-      if (pitIntakeOverdue(c, td))      out.push({ id: c.id, kind: 'in' });
-      else if (pitReturnOverdue(c, td)) out.push({ id: c.id, kind: 'out' });
+      if (pitIntakeOverdue(c, td)) out.push({ id: c.id, kind: 'in' });
     });
     return out;
   }
@@ -149,8 +146,7 @@
     list.forEach(function (x) {
       var c = cards().filter(function (y) { return y && y.id === x.id; })[0];
       if (!c) return;
-      if (x.kind === 'in')  { 未入庫へ(c, td);  n++; }
-      else                  { 返車日未定へ(c);  n++; }
+      if (x.kind === 'in') { 未入庫へ(c, td); n++; }
     });
     if (n && w.PitDB && w.PitDB.save) PitDB.save();
     return n;

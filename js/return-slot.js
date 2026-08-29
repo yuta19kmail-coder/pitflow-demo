@@ -278,10 +278,41 @@
     }
     if (c.returnStage === 'callWait') return 'callWait';
     if (!c.returnDate) return 'dateTbd';
+    /* 🔴🔴🔴 v2.25.0（2026-08-29・ゆうた指定）**過ぎた返車日は、消さずに置き場だけ未定へ。**
+       -------------------------------------------------------------
+       ◎それまで（予約 J32544 で表に出た）
+         自動処理が「返車予定日を過ぎた」車の **returnDate を消していた。**
+         🗣「返車日をいれても **常に未定にチェックが入る**」
+         ＝ 8/25 と入れた**1秒後**に消される。データチェックは「返車予定日が空」と赤を出し続ける。
+            **直せと言われるのに、正直に直すと消える＝出口がなかった。**
+       ◎ゆうたの言い方
+         🗣「返車日が決まる→来ない→**これは残した状態で**また未定に戻る→決める→返す」
+       ◎だからこう直した
+         🔴 **データは1文字も書き換えない。ここ（出す側）で未定の箱に出すだけ。**
+         ＝ 上の「待ち・当日返し」の車と**まったく同じ考え方**（前からそう書いてある）。
+            完TELを通った車だけデータを書き換えていたので、そちらをこちらに寄せた。
+       ◎おまけに止まったもの
+         ・「未定」のチェックが勝手に入る（空かどうかで見ているため）
+         ・データチェック F03「返車予定日が空」が鳴り続ける
+         ・消す→入れ直す のたびに操作ログが1行増える（1台で自動124行・人24行になっていた）
+       ⚠ 「いつの約束で何日過ぎたか」は `pitReturnLateDays` で出せる。**画面はそれを赤で出すこと。** */
+    if (String(c.returnDate) < _today()) return 'dateTbd';
     if (window.pitTimeTbd ? pitTimeTbd(c.returnTime) : !c.returnTime) return 'timeTbd';
     return 'calendar';
   }
   window.pitReturnPlace = pitReturnPlace;
+
+  /* 🔴 v2.25.0 返車の約束から何日過ぎたか（過ぎていなければ 0）。
+     ⚠ 画面が自分で引き算しない。**ここ1本**。 */
+  function pitReturnLateDays(c){
+    if (!c || !c.returnDate) return 0;
+    var t = _today(), d = String(c.returnDate);
+    if (d >= t) return 0;
+    var a = new Date(d + 'T00:00:00'), b = new Date(t + 'T00:00:00');
+    if (isNaN(a) || isNaN(b)) return 0;
+    return Math.round((b - a) / 86400000);
+  }
+  window.pitReturnLateDays = pitReturnLateDays;
 
   var PLACE_LABEL = {
     callWait: '完TEL待ち',

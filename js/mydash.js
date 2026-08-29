@@ -1477,29 +1477,99 @@
   }
 
   // ---- パレット（追加） ----
+  /* =========================================================
+     🖼🖼 v2.23.0 パレット＝**本物のBOXを、全サイズ並べて選ぶ**（2026-08-28・ゆうた指定）
+     ---------------------------------------------------------
+     🗣「テキストで **返車 小 中 大** とか言われても、どんな仕様なのか全然わからなくて使いにくい」
+
+     🔴 **絵は貼らない。その場で本物を描く。**（2026-08-28「見本ページは描かない。本物から吸い出す」）
+        画像やモックを貼ると、BOXを直した時に**パレットだけ古いまま残る＝嘘の見本**になる。
+        ここは `renderFlow` と同じ道（`def.body` / `listBody` / `viewOf`）を通す。
+        ＝ BOXを直せば、見本も**次に開いた時にはもう新しい姿**になっている。
+     🔴 **描くのは見えた分だけ。** 34種 × 最大4サイズ ＝ **115通り**。
+        いっぺんに描くとパレットを開くたびに固まるので、`IntersectionObserver` で
+        近づいたものから描く（一度描いたら描き直さない）。
+     ⚠ **見本は押せない**（CSS の `pointer-events:none`）。押すのは外側の枠＝そのサイズで追加。
+        中の押せる所（カード・チップ）が生きていると、見本のつもりが**本物を開いてしまう**。
+     ⚠ 中身は**その人の本物のデータ**。見本データを別に持たない（持つと、また嘘の見本になる）。
+     ========================================================= */
+  var palIO = null;
+
+  /* 見本を1つ描く。⚠ 新しく描き起こさないこと＝renderFlow と同じ関数を呼ぶ */
+  function palBoxHtml(k, sz) {
+    var def = EL[k]; if (!def) return '';
+    var it = { e: k, s: sz };
+    if (def.person) it.p = 'me';
+    var title = def.person ? (targetLabel(it) + ' ' + def.title) : def.title;
+    var vw = viewOf(it, def), bodyHtml;
+    if (vw === 'list') bodyHtml = safe(listBody, def, sz, it);
+    else if (vw === 'both') bodyHtml = safe(def.body, 's', it) + '<div class="md-bothsep"></div>' + safe(listBody, def, sz, it);
+    else bodyHtml = safe(def.body, sz, it);
+    return '<section class="md-box md-' + sz + ' md-noexp">' +
+      '<div class="md-bh"><span class="md-ic">' + icoE(def.icon) + '</span><h3>' + esc(title) + '</h3></div>' +
+      '<div class="md-body">' + bodyHtml + '</div></section>';
+  }
+  function palFill(cell) {
+    if (!cell || cell.getAttribute('data-done') === '1') return;
+    cell.setAttribute('data-done', '1');
+    var st = cell.querySelector('.md-pv-stage');
+    if (st) st.innerHTML = palBoxHtml(cell.getAttribute('data-k'), cell.getAttribute('data-s'));
+  }
+  function palWatch() {
+    if (palIO) { try { palIO.disconnect(); } catch (e) {} palIO = null; }
+    var root = $('myd-pal'); if (!root) return;
+    var cells = [].slice.call(root.querySelectorAll('.md-pv'));
+    if (!window.IntersectionObserver) { cells.forEach(palFill); return; }   /* 古いブラウザ＝全部描く */
+    palIO = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { palFill(e.target); palIO.unobserve(e.target); } });
+    }, { root: root, rootMargin: '500px 0px' });
+    cells.forEach(function (c) { palIO.observe(c); });
+  }
+  function palSection(k, person, opts) {
+    var d = EL[k];
+    var sizes = (d.sizes && d.sizes.length) ? d.sizes : ['m'];
+    var fn = person ? 'mydAddPerson' : 'mydAdd';
+    var cells = sizes.map(function (sz) {
+      return '<div class="md-pv" data-k="' + k + '" data-s="' + sz + '" title="この大きさで追加"' +
+        ' onclick="' + fn + '(\'' + k + '\',\'' + sz + '\')">' +
+        '<div class="md-pv-lb">' + SZL[sz] + '<b>＋ 追加</b></div>' +
+        '<div class="md-flow md-pv-stage"></div></div>';
+    }).join('');
+    var na = ['s', 'm', 'l', 'xl'].filter(function (sz) { return sizes.indexOf(sz) < 0; }).map(function (sz) { return SZL[sz]; });
+    return '<section class="md-pvsec" id="md-pv-' + k + '">' +
+      '<h4><span class="md-pe-ic">' + icoE(d.icon) + '</span>' + esc(d.title) +
+      (person ? '<select class="md-pe-person" id="md-pers-' + k + '">' + opts + '</select>' : '') +
+      (na.length ? '<em class="md-pv-na">' + na.join('・') + 'は不向き</em>' : '') +
+      '</h4><div class="md-pvrow">' + cells + '</div></section>';
+  }
+  window.mydPalJump = function (k) {
+    var el = $('md-pv-' + k); if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
   window.mydOpenPalette = function () {
     var b = $('myd-pal-body');
     var dataEls = Object.keys(EL).filter(function (k) { return !EL[k].person; });
     var personEls = Object.keys(EL).filter(function (k) { return EL[k].person; });
-    var dataSec = '<div class="md-pal-sec"><i data-ic=chart data-ics=16></i> 状況・数値</div>' + dataEls.map(function (k) {
-      var d = EL[k];
-      var chips = ['s', 'm', 'l', 'xl'].map(function (sz) { var ok = d.sizes.indexOf(sz) >= 0; return '<span class="md-szchip' + (ok ? '' : ' na') + '"' + (ok ? ' onclick="mydAdd(\'' + k + '\',\'' + sz + '\')"' : '') + '>' + SZL[sz] + '</span>'; }).join('');
-      return '<div class="md-pe"><span class="md-pe-ic">' + icoE(d.icon) + '</span><span class="md-pe-n">' + esc(d.title) + '</span><span class="md-pe-sz">' + chips + '</span></div>';
-    }).join('');
+    /* 上に名前の札を並べる＝見本は縦に長いので、名前から飛べるようにしておく */
+    var nav = '<div class="md-pvnav">' + dataEls.concat(personEls).map(function (k) {
+      return '<a onclick="mydPalJump(\'' + k + '\')">' + icoE(EL[k].icon) + ' ' + esc(EL[k].title) + '</a>';
+    }).join('') + '</div>';
+    var dataSec = '<div class="md-pal-sec"><i data-ic=chart data-ics=16></i> 状況・数値</div>' +
+      dataEls.map(function (k) { return palSection(k, false, ''); }).join('');
     // 個人BOX＝「誰のBOXを作るか」をここで選んでから追加（例：自分の売上／斎藤の売上）
     var opts = '<option value="__me__">自分</option>' + assignableStaff().map(function (s) { return '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>'; }).join('');
-    var personSec = '<div class="md-pal-sec"><i data-ic=user data-ics=16></i> 個人（担当者）＝誰のBOXを作るか選んで追加</div>' + personEls.map(function (k) {
-      var d = EL[k];
-      var chips = ['s', 'm', 'l', 'xl'].map(function (sz) { var ok = d.sizes.indexOf(sz) >= 0; return '<span class="md-szchip' + (ok ? '' : ' na') + '"' + (ok ? ' onclick="mydAddPerson(\'' + k + '\',\'' + sz + '\')"' : '') + '>' + SZL[sz] + '</span>'; }).join('');
-      return '<div class="md-pe"><span class="md-pe-ic">' + icoE(d.icon) + '</span><span class="md-pe-n">' + esc(d.title) + '</span><select class="md-pe-person" id="md-pers-' + k + '">' + opts + '</select><span class="md-pe-sz">' + chips + '</span></div>';
-    }).join('') + '<div class="md-tiny">複数人（自分＋部下など）にしたい時は、追加後にBOXの <i data-ic=user data-ics=16></i> から選び直せます。</div>';
+    var personSec = '<div class="md-pal-sec"><i data-ic=user data-ics=16></i> 個人（担当者）＝誰のBOXを作るか選んで追加</div>' +
+      personEls.map(function (k) { return palSection(k, true, opts); }).join('') +
+      '<div class="md-tiny">複数人（自分＋部下など）にしたい時は、追加後にBOXの <i data-ic=user data-ics=16></i> から選び直せます。</div>';
     var scSec = '<div class="md-pal-sec"><i data-ic=link data-ics=16></i> ショートカット（ビュー/アンカーへ飛ぶ）</div>' +
       '<div class="md-scgrid">' + SHORTCUTS.map(function (s, i) { return '<span class="md-scadd" onclick="mydAddSc(' + i + ')">' + icoE(s.icon) + ' ' + esc(s.label) + '</span>'; }).join('') + '</div>';
-    b.innerHTML = dataSec + personSec + scSec +
+    b.innerHTML = nav + dataSec + personSec + scSec +
       '<div class="md-pal-all"><button class="myd-fab primary" onclick="mydAddAll()"><i data-ic=download data-ics=16></i> 全部のせ（まず全部見る）</button><span class="md-tiny">初めての人向け：一旦すべて表示して、要らないBOXを消していけます</span></div>';
     $('myd-pal').classList.add('show');
+    $('myd-pal').scrollTop = 0;
+    palWatch();
   };
-  window.mydClosePalette = function () { $('myd-pal').classList.remove('show'); };
+  window.mydClosePalette = function () { $('myd-pal').classList.remove('show'); if (palIO) { try { palIO.disconnect(); } catch (e) {} palIO = null; } };
   window.mydAdd = function (e, s) { var l = curLayout(); var it = { e: e, s: s }; if (EL[e] && EL[e].person) it.p = 'me'; l.push(it); setCurLayout(l); renderFlow(); save(); toast(EL[e].title + '（' + SZL[s] + '）を追加'); };
   window.mydAddPerson = function (e, s) {
     var sel = $('md-pers-' + e); var v = sel ? sel.value : '__me__';

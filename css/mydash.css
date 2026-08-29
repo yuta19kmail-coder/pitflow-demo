@@ -373,12 +373,18 @@ body.md-edit .md-bh h3 { max-width: none; }
       押せると「見本のつもりが本物を開く」になる。外し方に注意。
    ========================================================= */
 #myd-pal .myd-modal-box { width: min(97vw, 1240px); }
-.md-pvnav { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 6px; }
-.md-pvnav a { font-size: 11px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px; cursor: pointer; }
-.md-pvnav a:hover { border-color: var(--brand); color: var(--text); }
-.md-pvsec { padding: 14px 0 4px; border-top: 1px solid var(--border); }
-.md-pvsec h4 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 800; margin: 0 0 9px; }
-.md-pv-na { font-style: normal; font-size: 10.5px; color: var(--text3); background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; }
+/* 畳んだ状態が既定。開いた1つだけ中身を描く */
+.md-pvsec { border-bottom: 1px solid var(--border); }
+.md-pvhd { display: flex; align-items: center; gap: 9px; padding: 9px 6px; cursor: pointer; border-radius: 8px; }
+.md-pvhd:hover { background: var(--bg3); }
+.md-pvcar { color: var(--text3); display: inline-flex; transition: transform .15s; }
+.md-pvsec.on .md-pvcar { transform: rotate(180deg); }
+.md-pvnm { font-size: 13px; font-weight: 800; }
+.md-pvsz { font-size: 10.5px; color: var(--text3); background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; }
+.md-pvopen { margin-left: auto; font-size: 11px; color: var(--text3); }
+.md-pvsec.on .md-pvopen { color: var(--brand); }
+.md-pvbody { display: none; padding: 4px 0 14px; }
+.md-pvsec.on .md-pvbody { display: block; }
 .md-pvrow { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
 .md-pv { background: var(--bg); border: 1px dashed var(--border2, var(--border)); border-radius: 12px; padding: 8px; cursor: pointer; }
 .md-pv:hover { border-color: var(--brand); border-style: solid; }

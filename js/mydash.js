@@ -1493,7 +1493,11 @@
         中の押せる所（カード・チップ）が生きていると、見本のつもりが**本物を開いてしまう**。
      ⚠ 中身は**その人の本物のデータ**。見本データを別に持たない（持つと、また嘘の見本になる）。
      ========================================================= */
-  var palIO = null;
+  /* 🔴 見本は「**畳んでおいて、開いた時に描く**」（2026-08-28・ゆうた指定）
+     🗣「それぞれアコーディオンで畳んでおいて、開いた時に描写するじゃだめか？ **データ以前に見にくい**もある」
+     ＝ 34種を全部ひろげると、ただ長いだけで探せない。畳めば一覧が1画面におさまる。
+        描くのも「開いた1つ」だけになるので、軽さは**結果として**ついてくる（軽さが目的ではない）。
+     ⚠ 一度に開くのは1つ（本物のアコーディオン）。2つ開けると、また一覧が読めなくなる。 */
 
   /* 見本を1つ描く。⚠ 新しく描き起こさないこと＝renderFlow と同じ関数を呼ぶ */
   function palBoxHtml(k, sz) {
@@ -1509,22 +1513,25 @@
       '<div class="md-bh"><span class="md-ic">' + icoE(def.icon) + '</span><h3>' + esc(title) + '</h3></div>' +
       '<div class="md-body">' + bodyHtml + '</div></section>';
   }
+  /* 一度描いたら描き直さない（開け閉めのたびに作り直さない） */
   function palFill(cell) {
     if (!cell || cell.getAttribute('data-done') === '1') return;
     cell.setAttribute('data-done', '1');
     var st = cell.querySelector('.md-pv-stage');
     if (st) st.innerHTML = palBoxHtml(cell.getAttribute('data-k'), cell.getAttribute('data-s'));
   }
-  function palWatch() {
-    if (palIO) { try { palIO.disconnect(); } catch (e) {} palIO = null; }
-    var root = $('myd-pal'); if (!root) return;
-    var cells = [].slice.call(root.querySelectorAll('.md-pv'));
-    if (!window.IntersectionObserver) { cells.forEach(palFill); return; }   /* 古いブラウザ＝全部描く */
-    palIO = new IntersectionObserver(function (es) {
-      es.forEach(function (e) { if (e.isIntersecting) { palFill(e.target); palIO.unobserve(e.target); } });
-    }, { root: root, rootMargin: '500px 0px' });
-    cells.forEach(function (c) { palIO.observe(c); });
+  function palOpen(k, jump) {
+    var sec = $('md-pv-' + k); if (!sec) return;
+    var wasOpen = sec.classList.contains('on');
+    [].forEach.call(document.querySelectorAll('#myd-pal .md-pvsec.on'), function (s) { s.classList.remove('on'); });
+    if (wasOpen && !jump) return;                       /* 開いていたものを押した＝閉じるだけ */
+    sec.classList.add('on');
+    [].forEach.call(sec.querySelectorAll('.md-pv'), palFill);   /* 🔴 ここで初めて描く */
+    try { sec.scrollIntoView({ behavior: 'smooth', block: jump ? 'start' : 'nearest' }); } catch (e) {}
   }
+  window.mydPalToggle = function (k) { palOpen(k, false); };
+  window.mydPalJump = function (k) { palOpen(k, true); };
+
   function palSection(k, person, opts) {
     var d = EL[k];
     var sizes = (d.sizes && d.sizes.length) ? d.sizes : ['m'];
@@ -1535,25 +1542,23 @@
         '<div class="md-pv-lb">' + SZL[sz] + '<b>＋ 追加</b></div>' +
         '<div class="md-flow md-pv-stage"></div></div>';
     }).join('');
-    var na = ['s', 'm', 'l', 'xl'].filter(function (sz) { return sizes.indexOf(sz) < 0; }).map(function (sz) { return SZL[sz]; });
     return '<section class="md-pvsec" id="md-pv-' + k + '">' +
-      '<h4><span class="md-pe-ic">' + icoE(d.icon) + '</span>' + esc(d.title) +
-      (person ? '<select class="md-pe-person" id="md-pers-' + k + '">' + opts + '</select>' : '') +
-      (na.length ? '<em class="md-pv-na">' + na.join('・') + 'は不向き</em>' : '') +
-      '</h4><div class="md-pvrow">' + cells + '</div></section>';
+      '<div class="md-pvhd" onclick="mydPalToggle(\'' + k + '\')">' +
+        '<span class="md-pvcar"><i data-ic=chevDown data-ics=14></i></span>' +
+        '<span class="md-pe-ic">' + icoE(d.icon) + '</span>' +
+        '<span class="md-pvnm">' + esc(d.title) + '</span>' +
+        '<span class="md-pvsz">' + sizes.map(function (sz) { return SZL[sz]; }).join('・') + '</span>' +
+        (person ? '<select class="md-pe-person" id="md-pers-' + k + '" onclick="event.stopPropagation()">' + opts + '</select>' : '') +
+        '<span class="md-pvopen">見本を見る</span>' +
+      '</div>' +
+      '<div class="md-pvbody"><div class="md-pvrow">' + cells + '</div></div></section>';
   }
-  window.mydPalJump = function (k) {
-    var el = $('md-pv-' + k); if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
   window.mydOpenPalette = function () {
     var b = $('myd-pal-body');
     var dataEls = Object.keys(EL).filter(function (k) { return !EL[k].person; });
     var personEls = Object.keys(EL).filter(function (k) { return EL[k].person; });
-    /* 上に名前の札を並べる＝見本は縦に長いので、名前から飛べるようにしておく */
-    var nav = '<div class="md-pvnav">' + dataEls.concat(personEls).map(function (k) {
-      return '<a onclick="mydPalJump(\'' + k + '\')">' + icoE(EL[k].icon) + ' ' + esc(EL[k].title) + '</a>';
-    }).join('') + '</div>';
+    /* ⚠ 上に名前の札を並べていたが**やめた**（2026-08-28）。
+       畳んだ一覧そのものが名前の一覧なので、同じ名前が2列に並んで**かえって見にくかった**。 */
     var dataSec = '<div class="md-pal-sec"><i data-ic=chart data-ics=16></i> 状況・数値</div>' +
       dataEls.map(function (k) { return palSection(k, false, ''); }).join('');
     // 個人BOX＝「誰のBOXを作るか」をここで選んでから追加（例：自分の売上／斎藤の売上）
@@ -1563,13 +1568,12 @@
       '<div class="md-tiny">複数人（自分＋部下など）にしたい時は、追加後にBOXの <i data-ic=user data-ics=16></i> から選び直せます。</div>';
     var scSec = '<div class="md-pal-sec"><i data-ic=link data-ics=16></i> ショートカット（ビュー/アンカーへ飛ぶ）</div>' +
       '<div class="md-scgrid">' + SHORTCUTS.map(function (s, i) { return '<span class="md-scadd" onclick="mydAddSc(' + i + ')">' + icoE(s.icon) + ' ' + esc(s.label) + '</span>'; }).join('') + '</div>';
-    b.innerHTML = nav + dataSec + personSec + scSec +
+    b.innerHTML = dataSec + personSec + scSec +
       '<div class="md-pal-all"><button class="myd-fab primary" onclick="mydAddAll()"><i data-ic=download data-ics=16></i> 全部のせ（まず全部見る）</button><span class="md-tiny">初めての人向け：一旦すべて表示して、要らないBOXを消していけます</span></div>';
     $('myd-pal').classList.add('show');
     $('myd-pal').scrollTop = 0;
-    palWatch();
   };
-  window.mydClosePalette = function () { $('myd-pal').classList.remove('show'); if (palIO) { try { palIO.disconnect(); } catch (e) {} palIO = null; } };
+  window.mydClosePalette = function () { $('myd-pal').classList.remove('show'); };
   window.mydAdd = function (e, s) { var l = curLayout(); var it = { e: e, s: s }; if (EL[e] && EL[e].person) it.p = 'me'; l.push(it); setCurLayout(l); renderFlow(); save(); toast(EL[e].title + '（' + SZL[s] + '）を追加'); };
   window.mydAddPerson = function (e, s) {
     var sel = $('md-pers-' + e); var v = sel ? sel.value : '__me__';

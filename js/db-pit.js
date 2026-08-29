@@ -438,7 +438,8 @@
       }
       const self = this;
       this.mode = 'cloud';
-      this._loaded = false;                       // 読み終わるまでは書かない
+      this._loaded = false;
+      this._rev = {};                             /* 版番号の控えも作り直す */                       // 読み終わるまでは書かない
       this._shadow = { docs: {}, settings: null };
       console.log('[PitDB] クラウドから読み込みます…');
 
@@ -457,7 +458,8 @@
         names.forEach(function (k, i) {
           const arr = [];
           res[i].forEach(function (d) {
-            const o = d.data() || {}; o.id = d.id; arr.push(o);
+            const o = self._takeRev(self._COLS[k], d.id, d.data() || {});   /* 🔴 版番号は中身から外して控える */
+            o.id = d.id; arr.push(o);
             self._shadow.docs[self._COLS[k] + '/' + d.id] = self._js(o);
           });
           state[k] = arr;
@@ -518,6 +520,35 @@
           （実際そうだった。パソコンはネットに繋がっていた）。
        ⚠ 読み直しで**手元の直しを消さない**。編集中のカードと、まだ保存していないものは触らない。
        ========================================================= */
+    /* =========================================================
+       🔴🔴🔴 v2.26.0 **版番号（rev）＝サーバーが古い書き込みを弾くための札**（2026-08-29）
+       ---------------------------------------------------------
+       🗣 ゆうた「上書きできない表面にはでないタイムスタンプ…**絶対それを照合して新しい方が優先される**みたいな」
+       ◎なぜ要るか
+         v2.24.0 の「気づく・張り直す・読み直す」は**古い時間を短くした**だけ。
+         **人が手で押した時の穴は塞がっていない。**古い画面で1か所直せば、8/28 と同じことが起きる。
+       ◎しくみ
+         カード1件ごとに**表に出ない番号**を持つ。書く時は必ず「**自分が見た版の次の番号**」を添える。
+         サーバー（Firestore のルール）が `新しい版 == いまの版 + 1` でなければ**受け付けない**。
+         🔴 **照合をアプリの中でやっても意味がない。**古い画面は自分が古いことを知らないから。
+            だから**サーバーで弾く**。ここが肝。
+       ◎🔴 中身には混ぜない
+         版番号を state のカードに入れると、**差分判定（_js）が毎回「変わった」と言い出して
+         永久に保存し続ける**（v1.0.0 で踏んだ罠と同じ形）。
+         だから **受け取ったら中身から外して、ここ（_rev）に別で控える。**
+       ⚠ 弾かれた時は**読み直すだけ。書き直さない。**
+          古い内容で押し切ったら、この仕掛けを自分で無効にすることになる。
+       ========================================================= */
+    _rev: null,             /* '入れ物名/id' → 版番号 */
+    _revOf: function (k, id) { var col = this._COLS[k]; return (this._rev && col) ? (this._rev[col + '/' + id] || 0) : 0; },
+    /* 受け取った1件から版番号を抜き取って控える（中身からは外す） */
+    _takeRev: function (col, id, o) {
+      if (!this._rev) this._rev = {};
+      if (o && o.rev !== undefined && o.rev !== null) this._rev[col + '/' + id] = o.rev;
+      if (o) delete o.rev;
+      return o;
+    },
+
     _link: true,            /* サーバーとつながっているか */
     _relinkT: null,
     _relinkN: 0,
@@ -575,7 +606,7 @@
             var arr = state[k] || (state[k] = []);
             var 生きている = {};
             res[i].forEach(function (d) {
-              var o = d.data() || {}; o.id = d.id;
+              var o = self._takeRev(col, d.id, d.data() || {}); o.id = d.id;   /* 🔴 版番号を控える */
               var key = col + '/' + d.id, js = self._js(o);
               生きている[d.id] = 1;
               if (self._shadow.docs[key] === js) return;                 /* 変わっていない */
@@ -674,7 +705,7 @@
             if (idx >= 0) arr.splice(idx, 1);
             return null;
           }
-          var o = d.data() || {}; o.id = id;
+          var o = self._takeRev(col, id, d.data() || {}); o.id = id;   /* 🔴 版番号を控える */
           self._shadow.docs[key] = self._js(o);
           if (idx >= 0) arr[idx] = o; else arr.push(o);
           return o;
@@ -721,7 +752,7 @@
                   v1.56.0 で「押すまで保存しない」にした結果、**編集中ずっとこの窓が開く**ようになった。
                ⚠ 見送った分は、編集を終えて保存した時に自分の内容で上書きされる。 */
             if (col === 'pitCards' && window.pitCardEditingId && window.pitCardEditingId() === id) return;
-            const o = ch.doc.data() || {}; o.id = id;
+            const o = self._takeRev(col, id, ch.doc.data() || {}); o.id = id;   /* 🔴 版番号を控える */
             const js = self._js(o);
             if (self._shadow.docs[key] === js) return;             // 自分が書いた分＝何もしない
             self._shadow.docs[key] = js;
@@ -826,6 +857,10 @@
           const js = self._js(o);
           if (self._shadow.docs[key] === js) return;
           const body = self._clean(o);
+          /* 🔴 v2.26.0 **自分が見た版の次の番号**を添える。
+             サーバーはこれが `いまの版 + 1` でなければ受け付けない＝古い画面は書けない。
+             ⚠ ここで足すだけ。`js`（差分の控え）には入れない＝入れると毎回「変わった」になる。 */
+          body.rev = (self._rev && self._rev[key] ? self._rev[key] : 0) + 1;
           ops.push({ t: 'set', ref: self._co().collection(col).doc(o.id), body: body, key: key, js: js });   /* js は並べ替え済みの文字（_js） */
         });
         /* 消えたもの */
@@ -859,9 +894,12 @@
           });
           return batch.commit().then(function () {
             group.forEach(function (op) {
-              if (op.t === 'del') delete self._shadow.docs[op.key];
+              if (op.t === 'del') { delete self._shadow.docs[op.key]; if (self._rev) delete self._rev[op.key]; }
               else if (op.key === '@settings') self._shadow.settings = op.js;
-              else self._shadow.docs[op.key] = op.js;
+              else {
+                self._shadow.docs[op.key] = op.js;
+                if (op.body && op.body.rev !== undefined && self._rev) self._rev[op.key] = op.body.rev;   /* 🔴 版も進める */
+              }
               delete self._pending[op.key];
             });
           });
@@ -871,9 +909,26 @@
         if (window.PitSync) PitSync.saved();
         console.log('[PitDB] 保存しました（' + ops.length + '件）');
       }).catch(function (e) {
+        ops.forEach(function (op) { delete self._pending[op.key]; });
+        /* 🔴🔴🔴 v2.26.0 **版が古くてサーバーに弾かれた**＝この画面が古い。
+           ◎やること＝**読み直すだけ。絶対に書き直さない。**
+             ここで「じゃあ新しい版で書き直そう」とすると、
+             **古い内容で押し切る**ことになり、この仕掛けを自分で無効にする。
+           ◎打った内容は捨てる。＝ 8/28 の事故で消えたのは「他の人が終わらせた仕事」で、
+             こちらの打ち込みより重い。**迷ったら、みんなの側を残す。** */
+        var 弾かれた = !!(e && (e.code === 'permission-denied' ||
+                    /permission[_-]?denied|insufficient permissions/i.test(String((e && e.message) || ''))));
+        if (弾かれた) {
+          console.warn('[PitDB] 🔴 版が古いのでサーバーに弾かれました。読み直します');
+          if (window.PitSync) PitSync.failed();
+          if (window.showToast) {
+            showToast('ほかの端末が先に直していたので、この画面を最新に直しました。いま打った内容は入っていません', 'PF-0012');
+          }
+          self._resync();
+          return;
+        }
         console.error('[PitDB] 保存に失敗', e);
         if (window.PitSync) PitSync.failed();
-        ops.forEach(function (op) { delete self._pending[op.key]; });
         self._cloudErr++;
         if (self._cloudErr <= 2 && window.showToast) {
           showToast('保存できませんでした。通信を確認してください（直した内容はこの画面には残っています）', 'PF-0002');

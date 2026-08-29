@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.24.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.25.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=9">
 <link rel="stylesheet" href="css/views.css?v=58">
-<link rel="stylesheet" href="css/polish.css?v=216">
+<link rel="stylesheet" href="css/polish.css?v=217">
 <link rel="stylesheet" href="css/floor.css?v=23">
 <link rel="stylesheet" href="css/board-notes.css?v=2">
 <link rel="stylesheet" href="css/coreflow-note-reply.css?v=b5c2b3fb"><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.css より後ろに読む -->
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.24.0</div>
+    <div class="login-ver">v2.25.0</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.24.0</span>
+    <span class="ver">v2.25.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -879,8 +879,8 @@ window.PIT_DEMO = true;</script>
 <script src="js/force-reload-pit.js?v=1"></script><!-- 📣 v2.8.2 全端末を今すぐ更新する合図（db-pit.js が呼ぶので、その前に読む） -->
 <script src="js/db-pit.js?v=52"></script>
 <script src="js/coreflow-return-plan.js?v=08a1675a"></script><!-- 🔴 v1.153.0 返車予定の確からしさ（未完／暫定／未定）＝_shared の共通部品。CarFlow の整備依頼業務と同じ答えにする。return-slot.js / car-sales.js より前に読む -->
-<script src="js/return-slot.js?v=14"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
-<script src="js/overdue-pit.js?v=5"></script><!-- 🔴 v1.101.0 当日を過ぎた予約・返車を自動で正しい箱へ移す。return-slot.js より後ろ、views.js（showView から呼ぶ）より前 -->
+<script src="js/return-slot.js?v=15"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
+<script src="js/overdue-pit.js?v=6"></script><!-- 🔴 v1.101.0 当日を過ぎた予約・返車を自動で正しい箱へ移す。return-slot.js より後ろ、views.js（showView から呼ぶ）より前 -->
 <script src="js/approval-pit.js?v=2"></script><!-- 🔵 v1.74.0 新規予約の「承認」制度（承認待ちの印・承認する・入庫前に1回聞く）。印を出す側（reserve / card-hover / loaner / card-view / undetermined）より前に読む -->
 <script src="js/views.js?v=55"></script>
 <script src="js/work-content.js?v=14"></script>
@@ -929,7 +929,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/import-bizcloud.js?v=8"></script>
 <script src="js/rules.js?v=16"></script>
 <script src="js/today.js?v=71"></script>
-<script src="js/undetermined.js?v=23"></script>
+<script src="js/undetermined.js?v=24"></script>
 <script src="js/reserve.js?v=76"></script>
 <script src="js/return.js?v=29"></script>
 <script src="js/car-sales.js?v=9"></script>

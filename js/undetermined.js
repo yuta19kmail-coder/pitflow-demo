@@ -205,9 +205,21 @@ function renderReturnTbd(){
   h += '<div class="ret-tbd-body">' + (callWait.length ? callWait.map(card).join('') : '<div class="today-empty">なし</div>') + '</div>';
   h += '<div class="und-note">完TELしたら、カードにマウスを乗せて確定金額・返車日時を入れてください。</div></div>';
 
-  h += '<div class="ret-tbd-col"><div class="ret-tbd-h"><i data-ic=calendar data-ics=16></i> 返車日未定 <small>（完TEL済・日にち待ち）</small><span class="und-cnt">' + dateTbd.length + '</span></div>';
-  h += '<div class="ret-tbd-body">' + (dateTbd.length ? dateTbd.map(card).join('') : '<div class="today-empty">なし</div>') + '</div>';
-  h += '<div class="und-note">返車日が入るとここから外れます（時間もそろえば返車カレンダーへ）。</div></div>';
+  /* 🔴 v2.25.0（2026-08-29・ゆうた指定）**約束を過ぎた車は、日付を消さずにここへ出す。**
+     ＝「いつの約束で何日過ぎたか」が見えないと、ただ未定に混ざって埋もれる。
+     ⚠ 日数の計算はここでやらない（`pitReturnLateDays` の1本）。 */
+  const 遅れ札 = c => {
+    const n = window.pitReturnLateDays ? pitReturnLateDays(c) : 0;
+    if (!n) return '';
+    const d = String(c.returnDate || '').slice(5).replace('-', '/');
+    return '<div class="ret-late"><i data-ic=alert data-ics=13></i> ' + d + ' の約束 ・ <b>' + n + '日過ぎ</b></div>';
+  };
+  const 未定カード = c => { const l = 遅れ札(c); return l ? '<div class="ret-late-wrap">' + l + card(c) + '</div>' : card(c); };
+  const 遅れ数 = dateTbd.filter(c => (window.pitReturnLateDays ? pitReturnLateDays(c) : 0) > 0).length;
+  h += '<div class="ret-tbd-col"><div class="ret-tbd-h"><i data-ic=calendar data-ics=16></i> 返車日未定 <small>（完TEL済・日にち待ち）</small><span class="und-cnt">' + dateTbd.length + '</span>'
+     + (遅れ数 ? '<span class="und-cnt late">' + 遅れ数 + '</span>' : '') + '</div>';
+  h += '<div class="ret-tbd-body">' + (dateTbd.length ? dateTbd.map(未定カード).join('') : '<div class="today-empty">なし</div>') + '</div>';
+  h += '<div class="und-note">返車日が入るとここから外れます（時間もそろえば返車カレンダーへ）。<br>約束の日を過ぎた車も、<b>日付を残したまま</b>ここに出ます。決め直すと外れます。</div></div>';
 
   /* ⚠ ここの車は**返車カレンダーの「時刻未定」にも同時に出る**（ゆうた確認済み）。
      日にちは決まっているので、その日の予定として見えていないと困るため。 */

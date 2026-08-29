@@ -2424,3 +2424,12 @@ th.cfs-lg-d{ z-index:3; }
    （数字が届かなかった月に、その裏付けをすぐ脇に置く・ゆうた 2026-08-24） */
 .sv-refnc{ margin:-2px 0 12px; padding:7px 12px; border-radius:8px; background:rgba(15,118,110,.10); border:1px solid #0f766e44; color:#0f766e; font-size:12px; font-weight:700; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
 .sv-refnc span{ font-weight:400; color:var(--text3); }
+
+/* =========================================================
+   🔴 v2.25.0 返車日未定：約束の日を過ぎた車（2026-08-29）
+   ⚠ 日付は消していない。過ぎたことを**赤で見せる**のが役目。
+   ========================================================= */
+.ret-late-wrap{ border:1px solid var(--red,#ef4444); border-radius:10px; padding:4px; margin-bottom:6px; background:color-mix(in srgb, var(--red,#ef4444) 7%, transparent); }
+.ret-late{ display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; color:var(--red,#ef4444); padding:1px 4px 4px; }
+.ret-late b{ font-weight:900; }
+.und-cnt.late{ background:var(--red,#ef4444); color:#fff; margin-left:4px; }

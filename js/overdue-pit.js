@@ -101,55 +101,119 @@
   }
 
   /* ===== 実際に動かす ===== */
+
+  /* 1台ぶんの入れ替え（判定は済んでいる前提。ここでは判定しない） */
+  function 未入庫へ(c, td){
+    var was = c.reserveDate;
+    c.status      = 'cancelled';   /* ＝未入庫の箱。1ヶ月で自動アーカイブ（undetermined.js） */
+    c.noShow      = true;          /* 🔴 自動で来なかった印。人が押した「予約キャンセル」と混ぜない */
+    c.noShowAt    = td;
+    c.cancelledAt = c.cancelledAt || td;   /* 1ヶ月の数えはじめ（今までと同じ入れ物） */
+    c.bayId = null; c.baySlot = null;
+    /* 🔄 v1.155.0（ゆうた確定）**自動で未入庫にする時、代車の予定は外さない。**
+       🗣「**2・3 は勘違いしてくるってパターンが結構あるから、未入庫に入る時点では残しておいて**」
+       ＝ 来なかったように見えても、あとから連絡が来てそのまま入庫することがよくある。
+          自動で外すと、戻した時に**押さえ直し**になる（先に別の人へ貸されているかもしれない）。
+       🔴 外すのは**人が決める**（未入庫の一覧の「代車予定クリア」）か、
+          **30日たって自動アーカイブされる時**（undetermined.js の `pitAutoArchive`）。
+       ⚠ v1.154.0 はここで自動で外していた。**わざと戻した。**
+       ⚠ 何が残っているかは、あとで追えるようにフローに書く。 */
+    var _lo = (w.pitLoanerPlanOf ? w.pitLoanerPlanOf(c.id) : { n: 0, text: '' });
+    flow(c, '入庫日（' + was + '）を過ぎたので未入庫へ（自動）'
+          + (_lo.n ? '（代車の予定はそのまま：' + _lo.text + '）' : ''));
+    /* 🔴 v2.22.0 **操作ログにも残す。** ここが空だったせいで「ログには残ってない」になり、
+       　 誰が動かしたのか（本当は誰も動かしていないのか）が分からなかった。 */
+    op('未入庫へ自動で移動', c, '入庫日 ' + was + ' を過ぎたため');
+  }
+  function 返車日未定へ(c){
+    var wasR = c.returnDate;
+    if (w.pitReturnSetDateTime) pitReturnSetDateTime(c, '', '');
+    else { c.returnDate = ''; c.returnTime = ''; }
+    c.returnDateFinal = null;      /* 確定返車日も過ぎている＝もう確定ではない */
+    flow(c, '返車予定日（' + wasR + '）を過ぎたので返車日未定へ（自動）');
+    op('返車日未定へ自動で移動', c, '返車予定日 ' + wasR + ' を過ぎたため');
+  }
+
+  /* 手元の写しで、動かす候補を拾う（ここではまだ動かさない） */
+  function 候補を拾う(td){
+    var out = [];
+    cards().forEach(function (c) {
+      if (!c || !c.id) return;
+      if (pitIntakeOverdue(c, td))      out.push({ id: c.id, kind: 'in' });
+      else if (pitReturnOverdue(c, td)) out.push({ id: c.id, kind: 'out' });
+    });
+    return out;
+  }
+  function 動かす(list, td){
+    var n = 0;
+    list.forEach(function (x) {
+      var c = cards().filter(function (y) { return y && y.id === x.id; })[0];
+      if (!c) return;
+      if (x.kind === 'in')  { 未入庫へ(c, td);  n++; }
+      else                  { 返車日未定へ(c);  n++; }
+    });
+    if (n && w.PitDB && w.PitDB.save) PitDB.save();
+    return n;
+  }
+
+  /* 🔴🔴🔴 v2.24.0 **動かす前に、その車だけサーバーを読み直す**（2026-08-29・事故を受けて）
+     -------------------------------------------------------------------
+     ◎なにが起きたか（2026-08-28 13:37:03）
+       開きっぱなしの画面の線が切れ、**前日の入庫・工程・返車がその画面に届いていなかった。**
+       そこでこの自動処理が走り、5件を「来なかった車」と判断して未入庫へ落とした。
+       保存は**カードまるごと差し替え**なので、他の人が進めた作業も一緒に消えた。
+       🗣 ゆうた「普通にあってはならないこと」
+     ◎ここで直すこと
+       🔴 **手元の写しだけで決めない。動かすと決めた車は、必ずサーバーの今の姿で判定し直す。**
+       🔴 **1件でも読み直せなかったら、今回は何も動かさない。**
+          読めない＝手元が古いかもしれない、ということ。**分からない時は触らないのが正解。**
+     ⚠ v2.22.0 の「実入庫日があれば動かさない」は、**古い写しの実入庫日**を見ていたので効かなかった。
+        関門そのものは正しい。**見る紙が古かった**だけ。だから読み直しが要る。
+     ⚠ 読み直しは `PitDB.refreshDoc`（画面の写しと差分の控えの両方を本物に合わせる）。
+        ここで自前に `state` を書き換えないこと＝控えがズレて、次の保存で別の事故になる。 */
   function pitAutoOverdue(){
     if (_busy) return 0;
     /* ⚠ クラウドを読み終わる前に触らない（v1.2.1 の決めごと＝読む前に書かない） */
     if (w.PIT_CLOUD && w.PitDB && !w.PitDB._loaded) return 0;
 
+    var td = today();
+    var 候補 = 候補を拾う(td);
+    if (!候補.length) return 0;
+
+    /* サンプルモード（この端末だけ）＝読み直す相手がいないので、今までどおり */
+    var クラウド = !!(w.PIT_CLOUD && w.PitDB && w.PitDB.mode === 'cloud' && w.PitDB.refreshDoc);
+    if (!クラウド) {
+      _busy = true;
+      var n = 0;
+      try { n = 動かす(候補, td); } catch (e) { console.warn('[overdue-pit] 自動移動でつまずきました', e); }
+      _busy = false;
+      return n;
+    }
+
     _busy = true;
-    var td = today(), n = 0;
-    try {
-      cards().forEach(function (c) {
-        if (pitIntakeOverdue(c, td)){
-          var was = c.reserveDate;
-          c.status      = 'cancelled';   /* ＝未入庫の箱。1ヶ月で自動アーカイブ（undetermined.js） */
-          c.noShow      = true;          /* 🔴 自動で来なかった印。人が押した「予約キャンセル」と混ぜない */
-          c.noShowAt    = td;
-          c.cancelledAt = c.cancelledAt || td;   /* 1ヶ月の数えはじめ（今までと同じ入れ物） */
-          c.bayId = null; c.baySlot = null;
-          /* 🔄 v1.155.0（ゆうた確定）**自動で未入庫にする時、代車の予定は外さない。**
-             🗣「**2・3 は勘違いしてくるってパターンが結構あるから、未入庫に入る時点では残しておいて**」
-             ＝ 来なかったように見えても、あとから連絡が来てそのまま入庫することがよくある。
-                自動で外すと、戻した時に**押さえ直し**になる（先に別の人へ貸されているかもしれない）。
-             🔴 外すのは**人が決める**（未入庫の一覧の「代車予定クリア」）か、
-                **30日たって自動アーカイブされる時**（undetermined.js の `pitAutoArchive`）。
-             ⚠ v1.154.0 はここで自動で外していた。**わざと戻した。**
-             ⚠ 何が残っているかは、あとで追えるようにフローに書く。 */
-          var _lo = (w.pitLoanerPlanOf ? w.pitLoanerPlanOf(c.id) : { n: 0, text: '' });
-          flow(c, '入庫日（' + was + '）を過ぎたので未入庫へ（自動）'
-                + (_lo.n ? '（代車の予定はそのまま：' + _lo.text + '）' : ''));
-          /* 🔴 v2.22.0 **操作ログにも残す。** ここが空だったせいで「ログには残ってない」になり、
-             　 誰が動かしたのか（本当は誰も動かしていないのか）が分からなかった。 */
-          op('未入庫へ自動で移動', c, '入庫日 ' + was + ' を過ぎたため');
-          n++;
+    var 読めた = true;
+    Promise.all(候補.map(function (x) {
+      return w.PitDB.refreshDoc('cards', x.id).catch(function (e) { 読めた = false; return null; });
+    })).then(function () {
+      try {
+        if (!読めた) {
+          /* 🔴 読み直せなかった＝手元が古いかもしれない。**今回は1台も動かさない。** */
+          console.warn('[overdue-pit] サーバーを読み直せませんでした。今回は何も動かしません');
           return;
         }
-        if (pitReturnOverdue(c, td)){
-          var wasR = c.returnDate;
-          if (w.pitReturnSetDateTime) pitReturnSetDateTime(c, '', '');
-          else { c.returnDate = ''; c.returnTime = ''; }
-          c.returnDateFinal = null;      /* 確定返車日も過ぎている＝もう確定ではない */
-          flow(c, '返車予定日（' + wasR + '）を過ぎたので返車日未定へ（自動）');
-          op('返車日未定へ自動で移動', c, '返車予定日 ' + wasR + ' を過ぎたため');
-          n++;
-        }
-      });
-      if (n && w.PitDB && w.PitDB.save) PitDB.save();
-    } catch (e) {
-      console.warn('[overdue-pit] 自動移動でつまずきました', e);
-    }
-    _busy = false;
-    return n;
+        /* 🔴 本物の姿で、もう一度判定する。ここで消える候補が「他の人が進めていた車」 */
+        var 本物 = 候補を拾う(td).filter(function (x) {
+          return 候補.some(function (y) { return y.id === x.id; });
+        });
+        var やめた = 候補.length - 本物.length;
+        if (やめた) console.log('[overdue-pit] ' + やめた + '台は、サーバーの姿を見て動かすのをやめました');
+        動かす(本物, td);
+      } catch (e) {
+        console.warn('[overdue-pit] 自動移動でつまずきました', e);
+      } finally { _busy = false; }
+    }, function () { _busy = false; });
+
+    return 0;   /* クラウドでは非同期。数は返せない（呼び出し側は使っていない） */
   }
 
   w.pitIntakeOverdue = pitIntakeOverdue;

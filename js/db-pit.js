@@ -447,8 +447,13 @@
       gets.push(this._co().collection('pitSettings').doc('main').get());
 
       Promise.all(gets).then(function (res) {
+        /* 🔴 v2.24.0 try/finally にした。ここで例外が出ると `_applying` が **true のまま**残り、
+           以後の保存が `save()` の先頭で黙って return true される＝**打っても一生保存されない**。
+           画面は動くしエラーも出ないので、誰も気づけない。 */
         self._applying = true;
         let total = 0;
+        const sdoc = res[res.length - 1];   /* ⚠ try の外で受ける（try の中で宣言すると下で見えない） */
+        try {
         names.forEach(function (k, i) {
           const arr = [];
           res[i].forEach(function (d) {
@@ -459,7 +464,6 @@
           total += arr.length;
         });
 
-        const sdoc = res[res.length - 1];
         if (sdoc.exists) {
           const sv = sdoc.data() || {};
           self._SETTINGS_KEYS.forEach(function (k) {
@@ -478,7 +482,7 @@
            ＝次の保存で設定が必ず1回上がる。🔴 MHS もここ（pitSettings/main）を読んでいる。 */
         self._applyWorkTypes();
         if (self._wtDirty) self._shadow.settings = '';
-        self._applying = false;
+        } finally { self._applying = false; }
 
         /* 📣 v2.8.2 読み込み時の合図は「見たこと」にして黙らせる
            ＝この版を初めて開いた端末が、開いた瞬間にもう1回読み直す、を起こさない。 */
@@ -494,6 +498,187 @@
       }).catch(function (e) {
         console.error('[PitDB] クラウドの読み込みに失敗', e);
         if (window.showToast) showToast('データを読み込めませんでした。通信を確認して開き直してください', 'PF-0003');
+      });
+    },
+
+    /* =========================================================
+       🔴🔴🔴 v2.24.0 **線がつながっているかを、自分で見張る**（2026-08-29・事故を受けて新設）
+       ---------------------------------------------------------
+       ◎なにが起きたか（2026-08-28 13:37:03・5件）
+         開きっぱなしの画面の**変更を受け取る線が切れた**。前日の入庫・工程・返車が届かなくなった。
+         それでも画面は普通に動き、エラーも出ず、**同期ランプも「全員と共有中」のまま**だった。
+         その古い画面で自動処理が走り、他人の作業をまるごと消した。
+         🗣 ゆうた「普通にあってはならないこと」
+       ◎ここで直すこと
+         🔴 ① 切れたら**気づく**（Firestore 自身の印＝`metadata.fromCache` を見る）
+         🔴 ② 切れたら**張り直す**（だんだん間隔をあけて、あきらめない）
+         🔴 ③ 戻ってきたら**全部読み直す**（切れている間に何が変わったか分からないので）
+         🔴 ④ 切れている間は**画面に出す**（ランプと帯）。黙らない
+       ⚠ `navigator.onLine` では足りない。**ネットは生きているのに見張りだけ死ぬ**ことがある
+          （実際そうだった。パソコンはネットに繋がっていた）。
+       ⚠ 読み直しで**手元の直しを消さない**。編集中のカードと、まだ保存していないものは触らない。
+       ========================================================= */
+    _link: true,            /* サーバーとつながっているか */
+    _relinkT: null,
+    _relinkN: 0,
+    _recvAt: 0,
+    _needResync: false,
+    _offT: null,
+    /* 🔴 「つながっていない」と言い切るまでの猶予（ミリ秒）。
+       ⚠ 開いた直後は必ず一瞬 `fromCache` になる。すぐ帯を出すと**毎回赤い帯が光る**＝
+          オオカミ少年になって、本当に切れた時に誰も見なくなる。 */
+    _OFF_WAIT: 8000,
+
+    _setLink: function (on, why) {
+      if (this._link === on) return;
+      this._link = on;
+      if (this._offT) { clearTimeout(this._offT); this._offT = null; }
+      if (on) {
+        this._relinkN = 0;
+        console.log('[PitDB] つながりました');
+        if (window.PitSync) { if (PitSync.link) PitSync.link(true); PitSync.connected(); }
+      } else {
+        console.warn('[PitDB] 🔴 つながっていません（' + (why || '') + '）＝この画面は古いかもしれません');
+        if (window.PitSync) { if (PitSync.link) PitSync.link(false, why || ''); PitSync.set('offline'); }
+      }
+    },
+
+    /* 切れたら張り直す。だんだん間隔をあける（最大30秒）。**あきらめない。** */
+    _scheduleRelink: function () {
+      var self = this;
+      if (this.mode !== 'cloud') return;
+      if (this._relinkT) return;
+      var wait = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._relinkN)));
+      this._relinkN++;
+      this._relinkT = setTimeout(function () {
+        self._relinkT = null;
+        if (self.mode !== 'cloud') return;
+        console.log('[PitDB] 見張りを張り直します（' + self._relinkN + '回目）');
+        try { self._watch(); } catch (e) { console.error('[PitDB] 張り直しに失敗', e); self._scheduleRelink(); return; }
+        self._resync();
+      }, wait);
+    },
+
+    /* 🔴 切れている間に何が変わったか分からないので、**全部**サーバーから読み直して合わせる。
+       ⚠ 手元の直しは消さない（編集中／まだ保存していないものは見送る）。 */
+    _resync: function () {
+      var self = this;
+      if (this.mode !== 'cloud' || !this._shadow) return Promise.resolve(0);
+      var names = Object.keys(this._COLS);
+      var gets = names.map(function (k) { return self._co().collection(self._COLS[k]).get({ source: 'server' }); });
+      return Promise.all(gets).then(function (res) {
+        var 直した = 0, 見送った = 0;
+        self._applying = true;
+        try {
+          names.forEach(function (k, i) {
+            var col = self._COLS[k];
+            var arr = state[k] || (state[k] = []);
+            var 生きている = {};
+            res[i].forEach(function (d) {
+              var o = d.data() || {}; o.id = d.id;
+              var key = col + '/' + d.id, js = self._js(o);
+              生きている[d.id] = 1;
+              if (self._shadow.docs[key] === js) return;                 /* 変わっていない */
+              var idx = arr.findIndex(function (x) { return x && x.id === d.id; });
+              /* ⚠ いま「予約を編集」で開いているカードは差し替えない（v1.56.1・打った内容が消える）。
+                 　 **見送ってよいのはここだけ。** */
+              if (col === 'pitCards' && window.pitCardEditingId && window.pitCardEditingId() === d.id) { 見送った++; return; }
+              /* 🔴🔴 v2.24.0 **それ以外は、サーバーが勝つ。**
+                 手元にまだ保存していない直しがあっても、ここではサーバーの姿を採る。
+                 ◎なぜそう決めたか（2026-08-29・事故のあと）
+                   「古い手元が勝つ」を1か所でも残すと、**8/28 の事故と同じ形**（古い写しが
+                   他人の作業を消す）が、その1か所から必ず戻ってくる。
+                   人が打っている最中のものは**編集中の関門**で守られているし、
+                   ふつうの保存は0.5秒で飛ぶので、ここで守る必要のある手元の直しは実質ない。
+                 ⚠ 受け取り（_watch）も同じ考え方で動いている。**2つの道で答えを変えない。** */
+              self._shadow.docs[key] = js;
+              if (idx >= 0) arr[idx] = o; else arr.push(o);
+              直した++;
+            });
+            /* サーバーではもう無いもの＝切れている間に誰かが消した */
+            Object.keys(self._shadow.docs).forEach(function (key) {
+              if (key.indexOf(col + '/') !== 0) return;
+              var id = key.slice(col.length + 1);
+              if (生きている[id]) return;
+              delete self._shadow.docs[key];
+              var j = arr.findIndex(function (x) { return x && x.id === id; });
+              if (j >= 0) arr.splice(j, 1);
+              直した++;
+            });
+          });
+        } finally { self._applying = false; }
+        if (直した || 見送った) console.log('[PitDB] 読み直しました（直した ' + 直した + '件／手元を優先 ' + 見送った + '件）');
+        if (直した) { if (window.PitSync) PitSync.received(); self._afterApply(); }
+        self._setLink(true);
+        return 直した;
+      }).catch(function (e) {
+        console.error('[PitDB] 読み直しに失敗', e);
+        self._setLink(false, '読み直せません');
+        self._scheduleRelink();
+        return -1;
+      });
+    },
+
+    /* つながっているかを Firestore 自身の印で見る。
+       ⚠ `fromCache: true` ＝ サーバーからではなく端末の中の写しから返っている＝**届いていない**。 */
+    _watchLink: function () {
+      var self = this;
+      try {
+        var un = this._co().collection('pitSettings').doc('main')
+          .onSnapshot({ includeMetadataChanges: true }, function (d) {
+            var 写しから = !!(d && d.metadata && d.metadata.fromCache);
+            if (写しから) {
+              self._needResync = true;
+              if (!self._offT) self._offT = setTimeout(function () {          /* 猶予を置いてから言う */
+                self._offT = null;
+                self._setLink(false, 'サーバーから届いていません');
+              }, self._OFF_WAIT);
+              return;
+            }
+            if (self._offT) { clearTimeout(self._offT); self._offT = null; }   /* 一瞬だった＝何も出さない */
+            self._setLink(true);
+            if (self._needResync) { self._needResync = false; self._resync(); }   /* 戻ったら読み直す */
+          }, function (e) {
+            self._setLink(false, 'つながり監視が切れました');
+            self._scheduleRelink();
+          });
+        this._unsubs.push(un);
+      } catch (e) { console.warn('[PitDB] つながり監視を張れませんでした', e); }
+    },
+
+    /* 🔴🔴🔴 v2.24.0 **1件だけ、サーバーから本物を読み直す**（2026-08-29・事故を受けて新設）
+       -----------------------------------------------------------------
+       ◎なぜ要るか（2026-08-28 13:37 の事故）
+         線が切れて更新が届かなくなった画面が、**古い写しのまま**カードを保存し、
+         他の人が進めた入庫・工程・返車・売上を**まるごと消した**。
+         保存は「カード1件まるごと差し替え」なので、手元が古いと他人の作業まで消える。
+       ◎これが直すこと
+         書く前に**その1件だけ**サーバーの今の姿を取り直し、画面の写し（state）と
+         差分の控え（_shadow）の**両方**を本物に合わせる。
+         ＝ そのあと保存しても、他人の作業を巻き込まない。
+       ⚠ 必ず `{source:'server'}`。ふつうの get は**端末の中の写しから返ってくることがある**
+          （実測で 0.001 秒で返った）＝ 古いまま「読み直したつもり」になる。
+       ⚠ 読めなかった時は **null ではなく例外**で返す。呼ぶ側が「読めたのか」を
+          見分けられないと、**読めていないのに動かす**という一番悪い形になる。 */
+    refreshDoc: function (k, id) {
+      var self = this, col = this._COLS[k];
+      if (this.mode !== 'cloud' || !col || !this._shadow || !id) return Promise.resolve(null);
+      return this._co().collection(col).doc(id).get({ source: 'server' }).then(function (d) {
+        var key = col + '/' + id;
+        var arr = state[k] || (state[k] = []);
+        var idx = arr.findIndex(function (x) { return x && x.id === id; });
+        self._applying = true;
+        try {
+          if (!d.exists) {                       /* サーバーではもう消えている */
+            delete self._shadow.docs[key];
+            if (idx >= 0) arr.splice(idx, 1);
+            return null;
+          }
+          var o = d.data() || {}; o.id = id;
+          self._shadow.docs[key] = self._js(o);
+          if (idx >= 0) arr[idx] = o; else arr.push(o);
+          return o;
+        } finally { self._applying = false; }
       });
     },
 
@@ -517,6 +702,7 @@
         const un = self._co().collection(col).onSnapshot(function (snap) {
           let touched = false;
           self._applying = true;
+          try {
           snap.docChanges().forEach(function (ch) {
             const id = ch.doc.id, key = col + '/' + id;
             if (ch.type === 'removed') {
@@ -544,11 +730,23 @@
             if (idx >= 0) arr[idx] = o; else arr.push(o);
             touched = true;
           });
-          self._applying = false;
+          } finally { self._applying = false; }
+          self._recvAt = Date.now();
+          self._setLink(true);
           if (touched) { if (window.PitSync) PitSync.received(); self._afterApply(); }
-        }, function (e) { console.error('[PitDB] ' + col + ' の購読に失敗', e); });
+        }, function (e) {
+          /* 🔴🔴🔴 v2.24.0（2026-08-29・事故を受けて）
+             ここは **console.error を出すだけ**だった。張り直しもしないし、画面にも出さない。
+             ＝ 線が切れた画面が「古いまま生きている」ことに、誰も気づけなかった。
+             その画面で自動処理が走り、他人の作業をまるごと消した（8/28 13:37 の5件）。 */
+          console.error('[PitDB] ' + col + ' の購読に失敗', e);
+          self._setLink(false, col + ' の購読が切れました');
+          self._scheduleRelink();
+        });
         self._unsubs.push(un);
       });
+
+      this._watchLink();     /* 🔴 v2.24.0 つながっているかも見張る */
 
       const un2 = this._co().collection('pitSettings').doc('main').onSnapshot(function (d) {
         if (!d.exists) return;
@@ -561,13 +759,14 @@
         });
         if (js === self._shadow.settings) return;
         self._applying = true;
-        self._SETTINGS_KEYS.forEach(function (k) {
-          if (sv[k] !== undefined && sv[k] !== null) {
-            if (k === 'settings') self._mergeSettings(sv[k]); else state[k] = sv[k];
-          }
-        });
-        self._shadow.settings = js;
-        self._applying = false;
+        try {
+          self._SETTINGS_KEYS.forEach(function (k) {
+            if (sv[k] !== undefined && sv[k] !== null) {
+              if (k === 'settings') self._mergeSettings(sv[k]); else state[k] = sv[k];
+            }
+          });
+          self._shadow.settings = js;
+        } finally { self._applying = false; }
         /* 🔴🔴 v2.8.1 **ここで書き戻さない。**
            前は「他の端末が古い作業タイプを書いていたら、揃え直して書き戻す」を
            **受け取るたびに即**やっていた。これが版のちがう端末との往復を

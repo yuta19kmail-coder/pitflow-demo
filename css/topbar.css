@@ -273,3 +273,18 @@
   z-index: 9998; opacity: 0; transition: opacity .22s; pointer-events: none; max-width: 92vw; text-align: center;
 }
 .pf-toast.show { opacity: 1; }
+
+/* =========================================================
+   🔴 v2.24.0 サーバーとつながっていない時の帯（2026-08-29・事故を受けて）
+   ⚠ 見落とせない大きさで出す。ランプの色だけでは誰も気づかなかった。
+   ⚠ 人が閉じられるようにしない（閉じられると、また気づけない画面に戻る）。
+   ========================================================= */
+.pit-link-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+  background: var(--red, #ef4444); color: #fff;
+  font-size: 13px; line-height: 1.5; font-weight: 700;
+  padding: 10px 16px; text-align: center;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, .35);
+}
+.pit-link-bar b { font-weight: 900; }
+.pit-link-bar .plb-sub { display: block; font-size: 11px; font-weight: 600; opacity: .9; margin-top: 2px; }

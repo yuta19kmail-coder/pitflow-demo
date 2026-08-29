@@ -81,6 +81,28 @@
       _tRecv = setTimeout(function () { if (_state === 'recv') { _state = 'idle'; paint(); } }, 1200);
     },
     connected: function () { _state = 'idle'; _lastAt = Date.now(); paint(); },
+    /* 🔴🔴🔴 v2.24.0（2026-08-29・事故を受けて）**線が切れたら、黙らずに画面に出す。**
+       ---------------------------------------------------------
+       ◎なぜ帯まで出すのか
+         8/28 の事故では、線が切れた画面が**普通に動いたまま**古い内容を映していた。
+         エラーも出ず、ランプも「同期済み」のまま。**使っている人は気づきようがなかった。**
+         🗣 ゆうた「普通にあってはならないこと」
+         ＝ ここは**見落とせない大きさ**で出す。ランプの色だけでは足りない。
+       ⚠ 消すのは「つながった」時だけ。人が閉じられるようにはしない
+          （閉じられると、また気づけない画面に戻る）。 */
+    link: function (on, why) {
+      var bar = d.getElementById('pit-link-bar');
+      if (on) { if (bar) bar.remove(); return; }
+      if (!bar) {
+        bar = d.createElement('div');
+        bar.id = 'pit-link-bar';
+        bar.className = 'pit-link-bar';
+        (d.body || d.documentElement).appendChild(bar);
+      }
+      bar.innerHTML = '<b>サーバーとつながっていません。</b>' +
+        'この画面は<b>古いかもしれません</b>。直した内容もまだ全員に届いていません。' +
+        '<span class="plb-sub">つなぎ直しています…' + (why ? '（' + String(why) + '）' : '') + '</span>';
+    },
     set: function (s) { _state = s; paint(); },
     refresh: paint
   };
@@ -93,6 +115,8 @@
       msg = 'この端末の中だけに保存しています（サンプル）。本番のアドレスで開くと全員で共有されます。';
     } else if (!navigator.onLine) {
       msg = 'ネットに繋がっていません。直した内容はこの画面には残っていますが、まだ全員には届いていません。';
+    } else if (_state === 'offline') {
+      msg = 'サーバーとつながっていません。この画面は古いかもしれません（他の人が直した内容が届いていません）。つなぎ直しています。';
     } else if (_state === 'error') {
       msg = '保存できませんでした。通信を確認して、もう一度直してみてください。';
     } else {

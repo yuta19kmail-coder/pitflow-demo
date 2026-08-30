@@ -1283,6 +1283,13 @@
     const last=lastVisitOf(cust);
     const yen=function(n){ return '¥'+Number(n||0).toLocaleString('ja-JP'); };
 
+    /* 🚗 v2.31.0 車をまとめる（veh-merge.js）の入口を上のバーに出すかどうか。
+       🔴 ゆうた指定＝**顧客情報の編集の横**に置く。**車のカードには置かない。**
+       　　「基本はあまり触る前提ではない」ので、編集と同じ大きさで並べず**小さいアイコンだけ**。
+       ⚠ 相手が居ない時に押せるボタンを並べない＝**2台以上ある時だけ**（吸収済みは数えない）。 */
+    const _mergeOK = !_archived(cust) &&
+      (cust.vehicles||[]).filter(function(v){ return v && !(window.pitVehMerged && pitVehMerged(v)); }).length >= 2;
+
     let h='';
     // 上部バー
     h+='<div class="cd-top"><button class="cd-back" onclick="custCloseModal()">'+backLbl+'</button>'+
@@ -1290,6 +1297,8 @@
           ⚠ ふだん押すものではないので、編集ボタンと同じ大きさで並べない。
           ⚠ 何のボタンか分かるよう title を必ず付ける（アイコンだけなので）。 */
        '<div class="cd-acts"><button class="cd-btn" onclick="custEdit(\''+cust.id+'\')"><i data-ic=pencil data-ics=16></i> 編集</button>'+
+       /* 🚗 v2.31.0 車をまとめる（ふだん押すものではないので、アイコンだけ・title 必須） */
+       (_mergeOK?'<button class="cd-ico cd-ico-merge" title="車をまとめる（同じ車が2件に分かれている時）" aria-label="車をまとめる" onclick="PitVehMerge.open(\''+cust.id+'\')"><i data-ic=link data-ics=15></i></button>':'')+
        (_archived(cust)
          ? ((window.PitArchive&&PitArchive.canRestore())
              ? '<button class="cd-ico cd-ico-restore" title="アーカイブから戻す" aria-label="アーカイブから戻す" onclick="custRestore(\''+cust.id+'\')"><i data-ic=undo data-ics=15></i></button>'
@@ -1328,11 +1337,6 @@
     h+='<div class="cd-sec"><div class="cd-sech"><div class="cd-sect"><i data-ic=car data-ics=16></i> 車両 <span class="cd-cnt">'+vehicles.length+'台</span></div>'+
        (_archived(cust)?'':'<button class="cd-btn cd-addveh" onclick="custAddVehicleFor(\''+cust.id+'\')"><i data-ic=plus data-ics=15></i> 車両を追加</button>')+
        '</div>';
-    /* 🚗 v2.31.0 同じ車が2件に分かれている時に「まとめる」を出す。
-       ⚠ 相手が居ない時に押せるボタンを並べない＝2台以上ある時だけ。
-       ⚠ 統合で吸収済みの車は相手に数えない。 */
-    const _mergeOK = !_archived(cust) &&
-      (cust.vehicles||[]).filter(function(v){ return v && !(window.pitVehMerged && pitVehMerged(v)); }).length >= 2;
     if(vehicles.length){
       h+='<div class="cd-vehs">';
       vehicles.forEach(function(v){
@@ -1367,10 +1371,6 @@
            /* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベルを付けて、読める大きさにした */
            ((v.vin||'').trim()?'<div class="cd-vvin"><i>車体番号</i>'+esc(v.vin.trim())+'</div>':'')+
            '<div class="cd-vacts"><span class="cd-vb" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=clock data-ics=16></i> 履歴</span>'+
-           /* 🚗 v2.31.0 この車を「主」にして、同じ車のもう1件を吸収する（顧客はまたがない） */
-           ((vArc || !_mergeOK) ? '' : '<span class="cd-vb" title="同じ車が2件に分かれている時、この車にまとめます" onclick="event.stopPropagation();PitVehMerge.open(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=link data-ics=16></i> まとめる</span>')+
-           /* 🔴 取り消しは管理者だけ（アーカイブを戻すのと同じ決まり） */
-           ((Array.isArray(v.mergeLog)&&v.mergeLog.length&&canR) ? '<span class="cd-vb cd-vb-restore" title="この車にまとめたのを取り消す" onclick="event.stopPropagation();PitVehMerge.undoAsk(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=undo data-ics=16></i> 統合を取り消す</span>' : '')+
            (vArc ? '' : '<span class="cd-vb go" onclick="custNewReserveFor(\''+cust.id+'\',\''+(v.id||'')+'\')">🆕 この車で新規予約</span>')+
            '</div>'+
            '</div>';

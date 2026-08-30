@@ -209,23 +209,38 @@
       + '<span class="um-sub">' + esc(t(c.kana)) + '　' + esc(primaryTel(c) || 'TELなし') + '　車 ' + liveVehs(c).length + '台</span>'
       + '<button class="vm-mini" onclick="PitCustMerge.clear(' + n + ')">選び直す</button></div>';
   }
+  /* 🔴 v2.36.1（ゆうた報告）**検索欄そのものを作り直さない。**
+     ◎何が起きていたか
+       1文字打つたびに窓を丸ごと描き直していたので、**入力欄が新しく作られて IME の変換が飛んだ**
+       （「こ」と打つと「k」で切れる）。
+     🔴 直し＝**打っている間に描き直すのは候補の並びだけ**。入力欄はそのまま置いておく。
+     ⚠ 顧客一覧の検索でも同じ事故を踏んでいる（v0.37.5「検索のIME割れ修正」）。**同じ轍を踏まない。** */
+  function _listHtml(n){
+    var q = n===1 ? _st.q1 : _st.q2;
+    if(norm(q).length < 2) return '';
+    var r = 探す(q), h = '';
+    if(!r.length) h += '<div class="um-none">見つかりません</div>';
+    r.forEach(function(c){
+      var 済 = (n===1 ? _st.サブ : _st.主) === c.id;
+      h += '<button class="um-row"' + (済?' disabled title="もう片方で選ばれています"':'') + ' onclick="PitCustMerge.pick(' + n + ',\'' + esc(c.id) + '\')">'
+         + '<b>' + esc(disp(c)) + '</b><span class="um-sub">' + esc(t(c.kana)) + '　' + esc(primaryTel(c) || 'TELなし')
+         + '　車 ' + liveVehs(c).length + '台' + ((c.oldNames||[]).length?('　旧：'+esc(c.oldNames.join('／'))):'') + '</span></button>';
+    });
+    return h;
+  }
   function _search(n){
     var q = n===1 ? _st.q1 : _st.q2;
-    var h = '<div class="um-sec">' + (n===1?'① <b>残す方</b>を探す':'② <b>寄せる方</b>を探す（アーカイブに移ります）') + '</div>'
-      + '<input class="um-input" value="' + esc(q) + '" placeholder="名前・カナ・電話・ナンバーで探す（2文字以上）" oninput="PitCustMerge.q(' + n + ',this.value)">';
-    var r = 探す(q);
-    if(norm(q).length >= 2){
-      h += '<div class="um-list">';
-      if(!r.length) h += '<div class="um-none">見つかりません</div>';
-      r.forEach(function(c){
-        var 済 = (n===1 ? _st.サブ : _st.主) === c.id;
-        h += '<button class="um-row"' + (済?' disabled title="もう片方で選ばれています"':'') + ' onclick="PitCustMerge.pick(' + n + ',\'' + esc(c.id) + '\')">'
-           + '<b>' + esc(disp(c)) + '</b><span class="um-sub">' + esc(t(c.kana)) + '　' + esc(primaryTel(c) || 'TELなし')
-           + '　車 ' + liveVehs(c).length + '台' + ((c.oldNames||[]).length?('　旧：'+esc(c.oldNames.join('／'))):'') + '</span></button>';
-      });
-      h += '</div>';
-    }
-    return h;
+    return '<div class="um-sec">' + (n===1?'① <b>残す方</b>を探す':'② <b>寄せる方</b>を探す（アーカイブに移ります）') + '</div>'
+      + '<input class="um-input" id="um-q' + n + '" value="' + esc(q) + '" placeholder="名前・カナ・電話・ナンバーで探す（2文字以上）"'
+      + ' autocomplete="off" oninput="PitCustMerge.q(' + n + ',this.value)">'
+      + '<div class="um-list" id="um-list' + n + '">' + _listHtml(n) + '</div>';
+  }
+  /* 打っている間はここだけ差し替える（入力欄には触らない） */
+  function _paint(n){
+    var box = d.getElementById('um-list' + n);
+    if(!box) return _home();          /* 窓の形が変わっている時だけ描き直す */
+    box.innerHTML = _listHtml(n);
+    if(w.pitIcons) try{ pitIcons(box); }catch(e){}
   }
 
   function _home(){
@@ -370,7 +385,8 @@
 
   w.PitCustMerge = {
     open: open, plan: plan, apply: apply, undo: undo, undoAsk: undoAsk, go: go, 探す: 探す,
-    q:        function(n, v){ if(!_st) return; if(n===1) _st.q1=v; else _st.q2=v; _home(); },
+    /* 🔴 打っている間は窓を描き直さない（IMEが飛ぶ）＝候補の並びだけ差し替える */
+    q:        function(n, v){ if(!_st) return; if(n===1) _st.q1=v; else _st.q2=v; _paint(n); },
     pick:     function(n, id){ if(!_st) return; if(n===1) _st.主=id; else _st.サブ=id; _st.欄={}; _home(); },
     clear:    function(n){ if(!_st) return; if(n===1){ _st.主=''; _st.q1=''; } else { _st.サブ=''; _st.q2=''; } _st.欄={}; _home(); },
     setField: function(k, which){ if(!_st) return; _st.欄[k]=which; _home(); },

@@ -643,7 +643,7 @@
        '<select class="cust-fsel" onchange="custSetFilter(\'maker\',this.value)">'+opt(_distinctVeh('maker'),_filters.maker,'メーカー：すべて')+'</select>'+
        /* 🔵 v2.36.0（ゆうた指定）**件数の下に「お客様をまとめる」**。
           ⚠ ふだん押すものではないので、しぼり込みの行の右端に控えめに置く（車の統合と同じ考え方）。 */
-       '<button type="button" class="cust-mergebtn" onclick="PitCustMerge.open()" title="同じお客様が2人に分かれている時、1人にまとめます"><i data-ic=link data-ics=15></i> お客様をまとめる</button>'+
+       '<button type="button" class="cust-mergeico" onclick="PitCustMerge.open()" title="お客様をまとめる（同じ方が2人に分かれている時）" aria-label="お客様をまとめる"><i data-ic=link data-ics=15></i></button>'+
        '</div>';
     h+='<div id="cust-thost"></div>';
     wrap.innerHTML=h;

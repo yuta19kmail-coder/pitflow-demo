@@ -434,45 +434,94 @@
 
 /* ========================================
  * 🚗 v2.31.0 車をまとめる（veh-merge.js）
- * 同じ車が2件に分かれている時に1台にする窓。顧客詳細の車カードから開く。
+ * 🔴 入口は顧客詳細の上のバーの小さいアイコン1つだけ（ふだん押すものではない）。
+ * 🔴 画面は1枚。車を押して ①（残す）② （寄せる）の印を付ける。
  * ⚠ 見た目は「これまで培ってきたもの」を借りる＝顧客まわりの器（cm-*）に乗せるだけ。
  * ======================================== */
-.cm-box.vm-box{ width:760px; max-width:calc(100vw - 40px); }
-.vm-note{ font-size:12.5px; color:var(--text2); background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:11px 13px; margin-bottom:14px; }
+.cd-ico-merge{ color:var(--text2); }
+.cd-ico-merge:hover{ border-color:var(--brand); color:var(--brand); background:var(--brand-soft); }
+
+.cm-box.vm-box{ width:820px; max-width:calc(100vw - 40px); }
+.vm-note{ font-size:12.5px; line-height:1.7; color:var(--text2); background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:11px 13px; margin-bottom:14px; }
 .vm-note b{ color:var(--text); }
-/* 相手を選ぶ */
-.vm-pick{ display:flex; flex-direction:column; gap:8px; }
-.vm-pickrow{ display:flex; align-items:center; gap:12px; text-align:left; width:100%; cursor:pointer;
+.vm-sec{ font-size:12px; font-weight:700; color:var(--text2); margin:14px 0 8px; display:flex; align-items:baseline; gap:8px; }
+.vm-step{ font-size:11.5px; font-weight:700; color:var(--brand); }
+.vm-must{ font-size:11px; font-weight:700; color:var(--orange); }
+.vm-none{ font-size:12.5px; color:var(--text3); background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:11px 13px; }
+
+/* 車の一覧＝押すと ①② が付く */
+.vm-cars{ display:flex; flex-direction:column; gap:8px; }
+.vm-car{ display:flex; align-items:center; gap:12px; text-align:left; width:100%; cursor:pointer;
   border:1px solid var(--border); background:var(--bg2); border-radius:11px; padding:11px 14px; }
-.vm-pickrow:hover{ background:var(--bg3); border-color:var(--brand); }
-.vm-pplate{ font-size:14px; font-weight:800; letter-spacing:.4px; min-width:170px; }
+.vm-car:hover{ background:var(--bg3); }
+.vm-car.on1{ border-color:var(--brand); background:var(--brand-soft); }
+.vm-car.on2{ border-color:#c08a3e; background:rgba(192,138,62,.12); }
+.vm-no{ width:22px; flex:0 0 auto; font-size:16px; font-weight:800; color:var(--text3); text-align:center; }
+.vm-car.on1 .vm-no{ color:var(--brand); }
+.vm-car.on2 .vm-no{ color:#e0b978; }
+.vm-pplate{ font-size:14px; font-weight:800; letter-spacing:.4px; min-width:165px; }
 .vm-pcar{ font-size:12.5px; color:var(--text2); flex:1; min-width:0; }
-.vm-ptag{ font-size:11px; color:var(--text3); border:1px solid var(--border); border-radius:7px; padding:3px 8px; }
+.vm-ptag{ font-size:11px; color:var(--text3); border:1px solid var(--border); border-radius:7px; padding:3px 8px; white-space:nowrap; }
 .vm-ptag.arch{ color:#e0b978; border-color:rgba(192,138,62,.5); }
+.vm-role{ font-size:11.5px; font-weight:700; min-width:76px; text-align:right; color:var(--text3); }
+.vm-car.on1 .vm-role{ color:var(--brand); }
+.vm-car.on2 .vm-role{ color:#e0b978; }
+
+/* いま何と何がくっつくか（帯） */
+.vm-pair{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:12px;
+  background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:10px 13px; font-size:12.5px; }
+.vm-pair b{ font-size:13px; }
+.vm-pn{ font-size:13px; font-weight:800; }
+.vm-pn.on1{ color:var(--brand); }
+.vm-pn.on2{ color:#e0b978; }
+.vm-arrow{ color:var(--text3); font-weight:800; }
+.vm-mini{ margin-left:auto; font-size:11px; font-weight:700; color:var(--text2); cursor:pointer;
+  border:1px solid var(--border); background:var(--bg3); border-radius:8px; padding:5px 10px; }
+.vm-mini:hover{ background:var(--bg4); }
+.vm-mini + .vm-mini{ margin-left:0; }
+
 /* 何が動くか */
-.vm-sum{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.vm-sum{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 0 0; }
 .vm-sumi{ background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:10px 12px; text-align:center; }
 .vm-sumi b{ display:block; font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; }
 .vm-sumi span{ font-size:11px; color:var(--text3); }
+.vm-sumi.hot{ border-color:rgba(245,158,11,.45); background:rgba(245,158,11,.08); }
+.vm-sumi.hot b{ color:var(--orange); }
+
+/* かかっている予約（見失わせない） */
+.vm-resv{ display:flex; flex-direction:column; gap:6px; }
+.vm-rsv{ display:flex; align-items:center; gap:10px; font-size:12.5px;
+  border:1px solid var(--border); background:var(--bg1); border-radius:9px; padding:8px 12px; }
+.vm-rsv b{ font-variant-numeric:tabular-nums; }
+.vm-rsvto{ margin-left:auto; font-size:11.5px; font-weight:700; color:var(--text2); }
+
 /* どちらを残すか */
-.vm-sec{ font-size:12px; font-weight:700; color:var(--text2); margin:4px 0 8px; }
-.vm-must{ font-size:11px; font-weight:700; color:var(--orange); }
-.vm-rows{ display:flex; flex-direction:column; gap:7px; margin-bottom:16px; }
+.vm-rows{ display:flex; flex-direction:column; gap:7px; }
 .vm-row{ display:grid; grid-template-columns:130px 1fr 1fr; gap:8px; align-items:stretch; }
 .vm-rl{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text2); }
 .vm-rt{ font-size:10.5px; font-weight:700; color:var(--text3); border:1px solid var(--border); border-radius:6px; padding:2px 5px; }
 .vm-opt{ display:flex; align-items:center; gap:8px; text-align:left; cursor:pointer; font-size:12.5px;
   border:1px solid var(--border); background:var(--bg2); color:var(--text2); border-radius:9px; padding:8px 11px; }
-.vm-opt i{ font-style:normal; font-size:10.5px; font-weight:800; color:var(--text3); border:1px solid var(--border); border-radius:6px; padding:2px 6px; }
+.vm-opt i{ font-style:normal; font-size:11px; font-weight:800; color:var(--text3); }
 .vm-opt:hover{ background:var(--bg3); }
 .vm-opt.on{ border-color:var(--brand); background:var(--brand-soft); color:var(--text); }
-.vm-opt.on i{ color:var(--brand); border-color:rgba(38,162,105,.45); }
-.vm-none{ font-size:12.5px; color:var(--text3); background:var(--bg1); border:1px solid var(--border); border-radius:11px; padding:11px 13px; margin-bottom:16px; }
-/* サブのナンバーの扱い（🔴 選ばないと進めない） */
-.vm-plate{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:6px; }
+.vm-opt.on i{ color:var(--brand); }
+
+/* ②のナンバーの扱い（🔴 選ばないと進めない） */
+.vm-plate{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .vm-pl{ text-align:left; cursor:pointer; border:1px solid var(--border); background:var(--bg2); border-radius:11px; padding:12px 14px; }
 .vm-pl:hover{ background:var(--bg3); }
 .vm-pl.on{ border-color:var(--brand); background:var(--brand-soft); }
 .vm-pl b{ display:block; font-size:13px; font-weight:800; margin-bottom:5px; }
 .vm-pl span{ display:block; font-size:11.5px; line-height:1.6; color:var(--text2); }
 .vm-pl span b{ display:inline; font-size:11.5px; color:var(--text); }
+
+/* まとめた記録（取り消しは管理者だけ） */
+.vm-logs{ display:flex; flex-direction:column; gap:6px; }
+.vm-log{ display:flex; align-items:center; gap:10px; border:1px solid var(--border); background:var(--bg1); border-radius:9px; padding:9px 12px; }
+.vm-logmain{ flex:1; min-width:0; font-size:12.5px; }
+.vm-logsub{ display:block; font-size:11px; color:var(--text3); margin-top:3px; }
+.vm-undo{ font-size:11.5px; font-weight:700; color:#1db97a; cursor:pointer;
+  border:1px solid #1db97a55; background:transparent; border-radius:8px; padding:6px 11px; }
+.vm-undo:hover{ background:rgba(29,185,122,.14); }
+.vm-lock{ font-size:11px; color:var(--text3); }

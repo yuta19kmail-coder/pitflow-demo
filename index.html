@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.38.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.39.1"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.38.0</div>
+    <div class="login-ver">v2.39.1</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.38.0</span>
+    <span class="ver">v2.39.1</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -857,7 +857,7 @@
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
 <script src="js/pit-share.js?v=23"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=f85dcc35"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
-<script src="js/errcode-pit.js?v=10"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
+<script src="js/errcode-pit.js?v=11"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
 <script src="js/state.js?v=78"></script>
 <script src="js/intern-pit.js?v=1"></script><!-- 🏢 v2.6.0 社内車両（中古・代車・内部）の物差し1本（区分マスター・実績化・参考の台数）。**card-detail.js / card-miss.js より前** -->
@@ -892,9 +892,9 @@ window.PIT_DEMO = true;</script>
 <script src="js/avail.js?v=7"></script>
 <script src="js/card-tabs.js?v=15"></script>
 <script src="js/archive-pit.js?v=5"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
-<script src="js/customers.js?v=71"></script>
-<script src="js/veh-merge.js?v=3"></script><!-- 🚗 v2.31.0→v2.32.0 同じ車が2件に分かれている時に1台にまとめる（顧客はまたがない・入口は顧客詳細の編集の横だけ）。customers.js の器（custShowModal）を借りるので後ろに読む -->
-<script src="js/cust-merge.js?v=5"></script>
+<script src="js/customers.js?v=73"></script>
+<script src="js/veh-merge.js?v=4"></script><!-- 🚗 v2.31.0→v2.32.0 同じ車が2件に分かれている時に1台にまとめる（顧客はまたがない・入口は顧客詳細の編集の横だけ）。customers.js の器（custShowModal）を借りるので後ろに読む -->
+<script src="js/cust-merge.js?v=7"></script>
 <script src="js/dup-find.js?v=3"></script><!-- 🔎 v2.37.0 ダブりを洗い出す（読むだけ）。veh-merge / cust-merge へ飛ばすので後ろに読む --><!-- 👤 v2.36.0 同じお客様が2人に分かれている時に1人にまとめる（2本検索の専用UI）。customers.js の器と veh-merge の見た目を借りるので後ろに読む -->
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
@@ -904,7 +904,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/coreflow-note-reply.js?v=a224b9c0"></script><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
 <script src="js/coreflow-note-all.js?v=830ce1ff"></script><!-- 📎 付箋のまとめて表示（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
 <script src="js/board-notes.js?v=11"></script>
-<script src="js/search.js?v=20"></script>
+<script src="js/search.js?v=21"></script>
 <script src="js/insurance-pit.js?v=1"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
 <script src="js/sales-count.js?v=7"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=5"></script>

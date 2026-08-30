@@ -414,7 +414,7 @@
                'いま入れたナンバー＝'+vehicle.plate,
                /* 🔵 v2.34.1 車種名がちがう時は、それも一緒に直ることを先に言う（黙って書き換えない） */
                ((((候補.maker?候補.maker+' ':'')+(候補.car||'')).trim()) !== 名)
-                 ? '⚠ 車種名がちがいます（'+((((候補.maker?候補.maker+' ':'')+(候補.car||'')).trim())||'（未入力）')+' → '+名+'）。「同じ車です」を選ぶと、車種名もいま入れた方に直ります。'
+                 ? '⚠ 車種名がちがいます（'+((((候補.maker?候補.maker+' ':'')+(候補.car||'')).trim())||'（車種名なし）')+' → '+名+'）。「同じ車です」を選ぶと、車種名もいま入れた方に直ります。'
                  : '',
                '「同じ車です」＝その車にナンバーを入れます。相談来店などの過去の入庫も、この車の履歴として並びます。',
                '「別の車です」＝新しい車として登録します。ナンバーなしの車はそのまま残ります。',
@@ -426,13 +426,17 @@
   window.upsertCustomerFromCard=upsertCustomerFromCard;
 
   /* ===== 検索 ===== */
+  /* 🔤 v2.39.0 探す時は**旧字・異体字も寄せる**（物差しは search.js の `pitSearchNorm` 1本）。
+     ⚠ 引き当て（`_findPerson`）はここを通さない＝**決める時は寄せない**（別姓が混ざるため）。 */
+  function snorm(s){ return window.pitSearchNorm ? pitSearchNorm(s) : norm(s); }
   function match(cust,q){
-    if(norm(cust.name).includes(q)||norm(cust.kana).includes(q)) return true;
+    q = snorm(q);
+    if(snorm(cust.name).includes(q)||snorm(cust.kana).includes(q)) return true;
     /* 🔵 v2.35.0 旧姓・旧ナンバーでも当たる（苗字が変わった／ナンバーが変わった人を見失わない） */
-    if((cust.oldNames||[]).some(function(x){ return norm(x).includes(q); })) return true;
-    if((cust.contacts||[]).some(ct=>norm(ct.tel).includes(q))) return true;
-    if((cust.vehicles||[]).some(v=>norm(v.plate).includes(q)||norm(v.car).includes(q)||norm(v.maker).includes(q)
-        ||(v.oldPlates||[]).some(function(x){ return norm(x).includes(q); }))) return true;
+    if((cust.oldNames||[]).some(function(x){ return snorm(x).includes(q); })) return true;
+    if((cust.contacts||[]).some(ct=>snorm(ct.tel).includes(q))) return true;
+    if((cust.vehicles||[]).some(v=>snorm(v.plate).includes(q)||snorm(v.car).includes(q)||snorm(v.maker).includes(q)
+        ||(v.oldPlates||[]).some(function(x){ return snorm(x).includes(q); }))) return true;
     return false;
   }
 
@@ -1470,7 +1474,12 @@
     const vehicles=liveVehs(cust);
     const archived=archVehs(cust);
     const cards=_custCards(cust);                       /* 実績になったものだけ（v1.54.0） */
-    const openCards=_custCardsAll(cust).filter(c=>!_cardDone(c));   /* いま予約・作業中のもの */
+    /* 🔴 v2.39.1（見張り test_overdue が捕まえた）**未入庫・廃車は「いま動いているもの」ではない。**
+       ⚠ 未入庫（来なかった）は `c.cancelled` が立たないので `_cardDone` では終わったことにならない。
+          そのまま出すと「来なかった車」が動いているものとして並ぶ（ゆうた確定＝別物）。
+       🔴 生きているカードかの物差しは `pitCardActive`（pit-share.js）1本。ここで条件を書き写さない。 */
+    const _alive = window.pitCardActive || function(c){ return !!c && c.status!=='scrap' && c.status!=='cancelled'; };
+    const openCards=_custCardsAll(cust).filter(c=>!_cardDone(c) && _alive(c));   /* いま予約・作業中のもの */
     /* 🔴 v1.101.0 キャンセルは**来ていない**ので「来店回数」には数えない。
        ⚠ ただし**履歴には出す**ので、一覧を出すかどうかは別の数（histN）で見ること。
           ここを1つの数で兼ねると、キャンセルだけのお客様で履歴が丸ごと消える。 */

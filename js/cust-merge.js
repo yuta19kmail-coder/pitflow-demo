@@ -46,7 +46,9 @@
     { k:'name',       l:'お名前' },
     { k:'kana',       l:'カナ' },
     { k:'lineStatus', l:'LINE', disp:function(v){ return v==='ok'?'登録済':(v==='ng'?'LINE NG':(v?v:'未案内')); } },
-    { k:'lstepId',    l:'Lステップ番号' }
+    /* 🔴 v2.37.3 番号に URL がまるごと入っていることがある。**欄の見くらべでも URL を並べない**
+       （持っていく中身は生のまま。ここは見せ方だけ） */
+    { k:'lstepId',    l:'Lステップ番号', disp:function(v){ return _lstepNo(v) || (t(v)?'（URLが入っています）':''); } }
   ];
 
   /* =====================================================================
@@ -213,10 +215,24 @@
     var 日 = a.map(function(x){ return t(x.completedAt)||t(x.returnDate)||t(x.reserveDate); }).filter(Boolean).sort();
     return { 回:a.length, 最終:(日.length?日[日.length-1].replace(/-/g,'/'):'') };
   }
+  /* 🔴 v2.37.3（ゆうた指摘）**Lステップの番号に、URL がまるごと入っていることがある。**
+     そのまま出すと長い URL が札からはみ出して読めない。**「Lステップ」と押せる形**にする。
+     ⚠ 番号だけの時も同じ見た目にそろえる（現場は番号を読みたいわけではない）。 */
+  function _lstepNo(v){
+    var x = t(v); if(!x) return '';
+    var m = x.match(/(\d{2,})\D*$/);          /* URL の末尾の数字＝顧客番号 */
+    return m ? m[1] : (/^https?:/i.test(x) ? '' : x);
+  }
   function _lineHtml(c){
     var st = t(c.lineStatus);
     if(st==='ng') return '<span class="um-pill">LINE NG</span>';
-    if(st==='ok') return '<span class="um-pill ok">LINE 登録済' + (t(c.lstepId)?('（'+esc(t(c.lstepId))+'）'):'') + '</span>';
+    if(st==='ok'){
+      var no = _lstepNo(c.lstepId);
+      var url = (w.pitLstepUrl && t(c.lstepId)) ? pitLstepUrl(c.lstepId) : '';
+      if(url) return '<a class="um-pill ok um-lstep" href="' + esc(url) + '" target="_blank" rel="noopener" '
+                   + 'onclick="event.stopPropagation()" title="Lステップを開く">Lステップ' + (no?(' '+esc(no)):'') + '</a>';
+      return '<span class="um-pill ok">LINE 登録済' + (no?('（'+esc(no)+'）'):'') + '</span>';
+    }
     return '<span class="um-pill mut">LINE 未案内</span>';
   }
   /* 🔎 v2.37.1 このカードは**洗い出しの窓からも使う**（同じ見た目で状況を見せる）＝写しを作らない。
@@ -411,11 +427,13 @@
       var かぶり = P.車.かぶり.length, aid = _st.主;
       var 記録 = apply(_st.主, _st.サブ, { 欄:_st.欄, 連絡先:_st.連絡先 });
       if(!記録) return;
-      _st = null;
       toast('まとめました');
       if(w.renderCustomers) try{ renderCustomers(); }catch(e){}
-      if(かぶり && w.PitVehMerge) PitVehMerge.open(aid);
-      else if(w.custOpen) custOpen(aid);
+      /* 🔴 v2.37.3（ゆうた指定）「**統合した後に、検索画面に戻ってほしい。つぎつぎ行きたい**」
+         ＝ 顧客詳細へは行かない。**まとめる窓を空で開き直す**（＝2本の検索画面）。
+         ⚠ 同じナンバーが両方に居た時だけは、先に「車をまとめる」へ渡す（そこは片づけないと残るので）。 */
+      if(かぶり && w.PitVehMerge){ _st = null; PitVehMerge.open(aid); }
+      else open();
     });
   }
 

@@ -727,19 +727,20 @@ function _ensureNameParts(c){
 }
 /* お客様名＝見た目1BOX・中で姓/名（ナンバー入力と同じ思想）。data-key=customer は必須チェックの赤枠用 */
 function nameBoxInput(c){
+  /* 🔵 v2.35.0 打っている最中に「似た方がいます」を出す（呼び出し済みなら出ない・customers.js 側で判断） */
   return '<div class="cf-namebox" data-key="customer">'
-    + '<input type="text" class="cf-nb-seg" data-name="sei" value="' + _pe(c.sei || '') + '" placeholder="姓" autocomplete="off">'
+    + '<input type="text" class="cf-nb-seg" data-name="sei" value="' + _pe(c.sei || '') + '" placeholder="姓" autocomplete="off" oninput="pitRecallHint(this,event)">'
     + '<span class="cf-nb-sep"></span>'
-    + '<input type="text" class="cf-nb-seg" data-name="mei" value="' + _pe(c.mei || '') + '" placeholder="名" autocomplete="off">'
+    + '<input type="text" class="cf-nb-seg" data-name="mei" value="' + _pe(c.mei || '') + '" placeholder="名" autocomplete="off" oninput="pitRecallHint(this,event)">'
     + '</div>';
 }
 /* 🔴 v1.76.0（ゆうた指定）**カナは必須（赤）** になったので、赤枠を付ける目印を足す。
    ⚠ 漢字（customer）は「入れたほうがいい（黄）」に変わった。 */
 function kanaBoxInput(c){
   return '<div class="cf-namebox" data-key="kana">'
-    + '<input type="text" class="cf-nb-seg" data-name="seiKana" value="' + _pe(c.seiKana || '') + '" placeholder="セイ" autocomplete="off">'
+    + '<input type="text" class="cf-nb-seg" data-name="seiKana" value="' + _pe(c.seiKana || '') + '" placeholder="セイ" autocomplete="off" oninput="pitRecallHint(this,event)">'
     + '<span class="cf-nb-sep"></span>'
-    + '<input type="text" class="cf-nb-seg" data-name="meiKana" value="' + _pe(c.meiKana || '') + '" placeholder="メイ" autocomplete="off">'
+    + '<input type="text" class="cf-nb-seg" data-name="meiKana" value="' + _pe(c.meiKana || '') + '" placeholder="メイ" autocomplete="off" oninput="pitRecallHint(this,event)">'
     + '</div>';
 }
 /* v0.92.0 LINE欄：状態（未/お断り/案内してない/OK）。OK のときだけ Lステップ顧客番号を入力し、
@@ -2094,11 +2095,12 @@ function telInput(c){
   let h = '<div class="cf-tel" data-key="tel">';
   h += '<input type="text" class="cf-input cf-tel-main" data-tel-main readonly value="' + _pe(c.tel || '') + '" placeholder="クリックして入力" autocomplete="off">';
   h += '<div class="cf-tel-guide"><div class="cf-tel-row">';
-  h += '<input type="text" class="cf-input cf-tel-1" data-tel="1" value="' + v1 + '" inputmode="numeric" maxlength="5" placeholder="090">';
+  /* 🔵 v2.35.0 電話を打っている最中にも「似た方がいます」を出す */
+  h += '<input type="text" class="cf-input cf-tel-1" data-tel="1" value="' + v1 + '" inputmode="numeric" maxlength="5" placeholder="090" oninput="pitRecallHint(this,event)">';
   h += '<span class="cf-tel-sep">-</span>';
-  h += '<input type="text" class="cf-input cf-tel-2" data-tel="2" value="' + v2 + '" inputmode="numeric" maxlength="4" placeholder="1234">';
+  h += '<input type="text" class="cf-input cf-tel-2" data-tel="2" value="' + v2 + '" inputmode="numeric" maxlength="4" placeholder="1234" oninput="pitRecallHint(this,event)">';
   h += '<span class="cf-tel-sep">-</span>';
-  h += '<input type="text" class="cf-input cf-tel-3" data-tel="3" value="' + v3 + '" inputmode="numeric" maxlength="4" placeholder="5678">';
+  h += '<input type="text" class="cf-input cf-tel-3" data-tel="3" value="' + v3 + '" inputmode="numeric" maxlength="4" placeholder="5678" oninput="pitRecallHint(this,event)">';
   h += '</div></div></div>';
   return h;
 }

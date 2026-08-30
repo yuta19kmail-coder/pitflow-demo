@@ -213,7 +213,20 @@
       }
     }
     if(!p){ p={ id:'cu'+Date.now()+Math.floor(Math.random()*1000), name, kana, contacts, vehicles:[], updatedAt:Date.now() }; list().push(p); }
-    else { p.name=name||p.name; p.kana=kana||p.kana; if(contacts.length) p.contacts=contacts; }
+    else {
+      /* 🔵 v2.35.0（ゆうた指定）**名前が変わったら、前の名前を「旧姓」として自動で残す。**
+         ⚠ 結婚・離婚で苗字が変わっても、旧姓で探せば当たるように（現場は何もしなくていい）。
+         ⚠ 空 → 入った（電話口のカナだけ → 漢字が分かった）は**変更ではない**ので残さない。
+         ⚠ 増え続けないよう、直近5件まで。 */
+      const 前の名=String(p.name||'').trim();
+      if(name && 前の名 && norm(前の名)!==norm(name)){
+        if(!Array.isArray(p.oldNames)) p.oldNames=[];
+        if(p.oldNames.every(function(x){ return norm(x)!==norm(前の名); })) p.oldNames.push(前の名);
+        if(p.oldNames.length>5) p.oldNames=p.oldNames.slice(-5);
+        if(window.pitOpLog) try{ pitOpLog('お名前を変更', 前の名+' → '+name+'（旧姓として残した）'); }catch(e){}
+      }
+      p.name=name||p.name; p.kana=kana||p.kana; if(contacts.length) p.contacts=contacts;
+    }
     // v0.93.0 LINEは人単位で保持（カードに値があれば更新・無ければ既存維持）
     if(c.lineStatus) p.lineStatus=c.lineStatus;
     if((c.lstepId||'').trim()) p.lstepId=(c.lstepId||'').trim();
@@ -253,25 +266,172 @@
         v = p.vehicles.find(x=>x && !x.perVisit && !isRealPlate(x.plate) && norm(String(x.maker||'')+String(x.car||''))===key) || null;
       }
     }
-    if(v){ v.plate=vehicle.plate||v.plate; v.maker=vehicle.maker||v.maker; v.car=vehicle.car||v.car; if(vehicle.boardId)v.boardId=vehicle.boardId; if(vehicle.division)v.division=vehicle.division; if(vehicle.frontStaff){v.frontStaff=vehicle.frontStaff; v.frontStaffId=vehicle.frontStaffId||'';} if(vehicle.karteNo)v.karteNo=vehicle.karteNo; v.updatedAt=Date.now(); }
-    else if(vehicle.plate||vehicle.maker||vehicle.car){
-      const base=p.vehicles[p.vehicles.length-1]||{};   // 新車両：未指定の担当/課/区分は既存からデフォ継承
-      v={ id:'v'+Date.now()+Math.floor(Math.random()*1000), plate:vehicle.plate, maker:vehicle.maker, car:vehicle.car,
-        boardId:vehicle.boardId||base.boardId||'', division:vehicle.division||base.division||'', frontStaff:vehicle.frontStaff||base.frontStaff||'', frontStaffId:vehicle.frontStaffId||base.frontStaffId||'', karteNo:vehicle.karteNo||'', updatedAt:Date.now() };
-      p.vehicles.push(v);
+    /* ================================================================
+       🔵🔵 v2.34.0（2026-08-30・ゆうた指定）**ナンバーが分かった時に、1回だけ聞く**
+       ----------------------------------------------------------------
+       ◎現場の流れ（受付に聞いた本当の形）
+         電話1本で「相談来店」と「本予約」を**2枚いっぺんに**取る（どちらもナンバーなし・カナだけ）。
+         相談来店で車検証をもらい、漢字・ナンバー・カルテNoが分かる。
+         **相談来店はもう終わっていて直せない**ので、**本予約だけ**を直す → **ダブる。**
+       ◎🔴 正体
+         ここは**ナンバーが入っているとナンバーでしか車を探さない**。
+         見つからなければ新しい車を作る＝**カードが覚えている「ナンバーなしの車」を見ていない。**
+         ⚠ 逆（ナンバーなしのカード）には引き当てがある（上の `if(!v && !vehicle.plate)`）。
+            **ナンバーが入った時のぶんだけ無かった。**
+       ◎決めごと（ゆうた 2026-08-30）
+         🔴 **黙ってくっつけない。1回だけ聞く。** ただし**聞くのはこの1場面だけ**
+            ＝「**ナンバーなしの車が居るのに、本物のナンバーが入った**」時。
+            名前・電話・担当・カルテNo の直しでは聞かない（車が別物になる変更ではない）。
+         🔴 言葉は**目的**で書く＝「**同じ車です**」／「**別の車です（乗り換え・増車）**」。
+            「この予約だけ変える」とは書かない（結果であって、受付が知っている軸ではない）。
+         🔴 **どちらを選んでも、過去のカードは書き換えない。**
+            変わるのは車の登録の方。当時の相談来店は「ナンバー未定」のまま＝記録は当時のまま。
+       ⚠ 窓が無い所（取り込み・サンプル・見張り）は**既定＝同じ車**。ダブりを増やさない側に倒す。
+       ================================================================ */
+    if(v){ _vehWrite(v, vehicle); }
+    else if(!vehicle.plate || c.perVisit){
+      if(vehicle.plate||vehicle.maker||vehicle.car) v=_vehNew(p, vehicle);
+    }
+    else if(_plateChanged(p, c, vehicle)){
+      /* 🔵 v2.35.0 ここは「ナンバー変更」として扱う（下の _plateChanged が中で書き換える） */
+      v=(p.vehicles||[]).find(function(x){ return x && x.id===c.vehId; })||null;
+    }
+    else {
+      const 候補=_plateLessCand(p, c, vehicle);
+      if(候補){
+        /* 🔴 決まるまで**新しい車を作らない**。人・連絡先の直しはここまでで済んでいる。 */
+        p.updatedAt=Date.now(); c.customerId=p.id;
+        if(window.PitDB) PitDB.save();
+        _askSameCar(p, 候補, c, vehicle);
+        return;
+      }
+      v=_vehNew(p, vehicle);
     }
     p.updatedAt=Date.now();
     c.customerId=p.id;
     if(v && v.id) c.vehId=v.id;   /* 🔴 v1.53.0 どの車の予約かをカードに覚えさせる（次の保存で増やさない） */
     if(window.PitDB) PitDB.save();
   }
+  /* 車に書き込む／新しい車を作る＝**ここ1本**（聞く道と聞かない道で写しを作らない） */
+  function _vehWrite(v, vehicle){
+    v.plate=vehicle.plate||v.plate; v.maker=vehicle.maker||v.maker; v.car=vehicle.car||v.car;
+    if(vehicle.boardId)v.boardId=vehicle.boardId; if(vehicle.division)v.division=vehicle.division;
+    if(vehicle.frontStaff){v.frontStaff=vehicle.frontStaff; v.frontStaffId=vehicle.frontStaffId||'';}
+    if(vehicle.karteNo)v.karteNo=vehicle.karteNo;
+    v.updatedAt=Date.now();
+    return v;
+  }
+  function _vehNew(p, vehicle){
+    const base=p.vehicles[p.vehicles.length-1]||{};   // 新車両：未指定の担当/課/区分は既存からデフォ継承
+    const v={ id:'v'+Date.now()+Math.floor(Math.random()*1000), plate:vehicle.plate, maker:vehicle.maker, car:vehicle.car,
+      boardId:vehicle.boardId||base.boardId||'', division:vehicle.division||base.division||'', frontStaff:vehicle.frontStaff||base.frontStaff||'', frontStaffId:vehicle.frontStaffId||base.frontStaffId||'', karteNo:vehicle.karteNo||'', updatedAt:Date.now() };
+    p.vehicles.push(v);
+    return v;
+  }
+  /* ================================================================
+     🔵🔵 v2.35.0（ゆうた 2026-08-30）**ナンバー変更は聞かない。**
+     ----------------------------------------------------------------
+     🗣「新規予約からだと**増車ボタンがあるよね？** だから増車なのか、ナンバー変更かは間違えなくない？」
+     ＝ そのとおり。**乗り換え・増車には専用の入口がある**（カード詳細の「＋ この顧客で新規車両」）。
+        だから **カードのナンバー欄を打ち替えた＝その車のナンバーが変わった（か、打ち間違いの直し）**。
+     🔴 なので聞かない。**その車のナンバーを書き換える**（新しい車を作らない）。
+     🔴 旧ナンバーを残すかは**機械的に決める**＝その番号で**終わった入庫があるか**。
+        ・ある … 実在したナンバー＝**旧ナンバーとして残す**（過去のカードから履歴が引ける）
+        ・ない … **打ち間違い**とみなして残さない（ありもしない番号を引き当てに使わない）
+     🔴 ⚠ 残る危ないところ＝**乗り換えを、ボタンを使わずに打ち替えでやった時**。
+        前の車の履歴が新しいナンバーに混ざる。だから**打ち替えた記録を車に残す**（`plateLog`）＋
+        画面にも知らせる。気づけば手で分けられる。**黙って済ませない。**
+     ================================================================ */
+  function _plateChanged(p, c, vehicle){
+    if(!vehicle.plate || c.perVisit || !c.vehId) return false;
+    const 覚え=(p.vehicles||[]).find(function(x){ return x && x.id===c.vehId; });
+    if(!覚え || 覚え.mergedInto) return false;
+    if(!isRealPlate(覚え.plate)) return false;                 /* ナンバーなし＝別の道（聞く方） */
+    if(norm(覚え.plate)===norm(vehicle.plate)) return false;   /* 同じなら何もない */
+    const 旧=String(覚え.plate||'').trim();
+    /* その旧ナンバーで「終わった入庫」があるか＝実在したナンバーか */
+    const 済み=window.pitCardIsDone||function(){ return false; };
+    const 実績あり=(Array.isArray(state.cards)?state.cards:[]).some(function(x){
+      return x && x.id!==c.id && isRealPlate(x.plate) && norm(x.plate)===norm(旧) && 済み(x);
+    });
+    if(実績あり){
+      if(!Array.isArray(覚え.oldPlates)) 覚え.oldPlates=[];
+      if(覚え.oldPlates.every(function(q){ return norm(q)!==norm(旧); })) 覚え.oldPlates.push(旧);
+    }
+    if(!Array.isArray(覚え.plateLog)) 覚え.plateLog=[];
+    覚え.plateLog.push({ at:Date.now(), by:(window.pitCurrentStaffName?pitCurrentStaffName():''),
+                         前:旧, 後:vehicle.plate, 旧を残した:実績あり });
+    _vehWrite(覚え, vehicle);
+    if(window.pitToast) pitToast('ナンバーを変更しました（'+旧+' → '+vehicle.plate+'）'+(実績あり?'。旧ナンバーは履歴用に残しました':'')+'　※別の車なら「＋ この顧客で新規車両」から');
+    if(window.pitOpLog) try{ pitOpLog('ナンバーを変更', (custDispName(p)||'')+' / '+旧+' → '+vehicle.plate+(実績あり?'（旧を残した）':'')); }catch(e){}
+    return true;
+  }
+  /* 「同じ車かもしれない」ナンバーなしの車を1台だけ選ぶ。
+     🔴 順番は**逆方向とそろえる**＝①カードが覚えている車 ②カルテNo ③メーカー＋車種。
+     ⚠ 都度車両変動・アーカイブ済み・統合で吸収済みは相手にしない。 */
+  function _plateLessCand(p, c, vehicle){
+    const 生き=(p.vehicles||[]).filter(function(x){
+      if(!x || x.perVisit || isRealPlate(x.plate)) return false;
+      if(x.mergedInto) return false;
+      return !(window.PitArchive ? PitArchive.vehSelfArchived(x) : x.archived);
+    });
+    if(!生き.length) return null;
+    if(c.vehId){ const h=生き.find(function(x){ return x.id===c.vehId; }); if(h) return h; }
+    if((vehicle.karteNo||'').trim()){ const h=生き.find(function(x){ return norm(x.karteNo)===norm(vehicle.karteNo); }); if(h) return h; }
+    if(vehicle.maker||vehicle.car){
+      const key=norm(vehicle.maker+vehicle.car);
+      const h=生き.find(function(x){ return norm(String(x.maker||'')+String(x.car||''))===key; });
+      if(h) return h;
+    }
+    /* 🔵 v2.34.1（ゆうた指摘 2026-08-30）**車種名がちがっていても拾う。**
+       ⚠ 相談の電話で分かるのは「ざっくりした車種」だけ＝**車検証を見たら違う名前だった**は普通に起きる。
+          ③（メーカー＋車種）だけだと、そこで外れて**黙って2台目ができる**。
+       🔴 ただし**ナンバーなしの車が1台だけの時に限る**＝どれのことか迷いようがない時だけ。
+          2台以上あって名前も合わないなら、こちらでは決めない（今までどおり新しい車にする）。
+       ⚠ 拾っても**黙ってくっつけない**＝このあと必ず聞く。違えば「別の車です」を押せばいいだけ。 */
+    if(生き.length===1) return 生き[0];
+    return null;
+  }
+  /* 🔴 1回だけ聞く。⚠ 見出しは第1引数（`title` は効かない・ask-pit.js の決まり）。 */
+  function _askSameCar(p, 候補, c, vehicle){
+    const 名=((vehicle.maker?vehicle.maker+' ':'')+(vehicle.car||'')).trim()||'この車';
+    const 決める=function(同じ){
+      const v = 同じ ? _vehWrite(候補, vehicle) : _vehNew(p, vehicle);
+      p.updatedAt=Date.now();
+      if(v && v.id) c.vehId=v.id;
+      if(window.PitDB) PitDB.save();
+      if(window.pitOpLog) try{
+        pitOpLog(同じ?'ナンバーを、登録済みの車に入れた':'別の車として登録',
+          (custDispName(p)||'')+' / '+(vehicle.plate||'')+(同じ?('（'+名+'・1台のまま）'):'（乗り換え・増車）'));
+      }catch(e){}
+      if(window.renderCustomers) try{ renderCustomers(); }catch(e){}
+    };
+    /* 窓が無い所（取り込み・サンプル・見張り）は**既定＝同じ車**＝ダブりを増やさない側 */
+    if(!window.pitAsk){ 決める(true); return; }
+    pitAsk('いま入れたナンバーは、この車のものですか？', {
+      detail:[ (custDispName(p)||'このお客様')+' 様は「ナンバーなしの '+((((候補.maker?候補.maker+' ':'')+(候補.car||'')).trim())||'車')+'」を1台持っています。',
+               'いま入れたナンバー＝'+vehicle.plate,
+               /* 🔵 v2.34.1 車種名がちがう時は、それも一緒に直ることを先に言う（黙って書き換えない） */
+               ((((候補.maker?候補.maker+' ':'')+(候補.car||'')).trim()) !== 名)
+                 ? '⚠ 車種名がちがいます（'+((((候補.maker?候補.maker+' ':'')+(候補.car||'')).trim())||'（未入力）')+' → '+名+'）。「同じ車です」を選ぶと、車種名もいま入れた方に直ります。'
+                 : '',
+               '「同じ車です」＝その車にナンバーを入れます。相談来店などの過去の入庫も、この車の履歴として並びます。',
+               '「別の車です」＝新しい車として登録します。ナンバーなしの車はそのまま残ります。',
+               'どちらでも、当時のカードは書き換えません（ナンバー未定のまま残ります）。'
+             ].filter(function(x){ return !!x; }),   /* ⚠ 空行を窓に出さない */
+      ok:'同じ車です（ナンバーを入れる）', cancel:'別の車です（乗り換え・増車）'
+    }).then(function(yes){ 決める(!!yes); });
+  }
   window.upsertCustomerFromCard=upsertCustomerFromCard;
 
   /* ===== 検索 ===== */
   function match(cust,q){
     if(norm(cust.name).includes(q)||norm(cust.kana).includes(q)) return true;
+    /* 🔵 v2.35.0 旧姓・旧ナンバーでも当たる（苗字が変わった／ナンバーが変わった人を見失わない） */
+    if((cust.oldNames||[]).some(function(x){ return norm(x).includes(q); })) return true;
     if((cust.contacts||[]).some(ct=>norm(ct.tel).includes(q))) return true;
-    if((cust.vehicles||[]).some(v=>norm(v.plate).includes(q)||norm(v.car).includes(q)||norm(v.maker).includes(q))) return true;
+    if((cust.vehicles||[]).some(v=>norm(v.plate).includes(q)||norm(v.car).includes(q)||norm(v.maker).includes(q)
+        ||(v.oldPlates||[]).some(function(x){ return norm(x).includes(q); }))) return true;
     return false;
   }
 
@@ -283,6 +443,35 @@
     const v=String(qstr==null?'':qstr);
     if(!window.pitTypeSoon){ custSuggest(v); return; }
     pitTypeSoon('recall', ev, function(){ custSuggest(v); });
+  };
+  /* ================================================================
+     🔵🔵 v2.35.0（ゆうた指定 2026-08-30）**打っている最中に「似た方がいます」を出す**
+     ----------------------------------------------------------------
+     ◎なぜ
+       いちばん多いダブりは「電話口はカナ、来店で漢字」＝**呼び出さずに新しく作ってしまう**こと。
+       名前・カナ・電話は**あとから変わる手がかり**なので、こちらで決めない。**候補を出すだけ。**
+     🔴 出すのは **まだ誰にも紐づいていないカード**の時だけ（呼び出し済みなら邪魔なだけ）。
+     🔴 候補の箱は**呼び出し欄と同じもの**を使う（新しい見た目を作らない）。押せばそのまま呼び出し。
+     ⚠ 2文字未満では出さない（1文字だと全員出て意味がない）。
+     ================================================================ */
+  window.pitRecallHint=function(el, ev){
+    try{
+      const id=(window.pitOpenCardId?pitOpenCardId():'');
+      const c=id?(state.cards||[]).find(function(x){ return x&&x.id===id; }):null;
+      const box=(el&&el.closest)?el.closest('.cf-namebox, .cf-tel'):null;
+      const hide=function(){
+        const host=document.getElementById('cf-recall-list'); if(host) host.style.display='none';
+      };
+      if(c && c.customerId) return hide();      /* もう呼び出し済み＝出さない */
+      let q='';
+      if(box && box.classList.contains('cf-tel')){
+        q=[].slice.call(box.querySelectorAll('[data-tel]')).map(function(x){ return String(x.value||'').trim(); }).filter(Boolean).join('');
+      } else if(box){
+        q=[].slice.call(box.querySelectorAll('.cf-nb-seg')).map(function(x){ return String(x.value||'').trim(); }).filter(Boolean).join(' ');
+      } else { q=String((el&&el.value)||''); }
+      if(norm(q).length<2) return hide();
+      custSuggestSoon(q, ev);
+    }catch(e){}
   };
   window.custSuggest=function(qstr){
     /* 🔴 v1.44.0 候補の箱は**いま開いているフォームの中**から探す。

@@ -525,3 +525,23 @@
   border:1px solid #1db97a55; background:transparent; border-radius:8px; padding:6px 11px; }
 .vm-undo:hover{ background:rgba(29,185,122,.14); }
 .vm-lock{ font-size:11px; color:var(--text3); }
+
+/* ========================================
+ * 🔵 v2.33.0 顧客詳細「いま動いているもの」＋ 作業履歴の戻るボタン（2026-08-30 ゆうた指定）
+ * ⚠ 見た目は来店履歴（.cd-hist / .cd-hrow）をそのまま借りる。**新しい形は作らない。**
+ *    違うのは「進行中」と分かる印だけ＝左の細い帯と、状態の札。
+ * ======================================== */
+.cd-nowlist{ border-color:rgba(38,162,105,.35); }
+.cd-hrow.cd-now{ position:relative; }
+.cd-hrow.cd-now::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--brand); }
+.cd-hdl{ display:inline-block; margin-right:5px; font-size:10px; font-weight:800; color:var(--text3); }
+.cd-hplate{ font-size:11.5px; font-weight:700; color:var(--text2); letter-spacing:.02em; }
+/* まだ確定していない金額＝「概算」と書いてから数字（¥だけ並べると確定に見える） */
+.cd-hest{ display:block; font-size:10px; font-weight:700; color:var(--text3); margin-bottom:1px; }
+.cd-htag.st.now{ color:var(--brand); border-color:rgba(38,162,105,.45); background:var(--brand-soft); }
+
+/* 作業履歴の窓から顧客詳細へ戻る（窓は同じ器なので、✕ だと顧客詳細ごと閉じる） */
+.ch-back{ display:inline-flex; align-items:center; gap:5px; margin-right:12px;
+  height:28px; padding:0 11px; font-size:11.5px; font-weight:700; cursor:pointer;
+  color:var(--text2); background:var(--bg3); border:1px solid var(--border); border-radius:8px; }
+.ch-back:hover{ background:var(--bg4); color:var(--text); }

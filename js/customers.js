@@ -963,7 +963,12 @@
     if (!P) return '';
     const cust = P.cust, cars = P.cars, ぜんぶ = P.ぜんぶ, rows = P.rows, open = P.open;
 
-    let h = '<div class="cm-head"><i data-ic=clock data-ics=16></i> 作業履歴 '
+    /* 🔵 v2.33.0（ゆうた指定 2026-08-30）「**履歴詳細に戻るボタンがほしい**」
+       ⚠ 窓は顧客詳細と**同じ器**なので、✕ を押すと顧客詳細ごと閉じてしまう（＝戻れない）。
+       ⚠ カードから直接開いた道（お客様が引けない `_hist.only`）では出さない。押しても戻る先が無い。 */
+    let h = '<div class="cm-head">'
+      + ((cust && !_hist.only) ? '<button class="ch-back" onclick="custOpen(\''+cust.id+'\')" title="顧客詳細へ戻る"><i data-ic=left data-ics=15></i> 顧客詳細へ戻る</button>' : '')
+      + '<i data-ic=clock data-ics=16></i> 作業履歴 '
       + '<span class="cm-sub">'+esc((cust?custDispName(cust):(_hist.名||''))||'(無名)')+'</span>'
       + '<button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div>';
     h += '<div class="ch-wrap">';
@@ -1378,6 +1383,58 @@
       h+='</div>';
     } else { h+='<div class="cd-empty">車両は未登録です</div>'; }
     h+='</div>';
+    /* ================================================================
+       🔵 v2.33.0（ゆうた指定 2026-08-30）
+       「**来店履歴の上に、来店履歴と同じテイストで、いまアクティブになってる予約や入庫中があれば出して**」
+       ----------------------------------------------------------------
+       ⚠ 来店履歴は「**返車まで終わって実績になったもの**」だけ＝いま動いているものは1件も出ていなかった。
+          （件数だけ添えていたので「1件ある」ことは分かるが、**何がどうなっているかは分からない**）
+       🔴 出す並びは**近いものから**（入庫日の古い順）＝今日これから触るものが上。
+       🔴 状態の言葉は `pitCardStatusText`（カードごと）1本。ここで status から作らない。
+       ================================================================ */
+    if(openCards.length){
+      const 進行 = openCards.slice().sort(function(a,b){
+        return String(a.actualInAt||a.reserveDate||'').localeCompare(String(b.actualInAt||b.reserveDate||'')); });
+      h+='<div class="cd-sec"><div class="cd-sech"><div class="cd-sect"><i data-ic=bolt data-ics=16></i> いま動いているもの <span class="cd-cnt">'+進行.length+'件</span></div></div>';
+      h+='<div class="cd-hist cd-nowlist">';
+      進行.forEach(function(c){
+        const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
+        const wt=_wts[0]||null;
+        const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
+        const wc=wt?wt.color:'#64748b';
+        const st=(window.pitCardStatusText)?pitCardStatusText(c):(c.status||'');
+        /* 金額はまだ確定していない＝**概算だと分かるように書く**（¥だけ並べると確定に見える） */
+        const est=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal)
+                 :((c.estAmount!=null&&c.estAmount!=='')?Number(c.estAmount):null);
+        const amtStr=(est!=null&&isFinite(est))?('<span class="cd-hest">概算</span>'+yen(est)):'—';
+        let loa='';
+        if(c.needLoaner){
+          const l=(state.loaners||[]).find(function(x){ return x.id===c.loanerId; });
+          const nm=(window.pitLoanerModel?pitLoanerModel(c.loanerId):'')||(l?(l.name||'代車'):'');
+          const pr=(window.pitLoanerPeriodOf?pitLoanerPeriodOf(c).text:'');
+          loa='<span class="cd-loa"><i data-ic=van data-ics=15></i>代車'+(nm?('（'+esc(nm)+'）'):'')+(pr?(' '+esc(pr)):'')+'</span>';
+        }
+        let tags='<span class="cd-htag st now">'+esc(st)+'</span>';
+        if(window.pitCardIntern&&pitCardIntern(c)) tags+='<span class="cd-htag">'+esc(pitInternLabel(c))+'</span>';
+        if(c.earlyDiscount) tags+='<span class="cd-htag">早期割</span>';
+        const menuTxt=c.menu?esc(String(c.menu).split('\n')[0]):'';
+        /* 日付＝もう入っていれば実入庫日、まだなら予約日。どちらの日かが分かるように札を付ける */
+        const dt=String(c.actualInAt||'').trim()?{d:c.actualInAt,l:'入庫'}:{d:c.reserveDate||'',l:'予約'};
+        h+='<div class="cd-hrow clickable cd-now" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
+           '<div class="cd-hdt"><span class="cd-hdl">'+dt.l+'</span>'+esc(dt.d||'日付未定')+
+             (c.resNo?'<span class="cd-hres">'+esc(c.resNo)+'</span>':'')+'</div>'+
+           '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+
+           '<div class="cd-hmid"><div class="cd-hl1"><b>'+esc(c.car||'—')+'</b>'+
+             (c.plate?'<span class="cd-hplate">'+esc(c.plate)+'</span>':'')+
+             (c.frontStaff?'<span class="cd-hstaff">担当 '+esc(c.frontStaff)+'</span>':'')+loa+tags+'</div>'+
+             (menuTxt?'<div class="cd-hsub">'+menuTxt+'</div>':'')+'</div>'+
+           '<div class="cd-hamt">'+amtStr+'</div>'+
+           '<div class="cd-hbtns">'+_histBtns(c, { detail:true, icons:false })+'</div>'+
+           '</div>';
+      });
+      h+='</div></div>';
+    }
+
     // 来店履歴
     /* 🔴 v1.54.0 来店履歴＝実績になったものだけ。予約・作業中のものは件数だけ添える（ゆうた指定） */
     h+='<div class="cd-sec"><div class="cd-sech"><div class="cd-sect"><i data-ic=clock data-ics=16></i> 来店履歴 <span class="cd-cnt">'+

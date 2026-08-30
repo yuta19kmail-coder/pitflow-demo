@@ -44,6 +44,10 @@
   function save(){ if (w.PitDB) PitDB.save(); }
   function meName(){ try { if (w.pitCurrentStaffName) return pitCurrentStaffName()||''; } catch(e){} return ''; }
   function toast(m, code){ if (w.pitToast) pitToast(m, code); }
+  /* 🔴 エラー番号は「1つにつき、出す所も1か所」（`test_errcode.mjs` の決めごと）。
+     同じ意味で2か所から出すと、台帳の「どこで出るか」が定まらない。 */
+  function _要ナンバー(){ toast('②のナンバーの扱いを選んでください', 'PF-6005'); }
+  function _記録なし(){ toast('取り消す記録が見つかりません', 'PF-6007'); }
 
   /* ---------- 🔴 車を見分けるナンバー＝いまのナンバー＋旧ナンバー（ここ1本） ---------- */
   function platesOf(v){
@@ -139,7 +143,7 @@
     選択 = 選択 || {};
     var P = plan(custId, mainId, subId);
     if(!P){ toast('まとめられませんでした（車が見つかりません）', 'PF-6004'); return null; }
-    if(P.ナンバーを選ぶ && !選択.ナンバー){ toast('サブのナンバーの扱いを選んでください', 'PF-6005'); return null; }
+    if(P.ナンバーを選ぶ && !選択.ナンバー){ _要ナンバー(); return null; }
     var cust = P.cust, main = P.main, sub = P.sub;
 
     var 記録 = { id:'mg'+Date.now()+Math.floor(Math.random()*1000), at:Date.now(), by:meName(),
@@ -228,7 +232,7 @@
     (cust.vehicles || []).forEach(function(v){
       (Array.isArray(v.mergeLog) ? v.mergeLog : []).forEach(function(m){ if(m && m.id===mergeId){ main = v; 記録 = m; } });
     });
-    if(!main || !記録){ toast('取り消す記録が見つかりません', 'PF-6007'); return false; }
+    if(!main || !記録){ _記録なし(); return false; }
     var sub = findVeh(cust, 記録.from);
 
     (記録.欄 || []).forEach(function(x){ if(t(main[x.k]) === t(x.後)) main[x.k] = x.前; });
@@ -428,7 +432,7 @@
   function go(){
     if(!_st || !_st.主 || !_st.サブ) return;
     var P = plan(_st.custId, _st.主, _st.サブ); if(!P) return;
-    if(P.ナンバーを選ぶ && !_st.ナンバー){ toast('②のナンバーの扱いを選んでください', 'PF-6005'); return; }
+    if(P.ナンバーを選ぶ && !_st.ナンバー){ _要ナンバー(); return; }
     var det = ['① 残す　' + vehTitle(P.main),
                '② 寄せる　' + vehTitle(P.sub) + ' → アーカイブへ（消えません）',
                '・伝票を ' + P.伝票.足す + '件 ①へ写します',
@@ -467,7 +471,7 @@
     (cust.vehicles || []).forEach(function(v){
       (Array.isArray(v.mergeLog) ? v.mergeLog : []).forEach(function(m){ if(m && m.id === mergeId) 記録 = m; });
     });
-    if(!記録){ toast('取り消す記録が見つかりません', 'PF-6007'); return; }
+    if(!記録){ _記録なし(); return; }
     var det = ['・② 「' + (記録.fromPlate || '（ナンバーなし）') + '」をアーカイブから戻します',
                '・写した伝票 ' + (記録.伝票 || []).length + '件 を①から外します',
                '・直したカード ' + (記録.カード || []).length + '件 を元に戻します',

@@ -34,6 +34,9 @@
   function meName(){ try { if (w.pitCurrentStaffName) return pitCurrentStaffName()||''; } catch(e){} return ''; }
   function toast(m, code){ if (w.pitToast) pitToast(m, code); }
   function 済み(c){ return w.pitCardIsDone ? pitCardIsDone(c) : false; }
+  /* 🔴 番号は車の統合と**使い回さない**（一度出した番号は意味と1対1・出す所も1か所） */
+  function _管理者だけ(){ toast('お客様の統合を取り消せるのは管理者だけです', 'PF-6009'); }
+  function _記録なし(){ toast('取り消すお客様の統合の記録が見つかりません', 'PF-6010'); }
   /* まとめられて残っているだけの人＝呼び出し・引き当ての対象にしない（車と同じ物差し） */
   function merged(c){ return !!(c && c.mergedInto); }
   w.pitCustMerged = merged;
@@ -152,12 +155,12 @@
 
   /* 取り消し（🔴 管理者だけ・車の統合と同じ決まり） */
   function undo(mergeId){
-    if(w.PitArchive && !PitArchive.canRestore()){ toast('統合を取り消せるのは管理者だけです', 'PF-6006'); return false; }
+    if(w.PitArchive && !PitArchive.canRestore()){ _管理者だけ(); return false; }
     var A = null, 記録 = null;
     custs().forEach(function(c){
       (Array.isArray(c.mergeLog) ? c.mergeLog : []).forEach(function(m){ if(m && m.id===mergeId){ A = c; 記録 = m; } });
     });
-    if(!A || !記録){ toast('取り消す記録が見つかりません', 'PF-6007'); return false; }
+    if(!A || !記録){ _記録なし(); return false; }
     var B = findCust(記録.from);
 
     (記録.欄||[]).forEach(function(x){ if(t(A[x.k])===t(x.後)) A[x.k]=x.前; });
@@ -197,15 +200,17 @@
     _home();
   }
   function 探す(q){
-    var k = norm(q);
+    /* 🔤 v2.39.0 探す時は旧字・異体字も寄せる（物差しは search.js 1本・写しを作らない） */
+    var nz = w.pitSearchNorm || norm;
+    var k = nz(q);
     if(k.length < 2) return [];
     return custs().filter(function(c){
       if(!c || merged(c)) return false;
       if(w.PitArchive && PitArchive.custArchived && PitArchive.custArchived(c)) return false;
-      if(norm(c.name).indexOf(k)>=0 || norm(c.kana).indexOf(k)>=0) return true;
-      if((c.oldNames||[]).some(function(x){ return norm(x).indexOf(k)>=0; })) return true;
-      if((c.contacts||[]).some(function(x){ return norm(x.tel).indexOf(k)>=0; })) return true;
-      return (c.vehicles||[]).some(function(v){ return norm(v.plate).indexOf(k)>=0 || norm(v.car).indexOf(k)>=0; });
+      if(nz(c.name).indexOf(k)>=0 || nz(c.kana).indexOf(k)>=0) return true;
+      if((c.oldNames||[]).some(function(x){ return nz(x).indexOf(k)>=0; })) return true;
+      if((c.contacts||[]).some(function(x){ return nz(x.tel).indexOf(k)>=0; })) return true;
+      return (c.vehicles||[]).some(function(v){ return nz(v.plate).indexOf(k)>=0 || nz(v.car).indexOf(k)>=0; });
     }).slice(0, 8);
   }
   /* 🔴 v2.36.2（ゆうた指摘）「**車種とかが出なくて分かりにくい。顧客カードをそのまま2枚並べるぐらいの感じがいい**」
@@ -440,7 +445,7 @@
   function undoAsk(mergeId){
     var 記録 = null;
     custs().forEach(function(c){ (Array.isArray(c.mergeLog)?c.mergeLog:[]).forEach(function(m){ if(m&&m.id===mergeId) 記録=m; }); });
-    if(!記録){ toast('取り消す記録が見つかりません', 'PF-6007'); return; }
+    if(!記録){ _記録なし(); return; }
     var det = ['・②「' + (記録.fromName||'') + '」をアーカイブから戻します',
                '・移した車 ' + (記録.車||[]).length + '台 を②へ返します',
                '・付け替えたカード ' + (記録.カード||[]).length + '件 を②へ戻します',

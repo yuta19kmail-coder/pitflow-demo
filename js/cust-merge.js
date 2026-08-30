@@ -187,8 +187,11 @@
      ===================================================================== */
   var _st = null;
 
-  function open(){
+  /* 🔎 v2.37.0 洗い出し（dup-find.js）から ①② を決め打ちで開けるようにした */
+  function open(a, b){
     _st = { 主:'', サブ:'', q1:'', q2:'', 欄:{}, 連絡先:'both' };
+    if(a && findCust(a) && !merged(findCust(a))) _st.主 = t(a);
+    if(b && findCust(b) && !merged(findCust(b)) && t(b)!==_st.主) _st.サブ = t(b);
     _home();
   }
   function 探す(q){

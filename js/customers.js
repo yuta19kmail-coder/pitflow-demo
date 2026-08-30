@@ -644,6 +644,8 @@
        /* 🔵 v2.36.0（ゆうた指定）**件数の下に「お客様をまとめる」**。
           ⚠ ふだん押すものではないので、しぼり込みの行の右端に控えめに置く（車の統合と同じ考え方）。 */
        '<button type="button" class="cust-mergeico" onclick="PitCustMerge.open()" title="お客様をまとめる（同じ方が2人に分かれている時）" aria-label="お客様をまとめる"><i data-ic=link data-ics=15></i></button>'+
+       /* 🔎 v2.37.0（ゆうた指定）**洗い出しは統合の隣にアイコンだけ。** */
+       '<button type="button" class="cust-mergeico" onclick="PitDupFind.open()" title="ダブりを洗い出す（同じ車体番号・ナンバーなしの重なり・同じ電話／カナ）" aria-label="ダブりを洗い出す"><i data-ic=search data-ics=15></i></button>'+
        '</div>';
     h+='<div id="cust-thost"></div>';
     wrap.innerHTML=h;

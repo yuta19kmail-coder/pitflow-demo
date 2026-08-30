@@ -30,11 +30,33 @@
   function vehName(v){ return (((v.maker?v.maker+' ':'')+(v.car||'')).trim()) || '—'; }
   function plateOf(v){ return t(v.plate) || (v.perVisit?'都度車両変動':'ナンバーなし'); }
 
+  /* ================================================================
+     🙅 特例で外すお客様（2026-08-30・ゆうた指定）
+     ----------------------------------------------------------------
+     🗣「**ANDRZEJ SCHMIDT／株式会社 Japan Campers だけはもう増えないし、特例的に除外して**
+     　　（レンタカー屋さんでほんとにこの状態）」
+     ＝ ナンバーなしの車や同じ車体番号が並ぶのが**本当の姿**なので、毎回上に出ても邪魔なだけ。
+     ⚠ **洗い出しから外すだけ。**まとめる窓からは今までどおり触れる（隠すのではなく、探さないだけ）。
+     ⚠ 増えたら `state.settings.dupSkip`（名前の配列）に足せば、ここを触らずに増やせる。
+     ================================================================ */
+  var 特例 = ['ANDRZEJ SCHMIDT', '株式会社 Japan Campers'];
+  function 外す名簿(){
+    var a = 特例.slice();
+    var add = (w.state && state.settings && state.settings.dupSkip) || [];
+    if(Array.isArray(add)) a = a.concat(add);
+    return a.map(norm).filter(Boolean);
+  }
+  function 外す(c){
+    var ng = 外す名簿();
+    return ng.indexOf(norm(c && c.name)) >= 0 || ng.indexOf(norm(c && c.kana)) >= 0;
+  }
+  w.pitDupSkipped = 外す;
   function 生きた客(){
     return custs().filter(function(c){
       if(!c) return false;
       if(w.pitCustMerged && pitCustMerged(c)) return false;
       if(w.PitArchive && PitArchive.custArchived && PitArchive.custArchived(c)) return false;
+      if(外す(c)) return false;                       /* 🙅 特例で外す（レンタカー屋さん等） */
       return true;
     });
   }
@@ -103,41 +125,56 @@
      画面（読むだけ。直すのは「まとめる」窓）
      ===================================================================== */
   var _tab = 'vin';
+  var _開 = '';        /* いま開いている行の目印 */
 
+  /* 押した行の下に、顧客の中身をそのまま出す（まとめる窓と同じカード＝写しを作らない） */
+  function _展開(ids){
+    if(!w.PitCustMerge || !PitCustMerge.カード) return '';
+    var cs = ids.map(function(id){ return custs().find(function(c){ return c && c.id===id; }); }).filter(Boolean);
+    if(!cs.length) return '';
+    return '<div class="df-open"><div class="df-cards' + (cs.length>1?' two':'') + '">'
+         + cs.map(function(c){ return PitCustMerge.カード(c); }).join('') + '</div></div>';
+  }
+  function _行(key, tag, 見出し, 中身, ボタン, ids){
+    var 開 = (_開 === key);
+    return '<div class="df-item' + (開?' open':'') + '">'
+      + '<div class="df-row" onclick="PitDupFind.toggle(\'' + esc(key) + '\')" title="押すと中身を見られます">'
+      + '<div class="df-main"><div class="df-t">' + tag + 見出し + '</div><div class="df-sub">' + 中身 + '</div></div>'
+      + '<span class="df-chev">' + (開?'▲':'▼') + '</span>' + ボタン + '</div>'
+      + (開 ? _展開(ids) : '') + '</div>';
+  }
   function _rowsHtml(R){
     var h = '';
     if(_tab === 'vin'){
       if(!R.車体番号.length) return '<div class="df-none">同じ車体番号の車はありません。<br><span>車体番号は伝票の突合（クォーターチェック）で入ります。入っている車が少ないうちは、ここも少なく出ます。</span></div>';
-      R.車体番号.slice(0,50).forEach(function(x){
-        h += '<div class="df-row"><div class="df-main"><div class="df-t"><span class="df-tag ng">100%ダブり</span>車体番号 <b>' + esc(x.vin) + '</b></div>'
-           + '<div class="df-sub">' + x.件.map(function(i){
-               return esc(disp(i.客)) + ' 様　' + esc(plateOf(i.車)) + '（' + esc(vehName(i.車)) + '）';
-             }).join('　／　') + '</div></div>'
-           + (x.同じ人
-               ? '<button class="df-go" onclick="PitDupFind.toVeh(\'' + esc(x.件[0].客.id) + '\')">車をまとめる</button>'
-               : '<button class="df-go" onclick="PitDupFind.toCust(\'' + esc(x.件[0].客.id) + '\',\'' + esc(x.件[1].客.id) + '\')">お客様をまとめる</button>')
-           + '</div>';
+      R.車体番号.slice(0,50).forEach(function(x, i){
+        var ids = []; x.件.forEach(function(k){ if(ids.indexOf(k.客.id)<0) ids.push(k.客.id); });
+        h += _行('vin'+i, '<span class="df-tag ng">100%ダブり</span>', '車体番号 <b>' + esc(x.vin) + '</b>',
+          x.件.map(function(k){ return esc(disp(k.客)) + ' 様　' + esc(plateOf(k.車)) + '（' + esc(vehName(k.車)) + '）'; }).join('　／　'),
+          (x.同じ人
+            ? '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toVeh(\'' + esc(ids[0]) + '\')">車をまとめる</button>'
+            : '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toCust(\'' + esc(ids[0]) + '\',\'' + esc(ids[1]) + '\')">お客様をまとめる</button>'),
+          ids);
       });
       return h;
     }
     if(_tab === 'plate'){
       if(!R.ナンバーなし.length) return '<div class="df-none">「ナンバーなし」と本物のナンバーを両方持っているお客様はいません。</div>';
-      R.ナンバーなし.slice(0,50).forEach(function(x){
-        h += '<div class="df-row"><div class="df-main"><div class="df-t">'
-           + '<span class="df-tag' + (x.同車種?' warn':'') + '">' + esc(x.度) + '</span>' + esc(disp(x.客)) + ' 様</div>'
-           + '<div class="df-sub">ナンバーなし（' + esc(vehName(x.なし)) + '）　と　' + esc(plateOf(x.本物)) + '（' + esc(vehName(x.本物)) + '）'
-           + (x.同車種?'　＝ <b>車種まで同じ</b>':'') + '</div></div>'
-           + '<button class="df-go" onclick="PitDupFind.toVeh(\'' + esc(x.客.id) + '\')">車をまとめる</button></div>';
+      R.ナンバーなし.slice(0,50).forEach(function(x, i){
+        h += _行('pl'+i, '<span class="df-tag' + (x.同車種?' warn':'') + '">' + esc(x.度) + '</span>', esc(disp(x.客)) + ' 様',
+          'ナンバーなし（' + esc(vehName(x.なし)) + '）　と　' + esc(plateOf(x.本物)) + '（' + esc(vehName(x.本物)) + '）'
+            + (x.同車種?'　＝ <b>車種まで同じ</b>':''),
+          '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toVeh(\'' + esc(x.客.id) + '\')">車をまとめる</button>',
+          [x.客.id]);
       });
       return h;
     }
     if(!R.人.length) return '<div class="df-none">同じ電話番号・同じカナのお客様はいません。</div>';
-    R.人.slice(0,50).forEach(function(x){
-      h += '<div class="df-row"><div class="df-main"><div class="df-t"><span class="df-tag">' + esc(x.理由) + '</span><b>' + esc(x.値) + '</b></div>'
-         + '<div class="df-sub">' + x.客.map(function(c){
-             return esc(disp(c)) + ' 様（車 ' + 生きた車(c).length + '台）';
-           }).join('　／　') + '</div></div>'
-         + '<button class="df-go" onclick="PitDupFind.toCust(\'' + esc(x.客[0].id) + '\',\'' + esc(x.客[1].id) + '\')">お客様をまとめる</button></div>';
+    R.人.slice(0,50).forEach(function(x, i){
+      h += _行('cu'+i, '<span class="df-tag">' + esc(x.理由) + '</span>', '<b>' + esc(x.値) + '</b>',
+        x.客.map(function(c){ return esc(disp(c)) + ' 様（車 ' + 生きた車(c).length + '台）'; }).join('　／　'),
+        '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toCust(\'' + esc(x.客[0].id) + '\',\'' + esc(x.客[1].id) + '\')">お客様をまとめる</button>',
+        x.客.map(function(c){ return c.id; }));
     });
     return h;
   }
@@ -161,13 +198,18 @@
        : '<b>同じ電話番号・同じカナ</b>のお客様です。<b>ご家族・同姓同名は別の方</b>なので、中身を見てから決めてください。'))
        + '</div>';
     h += '<div class="df-list">' + _rowsHtml(R) + '</div>';
+    /* 🙅 外している人がいることは、黙らずに書いておく */
+    var 外し = custs().filter(function(c){ return c && 外す(c); });
+    if(外し.length) h += '<div class="df-skip">🙅 洗い出しから外しているお客様：<b>'
+      + 外し.map(function(c){ return esc(disp(c)); }).join('／') + '</b>　（レンタカー等で、この姿が本当の状態のため。まとめる窓からは今までどおり触れます）</div>';
     h += '</div><div class="cm-foot"><button class="cm-cancel" onclick="custCloseModal()">閉じる</button></div>';
     if(w.custShowModal) custShowModal(h, 'vm-box df-box');
   }
 
   w.PitDupFind = {
-    open: open, scan: scan,
-    tab:    function(v){ _tab = v; open(); },
+    open: open, scan: scan, 外す: 外す,
+    tab:    function(v){ _tab = v; _開 = ''; open(); },
+    toggle: function(k){ _開 = (_開===k?'':k); open(); },
     toVeh:  function(custId){ if(w.PitVehMerge) PitVehMerge.open(custId); },
     toCust: function(a, b){ if(w.PitCustMerge) PitCustMerge.open(a, b); }
   };

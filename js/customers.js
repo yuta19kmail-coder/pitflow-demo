@@ -109,13 +109,19 @@
   function vehByPlate(plate){
     if(!isRealPlate(plate)) return null;
     const q=norm(plate), arr=list();
+    /* 🚗 v2.31.0 統合で主へ吸収された車は引かない（中身は残っているが、生きているのは主）。
+       旧ナンバーでも当てるが、**いまのナンバーが優先**＝全部見てから返す。 */
+    let 旧=null;
     for(let i=0;i<arr.length;i++){
       const p=arr[i], vs=(p&&Array.isArray(p.vehicles))?p.vehicles:[];
       for(let k=0;k<vs.length;k++){
-        if(isRealPlate(vs[k].plate)&&norm(vs[k].plate)===q) return {cust:p, veh:vs[k]};
+        const v=vs[k];
+        if(window.pitVehMerged && pitVehMerged(v)) continue;
+        if(isRealPlate(v.plate)&&norm(v.plate)===q) return {cust:p, veh:v};
+        if(!旧 && (Array.isArray(v.oldPlates)?v.oldPlates:[]).some(x=>isRealPlate(x)&&norm(x)===q)) 旧={cust:p, veh:v};
       }
     }
-    return null;
+    return 旧;
   }
   window.pitVehByPlate = vehByPlate;
   window.pitVehVin = function(plate){ const h=vehByPlate(plate); return h?String(h.veh.vin||''):''; };
@@ -742,14 +748,22 @@
   var _hist = { custId:'', vehId:'', mode:'veh', pick:'' };
 
   /* この顧客の「見せる車」（アーカイブ済みも履歴は見たいので出す） */
-  function _histCars(cust){ return (cust.vehicles||[]).filter(function(v){ return v && isRealPlate(v.plate); }); }
+  /* 🚗 v2.31.0 統合で主へ吸収された車は、履歴の「車の一覧」に出さない。
+     ⚠ 出すと、まとめたはずの履歴がまた2つに割れて見える。 */
+  function _histCars(cust){ return (cust.vehicles||[]).filter(function(v){
+    return v && isRealPlate(v.plate) && !(window.pitVehMerged && pitVehMerged(v)); }); }
 
   /* その車の、実績になったカード（新しい順）
      🔴 ナンバーで引く。「0」などの仮ナンバーでは引かない（他人のカードが混ざるため） */
-  function _histCards(plate){
+  /* 🚗 v2.31.0 **車を渡す**（ナンバー文字列も受ける）。統合で付いた旧ナンバーでも引けるように。 */
+  function _histCards(veh){
     const arr = Array.isArray(state.cards) ? state.cards : [];
-    if (!isRealPlate(plate)) return { done:[], open:0 };
-    const all = arr.filter(function(c){ return isRealPlate(c.plate) && norm(c.plate) === norm(plate); });
+    const ps = (typeof veh === 'string')
+      ? (isRealPlate(veh) ? [veh] : [])
+      : (window.pitVehPlates ? pitVehPlates(veh) : ((veh && isRealPlate(veh.plate)) ? [veh.plate] : []));
+    if (!ps.length) return { done:[], open:0 };
+    const keys = ps.map(norm);
+    const all = arr.filter(function(c){ return isRealPlate(c.plate) && keys.indexOf(norm(c.plate)) >= 0; });
     const done = all.filter(_cardDone).slice().sort(function(a,b){ return (_doneDate(b)||'').localeCompare(_doneDate(a)||''); });
     return { done: done, open: all.length - done.length };
   }
@@ -908,7 +922,7 @@
       if (c) rows = [{ c:c, v:cur }];
     } else if (ぜんぶ){
       cars.forEach(function(v){
-        const r = _histCards(v.plate); open += r.open;
+        const r = _histCards(v); open += r.open;
         r.done.forEach(function(c){ rows.push({ c:c, v:v }); });
         /* 🗃 v2.12.0 カードが無い伝票（始動前）も混ぜる */
         _denOnly(v, r.done).forEach(function(dn){ rows.push({ den:dn, v:v, 日:dn.売上日 }); });
@@ -916,7 +930,7 @@
       rows.sort(function(a,b){
         return (b.日||_doneDate(b.c)||'').localeCompare(a.日||_doneDate(a.c)||''); });
     } else if (cur){
-      const r = _histCards(cur.plate); open = r.open;
+      const r = _histCards(cur); open = r.open;
       rows = r.done.map(function(c){ return { c:c, v:cur }; })
         .concat(_denOnly(cur, r.done).map(function(dn){ return { den:dn, v:cur, 日:dn.売上日 }; }));
       rows.sort(function(a,b){
@@ -1154,7 +1168,11 @@
   /* その人のカード全部（予約中も含む）。件数の案内に使う */
   function _custCardsAll(cust){
     /* 🔴 v1.53.0 意味をなさないナンバー（「0」など）は突き合わせに使わない */
-    const plates=(cust.vehicles||[]).filter(v=>isRealPlate(v.plate)).map(v=>norm(v.plate));
+    /* 🚗 v2.31.0 車を指すナンバーは1つとは限らない（統合で旧ナンバーが付く）＝`pitVehPlates` 1本を通す */
+    const plates=[];
+    (cust.vehicles||[]).forEach(function(v){
+      (window.pitVehPlates?pitVehPlates(v):(isRealPlate(v&&v.plate)?[v.plate]:[])).forEach(function(p){ plates.push(norm(p)); });
+    });
     return (Array.isArray(state.cards)?state.cards:[]).filter(function(c){
       return (c.customerId&&c.customerId===cust.id) || (isRealPlate(c.plate)&&plates.indexOf(norm(c.plate))>=0);
     });
@@ -1310,6 +1328,11 @@
     h+='<div class="cd-sec"><div class="cd-sech"><div class="cd-sect"><i data-ic=car data-ics=16></i> 車両 <span class="cd-cnt">'+vehicles.length+'台</span></div>'+
        (_archived(cust)?'':'<button class="cd-btn cd-addveh" onclick="custAddVehicleFor(\''+cust.id+'\')"><i data-ic=plus data-ics=15></i> 車両を追加</button>')+
        '</div>';
+    /* 🚗 v2.31.0 同じ車が2件に分かれている時に「まとめる」を出す。
+       ⚠ 相手が居ない時に押せるボタンを並べない＝2台以上ある時だけ。
+       ⚠ 統合で吸収済みの車は相手に数えない。 */
+    const _mergeOK = !_archived(cust) &&
+      (cust.vehicles||[]).filter(function(v){ return v && !(window.pitVehMerged && pitVehMerged(v)); }).length >= 2;
     if(vehicles.length){
       h+='<div class="cd-vehs">';
       vehicles.forEach(function(v){
@@ -1344,6 +1367,10 @@
            /* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベルを付けて、読める大きさにした */
            ((v.vin||'').trim()?'<div class="cd-vvin"><i>車体番号</i>'+esc(v.vin.trim())+'</div>':'')+
            '<div class="cd-vacts"><span class="cd-vb" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=clock data-ics=16></i> 履歴</span>'+
+           /* 🚗 v2.31.0 この車を「主」にして、同じ車のもう1件を吸収する（顧客はまたがない） */
+           ((vArc || !_mergeOK) ? '' : '<span class="cd-vb" title="同じ車が2件に分かれている時、この車にまとめます" onclick="event.stopPropagation();PitVehMerge.open(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=link data-ics=16></i> まとめる</span>')+
+           /* 🔴 取り消しは管理者だけ（アーカイブを戻すのと同じ決まり） */
+           ((Array.isArray(v.mergeLog)&&v.mergeLog.length&&canR) ? '<span class="cd-vb cd-vb-restore" title="この車にまとめたのを取り消す" onclick="event.stopPropagation();PitVehMerge.undoAsk(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=undo data-ics=16></i> 統合を取り消す</span>' : '')+
            (vArc ? '' : '<span class="cd-vb go" onclick="custNewReserveFor(\''+cust.id+'\',\''+(v.id||'')+'\')">🆕 この車で新規予約</span>')+
            '</div>'+
            '</div>';

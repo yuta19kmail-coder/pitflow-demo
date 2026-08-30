@@ -486,9 +486,10 @@
         if (self._wtDirty) self._shadow.settings = '';
         } finally { self._applying = false; }
 
-        /* 📣 v2.8.2 読み込み時の合図は「見たこと」にして黙らせる
-           ＝この版を初めて開いた端末が、開いた瞬間にもう1回読み直す、を起こさない。 */
-        if (window.pitForceReloadSeed) { try { pitForceReloadSeed(state.settings); } catch (e) {} }
+        /* 📣 v2.8.2〜v2.29.0 ここには「全端末を今すぐ更新」の下ごしらえがあった。
+           🔴 2026-08-29：全アプリ共通の coreflow-power.js に1本化したので**もう要らない**。
+              向こうは `settings/forceReload` を自分で見張っていて、
+              **開いた瞬間の値では動かない**作り＝ここで黙らせる必要がない。 */
 
         self._loaded = true;                      // ここから先だけ保存を許す
         console.log('[PitDB] 読み込み完了（' + total + '件）');
@@ -805,9 +806,10 @@
            揃え直し自体は上の `_mergeSettings` → `_applyWorkTypes` で済んでいて、
            書き戻しが要るぶんは**ふつうの差分保存**（`_cloudFlush`）が拾う。
            ⚠ ここに `_flushWorkTypes()` を戻さないこと。 */
-        /* 📣 v2.8.2 「全端末を今すぐ更新する」の合図（force-reload-pit.js が判断する）。
-           ⚠ ここでは読むだけ。リロードするかどうかの物差しは向こう1本。 */
-        if (window.pitForceReloadCheck) { try { pitForceReloadCheck(state.settings); } catch (e) {} }
+        /* 📣 v2.8.2〜v2.29.0 ここで「全端末を今すぐ更新」の合図を見ていた。
+           🔴 2026-08-29：全アプリ共通の coreflow-power.js に1本化。
+              向こうが `companies/{会社}/settings/forceReload` を自分で見張るので、
+              **PitFlow の設定の購読に相乗りしない**（アプリごとに配線を持たない）。 */
         if (window.PitSync) PitSync.received();
         self._afterApply();
       }, function (e) { console.error('[PitDB] 設定の購読に失敗', e); });

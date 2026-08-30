@@ -203,11 +203,53 @@
       return (c.vehicles||[]).some(function(v){ return norm(v.plate).indexOf(k)>=0 || norm(v.car).indexOf(k)>=0; });
     }).slice(0, 8);
   }
+  /* 🔴 v2.36.2（ゆうた指摘）「**車種とかが出なくて分かりにくい。顧客カードをそのまま2枚並べるぐらいの感じがいい**」
+     ＝ 名前とTELだけでは、どっちがどっちか決められない。**顧客詳細と同じ中身**を出す。 */
+  function 来店(c){
+    var a = cards().filter(function(x){ return x && x.customerId===c.id && 済み(x); });
+    var 日 = a.map(function(x){ return t(x.completedAt)||t(x.returnDate)||t(x.reserveDate); }).filter(Boolean).sort();
+    return { 回:a.length, 最終:(日.length?日[日.length-1].replace(/-/g,'/'):'') };
+  }
+  function _lineHtml(c){
+    var st = t(c.lineStatus);
+    if(st==='ng') return '<span class="um-pill">LINE NG</span>';
+    if(st==='ok') return '<span class="um-pill ok">LINE 登録済' + (t(c.lstepId)?('（'+esc(t(c.lstepId))+'）'):'') + '</span>';
+    return '<span class="um-pill mut">LINE 未案内</span>';
+  }
   function _one(c, n){
-    return '<div class="um-one on' + n + '"><span class="um-no">' + (n===1?'①':'②') + '</span>'
-      + '<b>' + esc(disp(c)) + '</b>'
-      + '<span class="um-sub">' + esc(t(c.kana)) + '　' + esc(primaryTel(c) || 'TELなし') + '　車 ' + liveVehs(c).length + '台</span>'
-      + '<button class="vm-mini" onclick="PitCustMerge.clear(' + n + ')">選び直す</button></div>';
+    var vs = liveVehs(c), k = 来店(c);
+    var h = '<div class="um-one on' + n + '">';
+    h += '<div class="um-oh"><span class="um-no">' + (n===1?'①':'②') + '</span>'
+       + '<span class="um-role">' + (n===1?'残す':'アーカイブへ') + '</span>'
+       + '<button class="vm-mini" onclick="PitCustMerge.clear(' + n + ')">選び直す</button></div>';
+    h += '<div class="um-name">' + esc(disp(c)) + ' <small>様</small></div>';
+    if(t(c.kana)) h += '<div class="um-kana">' + esc(t(c.kana)) + '</div>';
+    if((c.oldNames||[]).length) h += '<div class="um-old">旧：' + esc(c.oldNames.join('／')) + '</div>';
+    h += '<div class="um-pills"><span class="um-pill mut">来店 ' + k.回 + '回</span>'
+       + '<span class="um-pill mut">' + (k.最終?('最終 '+esc(k.最終)):'まだ来店なし') + '</span>'
+       + _lineHtml(c) + '</div>';
+    h += '<div class="um-line"></div>';
+    h += '<div class="um-lab">連絡先</div>';
+    if((c.contacts||[]).length){
+      h += '<div class="um-cts">' + (c.contacts||[]).map(function(ct){
+        return '<div class="um-ct"><b>' + esc(t(ct.tel)||'—') + '</b>'
+             + (t(ct.label)?'<span>'+esc(t(ct.label))+'</span>':'')
+             + (ct.primary?'<span class="um-pri">優先</span>':'') + '</div>';
+      }).join('') + '</div>';
+    } else { h += '<div class="um-empty">未登録</div>'; }
+    h += '<div class="um-lab">車両 <b>' + vs.length + '台</b></div>';
+    if(vs.length){
+      h += '<div class="um-vehs">' + vs.map(function(v){
+        var nm = ((v.maker?v.maker+' ':'')+(v.car||'')).trim();
+        return '<div class="um-veh"><div class="um-vplate">' + esc(t(v.plate) || (v.perVisit?'都度車両変動':'ナンバーなし')) + '</div>'
+             + '<div class="um-vcar">' + esc(nm||'—') + '</div>'
+             + '<div class="um-vsub">' + (t(v.karteNo)?('カルテ '+esc(t(v.karteNo))):'') 
+             + (t(v.vin)?('　車体 '+esc(t(v.vin))):'') 
+             + ((v.oldPlates||[]).length?('　旧：'+esc(v.oldPlates.join('／'))):'') + '</div></div>';
+      }).join('') + '</div>';
+    } else { h += '<div class="um-empty">未登録</div>'; }
+    h += '</div>';
+    return h;
   }
   /* 🔴 v2.36.1（ゆうた報告）**検索欄そのものを作り直さない。**
      ◎何が起きていたか
@@ -222,9 +264,16 @@
     if(!r.length) h += '<div class="um-none">見つかりません</div>';
     r.forEach(function(c){
       var 済 = (n===1 ? _st.サブ : _st.主) === c.id;
+      /* 🔴 候補の並びにも**車種とナンバー**を出す（名前とTELだけでは選べない） */
+      var vs = liveVehs(c);
+      var 車 = vs.slice(0,2).map(function(v){
+        var nm = ((v.maker?v.maker+' ':'')+(v.car||'')).trim();
+        return (t(v.plate)||(v.perVisit?'都度車両変動':'ナンバーなし')) + (nm?('・'+nm):'');
+      }).join('／') + (vs.length>2?('　ほか'+(vs.length-2)+'台'):'');
       h += '<button class="um-row"' + (済?' disabled title="もう片方で選ばれています"':'') + ' onclick="PitCustMerge.pick(' + n + ',\'' + esc(c.id) + '\')">'
          + '<b>' + esc(disp(c)) + '</b><span class="um-sub">' + esc(t(c.kana)) + '　' + esc(primaryTel(c) || 'TELなし')
-         + '　車 ' + liveVehs(c).length + '台' + ((c.oldNames||[]).length?('　旧：'+esc(c.oldNames.join('／'))):'') + '</span></button>';
+         + ((c.oldNames||[]).length?('　旧：'+esc(c.oldNames.join('／'))):'') + '</span>'
+         + '<span class="um-sub2">' + esc(車 || '車の登録なし') + '</span></button>';
     });
     return h;
   }

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.36.1"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.36.2"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -19,7 +19,7 @@
 <link rel="stylesheet" href="css/coreflow-note-reply.css?v=b5c2b3fb"><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.css より後ろに読む -->
 <link rel="stylesheet" href="css/coreflow-req.css?v=fd4a9c74"><!-- 📮 予定依頼（全アプリ共通・_shared から配布） -->
 <link rel="stylesheet" href="css/search.css?v=8">
-<link rel="stylesheet" href="css/customer-detail.css?v=24">
+<link rel="stylesheet" href="css/customer-detail.css?v=25">
 <link rel="stylesheet" href="css/work-content.css?v=8">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=c679db13">
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.36.1</div>
+    <div class="login-ver">v2.36.2</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.36.1</span>
+    <span class="ver">v2.36.2</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -894,7 +894,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/archive-pit.js?v=5"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
 <script src="js/customers.js?v=70"></script>
 <script src="js/veh-merge.js?v=3"></script><!-- 🚗 v2.31.0→v2.32.0 同じ車が2件に分かれている時に1台にまとめる（顧客はまたがない・入口は顧客詳細の編集の横だけ）。customers.js の器（custShowModal）を借りるので後ろに読む -->
-<script src="js/cust-merge.js?v=2"></script><!-- 👤 v2.36.0 同じお客様が2人に分かれている時に1人にまとめる（2本検索の専用UI）。customers.js の器と veh-merge の見た目を借りるので後ろに読む -->
+<script src="js/cust-merge.js?v=3"></script><!-- 👤 v2.36.0 同じお客様が2人に分かれている時に1人にまとめる（2本検索の専用UI）。customers.js の器と veh-merge の見た目を借りるので後ろに読む -->
 <script src="js/cust-reg.js?v=4"></script><!-- v1.52.0：顧客・車両の登録画面（新規顧客／車両追加を統合・都度車両変動もここで付ける）。customers.js の器を借りるので後ろに読む -->
 <script src="js/sample-customers.js?v=10"></script>
 <script src="js/sample-reservations.js?v=32"></script>

@@ -219,10 +219,13 @@
     if(st==='ok') return '<span class="um-pill ok">LINE 登録済' + (t(c.lstepId)?('（'+esc(t(c.lstepId))+'）'):'') + '</span>';
     return '<span class="um-pill mut">LINE 未案内</span>';
   }
+  /* 🔎 v2.37.1 このカードは**洗い出しの窓からも使う**（同じ見た目で状況を見せる）＝写しを作らない。
+     n を渡さなければ、①②の見出しも「選び直す」も出さない。 */
   function _one(c, n){
+    if(!c) return '';
     var vs = liveVehs(c), k = 来店(c);
-    var h = '<div class="um-one on' + n + '">';
-    h += '<div class="um-oh"><span class="um-no">' + (n===1?'①':'②') + '</span>'
+    var h = '<div class="um-one' + (n?(' on'+n):' plain') + '">';
+    if(n) h += '<div class="um-oh"><span class="um-no">' + (n===1?'①':'②') + '</span>'
        + '<span class="um-role">' + (n===1?'残す':'アーカイブへ') + '</span>'
        + '<button class="vm-mini" onclick="PitCustMerge.clear(' + n + ')">選び直す</button></div>';
     h += '<div class="um-name">' + esc(disp(c)) + ' <small>様</small></div>';
@@ -438,6 +441,7 @@
   w.PitCustMerge = {
     open: open, plan: plan, apply: apply, undo: undo, undoAsk: undoAsk, go: go, 探す: 探す,
     /* 🔴 打っている間は窓を描き直さない（IMEが飛ぶ）＝候補の並びだけ差し替える */
+    カード:   function(c){ return _one(c, 0); },   /* 洗い出しの窓から借りる（同じ見た目） */
     q:        function(n, v){ if(!_st) return; if(n===1) _st.q1=v; else _st.q2=v; _paint(n); },
     pick:     function(n, id){ if(!_st) return; if(n===1) _st.主=id; else _st.サブ=id; _st.欄={}; _home(); },
     clear:    function(n){ if(!_st) return; if(n===1){ _st.主=''; _st.q1=''; } else { _st.サブ=''; _st.q2=''; } _st.欄={}; _home(); },

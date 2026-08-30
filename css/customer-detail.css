@@ -557,7 +557,8 @@
   color:var(--text2); background:var(--bg2); border:1px solid var(--border); border-radius:9px; }
 .cust-mergeico:hover{ border-color:var(--brand); color:var(--brand); background:var(--brand-soft); }
 .cust-mergeico:first-of-type{ margin-left:auto; }   /* 2つ並ぶ（まとめる／洗い出す）ので、先頭だけ右へ寄せる */
-.cm-box.um-box{ width:900px; max-width:calc(100vw - 40px); }
+/* 🔴 v2.37.1（ゆうた指定）**大事な画面なので広く取る。** */
+.cm-box.um-box{ width:1180px; max-width:calc(100vw - 40px); }
 .um-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:4px; }
 .um-col{ background:var(--bg1); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
 .um-sec{ font-size:12px; font-weight:700; color:var(--text2); margin:0 0 8px; }
@@ -619,7 +620,7 @@
  * 🔎 v2.37.0 ダブりを洗い出す（dup-find.js）── 読むだけの窓
  * ⚠ まとめる窓（vm-*）の器をそのまま借りる。
  * ======================================== */
-.cm-box.df-box{ width:900px; max-width:calc(100vw - 40px); }
+.cm-box.df-box{ width:1180px; max-width:calc(100vw - 40px); }
 .df-tabs{ display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
 .df-tab{ font-size:12px; font-weight:700; color:var(--text2); background:var(--bg2);
   border:1px solid var(--border); border-radius:999px; padding:8px 14px; cursor:pointer; }
@@ -642,3 +643,17 @@
 .df-none{ font-size:12.5px; color:var(--text3); background:var(--bg1); border:1px solid var(--border);
   border-radius:11px; padding:14px 16px; line-height:1.8; }
 .df-none span{ font-size:11.5px; color:var(--text3); }
+
+/* 🔎 v2.37.1 洗い出しの行＝押すと下に顧客の中身が開く（まとめる窓と同じカードを借りる） */
+.df-item{ border:1px solid var(--border); background:var(--bg1); border-radius:11px; overflow:hidden; }
+.df-item.open{ border-color:var(--brand); }
+.df-item .df-row{ border:none; background:transparent; border-radius:0; cursor:pointer; }
+.df-item .df-row:hover{ background:var(--bg2); }
+.df-chev{ flex:0 0 auto; font-size:10px; color:var(--text3); }
+.df-open{ border-top:1px solid var(--border); padding:12px 13px; background:var(--bg2); }
+.df-cards{ display:grid; grid-template-columns:1fr; gap:12px; }
+.df-cards.two{ grid-template-columns:1fr 1fr; }
+.um-one.plain{ border:1px solid var(--border); border-radius:12px; background:var(--bg1); }
+.df-skip{ margin-top:14px; font-size:11.5px; color:var(--text3); background:var(--bg1);
+  border:1px dashed var(--border2); border-radius:10px; padding:10px 13px; }
+.df-skip b{ color:var(--text2); }

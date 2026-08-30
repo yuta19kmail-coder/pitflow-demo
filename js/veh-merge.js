@@ -450,9 +450,12 @@
       if(!yes) return;
       var 記録 = apply(_st.custId, _st.主, _st.サブ, { 欄:_st.欄, ナンバー:_st.ナンバー });
       if(!記録) return;
-      _st.主 = ''; _st.サブ = ''; _st.欄 = {}; _st.ナンバー = '';
+      /* 🔴 v2.32.1（ゆうた指定 2026-08-30）
+         「**実際に統合が終わった後に画面に戻る必要はない。顧客詳細画面まで戻ってOK**」
+         ＝ まとめ終わったら窓は閉じて、**結果が見える顧客詳細**を出す。 */
+      var cid = _st.custId; _st = null;
       toast('まとめました');
-      _home();
+      if(w.custOpen) custOpen(cid); else if(w.custCloseModal) custCloseModal();
     });
   }
 

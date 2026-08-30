@@ -1469,8 +1469,15 @@
            '</div>'+
            '<div class="cd-aacts">'+
              '<button class="cd-ab" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')" title="この車の来店履歴を見る"><i data-ic=clock data-ics=15></i> 履歴</button>'+
-             (canR ? '<button class="cd-ab cd-ab-restore" onclick="custVehRestore(\''+cust.id+'\',\''+(v.id||'')+'\')" title="アーカイブから戻す"><i data-ic=undo data-ics=15></i> 戻す</button>'
-                   : '<span class="cd-ab cd-ab-lock" title="戻せるのは管理者だけです"><i data-ic=lock data-ics=15></i></span>')+
+             /* 🔴 v2.32.1（2026-08-30 実機で見つけた穴）
+                **統合でまとめた車に「戻す」を出さない。**
+                「戻す」はアーカイブの印を外すだけなので、押すと**統合した印（`mergedInto`）が残ったまま車が生き返る**
+                ＝一覧には出るのに履歴の引き当てからは外れる、という食い違いになる。
+                戻す道は**統合を取り消す（🔗の窓の中・管理者だけ）1本**。ここでは道案内だけ出す。 */
+             ((window.pitVehMerged && pitVehMerged(v))
+               ? '<button class="cd-ab" onclick="PitVehMerge.open(\''+cust.id+'\')" title="この車は統合でまとめたもの。戻すときは「車をまとめる」の窓から統合を取り消します"><i data-ic=link data-ics=15></i> 統合の記録へ</button>'
+               : (canR ? '<button class="cd-ab cd-ab-restore" onclick="custVehRestore(\''+cust.id+'\',\''+(v.id||'')+'\')" title="アーカイブから戻す"><i data-ic=undo data-ics=15></i> 戻す</button>'
+                       : '<span class="cd-ab cd-ab-lock" title="戻せるのは管理者だけです"><i data-ic=lock data-ics=15></i></span>'))+
            '</div>'+
            '</div>';
       });

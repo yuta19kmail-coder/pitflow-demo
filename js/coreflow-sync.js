@@ -210,6 +210,46 @@
       _state = 'idle'; _lastAt = Date.now(); paint();
     },
     set: function (s) { if (LABEL[s]) { _state = s; paint(); } },
+
+    /* 🔴🔴🔴 v2026-08-30 **「線は生きているのに、データだけ来なくなった」を見張る。**
+       ⚠ 2026-08-28 の事故（古い画面が他人の作業を丸ごと消した）で、いちばん質が悪かったのは
+          **画面は普通に動き、エラーも出ず、同期ランプも『同期済み』のままだった**こと。
+          ここまでのランプは「届いた時に緑にする」だけで、**届かなくなったことは誰も見ていなかった。**
+       🔴 Firestore 自身の印（`metadata.fromCache`）を1つの書類で見張る。
+          `fromCache: true` ＝ サーバーからではなく端末の中の写しから返っている＝**届いていない。**
+       ⚠ 開いた直後は必ず一瞬 fromCache になるので、**猶予（既定8秒）を置いてから**言う
+          （オオカミ少年にしない）。⚠ `navigator.onLine` では足りない
+          （**ネットは生きているのに見張りだけ死ぬ**のがこの事故の形）。
+       使い方： CFSync.watchLink(なにかの書類のref, { onBack:function(){ 購読を張り直す } })
+       返り値： 見張りを止める関数 */
+    watchLink: function (ref, opt) {
+      opt = opt || {};
+      var wait = opt.offWait || 8000, off = null, need = false, un = null, told = false;
+      if (!ref || typeof ref.onSnapshot !== 'function') return function () {};
+      try {
+        un = ref.onSnapshot({ includeMetadataChanges: true }, function (d) {
+          var 写しから = !!(d && d.metadata && d.metadata.fromCache);
+          if (写しから) {
+            need = true;
+            if (!off) off = setTimeout(function () {
+              off = null;
+              API.set('cache');
+              if (!told) { told = true; try { API.bubble('サーバーから届いていません。画面を読み込み直すか、電波を確かめてください'); } catch (e) {} }
+              try { if (opt.onLost) opt.onLost(); } catch (e) {}
+            }, wait);
+            return;
+          }
+          if (off) { clearTimeout(off); off = null; }     /* 一瞬だった＝何も言わない */
+          told = false;
+          API.connected();
+          if (need) { need = false; try { if (opt.onBack) opt.onBack(); } catch (e) {} }
+        }, function (err) {
+          try { if (w.console) w.console.warn('[CFSync] watchLink', err && (err.code || err.message)); } catch (e) {}
+          API.set('error');
+        });
+      } catch (e) { return function () {}; }
+      return function () { if (off) clearTimeout(off); try { if (un) un(); } catch (e) {} };
+    },
     bubble: function (msg) { bubble(msg || tellState()); },   /* ランプのそばにふきだしを出す */
     tell: tellState,
     state: function () { return _state; },

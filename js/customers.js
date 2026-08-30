@@ -151,7 +151,8 @@
      🔴 v1.53.0 ③（ゆうた確認）**どうやってその人だと決めたか**を一緒に返す。
         ナンバーで当てた時だけ「名前が違うなら上書きしない」という守りを入れるため。 */
   function _findPerson(c, vehicle){
-    const arr=list();
+    /* 🔵 v2.36.0 統合で①へ吸収された人は相手にしない（中身は残っているが、生きているのは①） */
+    const arr=list().filter(function(x){ return x && !(window.pitCustMerged && pitCustMerged(x)); });
     if(c.customerId){ const p=arr.find(x=>x.id===c.customerId); if(p) return {p:p, why:'id'}; }
     if(isRealPlate(vehicle.plate)){
       const p=arr.find(x=>Array.isArray(x.vehicles)&&x.vehicles.some(v=>isRealPlate(v.plate)&&norm(v.plate)===norm(vehicle.plate)));
@@ -640,6 +641,9 @@
          (state.divisions||[]).map(d=>'<option value="'+d.id+'"'+(_filters.div===d.id?' selected':'')+'>'+esc(d.label)+'</option>').join('')+'</select>'+
        '<select class="cust-fsel" onchange="custSetFilter(\'front\',this.value)">'+opt(_distinctVeh('frontStaff'),_filters.front,'担当：すべて')+'</select>'+
        '<select class="cust-fsel" onchange="custSetFilter(\'maker\',this.value)">'+opt(_distinctVeh('maker'),_filters.maker,'メーカー：すべて')+'</select>'+
+       /* 🔵 v2.36.0（ゆうた指定）**件数の下に「お客様をまとめる」**。
+          ⚠ ふだん押すものではないので、しぼり込みの行の右端に控えめに置く（車の統合と同じ考え方）。 */
+       '<button type="button" class="cust-mergebtn" onclick="PitCustMerge.open()" title="同じお客様が2人に分かれている時、1人にまとめます"><i data-ic=link data-ics=15></i> お客様をまとめる</button>'+
        '</div>';
     h+='<div id="cust-thost"></div>';
     wrap.innerHTML=h;

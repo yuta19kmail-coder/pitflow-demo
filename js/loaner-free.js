@@ -114,11 +114,18 @@
      ================================================================== */
   /* 🔴 `busy` ＝ **その日、代車として貸せないか**。
      ⚠ 🔧整備の枠の「候補」だけ false。理由は下の「候補は塞がない」を読むこと。 */
+  var MAINT_WORKS = {
+    shaken: { label: '車検',      slide: false },
+    '12pt': { label: '12ヶ月点検', slide: true  },
+    general:{ label: '一般',      slide: true  },
+    bp:     { label: 'B.P',       slide: true  },
+    fix:    { label: '修理',      slide: true  }
+  };
   var KINDS = {
     lend:  { label: '貸出',    busy: true  },
     hold:  { label: '仮押さえ', busy: true  },
     event: { label: '予定',    busy: true  },
-    maint: { label: '整備の枠', busy: null  }   /* null＝status で決まる（下の _maintBusy） */
+    maint: { label: '整備の枠', busy: null  }   /* null＝stage で決まる（下の _maintBusy） */
   };
 
   /* ==================================================================
@@ -128,7 +135,9 @@
      　4〜6／12〜16／22〜24 が空いてるからここのどこかで車検して！ みたいなスケジュールになる事が多い。
      　だから黄色の枠でとっておいて、そこから実際に作業する場合はタスクボードにカードとして入庫する」
 
-     ◎3つの顔（同じ1件が、決まり具合で見え方を変える）
+     ◎3つの顔（同じ1件が、決まり具合で見え方を変える）＝`stage`
+       ⚠ **`status` という名前は使わない。**このアプリで `status` は**カードの状態**（予約・入庫…）を指す。
+       　 同じ名前を別の意味で使うと、見張り（test_pit_rules の「知らない状態の名前」）が正しく鳴らなくなる。
        'month'     … 月の目標（10月に車検）。**日はまだ無い**
                      🔴 **保存しない。**満了日・12ヶ月点検日から**計算で出す**（裏で勝手に書かない）
                      🔴 **日のカレンダーには出さない**（縮尺が違うものを日軸に乗せると必ず破綻する）
@@ -145,7 +154,7 @@
         🗣「どんなにあっても、もともと生命線だから落とすことはない」
         ＝ 出すのは**警告だけ**。`pitLoanerUsable` からは外さない。**ここに貸出停止を書き足さないこと。**
      ================================================================== */
-  function _maintBusy(it) { return it && it.status === 'fixed'; }
+  function _maintBusy(it) { return it && it.stage === 'fixed'; }
 
   function _assignItem(a) {
     return {
@@ -162,13 +171,15 @@
     return {
       kind: 'maint', id: e.id, from: e.fromDate, to: e.toDate,
       event: e, maintOf: e,
-      status: e.status || 'candidate',
+      stage: e.stage || 'candidate',
       work: e.work || '',            /* shaken / 12pt / general / bp / fix */
       groupId: e.groupId || e.id,
       urgent: !!e.urgent,
       skipped: Array.isArray(e.skipped) ? e.skipped : [],
       memo: e.memo || '',
-      label: e.label || '整備の枠',
+      /* ⚠ 名前は**作業タイプから出す**。`label` の書き込み忘れで「整備の枠」に落ちると、
+         日ビューでもボードでも何の作業か分からなくなる（古いデータにも label は無い）。 */
+      label: e.label || (MAINT_WORKS[e.work] && MAINT_WORKS[e.work].label) || '整備の枠',
       color: '#d6a846'
     };
   }
@@ -193,7 +204,7 @@
     /* 並びは 貸出 → 整備の確定 → 仮押さえ → 整備の候補 → 予定
        （画面が「主役」を取りたい時は先頭を見る。**決まっているものほど前**） */
     var ord = { lend: 0, maintFixed: 1, hold: 2, maint: 3, event: 4 };
-    var rank = function (x) { return ord[(x.kind === 'maint' && x.status === 'fixed') ? 'maintFixed' : x.kind]; };
+    var rank = function (x) { return ord[(x.kind === 'maint' && x.stage === 'fixed') ? 'maintFixed' : x.kind]; };
     return items.slice().sort(function (a, b) { return (rank(a) - rank(b)) || (a.from < b.from ? -1 : 1); });
   }
   function _collect(loanerId, from, to, opt) {
@@ -208,8 +219,15 @@
     arr(w.state && w.state.fleetEvents).forEach(function (e) {
       if (!e || e.vehicleId !== loanerId) return;
       if (!(e.fromDate <= to && e.toDate >= from)) return;
-      /* 🔧 整備の枠は kind を分ける＝「代車自身の予定（車検入庫の青帯）」と混ぜない */
-      out.push(e.maint ? _maintItem(e) : _eventItem(e));
+      if (e.maint){
+        /* 🔴 **月の目標（stage:'month'）は日の軸には出さない。**
+           縮尺が違うものを日のカレンダーに乗せると必ず破綻する（2026-08-31 の整理）。
+           出すのは作業予定ボードと月カレンダーだけ＝そちらは opt.withMonth を付けて呼ぶ。 */
+        if ((e.stage || 'candidate') === 'month' && !(opt && opt.withMonth)) return;
+        out.push(_maintItem(e));   /* 整備の枠は「代車自身の予定（青帯）」と kind を分ける */
+      } else {
+        out.push(_eventItem(e));
+      }
     });
     return _pick(out, opt);
   }
@@ -394,13 +412,6 @@
     if (d.getDate() !== +p[2]) d = new Date(+p[0], +p[1] - 1 - n + 1, 0);
     return _ymd(d);
   }
-  var MAINT_WORKS = {
-    shaken: { label: '車検',      slide: false },
-    '12pt': { label: '12ヶ月点検', slide: true  },
-    general:{ label: '一般',      slide: true  },
-    bp:     { label: 'B.P',       slide: true  },
-    fix:    { label: '修理',      slide: true  }
-  };
   function maintPlans(v, todayStr) {
     var today = todayStr || _ymd(new Date());
     var out = [];

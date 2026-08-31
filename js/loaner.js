@@ -1623,8 +1623,10 @@ window.loHelp = function(){
     + '<h3>代車カレンダーの使い方</h3>'
     + '<p style="font-size:11px;color:var(--text3);margin:0">上の「？」からいつでも開けます</p>'
     + '<h5>色の見方</h5><div class="lo-help-lg">'
-    + '<div>' + sw('background:#1db97a') + '予約の貸出（国産）</div>'
-    + '<div>' + sw('background:#ec4899') + '予約の貸出（輸入）</div>'
+    /* ⚠ 国産の緑・輸入のピンクは**書き写さない**（pit-share.js の pitTeamColor が唯一の正）。
+       ここに直書きすると「同じ車なのに画面ごとに色が違う」が始まる。 */
+    + '<div>' + sw('background:' + (window.pitTeamColor ? pitTeamColor('default') : 'var(--brand)')) + '予約の貸出（国産）</div>'
+    + '<div>' + sw('background:' + (window.pitTeamColor ? pitTeamColor('import') : 'var(--brand)')) + '予約の貸出（輸入）</div>'
     + '<div>' + sw('background:#3b82f6') + '予約以外の貸出</div>'
     + '<div>' + sw(hatch('116,152,200')) + '🅿 仮押さえ</div>'
     + '<div>' + sw('background:#5b6675') + '返却済み</div>'

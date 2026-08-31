@@ -174,8 +174,20 @@ function renderToday(){
   html += '<div class="today-cols' + (window._todayFull ? ' full' : '')
         + (calTone === 'closed' ? ' is-closed' : '') + '">';
   html += '<div class="today-col">';
-  html += '<div class="today-col-head intake"><span class="ic"><i data-ic=download data-ics=16></i></span>入庫 <span class="cnt">' + intake.length + '</span></div>';
-  html += '<div class="today-col-body">' + (_todHasAny(merged.left) ? merged.left : '<div class="today-empty">入庫予定なし</div>') + '</div>';
+  /* 🔧 v2.45.0（ゆうた指定 2026-08-31）**自社の代車の整備も入庫の列に出す。**
+     🗣「当日ビュー→未入庫→消滅」＝候補の枠は「この期間のどの日でもいい」の提示なので、
+     　1日ずつ出て、やらなかった日は**未入庫を素通りしてその日ぶんだけ消える**。
+     🗣（見せ方）「基本は既存の物を出来る限り代車に寄せるレベルでいいよ。
+     　名前　自社代車　車種名　作業バッチ　車検・代車　みたいな感じで」
+     ⚠ v1.131.0 の「当日ビューに車検の枠は出さない」は**お客様の車検予定**の話。これは別物
+     　（自社の代車を**入庫させる**話なので、入庫の列に出るのが素直）。
+     ⚠ 時間が無いので**いちばん上に「終日」で置く**。時間のあるお客様の予約より前に出さない意味はない。 */
+  const maintHtml = (window.pitMaintTodayHtml && isToday) ? pitMaintTodayHtml(dayStr) : '';
+  const maintN = (window.pitMaintToday && isToday) ? pitMaintToday(dayStr).length : 0;
+  html += '<div class="today-col-head intake"><span class="ic"><i data-ic=download data-ics=16></i></span>入庫 <span class="cnt">' + (intake.length + maintN) + '</span>'
+        + (maintN ? '<span class="cnt tod-maint-cnt" title="自社の代車の整備">代車 ' + maintN + '</span>' : '') + '</div>';
+  html += '<div class="today-col-body">' + maintHtml
+        + (_todHasAny(merged.left) ? merged.left : (maintHtml ? '' : '<div class="today-empty">入庫予定なし</div>')) + '</div>';
   html += '</div>';
   html += '<div class="today-col">';
   html += '<div class="today-col-head return"><span class="ic"><i data-ic=upload data-ics=16></i></span>返車 <span class="cnt">' + returns.length + '</span></div>';

@@ -424,7 +424,9 @@
 /* ===== 代車ビュー（縦＝日付・横＝代車20台・両方向スクロール） ===== */
 .lo-scroll{ height:calc(100dvh - 150px); overflow:auto; border:1px solid var(--border); border-radius:var(--r); background:var(--bg2); }
 .lo-grid{ display:grid; min-width:max-content; }
-.lo-cell{ border-bottom:1px solid var(--border); border-right:1px solid var(--border); min-height:38px; padding:3px 4px; font-size:11px; position:relative; }
+/* 🔍 v2.41.0 縮尺。**1日の高さ（--lo-dayh）だけが元**で、列の幅も札の高さもここから割り出す。
+   ⚠ 既定は 38px ＝ 直す前とまったく同じ見た目になる値。変数が無い時も 38px に落ちる。 */
+.lo-cell{ border-bottom:1px solid var(--border); border-right:1px solid var(--border); min-height:var(--lo-dayh,38px); padding:3px 4px; font-size:11px; position:relative; }
 .lo-head{ position:sticky; top:0; z-index:4; background:var(--bg3); border-bottom:1px solid var(--border2); text-align:center; }
 .lo-corner{ position:sticky; left:0; top:0; z-index:6; }
 /* 🔴 v1.46.0 代車カレンダーの列見出し＝**車種名がメイン／番号は小さく下に**（ゆうた指定）。
@@ -499,7 +501,7 @@
 .lo-badge{ background:var(--lo-team, var(--brand)); color:#fff; box-shadow:0 2px 6px rgba(0,0,0,.4); cursor:pointer; text-align:left; }
 .lo-badge:active{ cursor:pointer; }
 /* 3行カード（必要最小の高さ＝約1.5日分・最大幅維持・はみ出しは…） */
-.lo-badge.full{ position:absolute; z-index:2; top:2px; left:4px; right:4px; height:56px; border-radius:8px; padding:4px 7px; overflow:hidden; }
+.lo-badge.full{ position:absolute; z-index:2; top:2px; left:4px; right:4px; height:calc(var(--lo-dayh,38px) * 1.474); border-radius:8px; padding:4px 7px; overflow:hidden; }
 .lo-badge.full .lo-lbl.full{ display:flex; flex-direction:column; gap:1px; height:100%; min-width:0; overflow:hidden; }
 .lo-badge.full .lo-nm{ display:block; font-size:11.5px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:100%; }
 .lo-badge.full .lo-car2{ display:flex; align-items:center; gap:4px; font-size:11.5px; font-weight:600; color:#fff; min-width:0; }
@@ -516,11 +518,15 @@
 .lo-fix{ display:inline-block; font-size:9px; font-weight:800; color:#3a2a00; background:#fbbf24; border-radius:4px; padding:0 5px; margin-left:3px; flex:0 0 auto; }
 /* 当日かぶり（本当に同日）＝後客の3行札を共有日の上端まで伸ばし、上辺を“下向き矢印型”にくり抜く。
    くり抜きの中を先客の棒＋▼が均一の隙間で通る（先客の▼は共有日の下端まで）。テキストはくり抜きの下＝翌日から。 */
-.lo-badge.full.lo-handoff{ top:-36px; height:96px; padding:44px 7px 4px;
+/* ⚠ v2.41.0 くり抜きの形も**縮尺について伸び縮みさせる**（固定pxのままだと、縮尺を上げた時に
+   矢印のくぼみが1日ぶんに届かず、先客の茎とズレて見える）。
+   ⚠ 係数は 38px の時に **前とまったく同じ px** になるよう割り出したもの。触らないこと。 */
+.lo-badge.full.lo-handoff{ top:calc(var(--lo-dayh,38px) * -0.947); height:calc(var(--lo-dayh,38px) * 2.526);
+  padding:calc(var(--lo-dayh,38px) * 1.158) 7px 4px;
   clip-path:polygon(0 0,
-    calc(50% - 6px) 0, calc(50% - 6px) 17px, calc(50% - 11px) 17px,
-    50% 40px,
-    calc(50% + 11px) 17px, calc(50% + 6px) 17px, calc(50% + 6px) 0,
+    calc(50% - 6px) 0, calc(50% - 6px) calc(var(--lo-dayh,38px) * 0.447), calc(50% - 11px) calc(var(--lo-dayh,38px) * 0.447),
+    50% calc(var(--lo-dayh,38px) * 1.053),
+    calc(50% + 11px) calc(var(--lo-dayh,38px) * 0.447), calc(50% + 6px) calc(var(--lo-dayh,38px) * 0.447), calc(50% + 6px) 0,
     100% 0, 100% 100%, 0 100%); }
 /* 返却済み＝アーカイブ（消し過ぎず読める・茎は実線でグレー） */
 .lo-bk.lo-returned .lo-badge{ background:#5b6675; color:#dfe6ef; box-shadow:inset 5px 0 0 var(--lo-team, #888); cursor:default; opacity:1; }   /* 左に国産=緑/輸入=ピンクのカラーバー＝どちらか分かる */
@@ -2478,3 +2484,81 @@ td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(11
 .cfs-lg tr.cfs-lg-band > td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(196,140,150,.38) 0 5px, rgba(196,140,150,.12) 5px 10px) !important; }
 /* 車両管理の利用カレンダー＝仮押さえは薄い網掛け */
 .fl-cal-cell.fl-use.fl-hold{ background:repeating-linear-gradient(135deg, rgba(116,152,200,.22) 0 6px, rgba(116,152,200,.06) 6px 12px) !important; }
+
+
+/* ===== 🔎🧹❔🔍 v2.41.0 代車カレンダーの上のバー（ゆうた指定 2026-08-31） =====
+   🗣「検索BOXを作る／絞り込みと並び替えのチップがぎゅうぎゅうに並びすぎだからすっきりさせたい／
+   　　操作が結構複雑だから簡易的マニュアルポップみたいなものをつくりたい・〇？があってクリックすると展開／
+   　　カレンダーの縮尺を変更したい」
+   🔴 チップ14個（装備4・区分4・並べ替え6）が2段に折り返して、カレンダーを下へ押していた。
+      絞込・並べ替えは**選んでいる時だけ**見えればよいので、ボタンの中へ畳んだ。
+      選んでいる数はボタンの右の丸バッジで出す＝閉じていても効いているか分かる。 */
+
+/* 🔎 検索 */
+.lo-search{ position:relative; display:inline-flex; align-items:center; }
+.lo-search input{ width:208px; background:var(--bg3); border:1px solid var(--border2); color:var(--text);
+  border-radius:999px; padding:5px 26px 5px 28px; font:inherit; font-size:12px; box-sizing:border-box; }
+.lo-search input:focus{ outline:none; border-color:var(--brand); background:var(--bg2); }
+.lo-search-ic{ position:absolute; left:9px; top:50%; transform:translateY(-50%); color:var(--text3); pointer-events:none; display:flex; }
+.lo-search-x{ position:absolute; right:6px; top:50%; transform:translateY(-50%); border:0; background:transparent;
+  color:var(--text3); cursor:pointer; font-size:14px; line-height:1; padding:2px; }
+.lo-search-x:hover{ color:var(--text); }
+/* 🔴 探し当てた札は**列を消さずに縁で光らせる**（列ごと消すと前後の予定が見えなくなる） */
+.lo-badge.lo-hit, .lo-hold-tag.lo-hit{ box-shadow:0 0 0 2px var(--brand), 0 2px 6px rgba(0,0,0,.4); }
+
+/* 選んでいる数の丸バッジ */
+.lo-cnt{ display:inline-block; min-width:15px; text-align:center; font-size:9.5px; font-weight:800;
+  background:var(--brand); color:#06281d; border-radius:999px; padding:0 4px; margin-left:2px; }
+.vh-btn.lo-on{ background:var(--brand-soft); border-color:var(--brand); color:#8ff0c4; }
+.vh-btn.lo-helpbtn{ width:28px; padding:0; justify-content:center; border-radius:999px; font-weight:800; }
+
+/* 🔍 縮尺＝つまんで動かすスライダー。**段ではなく連続**（ゆうた指定「がっつり動く摘まめるもの」） */
+.lo-zoom{ display:inline-flex; align-items:center; gap:7px; background:var(--bg3); border:1px solid var(--border2);
+  border-radius:999px; padding:3px 12px 3px 10px; }
+.lo-zoom-a{ font-size:10px; color:var(--text3); font-weight:800; line-height:1; }
+.lo-zoom input[type=range]{ -webkit-appearance:none; appearance:none; width:104px; height:18px; background:transparent; cursor:grab; margin:0; }
+.lo-zoom input[type=range]:active{ cursor:grabbing; }
+.lo-zoom input[type=range]::-webkit-slider-runnable-track{ height:4px; border-radius:999px; border:1px solid var(--border2);
+  background:linear-gradient(90deg, var(--brand) var(--lo-zfill,23%), var(--bg) var(--lo-zfill,23%)); }
+.lo-zoom input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:16px; height:16px;
+  margin-top:-7px; border-radius:999px; background:var(--brand); border:2px solid var(--bg);
+  box-shadow:0 2px 7px rgba(0,0,0,.55); transition:transform .08s; }
+.lo-zoom input[type=range]:hover::-webkit-slider-thumb{ transform:scale(1.12); }
+.lo-zoom input[type=range]:active::-webkit-slider-thumb{ transform:scale(1.24); }
+.lo-zoom input[type=range]::-moz-range-track{ height:4px; border-radius:999px; background:var(--bg); border:1px solid var(--border2); }
+.lo-zoom input[type=range]::-moz-range-progress{ height:4px; border-radius:999px; background:var(--brand); }
+.lo-zoom input[type=range]::-moz-range-thumb{ width:14px; height:14px; border-radius:999px; background:var(--brand);
+  border:2px solid var(--bg); box-shadow:0 2px 7px rgba(0,0,0,.55); }
+
+/* 上のバーから出す小窓（絞込／並べ替え／追加） */
+.lo-hpop{ position:fixed; z-index:210; background:var(--bg2); border:1px solid var(--border2); border-radius:12px;
+  box-shadow:0 14px 40px rgba(0,0,0,.55); padding:12px; min-width:238px; max-width:320px; }
+.lo-hpop h4{ margin:0 0 7px; font-size:10.5px; color:var(--text3); font-weight:800; letter-spacing:.04em; }
+.lo-hpop h4:not(:first-child){ margin-top:12px; }
+.lo-hpop-chips{ display:flex; flex-wrap:wrap; gap:5px; }
+.lo-hpop-foot{ display:flex; justify-content:space-between; gap:8px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
+/* 並べ替えは**同時に2つ効かない**のでラジオ（1つだけ）。押すたび入れ替わる形はやめた */
+.lo-radio{ display:block; padding:6px 9px; border-radius:7px; cursor:pointer; font-size:12.5px; color:var(--text2); }
+.lo-radio:hover{ background:var(--bg3); color:var(--text); }
+.lo-radio.on{ background:var(--brand-soft); color:#8ff0c4; font-weight:700; }
+.lo-hpop-b{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; background:var(--bg3);
+  border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font:inherit;
+  font-size:12.5px; font-weight:600; cursor:pointer; margin-bottom:6px; }
+.lo-hpop-b:hover{ background:var(--bg4); }
+.lo-hpop-b small{ display:block; font-size:10px; color:var(--text3); font-weight:400; }
+.lo-hpop-sw{ width:11px; height:11px; border-radius:3px; flex:0 0 auto; }
+
+/* ❔ 簡易マニュアル */
+.lo-help-ov{ position:fixed; inset:0; z-index:220; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:20px; }
+.lo-help-box{ background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:18px 20px;
+  width:min(560px,94vw); max-height:86vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+.lo-help-box h3{ margin:0 0 2px; font-size:15px; color:var(--text); }
+.lo-help-box h5{ margin:16px 0 6px; font-size:11.5px; color:var(--text2); font-weight:700; }
+.lo-help-x{ float:right; border:0; background:transparent; color:var(--text3); font-size:20px; cursor:pointer; line-height:1; }
+.lo-help-lg{ display:flex; flex-wrap:wrap; gap:7px 16px; }
+.lo-help-lg > div{ display:flex; align-items:center; gap:7px; font-size:12px; color:var(--text2); }
+.lo-help-sw{ width:26px; height:15px; border-radius:4px; flex:0 0 auto; border:1px solid var(--border2); }
+.lo-help-kv{ display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:12.5px; color:var(--text2); }
+.lo-help-kv b{ color:var(--text); font-weight:600; white-space:nowrap; }
+.lo-help-box ul{ margin:6px 0 0; padding-left:18px; font-size:12.5px; color:var(--text2); }
+.lo-help-box li{ margin:3px 0; }

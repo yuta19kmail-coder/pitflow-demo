@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.40.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.41.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=9">
 <link rel="stylesheet" href="css/views.css?v=58">
-<link rel="stylesheet" href="css/polish.css?v=218">
+<link rel="stylesheet" href="css/polish.css?v=219">
 <link rel="stylesheet" href="css/floor.css?v=23">
 <link rel="stylesheet" href="css/board-notes.css?v=2">
 <link rel="stylesheet" href="css/coreflow-note-reply.css?v=b5c2b3fb"><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.css より後ろに読む -->
@@ -124,7 +124,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.40.0</div>
+    <div class="login-ver">v2.41.0</div>
   </div>
 </div>
 
@@ -138,7 +138,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.40.0</span>
+    <span class="ver">v2.41.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -409,27 +409,24 @@
       <div class="view-header">
         <div class="view-title"><span class="icon"><i data-ic=van data-ics=16></i></span>代車カレンダー <span style="font-size:11px;color:var(--text3);font-weight:400">縦＝日付（下に無限）／横＝代車</span></div>
         <div class="view-actions">
-          <div class="lo-filters">
-            <span class="lo-filters-lb">絞込</span>
-            <button class="lo-filter" data-k="etc"  onclick="loToggleFilter('etc')">ETC</button>
-            <button class="lo-filter" data-k="navi" onclick="loToggleFilter('navi')">ナビ</button>
-            <button class="lo-filter" data-k="iso"  onclick="loToggleFilter('iso')">ISO</button>
-            <button class="lo-filter" data-k="camera" onclick="loToggleFilter('camera')">Bカメ</button>
-            <button class="lo-filter" data-cat="kei"    onclick="loToggleCat('kei')">軽</button>
-            <button class="lo-filter" data-cat="normal" onclick="loToggleCat('normal')">普通</button>
-            <button class="lo-filter" data-cat="import" onclick="loToggleCat('import')">輸入</button>
-            <button class="lo-filter" data-cat="commercial" onclick="loToggleCat('commercial')">商用</button>
-            <span class="lo-filters-lb">並べ替え</span>
-            <button class="lo-filter" data-sort="length" onclick="loToggleSort('length')" title="短い順">長さ↑</button>
-            <button class="lo-filter" data-sort="width"  onclick="loToggleSort('width')"  title="狭い順">幅↑</button>
-            <button class="lo-filter" data-sort="height" onclick="loToggleSort('height')" title="低い順">高さ↑</button>
-            <button class="lo-filter" data-sort="camera" onclick="loToggleSort('camera')" title="バックカメラ付きを先に">Bカメ</button>
-            <button class="lo-filter" data-sort="shakenDate" onclick="loToggleSort('shakenDate')" title="車検満了が近い順">車検↑</button>
-            <button class="lo-filter" data-sort="seats"  onclick="loToggleSort('seats')"  title="少ない順">定員↑</button>
+          <!-- 🔎🧹❔🔍 v2.41.0（ゆうた指定 2026-08-31）**上のバーを畳んだ。**
+               チップ14個が2段に折り返して、カレンダーを下へ押していた。
+               絞込・並べ替えは「選んでいる時だけ」見えればよいので、ボタンの中へ入れた。 -->
+          <div class="lo-search">
+            <span class="lo-search-ic"><i data-ic=search data-ics=14></i></span>
+            <input id="lo-q" type="text" placeholder="代車・お客様・メモ" autocomplete="off" oninput="loSearch(this.value)">
+            <button class="lo-search-x" onclick="loSearchClear()" title="消す">×</button>
           </div>
-          <button class="vh-btn" onclick="loAddManualBlock()" title="車販の乗り換え等：整備予約に出さず代車だけ貸出"><i data-ic=car data-ics=16></i> 予約以外で貸出</button>
-          <button class="vh-btn lo-emg-btn" onclick="loAddEmergency()" title="クレーム等で社用車を緊急で出す（一番左に追加・返車で消える）"><i data-ic=warn data-ics=16></i> 緊急車両追加</button>
+          <button class="vh-btn" id="lo-fbtn" onclick="loFilterMenu(event)"><i data-ic=filter data-ics=16></i> 絞込<span class="lo-cnt" id="lo-fcnt" style="display:none">0</span> ▾</button>
+          <button class="vh-btn" id="lo-sbtn" onclick="loSortMenu(event)"><i data-ic=sort data-ics=16></i> 並べ替え ▾</button>
+          <!-- 🔍 縮尺＝つまんで動かすスライダー（ゆうた指定「AAAのスイッチじゃなく、がっつり動く摘まめるもの」） -->
+          <div class="lo-zoom" title="つまんで動かすと、カレンダーの縮尺が変わります">
+            <span class="lo-zoom-a">A</span>
+            <input type="range" id="lo-zoom" min="0" max="100" value="23" oninput="loZoom(this.value)">
+          </div>
+          <button class="vh-btn lo-addbtn" onclick="loAddMenu(event)"><i data-ic=plus data-ics=16></i> 追加 ▾</button>
           <button class="vh-btn" onclick="loScrollToday()"><i data-ic=location data-ics=16></i> 今日へ</button>
+          <button class="vh-btn lo-helpbtn" onclick="loHelp()" title="使い方">？</button>
           <button class="vh-btn" onclick="showView('fleet')"><i data-ic=van data-ics=16></i> 車両管理へ</button>
         </div>
       </div>
@@ -941,7 +938,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/shaken.js?v=31"></script>
 <script src="js/shaken-log.js?v=7"></script>
 <script src="js/outsource.js?v=5"></script>
-<script src="js/loaner.js?v=76"></script>
+<script src="js/loaner.js?v=77"></script>
 <script src="js/fleet.js?v=34"></script>
 <script src="js/auth-pit.js?v=17"></script>
 <script src="js/members-pit.js?v=17"></script>

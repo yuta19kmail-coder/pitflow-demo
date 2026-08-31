@@ -10,6 +10,12 @@ let _loStart = null, _loCount = 0, _loBound = false, _loDnd = false, _loDragAid 
 let _loFilters = { etc:false, navi:false, iso:false };
 let _loCats = { kei:false, normal:false, import:false, commercial:false };   // 区分の絞り込み（OR）／v1.15.0 商用車を追加
 let _loSortKey = null;   // 並べ替え（低い順）：'height'|'width'|'length'|'seats'|null
+/* 🔎🔍 v2.41.0（ゆうた指定 2026-08-31）上のバー＝探す・畳む・縮尺 */
+let _loQ = '';           // 探している言葉（小文字）
+let _loZoom = 23;        // 縮尺 0〜100。**23 が直す前とまったく同じ見た目**（1日 38px・列 112px）
+const LO_ZOOM_KEY = 'pitflow_lo_zoom_v1';
+const LO_DAY_MIN = 28, LO_DAY_MAX = 72;   /* 1日の高さの両端 */
+const LO_COL_MIN = 96, LO_COL_MAX = 166;  /* 列の幅の両端（1日の高さと連動） */
 let _loVehBound = false;
 let _loPrepending = false;
 
@@ -277,11 +283,67 @@ function _loFiltered(){
   } else if (_loSortKey) {
     ls.sort(function(a, b){ return (a[_loSortKey] != null ? a[_loSortKey] : 99999) - (b[_loSortKey] != null ? b[_loSortKey] : 99999); });
   }
+  /* 🔎 v2.41.0 探している言葉。
+     🔴 **代車（車種・番号）に当たった時だけ列を絞る。**
+        お客様名やメモに当たった時は**列を消さない**＝消すと前後の予定が見えなくなり、
+        「空いているか」を見るというこの画面の役目が壊れる。そちらは札を縁で光らせるだけ（_loHitA）。 */
+  if (_loQ){
+    const byVeh = ls.filter(_loHitVeh);
+    if (byVeh.length) ls = byVeh;
+  }
   // 緊急車両は常に一番左
   const emg = ls.filter(function(l){ return l.emergency; });
   const norm = ls.filter(function(l){ return !l.emergency; });
   return emg.concat(norm);
 }
+
+/* ===== 🔎 探す（v2.41.0） ===== */
+function _loNorm(s){ return String(s == null ? '' : s).toLowerCase(); }
+/* 代車そのものに当たったか（車種・番号・名前） */
+function _loHitVeh(l){
+  if (!_loQ || !l) return false;
+  return _loNorm(l.model + ' ' + (l.number == null ? '' : l.number) + ' ' + (l.name || '') + ' ' + (l.plate || '')).indexOf(_loQ) >= 0;
+}
+/* 貸出・仮押さえの札に当たったか（お客様名・車種・メモ） */
+function _loHitA(a){
+  if (!_loQ || !a) return false;
+  const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
+  const nm = card ? ((window.pitCustName ? pitCustName(card) : card.customer) || '') : (a.customer || '');
+  const kn = card ? (card.kana || '') : '';
+  const car = card ? (card.car || '') : (a.car || '');
+  const memo = card ? (card.loanerOther || '') : (a.memo || a.purpose || '');
+  return _loNorm(nm + ' ' + kn + ' ' + car + ' ' + memo).indexOf(_loQ) >= 0;
+}
+window.loSearch = function(v){ _loQ = _loNorm(v).trim(); _loRefresh(); };
+window.loSearchClear = function(){
+  const el = document.getElementById('lo-q'); if (el) el.value = '';
+  _loQ = ''; _loRefresh();
+};
+
+/* ===== 🔍 縮尺（v2.41.0・ゆうた指定「がっつり動く摘まめるもの」） =====
+   🔴 **1日の高さ（--lo-dayh）だけが元。**列の幅も札の高さもここから割り出す（CSS 側の calc）。
+   🔴 つまんでいる間は**描き直さない**＝CSS変数と列幅を書き換えるだけ。
+      描き直すと20台×56日ぶんのHTMLを毎フレーム作ることになり、指について来なくなる。 */
+function _loDayH(){ return Math.round(LO_DAY_MIN + (LO_DAY_MAX - LO_DAY_MIN) * (_loZoom / 100)); }
+function _loColW(){ return Math.round(LO_COL_MIN + (LO_COL_MAX - LO_COL_MIN) * (_loZoom / 100)); }
+function _loZoomLoad(){
+  try { const v = localStorage.getItem(LO_ZOOM_KEY); if (v != null && v !== '') _loZoom = Math.max(0, Math.min(100, +v || 0)); } catch (e) {}
+}
+function _loApplyZoom(){
+  document.documentElement.style.setProperty('--lo-dayh', _loDayH() + 'px');
+  const g = document.getElementById('loaner-grid');
+  if (g && g.children.length){
+    const cw = _loColW();
+    g.style.gridTemplateColumns = '64px repeat(' + Math.max(1, _loFiltered().length) + ', minmax(' + cw + 'px, ' + cw + 'px))';
+  }
+  const el = document.getElementById('lo-zoom');
+  if (el){ if (el.value != _loZoom) el.value = _loZoom; el.style.setProperty('--lo-zfill', _loZoom + '%'); }
+}
+window.loZoom = function(v){
+  _loZoom = Math.max(0, Math.min(100, +v || 0));
+  try { localStorage.setItem(LO_ZOOM_KEY, String(_loZoom)); } catch (e) {}
+  _loApplyZoom();
+};
 /* 緊急車両：返車（割当の toDate を過ぎた）が済んだら列ごと消す（retired）。割当・車両データは履歴として残す。 */
 function _loProcessEmergency(){
   const today = ymd(new Date());
@@ -297,18 +359,118 @@ function _loProcessEmergency(){
 window.loToggleFilter = function(k){
   _loFilters[k] = !_loFilters[k];
   const b = document.querySelector('.lo-filter[data-k="' + k + '"]'); if (b) b.classList.toggle('on', _loFilters[k]);
-  _loRefresh();
+  _loHeadSync(); _loRefresh();
 };
 window.loToggleCat = function(cat){
   _loCats[cat] = !_loCats[cat];
   const b = document.querySelector('.lo-filter[data-cat="' + cat + '"]'); if (b) b.classList.toggle('on', _loCats[cat]);
-  _loRefresh();
+  _loHeadSync(); _loRefresh();
 };
+/* 🔴 v2.41.0 並べ替えは**同時に2つ効かない**ので、押すたび入れ替わる形をやめて
+   ラジオ（1つだけ選ぶ）にした。⚠ 同じものをもう一度選んでも解除しない＝「標準」を選ぶ。 */
 window.loToggleSort = function(key){
-  _loSortKey = (_loSortKey === key) ? null : key;   // 並べ替えは1つだけ（再押下で解除）
-  document.querySelectorAll('.lo-filter[data-sort]').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-sort') === _loSortKey); });
-  _loRefresh();
+  _loSortKey = key ? key : null;
+  document.querySelectorAll('.lo-radio[data-sort]').forEach(function(b){ b.classList.toggle('on', (b.getAttribute('data-sort') || '') === (_loSortKey || '')); });
+  _loHeadSync(); _loRefresh();
 };
+
+/* ===== 上のバーの小窓（v2.41.0） ===== */
+const LO_SORTS = [
+  { k:'',           lb:'標準（番号順）' },
+  { k:'length',     lb:'長さ ↑' },
+  { k:'width',      lb:'幅 ↑' },
+  { k:'height',     lb:'高さ ↑' },
+  { k:'seats',      lb:'定員 ↑' },
+  { k:'camera',     lb:'Bカメ付きを先に' },
+  { k:'shakenDate', lb:'車検満了が近い順' }
+];
+function _loHeadPopClose(){
+  const p = document.getElementById('lo-hpop'); if (p) p.remove();
+  document.removeEventListener('mousedown', _loHeadPopOut, true);
+}
+function _loHeadPopOut(e){
+  const p = document.getElementById('lo-hpop');
+  if (p && !p.contains(e.target)) _loHeadPopClose();
+}
+window.loHeadPopClose = _loHeadPopClose;
+function _loHeadPop(btn, html){
+  const same = !!document.getElementById('lo-hpop') && document.getElementById('lo-hpop').getAttribute('data-for') === (btn && btn.id);
+  _loHeadPopClose();
+  if (same) return;                    /* 同じボタンをもう一度＝閉じる */
+  const p = document.createElement('div');
+  p.id = 'lo-hpop'; p.className = 'lo-hpop'; p.setAttribute('data-for', (btn && btn.id) || '');
+  p.innerHTML = html;
+  document.body.appendChild(p);
+  /* ⚠ 押したボタンが見つからない時でも落とさない（画面の作りを変えた時に ここ で止まると全部止まる） */
+  const r = (btn && btn.getBoundingClientRect) ? btn.getBoundingClientRect()
+          : { top: 60, bottom: 88, left: 0, right: document.documentElement.clientWidth - 16 };
+  const w = p.offsetWidth, h = p.offsetHeight;
+  const vw = document.documentElement.clientWidth;
+  let left = r.right - w; if (left + w > vw - 8) left = vw - w - 8; if (left < 8) left = 8;
+  let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  p.style.left = left + 'px'; p.style.top = top + 'px';
+  setTimeout(function(){ document.addEventListener('mousedown', _loHeadPopOut, true); }, 0);
+}
+window.loFilterMenu = function(ev){
+  if (ev) ev.stopPropagation();
+  const chip = function(attr, val, lb, on){
+    return '<button class="lo-filter' + (on ? ' on' : '') + '" ' + attr + '="' + val + '" onclick="'
+         + (attr === 'data-k' ? 'loToggleFilter' : 'loToggleCat') + '(\'' + val + '\')">' + lb + '</button>';
+  };
+  _loHeadPop(document.getElementById('lo-fbtn'),
+    '<h4>装備</h4><div class="lo-hpop-chips">'
+    + chip('data-k','etc','ETC',_loFilters.etc) + chip('data-k','navi','ナビ',_loFilters.navi)
+    + chip('data-k','iso','ISO',_loFilters.iso) + chip('data-k','camera','Bカメ',_loFilters.camera)
+    + '</div><h4>区分</h4><div class="lo-hpop-chips">'
+    + chip('data-cat','kei','軽',_loCats.kei) + chip('data-cat','normal','普通',_loCats.normal)
+    + chip('data-cat','import','輸入',_loCats.import) + chip('data-cat','commercial','商用',_loCats.commercial)
+    + '</div><div class="lo-hpop-foot"><button class="vh-btn" onclick="loFilterClear()">クリア</button>'
+    + '<button class="vh-btn" onclick="loHeadPopClose()">閉じる</button></div>');
+};
+window.loFilterClear = function(){
+  Object.keys(_loFilters).forEach(function(k){ _loFilters[k] = false; });
+  Object.keys(_loCats).forEach(function(k){ _loCats[k] = false; });
+  document.querySelectorAll('#lo-hpop .lo-filter').forEach(function(b){ b.classList.remove('on'); });
+  _loHeadSync(); _loRefresh();
+};
+window.loSortMenu = function(ev){
+  if (ev) ev.stopPropagation();
+  const rows = LO_SORTS.map(function(x){
+    return '<label class="lo-radio' + (((_loSortKey || '') === x.k) ? ' on' : '') + '" data-sort="' + x.k
+         + '" onclick="loToggleSort(\'' + x.k + '\')">' + x.lb + '</label>';
+  }).join('');
+  _loHeadPop(document.getElementById('lo-sbtn'), '<h4>並べ替え（低い・少ない順）</h4>' + rows);
+};
+/* ＋追加＝いまある入口をここに集めた。**新しい機能はここでは増やしていない。** */
+window.loAddMenu = function(ev){
+  if (ev) ev.stopPropagation();
+  let btn = (ev && ev.currentTarget) ? ev.currentTarget : null;
+  if (!btn && document.querySelector) btn = document.querySelector('.lo-addbtn');
+  if (!btn) btn = document.getElementById('lo-abtn');
+  if (btn && !btn.id) btn.id = 'lo-abtn';
+  _loHeadPop(btn,
+    '<button class="lo-hpop-b" onclick="loHeadPopClose();loAddManualBlock()">'
+    + '<span class="lo-hpop-sw" style="background:#3b82f6"></span>予約以外で代車を貸出<small>車販の乗り換えなど</small></button>'
+    + '<button class="lo-hpop-b" onclick="loHeadPopClose();loAddHold({})">'
+    + '<span class="lo-hpop-sw" style="background:rgba(116,152,200,.65)"></span>🅿 仮押さえ<small>ひとことメモだけで枠を押さえる</small></button>'
+    + '<button class="lo-hpop-b" onclick="loHeadPopClose();loAddEmergency()">'
+    + '<span class="lo-hpop-sw" style="background:#ef4444"></span>緊急車両を追加<small>クレーム対応などで社用車を出す</small></button>');
+};
+/* ボタンの見た目を、いまの絞込・並べ替えに合わせる（閉じていても効いているか分かるように） */
+function _loHeadSync(){
+  const n = Object.keys(_loFilters).filter(function(k){ return _loFilters[k]; }).length
+          + Object.keys(_loCats).filter(function(k){ return _loCats[k]; }).length;
+  const c = document.getElementById('lo-fcnt');
+  if (c){ c.textContent = n; c.style.display = n ? 'inline-block' : 'none'; }
+  const fb = document.getElementById('lo-fbtn'); if (fb) fb.classList.toggle('lo-on', !!n);
+  const sb = document.getElementById('lo-sbtn');
+  if (sb){
+    const cur = LO_SORTS.filter(function(x){ return x.k === (_loSortKey || ''); })[0];
+    sb.innerHTML = '<i data-ic=sort data-ics=16></i> ' + ((cur && cur.k) ? cur.lb : '並べ替え') + ' ▾';
+    sb.classList.toggle('lo-on', !!_loSortKey);
+  }
+}
+window.loHeadSync = _loHeadSync;
 
 /* カードの代車情報(needLoaner+loanerId+loanerFrom)を代車カレンダーの割当(loanerAssigns)へ同期する（v0.100.2）。
    ◎背景：従来は実予約・仮予約で代車を入れてもカードに値が入るだけで割当が作られず、代車カレンダーに載らなかった
@@ -430,6 +592,9 @@ function renderLoaner(){
     if (a && !a.id) a.id = 'la' + Date.now().toString(36) + i.toString(36);
   });
   _loEnsureOpts();
+  /* 🔍 v2.41.0 端末に覚えさせた縮尺を先に当てる（描いたあとだと一瞬前の大きさが見える） */
+  _loZoomLoad();
+  document.documentElement.style.setProperty('--lo-dayh', _loDayH() + 'px');
   _loDedupeAssigns();         // 同一予約の二重割当を掃除（日数調整が重複扱いされる不具合の元）
   _loProcessReplacements();   // 入替日を過ぎた予定を確定
   _loProcessEmergency();      // 返車済みの緊急車両は列を消す（履歴は残す）
@@ -462,6 +627,10 @@ function renderLoaner(){
     });
   }
   if (!_loDnd){ _loDnd = true; loBindDnd(grid); }
+  /* 🔎🔍 v2.41.0 上のバーを、いまの状態に合わせる（探している言葉・絞込の数・並べ替え・縮尺） */
+  const _q = document.getElementById('lo-q'); if (_q && _q.value !== _loQ) _q.value = _loQ;
+  _loHeadSync();
+  _loApplyZoom();
   if (_fresh){
     requestAnimationFrame(function(){ loScrollToday(); setTimeout(loScrollToday, 60); });   // レイアウト確定後に確実にアンカー
   } else if (wrap && _keep){
@@ -528,7 +697,9 @@ function loRebuild(days){
   _loEnsureOpts();
   const ls = _loFiltered();
   grid.innerHTML = '';
-  grid.style.gridTemplateColumns = '64px repeat(' + Math.max(1, ls.length) + ', minmax(96px, 112px))';   // 案A：名前様＋車種＋メモが収まる幅
+  /* 🔍 v2.41.0 列の幅は縮尺から。⚠ 既定（縮尺23）で 112px ＝直す前と同じ。 */
+  const _cw = _loColW();
+  grid.style.gridTemplateColumns = '64px repeat(' + Math.max(1, ls.length) + ', minmax(' + _cw + 'px, ' + _cw + 'px))';
   let h = '<div class="lo-cell lo-head lo-corner">日付</div>';
   ls.forEach(function(l){
     /* 🔴 v1.46.0 ゆうた指定＝**数字より車種名をメイン**。
@@ -635,7 +806,7 @@ function _loRenderDays(start, n){
         if (hold.fromDate === dStr){
           /* 2日以上押さえている時は、下に余白があるのでメモを2行まで出す（1日だけなら1行） */
           const wide = (hold.toDate > hold.fromDate) ? ' lo-hold-w' : '';
-          hv += '<span class="lo-hold-tag' + wide + '" title="' + _loEsc(hold.memo || '仮押さえ') + '" onclick="loHoldMenu(event,\'' + hold.id + '\')">'
+          hv += '<span class="lo-hold-tag' + wide + (_loHitA(hold) ? ' lo-hit' : '') + '" title="' + _loEsc(hold.memo || '仮押さえ') + '" onclick="loHoldMenu(event,\'' + hold.id + '\')">'
               + '<span class="lo-hold-k">仮</span><span class="lo-hold-memo">' + _loEsc(hold.memo || '仮押さえ') + '</span></span>';
         }
       }
@@ -694,7 +865,7 @@ function _loRenderDays(start, n){
              + ' onclick="event.stopPropagation();loShowDup(\'' + l.id + '\',\'' + dStr + '\')">' + dupN + '</span>';
         }
         if (isStart){
-          h += '<span class="lo-badge ' + (compact ? 'mini' : 'full') + (hand ? ' lo-handoff' : '') + (isChg?' chg':'') + (isKari ? ' lo-kari' : '') + '"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '"' + (card ? ' data-card-id="' + card.id + '"' : '') + ' onclick="loBadgeMenu(event,\'' + (a.id || '') + '\')"' + hoverAttr + '>' + labelHtml + '</span>';
+          h += '<span class="lo-badge ' + (compact ? 'mini' : 'full') + (hand ? ' lo-handoff' : '') + (isChg?' chg':'') + (isKari ? ' lo-kari' : '') + (_loHitA(a) ? ' lo-hit' : '') + '"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '"' + (card ? ' data-card-id="' + card.id + '"' : '') + ' onclick="loBadgeMenu(event,\'' + (a.id || '') + '\')"' + hoverAttr + '>' + labelHtml + '</span>';
         }
         if (isEnd && !single){
           /* 🔴 v1.94.0 終端の▼は CSS の三角（.lo-end::after）で描く＝茎と地続きにするため。
@@ -1415,6 +1586,53 @@ window.loSaveManualBlock = function(){
   }
 };
 
+
+
+/* ===== ❔ 簡易マニュアル（v2.41.0・ゆうた指定 2026-08-31） =====
+   🗣「ここ操作が結構複雑だから簡易的マニュアルポップみたいなものをつくりたい。〇？があってクリックすると展開」
+   🔴 **いちばん厚く書くのは「下書きと一括実行」**＝押しても他の人に見えない、が一番聞かれる所。
+   ⚠ ここに新しい決めごとを書かない。**いま動いているとおりのことだけ**書く
+      （書いた通りに動いていない、が起きると、マニュアルの方が嘘になって誰も見なくなる）。 */
+window.loHelp = function(){
+  loHelpClose();
+  const sw = function(css){ return '<span class="lo-help-sw" style="' + css + '"></span>'; };
+  const hatch = function(rgb){ return 'background:repeating-linear-gradient(135deg,rgba(' + rgb + ',.5) 0 5px,rgba(' + rgb + ',.12) 5px 10px)'; };
+  const ov = document.createElement('div');
+  ov.id = 'lo-help'; ov.className = 'lo-help-ov';
+  ov.innerHTML = '<div class="lo-help-box">'
+    + '<button class="lo-help-x" onclick="loHelpClose()">×</button>'
+    + '<h3>代車カレンダーの使い方</h3>'
+    + '<p style="font-size:11px;color:var(--text3);margin:0">上の「？」からいつでも開けます</p>'
+    + '<h5>色の見方</h5><div class="lo-help-lg">'
+    + '<div>' + sw('background:#1db97a') + '予約の貸出（国産）</div>'
+    + '<div>' + sw('background:#ec4899') + '予約の貸出（輸入）</div>'
+    + '<div>' + sw('background:#3b82f6') + '予約以外の貸出</div>'
+    + '<div>' + sw(hatch('116,152,200')) + '🅿 仮押さえ</div>'
+    + '<div>' + sw('background:#5b6675') + '返却済み</div>'
+    + '<div>' + sw('background:#ef4444') + '緊急車両</div>'
+    + '</div>'
+    + '<h5>さわり方</h5><div class="lo-help-kv">'
+    + '<b>空きを押す／なぞる</b><span>「仮押さえ」か「予約以外で貸出」を選ぶ</span>'
+    + '<b>札を押す</b><span>予約詳細・返却の確定・この予約の代車をキャンセル</span>'
+    + '<b>札をつかんで動かす</b><span>別の代車・別の日へ移す（<b>下書き</b>。まだ誰にも見えません）</span>'
+    + '<b>札の下の ▼ を下へ引く</b><span>返す日を伸ばす（これも下書き）</span>'
+    + '<b>画面の下のバー</b><span>動かした分をまとめて「反映」か「破棄」。<b>反映するまでクラウドに上がりません</b></span>'
+    + '<b>網掛けを押す</b><span>仮押さえのメモを読む／解除する</span>'
+    + '<b>左の日付をなぞる</b><span>その期間の行を目立たせる（見比べ用）</span>'
+    + '<b>上の検索</b><span>代車の車種・番号なら<b>列を絞る</b>／お客様名・メモなら<b>札を緑で囲う</b></span>'
+    + '<b>上のスライダー</b><span>カレンダーの縮尺。<b>端末に覚えます</b></span>'
+    + '</div>'
+    + '<h5>覚えておくと早い</h5><ul>'
+    + '<li>返す日と、次の人が借りる日が<b>同じ日</b>なのは、ぶつかり扱いになりません（その日のうちに受け渡す前提）</li>'
+    + '<li>赤い「2」＝<b>二重貸し</b>。押すと何と重なっているか出ます。どちらかをずらしてください</li>'
+    + '<li>灰色＝返却済み。<b>消せません</b>（貸した記録として残す決まり）</li>'
+    + '<li>緊急車両はいちばん左の列。返車が済むと列ごと消えます（記録は残ります）</li>'
+    + '<li>引退した代車は列に出ません。過去の貸出・履歴は残っています</li>'
+    + '</ul></div>';
+  ov.addEventListener('click', function(e){ if (e.target === ov) loHelpClose(); });
+  document.body.appendChild(ov);
+};
+window.loHelpClose = function(){ const el = document.getElementById('lo-help'); if (el) el.remove(); };
 
 /* ===========================================================
    🅿 仮押さえ（v2.40.0・ゆうた指定 2026-08-31）

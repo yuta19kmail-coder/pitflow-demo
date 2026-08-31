@@ -2433,3 +2433,48 @@ th.cfs-lg-d{ z-index:3; }
 .ret-late{ display:flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; color:var(--red,#ef4444); padding:1px 4px 4px; }
 .ret-late b{ font-weight:900; }
 .und-cnt.late{ background:var(--red,#ef4444); color:#fff; margin-left:4px; }
+
+
+/* ===== 🅿 仮押さえ（v2.40.0・ゆうた指定 2026-08-31） =====
+   予約以外の貸出とは別。**ひとことメモだけで枠を押さえる**もの。
+   🔴 見た目＝**くすんだ青（ダスティブルー）の網掛け**。札（.lo-badge）は出さない＝掴んで動かすものではない。
+   🔴🔴 色の温度（2026-08-31・ゆうた指定）
+      🗣「黄色はちょっとぎょうぎょうしすぎるかな。
+      　　要素としては『もしかしたら、隣の代車にずらす可能性があるから一応押さえておきたい』てきなのり」
+      ＝ **警告ではなく「保留」。** 最初は #f59e0b（黄）で出したが、事故・超過の赤／固定の黄と同じ強さで
+        目に入ってしまい、**まだ決まっていないものが一番うるさい**という逆転が起きていた。
+      🔴 だから **彩度を落とし、明るさで主張しない**：面は薄い斜線、縁は細く、札は塗らずに枠だけ。
+      🔵 2026-08-31（同日・ゆうた）「**もうちょい青要素欲しいかも**」→ 藤色から**くすんだ青**へ寄せた。
+        ⚠ ただし **車検の青（#3b82f6）と同じ鮮やかさにはしない。**彩度で必ず一段下に置くこと。
+        **貸出の緑・輸入のピンク・緊急の赤・車検の青より必ず弱いこと。**ここを強くしないこと。
+   ⚠ 網掛けは敷き紙（.lo-daybg）の上・札の下。休みの色を消さないよう敷き紙には触らない。 */
+.lo-cell.lo-hold{ cursor:pointer; }
+.lo-holdbg{ position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:repeating-linear-gradient(135deg, rgba(116,152,200,.20) 0 7px, rgba(116,152,200,.05) 7px 14px);
+  box-shadow:inset 2px 0 0 rgba(116,152,200,.45), inset -2px 0 0 rgba(116,152,200,.45); }
+.lo-cell.lo-hold-start > .lo-holdbg{ box-shadow:inset 2px 0 0 rgba(116,152,200,.45), inset -2px 0 0 rgba(116,152,200,.45), inset 0 2px 0 rgba(116,152,200,.45); }
+.lo-cell.lo-hold-end   > .lo-holdbg{ box-shadow:inset 2px 0 0 rgba(116,152,200,.45), inset -2px 0 0 rgba(116,152,200,.45), inset 0 -2px 0 rgba(116,152,200,.45); }
+/* メモの札＝いちばん上の日に1枚。**塗らずに枠だけ**（貸出の札と強さで並ばないように）。 */
+.lo-hold-tag{ position:absolute; left:4px; right:4px; top:3px; z-index:3;
+  display:flex; align-items:center; gap:4px; box-sizing:border-box;
+  font-size:10px; font-weight:600; color:#c0d2e6;
+  background:rgba(22,28,40,.82); border:1px solid rgba(116,152,200,.48);
+  border-radius:6px; padding:2px 5px; cursor:pointer; backdrop-filter:blur(2px); }
+.lo-hold-tag:hover{ border-color:rgba(150,186,230,.85); color:#e2eefb; }
+.lo-hold-tag .lo-hold-memo{ flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+/* 2日以上押さえた時は下に余白があるので、メモを2行まで出す（1日だけの時は1行のまま） */
+.lo-hold-tag.lo-hold-w{ align-items:flex-start; }
+.lo-hold-tag.lo-hold-w .lo-hold-memo{ white-space:normal; line-height:1.35; max-height:2.7em;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+/* 「仮」の小さな印（窓の見出し・2択のボタンでも使う）。ここも塗らない。 */
+.lo-hold-k{ display:inline-block; flex:0 0 auto; font-size:9px; font-weight:700; line-height:1.5;
+  color:#a6bcd6; background:transparent; border:1px solid rgba(116,152,200,.55); border-radius:4px; padding:0 4px; }
+.lo-bpop-h .lo-hold-k, .lo-modal-h .lo-hold-k, .lo-bpop-b .lo-hold-k{ margin-right:4px; }
+/* 窓の下に出す注意書き */
+.lo-modal-note{ font-size:10.5px; color:var(--text3); line-height:1.5; margin:2px 2px 10px; }
+.lo-modal-note b{ color:var(--text2); }
+/* 新規予約の空きガント＝仮押さえのマスは薄い網掛け（貸出のオレンジ塗りより弱く） */
+td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(116,152,200,.42) 0 5px, rgba(116,152,200,.12) 5px 10px) !important; }
+.cfs-lg tr.cfs-lg-band > td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(196,140,150,.38) 0 5px, rgba(196,140,150,.12) 5px 10px) !important; }
+/* 車両管理の利用カレンダー＝仮押さえは薄い網掛け */
+.fl-cal-cell.fl-use.fl-hold{ background:repeating-linear-gradient(135deg, rgba(116,152,200,.22) 0 6px, rgba(116,152,200,.06) 6px 12px) !important; }

@@ -60,7 +60,11 @@
         足す場所を増やさないこと＝1行足せば ⋮ も帯も権限も全部そろって効く。 */
   function cardArchived(c){
     if (!c) return false;
-    if (w.pitCardNoSale && w.pitCardNoSale(c)) return true;   /* 売上なしアーカイブ（v1.136.0） */
+    /* 🔴🔴 v2.47.0 見るのは **`pitCardNoSaleMarked`（人が手で付けた「売上なし」の印）だけ**。
+       ⚠ `pitCardNoSale` を見てはいけない。あちらは v2.6.0 から社内車両（中古・代車・内部）も
+          true を返す＝**代車から起こしたカードが、点検待ちの時点でアーカイブ済みになる**。
+          「売上に数えない」と「もう片付いた」は**別の話**（pit-share.js に理由を書いた）。 */
+    if (w.pitCardNoSaleMarked && w.pitCardNoSaleMarked(c)) return true;   /* 売上なしアーカイブ（v1.136.0） */
     if (c.status === 'returned') return true;                 /* 返車済み＝実績（v1.138.0） */
     /* 🔴 v1.139.0 未入庫・予約キャンセルで**アーカイブまで行ったもの**（v1.139.0）
        ⚠ 未入庫は30日たつまで `archived` が立たない＝その間は今までどおり
@@ -71,12 +75,13 @@
   }
   /* アーカイブ済みか（返車済み＝実績のほう）。売上なしと戻し先が違うので見分ける。 */
   function cardIsResult(c){
-    return !!(c && c.status === 'returned' && !(w.pitCardNoSale && w.pitCardNoSale(c)));
+    /* ⚠ v2.47.0 ここも `pitCardNoSaleMarked`。社内車両が完TELまで行ったものは**実績側**（戻し先＝完TEL済）。 */
+    return !!(c && c.status === 'returned' && !(w.pitCardNoSaleMarked && w.pitCardNoSaleMarked(c)));
   }
   /* 帯に出す文字（画面ごとに書き分けない） */
   function cardArchiveNote(c){
     if (!cardArchived(c)) return '';
-    if (w.pitCardNoSale && w.pitCardNoSale(c)){
+    if (w.pitCardNoSaleMarked && w.pitCardNoSaleMarked(c)){   /* ⚠ v2.47.0 手で付けた印だけ */
       var s = 'アーカイブ済み（売上なし）';
       if (c.noSaleAt) s += '　' + c.noSaleAt + (c.noSaleBy ? ' ' + c.noSaleBy : '');
       return s;

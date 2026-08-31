@@ -137,6 +137,10 @@
       c.completedAt = t;
       c.amountFinal = '';                       /* 社内車両は金額を持たない */
       if (w.logFlow && typeof w.statusLabel === 'function') w.logFlow(c, '実績化（社内車両・売上なし）');
+      /* 🔧 v2.45.0（ゆうた指定）**残りの整備の候補が消えるのはここ＝完TEL関門を通った時。**
+         🗣「いや、場合によってはその作業が長引く事もあるから、関TEL関門を通った時にして」
+         ＝入庫した時ではない。⚠ 判断は maint-pit.js の1本（ここに条件を書き写さない）。 */
+      if (w.pitMaintOnComplete) w.pitMaintOnComplete(c);
       if (w.PitDB) w.PitDB.save();
       if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
       if (w.PitPip && w.PitPip.isOpen && w.PitPip.isOpen()) w.PitPip.refresh();

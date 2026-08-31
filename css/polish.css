@@ -2563,3 +2563,85 @@ td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(11
 .lo-help-kv b{ color:var(--text); font-weight:600; white-space:nowrap; }
 .lo-help-box ul{ margin:6px 0 0; padding-left:18px; font-size:12.5px; color:var(--text2); }
 .lo-help-box li{ margin:3px 0; }
+
+
+/* ===== 🔧 代車作業予定ボード（v2.44.0・ゆうた指定 2026-08-31） =====
+   🗣「車両カレンダーと代車一覧の間に **代車作業予定** の欄を追加。ココには直近半年分の予定が入る。
+   　基本的な考え方は各カードに、飛び地の作業予定とか、各種警告、等がまとまるイメージ」
+   🔴 色の強さ＝ 赤（車検の満了超過）＞ 橙（警告）＞ 黄（動いている）＞ 何もなし。
+      ⚠ 赤は**満了超過だけ**に使う。増やすと現場が赤を見なくなる。 */
+.mb-cnt{ display:inline-block; font-size:10px; font-weight:800; border-radius:999px; padding:1px 8px; margin-left:7px; }
+.mb-cnt.warn{ background:rgba(245,158,11,.18); color:#fbbf24; border:1px solid rgba(245,158,11,.45); }
+.mb-cnt.bad{ background:rgba(239,68,68,.18); color:#fca5a5; border:1px solid rgba(239,68,68,.5); }
+.mb-rows{ display:flex; flex-direction:column; gap:7px; padding:10px 12px 12px; }
+.mb-row{ display:grid; grid-template-columns:126px 1fr auto; gap:12px; align-items:start;
+  background:var(--bg3); border:1px solid var(--border); border-left:4px solid var(--border2);
+  border-radius:9px; padding:9px 12px; }
+.mb-row.mb-warn{ border-left-color:var(--orange); background:linear-gradient(90deg,rgba(245,158,11,.07),var(--bg3) 220px); }
+.mb-row.mb-bad{ border-left-color:var(--red); background:linear-gradient(90deg,rgba(239,68,68,.10),var(--bg3) 260px); }
+.mb-row.mb-go{ border-left-color:rgb(214,168,70); }
+.mb-row.mb-doing{ border-left-color:var(--brand); }
+.mb-row.mb-idle{ opacity:.72; }
+.mb-veh{ min-width:0; }
+.mb-nm{ font-size:13px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mb-no{ font-size:10.5px; color:var(--text3); }
+.mb-kind{ display:inline-block; margin-top:4px; font-size:10.5px; font-weight:800; border-radius:5px; padding:1px 7px; }
+.mb-k-shaken{ background:rgba(239,68,68,.16); color:#fca5a5; border:1px solid rgba(239,68,68,.4); }
+.mb-k-12{ background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.4); }
+.mb-k-fix{ background:rgba(168,85,247,.16); color:#d8b4fe; border:1px solid rgba(168,85,247,.4); }
+.mb-k-gen{ background:rgba(55,138,221,.16); color:#93c5fd; border:1px solid rgba(55,138,221,.4); }
+.mb-urgent{ display:inline-block; margin-left:4px; font-size:10px; font-weight:800; color:#fff; background:var(--red); border-radius:5px; padding:1px 6px; }
+.mb-mid{ min-width:0; }
+.mb-line{ font-size:12px; color:var(--text2); display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.mb-line + .mb-line{ margin-top:5px; }
+.mb-due{ font-weight:700; color:var(--text); }
+.mb-slots{ display:flex; gap:6px; flex-wrap:wrap; }
+/* 候補＝網掛け（代車カレンダーの黄色と同じ物差し）／確定＝塗り */
+.mb-chip{ font-size:11px; font-weight:700; border-radius:6px; padding:2px 8px; color:#e8d5a0;
+  border:1px solid rgba(214,168,70,.5);
+  background:repeating-linear-gradient(45deg,rgba(214,168,70,.16) 0 6px,rgba(214,168,70,.04) 6px 12px); }
+.mb-chip.gone{ opacity:.38; text-decoration:line-through; }
+.mb-chip.fixed{ background:rgb(214,168,70); color:#3a2a00; border-color:rgb(214,168,70); }
+.mb-chip.add{ color:var(--text3); border:1px dashed var(--border2); background:transparent; cursor:pointer; }
+.mb-chip.add:hover{ color:var(--text); border-color:var(--brand); }
+.mb-msg{ font-size:11.5px; border-radius:6px; padding:3px 9px; margin-top:6px; display:inline-block; }
+.mb-msg.w{ background:rgba(245,158,11,.12); color:#fbbf24; border:1px solid rgba(245,158,11,.35); }
+.mb-msg.b{ background:rgba(239,68,68,.14); color:#fca5a5; border:1px solid rgba(239,68,68,.45); }
+.mb-msg.g{ background:rgba(29,185,122,.12); color:#7ee2b8; border:1px solid rgba(29,185,122,.35); }
+.mb-act{ display:flex; flex-direction:column; gap:5px; align-items:stretch; }
+.mb-act .vh-btn{ justify-content:center; }
+.vh-btn.mb-del{ border-color:rgba(239,68,68,.45); color:#fca5a5; }
+/* 月カレンダーのバッジ（車検は満了月＋前2ヶ月の3ヶ月に立つ） */
+.fl-mbdg{ display:block; font-size:9.5px; font-weight:800; border-radius:5px; padding:1px 5px; margin-bottom:3px;
+  text-align:center; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fl-mbdg.plan{ color:#e8d5a0; border:1px solid rgba(214,168,70,.55);
+  background:repeating-linear-gradient(45deg,rgba(214,168,70,.18) 0 6px,rgba(214,168,70,.04) 6px 12px); }
+.fl-mbdg.plan.warn{ border-color:rgba(245,158,11,.9); color:#fbbf24; }
+.fl-mbdg.fixed{ background:rgb(214,168,70); color:#3a2a00; }
+.fl-mbdg.due{ background:rgba(239,68,68,.9); color:#fff; }
+.fl-mbdg.bad{ background:var(--red); color:#fff; }
+/* ボードから飛んできた車の行（日ビュー） */
+.fl-cal-name.fl-hl{ box-shadow:inset 0 0 0 2px var(--brand); }
+.fl-cal-cell.fl-hl{ box-shadow:inset 0 -1px 0 rgba(38,162,105,.35), inset 0 1px 0 rgba(38,162,105,.35); }
+
+
+/* ===== 🔧 整備の枠：日ビューのチップ・当日ビューの行（v2.45.0） ===== */
+/* 日ビュー（車両管理）の1マスに出る整備の枠。候補＝網掛け／確定＝塗り（ボード・代車カレンダーと同じ物差し） */
+.fl-mn{ display:block; font-size:9px; font-weight:800; border-radius:4px; padding:0 4px; margin-top:2px;
+  text-align:center; cursor:pointer; white-space:nowrap; overflow:hidden; }
+.fl-mn.cand{ color:#e8d5a0; border:1px solid rgba(214,168,70,.55);
+  background:repeating-linear-gradient(45deg,rgba(214,168,70,.20) 0 6px,rgba(214,168,70,.05) 6px 12px); }
+.fl-mn.fixed{ background:rgb(214,168,70); color:#3a2a00; }
+.fl-mn.mid{ height:4px; padding:0; border-radius:2px; opacity:.75; }
+/* 小窓の色の見本 */
+.mb-dot{ width:11px; height:11px; border-radius:3px; flex:0 0 auto; display:inline-block; margin-right:2px;
+  border:1px solid rgba(214,168,70,.6);
+  background:repeating-linear-gradient(45deg,rgba(214,168,70,.35) 0 5px,rgba(214,168,70,.08) 5px 10px); }
+.mb-dot.fixed{ background:rgb(214,168,70); }
+.lo-bpop.mb-pop{ width:auto; min-width:250px; max-width:330px; left:50%; top:96px; transform:translateX(-50%); }
+.lo-bpop-b.primary{ background:var(--brand); border-color:var(--brand); color:#06281d; }
+/* 当日ビュー：自社の代車の整備（既存のカードに寄せる） */
+.today-row.tod-maint{ background:repeating-linear-gradient(45deg,rgba(214,168,70,.10) 0 8px,rgba(214,168,70,.02) 8px 16px); }
+.tod-maint .tr-customer{ color:#e8d5a0; }
+.tod-maint .tod-note{ font-size:10.5px; color:var(--text3); margin-left:6px; }
+.tod-maint-cnt{ background:rgba(214,168,70,.2) !important; color:#e8d5a0 !important; border:1px solid rgba(214,168,70,.5); }

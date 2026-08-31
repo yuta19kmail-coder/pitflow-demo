@@ -68,6 +68,11 @@ function renderFleet(){
   }
   h += '</div>';
 
+  /* ===== ①-2 🔧 代車作業予定ボード（v2.44.0・ゆうた指定 2026-08-31） =====
+     🗣「車両カレンダーと代車一覧の間に **代車作業予定** の欄を追加。ココには直近半年分の予定が入る」
+     ⚠ 中身は maint-pit.js。ここは差し込むだけ（この画面に判断を書かない）。 */
+  if (window.flMaintBoardHtml) h += flMaintBoardHtml();
+
   /* ===== ② 車両リスト ===== */
   const groups = [
     { name: '<i data-ic=van data-ics=16></i> 代車', arr: state.loaners || [] },
@@ -175,6 +180,12 @@ function flMonthCalHtml(){
             （種類が増えた時に、この画面だけ古くなる＝🅿仮押さえで実際に踏んだ）。 */
       const evs = pitLoanerSpan(v.id, first, last, { kinds:['event'] }).filter(function(x){ return !x.auto; });
       h += '<div class="fl-cal-cell" onclick="flOpenEventModal(\'' + v.id + '\',\'' + first + '\')">';
+      /* 🔧 v2.44.0 整備の枠のバッジ（車検は満了月＋その前2ヶ月の3ヶ月）。中身は maint-pit.js。
+         押すと**日ビューに切り替わって、その車の行がアクティブになる**（ゆうた指定）。 */
+      (window.pitMaintBadges ? pitMaintBadges(v, ym) : []).forEach(function(b){
+        h += '<span class="fl-mbdg ' + b.cls + '" title="' + _fleetEsc(b.title || '') + '"'
+           + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">' + _fleetEsc(b.text) + '</span>';
+      });
       if (sh) h += '<span class="fl-bdg shaken" title="車検満了 ' + _fleetEsc(v.shakenDate) + '">車検</span>';
       if (tk) h += '<span class="fl-bdg tenken" title="12ヶ月点検（車検満了の翌年）' + _fleetEsc(window.pitWareki ? pitWareki(tkDate) : tkDate) + '">12ヶ月</span>';
       evs.forEach(function(x){
@@ -211,7 +222,8 @@ function flDayCalHtml(y, mo){
    h += _flSecRow(sec.label);
    sec.arr.forEach(function(v){
     const isLoanerVeh = (state.loaners || []).some(function(l){ return l.id === v.id; });
-    h += '<div class="fl-cal-name" title="' + _fleetEsc(v.model || '') + '">' + _fleetEsc(_flVehName(v)) + '</div>';
+    const _hl = (_flHlVeh && _flHlVeh === v.id) ? ' fl-hl' : '';   /* 🔧 v2.44.0 ボードから飛んできた車 */
+    h += '<div class="fl-cal-name' + _hl + '" title="' + _fleetEsc(v.model || '') + '">' + _fleetEsc(_flVehName(v)) + '</div>';
     metas.forEach(function(m){
       const ds = m.ds;
       const sh = v.shakenDate === ds;
@@ -229,8 +241,18 @@ function flDayCalHtml(y, mo){
         if (it){ useCls = ' fl-use' + (it.kind === 'hold' ? ' fl-hold' : '');
           if (it.isStart) useTag = '<span class="fl-use-tag">' + _fleetEsc(it.kind === 'hold' ? ('仮押さえ' + (it.memo ? '：' + it.memo : '')) : it.label) + '</span>'; }
       }
-      h += '<div class="fl-cal-cell fl-day' + useCls + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '" onclick="flOpenEventModal(\'' + v.id + '\',\'' + ds + '\')">';
+      /* 🔧 v2.45.0 セルを押したら**選択肢を出す**（整備の候補／ここで確定／いままでの予定追加）。
+         ⚠ いままでの「セル＝予定追加」は**消していない**。選択肢の3つ目に残してある。 */
+      h += '<div class="fl-cal-cell fl-day' + useCls + _hl + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '" onclick="flMaintCellMenu(\'' + v.id + '\',\'' + ds + '\')">';
       h += useTag;
+      /* 🔧 整備の枠（候補＝網掛け／確定＝塗り）。押すと確定・期間直し・取り消し */
+      day.maints.forEach(function(x){
+        if (!x.isStart) { h += '<span class="fl-mn ' + (x.stage === 'fixed' ? 'fixed' : 'cand') + ' mid"></span>'; return; }
+        h += '<span class="fl-mn ' + (x.stage === 'fixed' ? 'fixed' : 'cand') + '"'
+           + ' title="' + _fleetEsc((x.label || '整備') + ' ' + x.from + '〜' + x.to) + '"'
+           + ' onclick="event.stopPropagation();flMaintChip(\'' + x.id + '\')">'
+           + _fleetEsc(String(x.label || '整備').slice(0, 4)) + '</span>';
+      });
       if (sh) h += '<span class="fl-bdg shaken">車検</span>';
       if (tk) h += '<span class="fl-bdg tenken">12ヶ月</span>';
       evs.forEach(function(x){
@@ -245,6 +267,18 @@ function flDayCalHtml(y, mo){
 }
 
 function flZoom(y, m){ _flMode = 'day'; _flDay = new Date(y, m, 1); renderFleet(); }
+/* 🔧 v2.44.0 作業予定ボードから「日を決める」＝**日ビューに切り替えて、その車の行をアクティブに**する。
+   ⚠ 代車カレンダーへは飛ばさない（ゆうた指定「今も管理カレンダーの月をクリックすると日ビューにかわる仕様、
+      それをそのまま使うイメージで」）。 */
+window.flZoomTo = function(vehId, y, m){
+  _flHlVeh = vehId || '';
+  _flMode = 'day'; _flDay = new Date(y, m, 1);
+  renderFleet();
+  setTimeout(function(){
+    var el = document.querySelector('.fl-cal-name.fl-hl');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block:'center' });
+  }, 0);
+};
 function flBackMonth(){ _flMode = 'month'; renderFleet(); }
 
 /* ===== イベント 追加・編集ポップアップ ===== */
@@ -635,7 +669,9 @@ function _fleetSubmitInner(){
      ⚠ **見るだけ。**ここから消したり直したりはできない（v1.143.0「返却済みは不可侵」の続き）。
      ⚠ 数える所（何日間・返却済みか）は**貸出の札に書いてある内容だけ**を使う。ここで計算し直さない。
    ===================================================================== */
-let _flHistLo = '';        /* 絞り込み中の代車（空＝全部）。画面の中だけ・保存しない */
+let _flHistLo = '';
+/* 🔧 v2.44.0 作業予定ボードから飛んできた車（日ビューで行を光らせる）。画面の中だけ・保存しない */
+let _flHlVeh = '';
 let _flHistOpen = false;  /* 🔴 v1.146.0（ゆうた指定）**最初はたたんでおく。**開いたかどうかも画面の中だけ */
 
 window.flHistToggle = function(){

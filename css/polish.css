@@ -2512,14 +2512,15 @@ td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(11
 .vh-btn.lo-on{ background:var(--brand-soft); border-color:var(--brand); color:#8ff0c4; }
 .vh-btn.lo-helpbtn{ width:28px; padding:0; justify-content:center; border-radius:999px; font-weight:800; }
 
-/* 🔍 縮尺＝つまんで動かすスライダー。**段ではなく連続**（ゆうた指定「がっつり動く摘まめるもの」） */
+/* 🔍 縮尺＝つまんで動かすスライダー。**6段に吸い付く**（ゆうた指定「吸着でいい」）。
+   ⚠ 連続にしていた時は 28〜72px を100段に割ったせいで細かすぎ、狙った大きさに合わせられなかった。 */
 .lo-zoom{ display:inline-flex; align-items:center; gap:7px; background:var(--bg3); border:1px solid var(--border2);
   border-radius:999px; padding:3px 12px 3px 10px; }
 .lo-zoom-a{ font-size:10px; color:var(--text3); font-weight:800; line-height:1; }
 .lo-zoom input[type=range]{ -webkit-appearance:none; appearance:none; width:104px; height:18px; background:transparent; cursor:grab; margin:0; }
 .lo-zoom input[type=range]:active{ cursor:grabbing; }
 .lo-zoom input[type=range]::-webkit-slider-runnable-track{ height:4px; border-radius:999px; border:1px solid var(--border2);
-  background:linear-gradient(90deg, var(--brand) var(--lo-zfill,23%), var(--bg) var(--lo-zfill,23%)); }
+  background:linear-gradient(90deg, var(--brand) var(--lo-zfill,40%), var(--bg) var(--lo-zfill,40%)); }
 .lo-zoom input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:16px; height:16px;
   margin-top:-7px; border-radius:999px; background:var(--brand); border:2px solid var(--bg);
   box-shadow:0 2px 7px rgba(0,0,0,.55); transition:transform .08s; }

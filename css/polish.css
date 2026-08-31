@@ -2645,11 +2645,14 @@ td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(11
 .mb-dot.fixed{ background:rgb(214,168,70); }
 .lo-bpop.mb-pop{ width:auto; min-width:250px; max-width:330px; left:50%; top:96px; transform:translateX(-50%); }
 .lo-bpop-b.primary{ background:var(--brand); border-color:var(--brand); color:#06281d; }
-/* 当日ビュー：自社の代車の整備（既存のカードに寄せる） */
-.today-row.tod-maint{ background:repeating-linear-gradient(45deg,rgba(214,168,70,.10) 0 8px,rgba(214,168,70,.02) 8px 16px); }
-.tod-maint .tr-customer{ color:#e8d5a0; }
+/* 当日ビュー：自社の代車の整備
+   🔴 v2.48.0（ゆうた指摘「網掛けがはいった変な表示」）**網掛けをやめた。**
+      骨格はふつうの入庫行とまったく同じ（tr-time / tr-front / tr-main / tr-tags）。
+      区別は**担当バッジの「代車」と帯の色**だけでつく＝行の見た目を1つにそろえる。
+   ⚠ 色は JS の `PIT_MAINT_COLOR` が `--pit-maint` に配る。**ここで色を綴らない。** */
 .tod-maint .tod-note{ font-size:10.5px; color:var(--text3); margin-left:6px; }
-.tod-maint-cnt{ background:rgba(214,168,70,.2) !important; color:#e8d5a0 !important; border:1px solid rgba(214,168,70,.5); }
+.tod-maint-cnt{ background:color-mix(in srgb, var(--pit-maint,#d6a846) 20%, transparent) !important;
+  color:var(--pit-maint,#d6a846) !important; border:1px solid color-mix(in srgb, var(--pit-maint,#d6a846) 50%, transparent); }
 
 
 /* 🔧 v2.46.0 日ビューのなぞり（候補日をまとめて選ぶ）。画面の中だけ・1文字も保存しない */

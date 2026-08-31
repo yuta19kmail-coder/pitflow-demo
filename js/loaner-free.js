@@ -60,37 +60,125 @@
      ⚠ opt.ignoreAssignId … その1件は無いものとして見る（自分自身を数えないため）
      ⚠ opt.noEvents      … 代車自身の予定は見ない（カレンダーの塗り分け用）
      ------------------------------------------------------------------ */
+  /* 🧩 v2.42.0 中身は下の部品（dayOf）1本に寄せた。**答えは前と同じ。**
+     ⚠ ここに自前の読み方を書き戻さないこと。種類が増えた時に**ここだけ古くなる。** */
   function busyOn(l, ds, opt) {
     if (!l || !ds) return false;
-    var skip = opt && opt.ignoreAssignId;
-    var busy = arr(w.state && w.state.loanerAssigns).some(function (a) {
-      if (skip && a.id === skip) return false;
-      return a.loanerId === l.id && a.fromDate <= ds && a.toDate >= ds;
-    });
-    if (busy) return true;
-    if (opt && opt.noEvents) return false;
-    return arr(w.state && w.state.fleetEvents).some(function (e) {
-      return e.vehicleId === l.id && e.fromDate <= ds && e.toDate >= ds;
-    });
+    return dayOf(l.id, ds, opt).busy;
   }
 
   /* その日ふさがっている理由（画面の説明用）。空いていれば null */
+  /* 🧩 v2.42.0 中身は下の部品（dayOf）1本に寄せた。**返す形は今までのまま**
+     （kind:'assign'|'event'／仮押さえは kind:'assign' ＋ hold:true）
+     ＝古い呼び方をしている画面（新規予約の右カラム）をここで守る。
+     ⚠ 新しく書く画面は dayOf を直に使うこと。items を回せるので、種類が増えても直さなくていい。 */
   function busyWhy(l, ds, opt) {
     if (!l || !ds) return null;
-    var skip = opt && opt.ignoreAssignId;
-    var a = arr(w.state && w.state.loanerAssigns).find(function (x) {
-      if (skip && x.id === skip) return false;
-      return x.loanerId === l.id && x.fromDate <= ds && x.toDate >= ds;
-    });
-    /* 🅿 v2.40.0 仮押さえも kind は 'assign' のまま返す（呼ぶ側の分岐を増やさない）。
-       見た目を変えたい画面は `why.assign.hold` を見る＝card-detail の空きガントがそれ。 */
-    if (a) return { kind: 'assign', assign: a, hold: !!a.hold };
-    var e = arr(w.state && w.state.fleetEvents).find(function (x) {
-      return x.vehicleId === l.id && x.fromDate <= ds && x.toDate >= ds;
-    });
-    if (e) return { kind: 'event', event: e };
-    return null;
+    var m = dayOf(l.id, ds, opt).main;
+    if (!m) return null;
+    if (m.kind === 'event') return { kind: 'event', event: m.event, item: m };
+    return { kind: 'assign', assign: m.assign, hold: (m.kind === 'hold'), item: m };
   }
+
+
+
+  /* ==================================================================
+     🧩🧩 v2.42.0（2026-08-31・ゆうた合意）**「この代車の、この日に何が乗っているか」はここが答える。**
+     ------------------------------------------------------------------
+     🗣 ゆうた「代車のスケジュールはあくまで**代車カレンダーが本流でありマスター**で、
+     　　車両管理カレンダーはあくまで**必要な情報をそこから抜き出して見やすくしたよ**、ってイメージ。
+     　　新規予約の右カラムの代車カレンダーと同じ扱いって意味合い」
+
+     ◎なぜ作ったか（2026-08-31・🅿仮押さえを入れた時に実際に踏んだ）
+       出す場所は4つ（代車カレンダー／車両管理の月・日／新規予約の右カラム）あるのに、
+       **どの画面も自前で `state.loanerAssigns` を読んで札を組み立てていた。**
+       だから 🅿仮押さえ を足した時、`fleet.js` を**手で直さないと出なかった。**
+       このまま 🔧整備の枠 を足すと、また4画面ぶん手で書くことになる（そして必ずどれか忘れる）。
+
+     🔴🔴 **種類（kind）を増やすのはここ1か所。** 画面は items を回して自分の軸で描くだけ。
+       ⚠ 軸は画面ごとに違う（代車カレンダー＝縦が日／車両管理＝横が日や月）ので、
+          **描き方は共有しない。共有するのは「何が乗っているか」だけ。**
+
+     ◎kind（いまは3つ）
+       'lend'  … 貸出（予約から／予約以外／緊急）
+       'hold'  … 🅿 仮押さえ
+       'event' … 代車自身の予定（車検入庫・12ヶ月点検・リースアップ・その他）
+       ⏭ 🔧整備の枠を入れる時は、ここに 'maint' を足す（画面は触らない）
+
+     ◎使い方
+       pitLoanerDay(loanerId, 'YYYY-MM-DD', opt)  … その日に乗っているもの
+       pitLoanerSpan(loanerId, from, to, opt)     … その期間にかかっているもの（月表示用）
+       opt.ignoreAssignId … その貸出1件は無かったことにする（自分自身を数えないため）
+       opt.noEvents       … 代車自身の予定は見ない（カレンダーの塗り分け用）
+       opt.kinds          … 欲しい種類だけ（例 ['event']）
+     ================================================================== */
+  var KINDS = {
+    lend:  { label: '貸出',   busy: true },
+    hold:  { label: '仮押さえ', busy: true },
+    event: { label: '予定',   busy: true }
+  };
+
+  function _assignItem(a) {
+    return {
+      kind: a.hold ? 'hold' : 'lend',
+      id: a.id, from: a.fromDate, to: a.toDate,
+      assign: a, cardId: a.cardId || null,
+      emergency: !!a.emergency, returned: !!a.returned,
+      memo: a.hold ? (a.memo || '') : (a.purpose || ''),
+      label: a.hold ? '仮押さえ' : (a.customer || (a.emergency ? '緊急' : '貸出'))
+    };
+  }
+  function _eventItem(e) {
+    /* ⚠ `FL_EVT_TYPES` は fleet.js の **const**＝`window.FL_EVT_TYPES` にはならない。
+       `w.FL_EVT_TYPES` で取ろうとすると必ず undefined になり、
+       **車検入庫の赤・12ヶ月点検の橙・リースアップの紫が全部あおに落ちる**（画面は出るので気づけない）。
+       ⚠ このファイルは fleet.js より**前**に読むので、読み込み時には居ない。呼ばれる時には居る。 */
+    var TY = (typeof FL_EVT_TYPES !== 'undefined') ? FL_EVT_TYPES : null;
+    var t = (TY && TY[e.type]) || null;
+    return {
+      kind: 'event', id: e.id, from: e.fromDate, to: e.toDate,
+      event: e, auto: !!e.auto,
+      memo: '', label: e.label || (t ? t.label : '予定'), color: t ? t.color : '#3b82f6'
+    };
+  }
+  function _pick(items, opt) {
+    if (opt && opt.kinds && opt.kinds.length) {
+      items = items.filter(function (x) { return opt.kinds.indexOf(x.kind) >= 0; });
+    }
+    if (opt && opt.noEvents) items = items.filter(function (x) { return x.kind !== 'event'; });
+    /* 並びは 貸出 → 仮押さえ → 予定（画面が「主役」を取りたい時は先頭を見る） */
+    var ord = { lend: 0, hold: 1, event: 2 };
+    return items.slice().sort(function (a, b) { return (ord[a.kind] - ord[b.kind]) || (a.from < b.from ? -1 : 1); });
+  }
+  function _collect(loanerId, from, to, opt) {
+    var skip = opt && opt.ignoreAssignId;
+    var out = [];
+    arr(w.state && w.state.loanerAssigns).forEach(function (a) {
+      if (!a || a.loanerId !== loanerId) return;
+      if (skip && a.id === skip) return;
+      if (!(a.fromDate <= to && a.toDate >= from)) return;
+      out.push(_assignItem(a));
+    });
+    arr(w.state && w.state.fleetEvents).forEach(function (e) {
+      if (!e || e.vehicleId !== loanerId) return;
+      if (!(e.fromDate <= to && e.toDate >= from)) return;
+      out.push(_eventItem(e));
+    });
+    return _pick(out, opt);
+  }
+  function dayOf(loanerId, ds, opt) {
+    var items = _collect(loanerId, ds, ds, opt);
+    items.forEach(function (x) { x.isStart = (x.from === ds); x.isEnd = (x.to === ds); });
+    return {
+      ds: ds, loanerId: loanerId, items: items,
+      lends:  items.filter(function (x) { return x.kind === 'lend'; }),
+      holds:  items.filter(function (x) { return x.kind === 'hold'; }),
+      events: items.filter(function (x) { return x.kind === 'event'; }),
+      main:   items[0] || null,
+      busy:   items.some(function (x) { return KINDS[x.kind] && KINDS[x.kind].busy; })
+    };
+  }
+  function spanOf(loanerId, from, to, opt) { return _collect(loanerId, from, to, opt); }
 
   /* ------------------------------------------------------------------
      ③ 「N日連続で丸ごと空く代車」が1台でもあるか
@@ -358,6 +446,10 @@
   w.pitLoanerUsableList  = usableList;
   w.pitLoanerBusyOn      = busyOn;
   w.pitLoanerBusyWhy     = busyWhy;
+  /* 🧩 v2.42.0 「その日／その期間に何が乗っているか」＝画面はこれを呼ぶ */
+  w.pitLoanerDay         = dayOf;
+  w.pitLoanerSpan        = spanOf;
+  w.PIT_LOANER_KINDS     = KINDS;
   w.pitLoanerFreeRun     = freeRun;
   w.pitLoanerFitsBoard   = fitsBoard;
   w.pitLoanerPlanNeed    = planNeed;

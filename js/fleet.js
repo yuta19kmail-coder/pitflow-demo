@@ -170,13 +170,15 @@ function flMonthCalHtml(){
       const tk = tkDate && tkDate.indexOf(ym) === 0;
       /* v1.13.2：車検・点検は下の赤/橙バッジで出しているので、自動で作った同じ予定は重ねて出さない
          （＝「車検」と「車検入庫」が二重に見えていた）。手で足した予定はそのまま出す。 */
-      const evs = _flEvents().filter(function(e){ return !e.auto && e.vehicleId === v.id && e.fromDate <= last && e.toDate >= first; });
+      /* 🧩 v2.42.0 その期間に何がかかっているかは **loaner-free.js の部品1本**に聞く。
+         ⚠ ここで state.fleetEvents / loanerAssigns を自前で読まないこと
+            （種類が増えた時に、この画面だけ古くなる＝🅿仮押さえで実際に踏んだ）。 */
+      const evs = pitLoanerSpan(v.id, first, last, { kinds:['event'] }).filter(function(x){ return !x.auto; });
       h += '<div class="fl-cal-cell" onclick="flOpenEventModal(\'' + v.id + '\',\'' + first + '\')">';
       if (sh) h += '<span class="fl-bdg shaken" title="車検満了 ' + _fleetEsc(v.shakenDate) + '">車検</span>';
       if (tk) h += '<span class="fl-bdg tenken" title="12ヶ月点検（車検満了の翌年）' + _fleetEsc(window.pitWareki ? pitWareki(tkDate) : tkDate) + '">12ヶ月</span>';
-      evs.forEach(function(e){
-        const t = FL_EVT_TYPES[e.type] || FL_EVT_TYPES.other;
-        h += '<span class="fl-evt" style="background:' + t.color + '" title="' + _fleetEsc(e.fromDate + '〜' + e.toDate) + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + e.id + '\')">' + _fleetEsc(e.label || t.label) + '</span>';
+      evs.forEach(function(x){
+        h += '<span class="fl-evt" style="background:' + x.color + '" title="' + _fleetEsc(x.from + '〜' + x.to) + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">' + _fleetEsc(x.label) + '</span>';
       });
       h += '</div>';
     });
@@ -214,22 +216,25 @@ function flDayCalHtml(y, mo){
       const ds = m.ds;
       const sh = v.shakenDate === ds;
       const tk = (window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '') === ds;
-      const evs = _flEvents().filter(function(e){ return !e.auto && e.vehicleId === v.id && e.fromDate <= ds && e.toDate >= ds; });
-      // 代車の貸出状況（利用カレンダー）を透かして重ねる
+      /* 🧩 v2.42.0 その日に何が乗っているかは **loaner-free.js の部品1本**に聞く。
+         ⚠ ここで state.loanerAssigns を自前で読まないこと。🅿仮押さえを足した時、
+            ここを手で直さないと出なかった＝同じことを繰り返さないための1本化。 */
+      const day = pitLoanerDay(v.id, ds);
+      const evs = day.events.filter(function(x){ return !x.auto; });
+      // 代車の貸出・仮押さえ（利用カレンダー）を透かして重ねる
       let useCls = '', useTag = '';
       if (isLoanerVeh){
-        const a = (state.loanerAssigns || []).find(function(x){ return x.loanerId === v.id && x.fromDate <= ds && x.toDate >= ds; });
+        const it = day.lends[0] || day.holds[0] || null;
         /* 🅿 v2.40.0 仮押さえも「その日ふさがっている」ので出す。ただし**貸出とは名前を分ける。** */
-        if (a){ useCls = ' fl-use' + (a.hold ? ' fl-hold' : '');
-          if (a.fromDate === ds) useTag = '<span class="fl-use-tag">' + _fleetEsc(a.hold ? ('仮押さえ' + (a.memo ? '：' + a.memo : '')) : (a.customer || '貸出')) + '</span>'; }
+        if (it){ useCls = ' fl-use' + (it.kind === 'hold' ? ' fl-hold' : '');
+          if (it.isStart) useTag = '<span class="fl-use-tag">' + _fleetEsc(it.kind === 'hold' ? ('仮押さえ' + (it.memo ? '：' + it.memo : '')) : it.label) + '</span>'; }
       }
       h += '<div class="fl-cal-cell fl-day' + useCls + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '" onclick="flOpenEventModal(\'' + v.id + '\',\'' + ds + '\')">';
       h += useTag;
       if (sh) h += '<span class="fl-bdg shaken">車検</span>';
       if (tk) h += '<span class="fl-bdg tenken">12ヶ月</span>';
-      evs.forEach(function(e){
-        const t = FL_EVT_TYPES[e.type] || FL_EVT_TYPES.other;
-        h += '<span class="fl-evt" style="background:' + t.color + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + e.id + '\')">' + _fleetEsc((e.label || t.label).slice(0, 4)) + '</span>';
+      evs.forEach(function(x){
+        h += '<span class="fl-evt" style="background:' + x.color + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">' + _fleetEsc(String(x.label).slice(0, 4)) + '</span>';
       });
       h += '</div>';
     });

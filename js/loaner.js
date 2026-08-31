@@ -787,15 +787,20 @@ function _loRenderDays(start, n){
 
     ls.forEach(function(l){
       const attrs = ' data-lo="' + l.id + '" data-ld="' + dStr + '"';
+      /* 🧩 v2.42.0 その日に何が乗っているかは **loaner-free.js の部品1本**に聞く。
+         この画面が本流（マスター）だが、**読み方まで自前で持つ必要は無い。**
+         🔴 **保険の写し（部品が無い時の自前の読み方）は置かない。**置いた瞬間それが古くなる側になる。
+         　 `loaner-free.js` は index.html で**必ずこのファイルより前**に読む（そういう決めごと）。
+         ⚠ 種類（貸出／仮押さえ／代車自身の予定／これから足す整備の枠）を増やすのは部品の側。 */
+      const day = pitLoanerDay(l.id, dStr);
       // 車両イベント（車検・点検・修理等）の予定オーバーレイ＝日付枠で目立たせる（セル全体を色づけ＋ラベル）
       let ov = '', evCls = '';
-      const evs = (state.fleetEvents || []).filter(function(e){ return e.vehicleId === l.id && e.fromDate <= dStr && e.toDate >= dStr; });
+      const evs = day.events;
       if (evs.length){
-        const e0 = evs[0];
-        const t = (typeof FL_EVT_TYPES !== 'undefined' ? FL_EVT_TYPES[e0.type] : null) || { color:'#3b82f6', label:'予定' };
+        const e0 = evs[0], c0 = e0.color || '#3b82f6';
         evCls = ' lo-evday';
-        ov += '<span class="lo-evbg" style="background:' + t.color + '22;box-shadow:inset 4px 0 0 ' + t.color + ',inset -4px 0 0 ' + t.color + '"></span>';
-        if (e0.fromDate === dStr) ov += '<span class="lo-evt-tag" style="background:' + t.color + '"><i data-ic=wrench data-ics=16></i> ' + _loEsc(e0.label || t.label) + '</span>';
+        ov += '<span class="lo-evbg" style="background:' + c0 + '22;box-shadow:inset 4px 0 0 ' + c0 + ',inset -4px 0 0 ' + c0 + '"></span>';
+        if (e0.isStart) ov += '<span class="lo-evt-tag" style="background:' + c0 + '"><i data-ic=wrench data-ics=16></i> ' + _loEsc(e0.label) + '</span>';
       }
       // 元位置ゴースト（下書きで動かした割当の、元の代車・日付）＝列の左端に点線で並べる
       let gh = '';
@@ -808,7 +813,7 @@ function _loRenderDays(start, n){
       }
       /* 🅿 v2.40.0 仮押さえ＝色つきの網掛け。**札（.lo-badge）は出さない**＝ドラッグで動かすものではない。
          🔴 「空いているか」の物差し（loaner-free.js）では貸出と同じ「埋まり」に数えている。ここは見た目だけ。 */
-      const hold = (state.loanerAssigns || []).find(function(x){ return x && x.hold && x.loanerId === l.id && x.fromDate <= dStr && x.toDate >= dStr; }) || null;
+      const hold = day.holds.length ? day.holds[0].assign : null;
       let hv = '', hCls = '';
       if (hold){
         hCls = ' lo-holdday' + (hold.fromDate === dStr ? ' lo-hold-start' : '') + (hold.toDate === dStr ? ' lo-hold-end' : '');
@@ -820,8 +825,8 @@ function _loRenderDays(start, n){
               + '<span class="lo-hold-k">仮</span><span class="lo-hold-memo">' + _loEsc(hold.memo || '仮押さえ') + '</span></span>';
         }
       }
-      // この代車・この日を覆う割当（当日かぶり対応）／🅿 仮押さえは札にしないので外す
-      const covering = (state.loanerAssigns || []).filter(function(x){ return x.loanerId === l.id && !x.hold && x.fromDate <= dStr && x.toDate >= dStr; });
+      // この代車・この日を覆う割当（当日かぶり対応）／🅿 仮押さえは札にしないので外す（部品が kind で分けている）
+      const covering = day.lends.map(function(x){ return x.assign; });
       // バーの主役＝実効開始(effStart)がこの日以前で覆う割当（後発の同日かぶりは初日を除外＝翌日からバー）
       const a = covering.find(function(x){ return _loEffStart(x) <= dStr; }) || null;
       if (a){
@@ -1055,7 +1060,10 @@ function loPreview(lo, date){
     const ds = ymd(d);
     const el = document.querySelector('[data-lo="' + targetLo + '"][data-ld="' + ds + '"]');
     if (el){
-      const conflict = (state.loanerAssigns || []).some(function(x){ return x.loanerId === targetLo && x.id !== _loDragAid && x.fromDate <= ds && x.toDate >= ds; });
+      /* 🧩 v2.42.0 ここも部品ごしに。**答えは前と同じ**
+         （noEvents＝代車自身の予定では赤くしない。前からそうだった）。
+         ⏭ 車検入庫の上にも赤を出すかは別の話。変えるなら見張りを足してから。 */
+      const conflict = pitLoanerDay(targetLo, ds, { ignoreAssignId:_loDragAid, noEvents:true }).busy;
       el.classList.add(conflict ? 'lo-prev-bad' : 'lo-prev');
     }
     d = addDays(d, 1);
@@ -1073,7 +1081,8 @@ function loConflictDays(loanerId, from, to, exceptAid){
   let n = 0, d = _loPd(from);
   while (ymd(d) <= to){
     const ds = ymd(d);
-    if ((state.loanerAssigns || []).some(function(x){ return x.loanerId === loanerId && x.id !== exceptAid && x.fromDate <= ds && x.toDate >= ds; })) n++;
+    /* 🧩 v2.42.0 部品ごしに（答えは前と同じ） */
+    if (pitLoanerDay(loanerId, ds, { ignoreAssignId:exceptAid, noEvents:true }).busy) n++;
     d = addDays(d, 1);
   }
   return n;
@@ -1263,9 +1272,9 @@ function _loBadgePopOpen(html){
    ⚠ ここは知らせるだけ。**勝手に直さない**（どちらを動かすかは人が決める）。 */
 window.loShowDup = function(loanerId, ds){
   const lo = (state.loaners || []).find(function(l){ return l.id === loanerId; });
-  const list = (state.loanerAssigns || []).filter(function(x){
-    return x.loanerId === loanerId && !x.hold && x.fromDate <= ds && x.toDate >= ds && _loEffStart(x) <= ds;
-  });
+  /* 🧩 v2.42.0 部品ごしに。仮押さえは kind で分かれるので、ここで !x.hold を書かなくてよくなった */
+  const list = pitLoanerDay(loanerId, ds).lends.map(function(x){ return x.assign; })
+               .filter(function(x){ return _loEffStart(x) <= ds; });
   const name = lo ? (window.pitVehLabel ? pitVehLabel(lo) : (lo.name || '代車')) : '代車';
   pitAlert(_loMD(ds) + ' は貸出が ' + list.length + ' 件重なっています', {
     detail: name + '\n\n' + _loConflictMsg(list)

@@ -59,6 +59,11 @@
      ＝入庫でカードを起こす時、そのまま `workType` に渡せる（変換表を持たない）。
      ⚠ 「修理」は独立した作業タイプではない＝**一般**（設定の説明も「通常の修理作業」）。
         独自の 'fix' を作ると、カードにする時に必ず変換表が要る＝そこが古くなる。 */
+  /* 🔧 自社の代車の整備の色。**JS と CSS で別々に綴らない**（CSS は --pit-maint に受け取る）。 */
+  var MAINT_COLOR = '#d6a846';
+  w.PIT_MAINT_COLOR = MAINT_COLOR;
+  try { document.documentElement.style.setProperty('--pit-maint', MAINT_COLOR); } catch (e) {}
+
   var WORK_LB = { shaken:'車検', '12pt':'12ヶ月点検', general:'一般（修理）', bp:'B.P' };
   var WORK_CLS = { shaken:'mb-k-shaken', '12pt':'mb-k-12', general:'mb-k-fix', bp:'mb-k-gen' };
 
@@ -477,6 +482,15 @@
     recs().forEach(function(r){
       var st = r.stage || 'candidate';
       if (st === 'month' || r.done) return;
+      /* 🔴🔴 v2.48.0（ゆうた報告 2026-08-31「消えないのも変」）**入庫したら、ここから消える。**
+         ◎なにが起きていたか
+           `入庫する` を押すと枠は `started` になるが、この一覧は `done`（完TEL）まで消していなかった。
+           ＝ **入庫したのに当日ビューの入庫欄に残り続け、もう一度押せばカードが2枚できた。**
+           入庫の「代車 ◯」の数も減らなかった。
+         🔴 当日ビューの入庫欄は「**まだ入っていないもの**」を並べる場所。
+            ふつうの車が `status:'reserved'` の間だけ並ぶのと、意味をそろえる。
+         ⚠ 枠を消すのではない。入庫後の姿は**タスクボードのカード**が持つ（＝居場所は1つ）。 */
+      if (r.started) return;
       if (!(r.fromDate <= ds && r.toDate >= ds)) return;
       if (arr(r.skipped).indexOf(ds) >= 0) return;      /* 「今日はやらない」を押した日 */
       var v = vehOf(r.vehicleId); if (!v || v.retired) return;
@@ -489,47 +503,98 @@
   }
 
   /* 当日ビューの1行。**既存のカードと同じ見た目**（クラスをそのまま借りる） */
+  /* 🔴🔴 v2.48.0（ゆうた指摘「網掛けがはいった変な表示」）
+     **ふつうの入庫行と同じ骨格で組む。**
+     ◎前まで
+       `tr-side` という当日ビューに無い入れ物を使い、CSS で網掛けをかけて区別していた。
+       ＝ **当日ビューの中に、うちだけ違う見た目の行**があった。
+     🔴 いまは `tr-time` / `tr-front` / `tr-main` / `tr-tags`（3スロット）＝**ふつうの行と同じ並び**。
+        区別は**担当バッジの「代車」と帯の色**だけでつく（網掛けは要らない）。
+     ⚠ 作業バッジの出し方も、ふつうの行と同じ `state.workTypes` の色をそのまま使う。 */
   function todayHtml(ds){
     var list = todayList(ds);
     if (!list.length) return '';
     var h = '';
     list.forEach(function(x){
       var wt = arr(w.state && w.state.workTypes).filter(function(t){ return t.id === x.work; })[0];
+      /* ⚠ v2.48.0 ナンバーと同じ行に入るので**短く**（長いと2行に折れて、行の高さがふつうの行とずれる） */
+      var span = md(x.rec.fromDate) + '〜' + md(x.rec.toDate);
+      var note = x.fixed ? (span + ' で確定') : ('候補 ' + span);
       h += '<div class="today-row tod-maint' + (x.urgent ? ' is-urgent' : '') + '"'
-         + ' onclick="pitMaintTodayTap(\'' + x.rec.id + '\')" style="--team:#d6a846">'
+         + ' onclick="pitMaintTodayTap(\'' + x.rec.id + '\')" style="--team:' + MAINT_COLOR + '">'
          + '<div class="tr-time">終日</div>'
-         + '<div class="tr-front is-div" style="background:#d6a846" title="自社の代車">代車</div>'
+         + '<div class="tr-front is-div" style="background:' + MAINT_COLOR + '" title="自社の代車">代車</div>'
          + '<div class="tr-main">'
-         + '<div class="tr-headline"><span class="tr-customer">自社代車</span>'
-         + '<span class="tr-carname">' + esc(vehName(x.veh)) + '</span></div>'
-         + '<div class="tr-plateline">'
-         + (x.veh.plate ? '<span class="tr-plate">' + esc(x.veh.plate) + '</span>' : '')
-         + '<span class="tod-note">' + esc(x.fixed ? (md(x.rec.fromDate) + '〜' + md(x.rec.toDate) + ' で確定')
-                                                   : ('候補 ' + md(x.rec.fromDate) + '〜' + md(x.rec.toDate) + ' のうち今日')) + '</span>'
-         + '</div></div>'
-         + '<div class="tr-side">'
-         + (x.urgent ? '<span class="tag-side">急ぎ</span>' : '')
-         + '<span class="tag-side loaner">代車</span>'
-         + (wt ? '<span class="tag-work" style="background:' + wt.color + '20;color:' + wt.color + ';border-color:' + wt.color + ';">' + esc(wt.label) + '</span>' : '')
-         + '</div></div>';
+         +   '<div class="tr-headline"><span class="tr-customer">自社代車</span>'
+         +   '<span class="tr-carname">' + esc(vehName(x.veh)) + '</span></div>'
+         +   '<div class="tr-plateline">'
+         +     (x.veh.plate ? '<span class="tr-plate">' + esc(x.veh.plate) + '</span>' : '')
+         +     '<span class="tod-note">' + esc(note) + '</span>'
+         +   '</div>'
+         + '</div>'
+         + '<div class="tr-tags">'
+         +   '<div class="tr-tag-slot">' + (x.urgent ? '<span class="tag-side consult">急ぎ</span>' : '') + '</div>'
+         /* ⚠ v2.48.0 受付タイプ（預かり／待ち／当日）の場所は**代車には無い**ので空ける。
+            🔴 確定か候補かは `tod-note` の文字で言う。**他の意味のタグを借りない**
+               （前は `tag-drop-drop` を借りていて、「預かり」とまったく同じ緑に見えた）。 */
+         +   '<div class="tr-tag-slot"></div>'
+         +   '<div class="tr-tag-slot tr-tag-work">'
+         +     (wt ? '<span class="tag-work' + (wt.label.length >= 4 ? ' long' : '')
+                   + '" style="background:' + wt.color + '20;color:' + wt.color + ';border-color:' + wt.color + ';">'
+                   + esc(wt.label) + '</span>' : '')
+         +   '</div>'
+         + '</div>'
+         + '</div>';
     });
     return h;
   }
 
+
+  /* 🔴🔴 v2.48.0（ゆうた指摘「POPアップの画面も自前出し」）
+     **当日ビュー共通のアクションシート（`pitTodaySheet`）に乗せる。**
+     前までは代車カレンダー用の小さいポップ（`lo-bpop`）を自前で出していた＝
+     同じ当日ビューの中に、押し方も閉じ方も違う窓が2種類あった。
+     🔴 殻は today.js の1本。ここは**中身（ボタンの並び）だけ**を渡す。
+     ⚠ ボタンの並びも、ふつうの車と同じ順にそろえてある
+        （主ボタン＝入庫済みにする／見るだけ＝詳細／取り消し系＝いちばん下）。 */
   w.pitMaintTodayTap = function(recId){
     var r = recs().filter(function(x){ return x.id === recId; })[0];
     if (!r) return;
-    var v = vehOf(r.vehicleId);
-    _pop('<div class="lo-bpop-h">🔧 ' + esc(vehName(v)) + ' <small>' + esc(WORK_LB[r.work] || '整備') + '</small></div>'
-      + '<button class="lo-bpop-b primary" onclick="flMaintPopClose();pitMaintIntake(\'' + recId + '\')">'
-      + '<i data-ic=download data-ics=16></i> 入庫する<small>タスクボードにカードが起きます</small></button>'
-      + '<button class="lo-bpop-b" onclick="flMaintPopClose();pitMaintSkip(\'' + recId + '\')">'
-      + '今日はやらない<small>この日ぶんだけ消えます（次の候補日を待ちます）</small></button>');
+    var v = vehOf(r.vehicleId); if (!v) return;
+    var wt = arr(w.state && w.state.workTypes).filter(function(t){ return t.id === r.work; })[0];
+    var span = md(r.fromDate) + '〜' + md(r.toDate);
+    if (!w.pitTodaySheet){ if (w.pitToast) w.pitToast('当日ビューが読み込めていません', 'PF-3057'); return; }
+    w.pitTodaySheet(
+      '<div class="ta-head"><b>自社代車</b>　' + esc(vehName(v))
+        + (v.plate ? '<span class="ta-plate">' + esc(v.plate) + '</span>' : '')
+        + '<div class="ta-sub">🔧 ' + esc(WORK_LB[r.work] || '整備')
+        + (wt ? '' : '') + '・' + (r.stage === 'fixed' ? span + ' で確定' : '候補 ' + span + ' のうち今日')
+        + (r.urgent ? '　<span class="ret-pend ret-pend-row">急ぎ</span>' : '') + '</div></div>'
+      + '<button class="ta-btn primary" onclick="pitMaintIntake(\'' + recId + '\')">'
+        + '<b><i data-ic=download data-ics=16></i> 入庫済みにする</b>'
+        + '<span>タスクボードにカードが起きます（社内区分「代車」）</span></button>'
+      + '<button class="ta-btn" onclick="pitMaintGotoFromToday(\'' + recId + '\')">'
+        + '<b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b>'
+        + '<span>車両管理の日ビューで、この車の枠を見る・直す</span></button>'
+      + '<button class="ta-btn danger" onclick="pitMaintSkip(\'' + recId + '\')">'
+        + '<b><i data-ic=ban data-ics=16></i> 今日はやらない</b>'
+        + '<span>この日ぶんだけ消えます（次の候補日を待ちます・未入庫には溜めません）</span></button>'
+      + '<button class="ta-cancel" onclick="pitTodayActionClose()">閉じる</button>');
   };
+
+  /* 当日ビューの「詳細を見る」＝車両管理の日ビューへ（飛び先は flMaintGoto の1本） */
+  w.pitMaintGotoFromToday = function(recId){
+    var r = recs().filter(function(x){ return x.id === recId; })[0];
+    if (w.pitTodayActionClose) w.pitTodayActionClose();
+    if (!r) return;
+    if (w.flMaintGoto) w.flMaintGoto(r.vehicleId, String(r.fromDate || '').slice(0, 7));
+  };
+
 
   /* 「今日はやらない」＝その日だけ消す（枠そのものは残る） */
   w.pitMaintSkip = function(recId, ds){
     var r = recs().filter(function(x){ return x.id === recId; })[0];
+    if (w.pitTodayActionClose) w.pitTodayActionClose();   /* ⚠ v2.48.0 共通シートから押される */
     if (!r) return;
     var d = ds || today();
     if (!Array.isArray(r.skipped)) r.skipped = [];
@@ -574,10 +639,24 @@
     if (!r) return;
     var v = vehOf(r.vehicleId);
     if (!v){ w.pitAlert('この車両が見つかりません', { code:'PF-3055' }); return; }
+    /* 🔴🔴 v2.48.0 **もう入庫している枠は、ここでも止める。**
+       ◎なぜ「行を隠す」だけでは足りないか
+         行が消えるのは**次に描き直した時**。押した直後の連打・別の端末・古い画面・
+         直リンクからは、この関数が**そのまま呼べてしまう**＝カードが2枚できる。
+       ⚠ v2.46.0 までの「消えない」不具合で実際に起きた事故と同じ形。
+          **ボタンを消すだけにしない**（PitFlow のいつもの決めごと）。 */
+    if (r.started){
+      w.pitAlert('この枠はもう入庫しています', { code:'PF-3058',
+        detail:'タスクボードにカードがあります。そちらから進めてください。' });
+      return;
+    }
     var td = today();
     var own = ownerOf(v);
     var det = 'お客様＝自社（社内区分「代車」）。売上・完TEL・洗車・伝票はありません。\n'
             + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）')) : '⚠ ナンバーで顧客控えを引けませんでした（カードは作れます）');
+    /* ⚠ v2.48.0 当日ビューの共通シートから呼ばれる＝**先にシートを閉じてから**聞く
+       （窓が2枚重なると、どちらを押しているのか分からなくなる）。 */
+    if (w.pitTodayActionClose) w.pitTodayActionClose();
     w.pitAsk('この代車を入庫させますか？', { title:(WORK_LB[r.work] || '整備') + '　' + vehName(v), ok:'入庫する', detail:det })
       .then(function(yes){ if (yes) _intakeGo(r, v, own, td); });
   };

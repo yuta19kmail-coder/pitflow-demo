@@ -226,6 +226,29 @@ window.todayShift = function(n){
   renderToday();
 };
 
+/* 🔴🔴 v2.48.0（ゆうた指摘 2026-08-31「POPアップの画面も自前出し」）
+   **当日ビューのアクションシートの殻は、ここ1本。**
+   ◎なぜ
+     🔧代車の整備は、代車カレンダー用の小さいポップ（`lo-bpop`）を自前で出していた。
+     当日ビューの中に**別の見た目・別の閉じ方の窓が2種類**あるのは、押す人から見て意味がない。
+   🔴 中身（ボタンの並び）は呼ぶ側が作る。**殻（覆い・外を押したら閉じる・show）はここだけ。**
+   ⚠ 新しい窓を当日ビューに足す時は、必ずこれを通すこと。`document.createElement` を書かない。 */
+window.pitTodaySheet = function(inner){
+  let back = document.getElementById('today-action');
+  if (!back){
+    back = document.createElement('div');
+    back.id = 'today-action';
+    back.className = 'modal-backdrop';
+    pitModalOutside(back, function(){ pitTodayActionClose(); });
+    document.body.appendChild(back);
+  }
+  back.innerHTML = '<div class="ta-sheet">' + inner + '</div>';
+  back.classList.add('show');
+  /* ⚠ アイコンを埋める入口は `icoBoot`（`pitIcons` という名前は無い）。見張りでも埋まるが、開いた瞬間に埋めたい。 */
+  if (window.icoBoot) try { icoBoot(back); } catch (e) {}
+  return back;
+};
+
 /* ===== カードタップ → アクションシート（入庫済み/返車済み・詳細を見る）v0.30.0 ===== */
 window.pitTodayTap = function(id, isReturn){
   const c = state.cards.find(x => x.id === id);

@@ -59,7 +59,7 @@ function renderFleet(){
   /* ===== ① カレンダー（最上部） ===== */
   h += '<div class="fl-card">';
   if (_flMode === 'month'){
-    h += '<div class="fl-h"><i data-ic=calendar data-ics=16></i> 車両カレンダー（月をクリック＝日別表示／右へ無限）<span class="fl-note"><i data-ic=dot data-ics=12 style=color:#ef4444></i>車検 <i data-ic=dot data-ics=12 style=color:#f97316></i>12点 ＋ イベント（セルをクリックで追加）</span></div>';
+    h += '<div class="fl-h"><i data-ic=calendar data-ics=16></i> 車両カレンダー（月をクリック＝日別表示／右へ無限）<span class="fl-note">🔧 整備の枠（押すと日ビューへ）＋ イベント（セルをクリックで追加）</span></div>';
     h += flMonthCalHtml();
   } else {
     const y = _flDay.getFullYear(), m = _flDay.getMonth();
@@ -134,6 +134,11 @@ function renderFleet(){
 
   wrap.innerHTML = h;
 
+  /* 🔧 v2.46.0（ゆうた指定 2026-08-31）**候補日はドラッグでまとまった日を選べる。**
+     ⚠ クリックだけでも1日ぶんとして通る（押した＝離した が同じマス）。
+     ⚠ 同じ車の行の中だけで伸びる（別の車へは飛ばない）。 */
+  if (_flMode === 'day') _flBindDayDrag();
+
   // 月モード：右端付近までスクロールしたら列を増やす（未来永劫）
   const cw = document.getElementById('fl-cal-scroll');
   if (cw && _flMode === 'month'){
@@ -147,6 +152,52 @@ function renderFleet(){
       }
     });
   }
+}
+
+/* 🔧 v2.46.0 日ビューのなぞり（範囲選択）。
+   ⚠ 画面の中だけの話＝1文字も保存しない。離した時に選択肢を出すだけ。 */
+let _flDrag = null;
+function _flBindDayDrag(){
+  const wrap = document.getElementById('view-fleet-body');
+  if (!wrap || wrap._flDragBound) return;
+  wrap._flDragBound = true;
+  const cellOf = function(t){ return t && t.closest ? t.closest('.fl-cal-cell.fl-day') : null; };
+  wrap.addEventListener('mousedown', function(e){
+    const el = cellOf(e.target);
+    if (!el || !el.dataset.fv) return;
+    if (e.target.closest('.fl-mn') || e.target.closest('.fl-evt')) return;   /* チップの上は掴まない */
+    e.preventDefault();
+    _flDrag = { v: el.dataset.fv, a: el.dataset.fd, b: el.dataset.fd };
+    _flPaintDrag();
+  });
+  wrap.addEventListener('mousemove', function(e){
+    if (!_flDrag) return;
+    const el = cellOf(e.target);
+    if (!el || el.dataset.fv !== _flDrag.v) return;   /* 別の車へは伸ばさない */
+    if (el.dataset.fd === _flDrag.b) return;
+    _flDrag.b = el.dataset.fd;
+    _flPaintDrag();
+  });
+  document.addEventListener('mouseup', function(){
+    if (!_flDrag) return;
+    const d = _flDrag; _flDrag = null;
+    _flClearDrag();
+    const from = (d.a <= d.b) ? d.a : d.b, to = (d.a <= d.b) ? d.b : d.a;
+    if (window.flMaintCellMenu) flMaintCellMenu(d.v, from, to);
+  });
+}
+function _flPaintDrag(){
+  _flClearDrag();
+  if (!_flDrag) return;
+  const lo = (_flDrag.a <= _flDrag.b) ? _flDrag.a : _flDrag.b;
+  const hi = (_flDrag.a <= _flDrag.b) ? _flDrag.b : _flDrag.a;
+  document.querySelectorAll('.fl-cal-cell.fl-day').forEach(function(el){
+    if (el.dataset.fv !== _flDrag.v) return;
+    if (el.dataset.fd >= lo && el.dataset.fd <= hi) el.classList.add('fl-pick');
+  });
+}
+function _flClearDrag(){
+  document.querySelectorAll('.fl-cal-cell.fl-pick').forEach(function(el){ el.classList.remove('fl-pick'); });
 }
 
 /* 月モードのカレンダー */
@@ -170,9 +221,11 @@ function flMonthCalHtml(){
       const ym = y + '-' + String(mo+1).padStart(2, '0');
       const first = ym + '-01';
       const last = ym + '-' + String(new Date(y, mo+1, 0).getDate()).padStart(2, '0');
-      const sh = v.shakenDate && v.shakenDate.indexOf(ym) === 0;
-      const tkDate = window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '';
-      const tk = tkDate && tkDate.indexOf(ym) === 0;
+      /* 🔧 v2.46.0（ゆうた報告 2026-08-31「今元のバッチとダブっちゃってる」）
+         **月カレンダーの元の「車検」「12ヶ月」バッジは消した。**
+         v2.44.0 で足した整備の枠のバッジが、満了月・点検月・満了日まで全部出すので二重になっていた。
+         🔴 消したのは**月ビューだけ**。日ビュー側の「車検」「12ヶ月」は
+            「**その日が満了日・点検日**」という別の意味なので残してある。 */
       /* v1.13.2：車検・点検は下の赤/橙バッジで出しているので、自動で作った同じ予定は重ねて出さない
          （＝「車検」と「車検入庫」が二重に見えていた）。手で足した予定はそのまま出す。 */
       /* 🧩 v2.42.0 その期間に何がかかっているかは **loaner-free.js の部品1本**に聞く。
@@ -186,8 +239,6 @@ function flMonthCalHtml(){
         h += '<span class="fl-mbdg ' + b.cls + '" title="' + _fleetEsc(b.title || '') + '"'
            + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">' + _fleetEsc(b.text) + '</span>';
       });
-      if (sh) h += '<span class="fl-bdg shaken" title="車検満了 ' + _fleetEsc(v.shakenDate) + '">車検</span>';
-      if (tk) h += '<span class="fl-bdg tenken" title="12ヶ月点検（車検満了の翌年）' + _fleetEsc(window.pitWareki ? pitWareki(tkDate) : tkDate) + '">12ヶ月</span>';
       evs.forEach(function(x){
         h += '<span class="fl-evt" style="background:' + x.color + '" title="' + _fleetEsc(x.from + '〜' + x.to) + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">' + _fleetEsc(x.label) + '</span>';
       });
@@ -243,7 +294,8 @@ function flDayCalHtml(y, mo){
       }
       /* 🔧 v2.45.0 セルを押したら**選択肢を出す**（整備の候補／ここで確定／いままでの予定追加）。
          ⚠ いままでの「セル＝予定追加」は**消していない**。選択肢の3つ目に残してある。 */
-      h += '<div class="fl-cal-cell fl-day' + useCls + _hl + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '" onclick="flMaintCellMenu(\'' + v.id + '\',\'' + ds + '\')">';
+      h += '<div class="fl-cal-cell fl-day' + useCls + _hl + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '"'
+         + ' data-fv="' + v.id + '" data-fd="' + ds + '">';
       h += useTag;
       /* 🔧 整備の枠（候補＝網掛け／確定＝塗り）。押すと確定・期間直し・取り消し */
       day.maints.forEach(function(x){

@@ -38,6 +38,7 @@
     y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
     return y + '-' + String(m + 1).padStart(2, '0');
   }
+  function _pd(s){ var p = String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
   function md(ds){ var p = String(ds).split('-'); return p.length === 3 ? (+p[1]) + '/' + (+p[2]) : ds; }
   function ymText(ym){ var p = String(ym).split('-'); return p.length === 2 ? (+p[1]) + '月' : ym; }
   function daysBetween(a, b){
@@ -359,13 +360,16 @@
     });
   }
 
-  w.flMaintCellMenu = function(vehId, ds){
+  /* 🔧 v2.46.0 なぞった範囲（from〜to）で受ける。クリックだけなら from===to。 */
+  w.flMaintCellMenu = function(vehId, ds, to){
+    to = to || ds;
     var ps = plansFor(vehId, ds);
-    var h = '<div class="lo-bpop-h">' + esc(md(ds)) + '</div>';
+    var per = (ds === to) ? md(ds) : (md(ds) + '〜' + md(to));
+    var h = '<div class="lo-bpop-h">' + esc(per) + (ds === to ? '' : '<small>（' + (Math.round((_pd(to) - _pd(ds)) / 86400000) + 1) + '日）</small>') + '</div>';
     ps.forEach(function(r){
-      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\',\'' + to + '\')">'
          + '<span class="mb-dot"></span>🔧 ' + esc(r.workLabel) + ' の<b>候補</b>を置く<small>この期間のどこかでやる、の提示</small></button>';
-      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'fixed\',\'\',\'' + r.work + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'fixed\',\'\',\'' + r.work + '\',\'' + to + '\')">'
          + '<span class="mb-dot fixed"></span>🔧 ' + esc(r.workLabel) + ' を<b>ここで確定</b><small>枠を押さえる（代車は貸せなくなる）</small></button>';
     });
     if (!ps.length){
@@ -379,10 +383,10 @@
   /* 置く／直す の窓（期間） */
   /* ⚠ `work` は**呼ぶ側から渡す**。ここで groupId から引き直すと、
      引けなかった時に黙って「一般」に落ちる（画面には出るので気づけない）。 */
-  w.flMaintPlace = function(gid, vehId, ds, mode, recId, work){
+  w.flMaintPlace = function(gid, vehId, ds, mode, recId, work, dsTo){
     flMaintPopClose();
     var cur = recId ? recs().filter(function(r){ return r.id === recId; })[0] : null;
-    var from = cur ? cur.fromDate : ds, to = cur ? cur.toDate : ds;
+    var from = cur ? cur.fromDate : ds, to = cur ? cur.toDate : (dsTo || ds);
     var lb = (mode === 'fixed') ? '確定' : '候補';
     _modal(
       '<h3 class="lo-modal-h">🔧 整備の' + lb + (cur ? 'を直す' : 'を置く') + '</h3>'

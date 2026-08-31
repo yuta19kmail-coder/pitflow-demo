@@ -1264,7 +1264,11 @@ function _cfsLgRows(from, to, today, tStr, c, ro){
       const col = ' data-lgcol="' + l.id + '"';
       if (a){
         /* 古いtitle（誰に・いつまで）は撤去＝情報はヘッダのホバー詳細カードへ */
-        h += '<td class="cfs-lg-busy"' + col + '></td>';
+        /* 🅿 v2.40.0 仮押さえ＝**埋まり扱いは貸出と同じ**（ここは網掛けにするだけ）。
+           ゆうた指定「新規予約などからその部分は埋まっているのと同義で扱ってほしい」。 */
+        const _hd = !!(a && a.hold);
+        h += '<td class="cfs-lg-busy' + (_hd ? ' cfs-lg-hold' : '') + '"' + col
+           + (_hd ? ' title="仮押さえ' + (a.memo ? '：' + String(a.memo).replace(/"/g, '') : '') + '"' : '') + '></td>';
       } else if (ro){
         /* 空きカレンダービュー＝読み取り専用（クリック選択なし） */
         h += '<td class="cfs-lg-free cfs-lg-ro"' + col + '></td>';

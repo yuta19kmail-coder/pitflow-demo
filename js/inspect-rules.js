@@ -697,8 +697,13 @@
         var out = [], seen = {};
         ctx.assigns.forEach(function(a){
           if (!a || !a.loanerId || !a.fromDate || !a.toDate) return;
+          /* 🅿 v2.40.0 仮押さえ（hold）は「二重貸し」ではない。
+             押さえた枠に本物の貸出が入るのは**わざとやること**（窓の側で1回聞いている）。
+             毎日のデータチェックに出すと、消しようのない赤が並ぶだけなので数えない。 */
+          if (a.hold) return;
           var hit = w.pitLoanerConflicts(a.loanerId, a.fromDate, a.toDate,
-                        { ignoreAssignId:a.id, ignoreCardId:a.cardId });
+                        { ignoreAssignId:a.id, ignoreCardId:a.cardId })
+                     .filter(function(x){ return x && !x.hold; });
           if (!hit.length) return;
           var k = a.cardId || a.id;
           if (seen[k]) return; seen[k] = 1;

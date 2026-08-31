@@ -219,7 +219,9 @@ function flDayCalHtml(y, mo){
       let useCls = '', useTag = '';
       if (isLoanerVeh){
         const a = (state.loanerAssigns || []).find(function(x){ return x.loanerId === v.id && x.fromDate <= ds && x.toDate >= ds; });
-        if (a){ useCls = ' fl-use'; if (a.fromDate === ds) useTag = '<span class="fl-use-tag">' + _fleetEsc(a.customer || '貸出') + '</span>'; }
+        /* 🅿 v2.40.0 仮押さえも「その日ふさがっている」ので出す。ただし**貸出とは名前を分ける。** */
+        if (a){ useCls = ' fl-use' + (a.hold ? ' fl-hold' : '');
+          if (a.fromDate === ds) useTag = '<span class="fl-use-tag">' + _fleetEsc(a.hold ? ('仮押さえ' + (a.memo ? '：' + a.memo : '')) : (a.customer || '貸出')) + '</span>'; }
       }
       h += '<div class="fl-cal-cell fl-day' + useCls + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '" onclick="flOpenEventModal(\'' + v.id + '\',\'' + ds + '\')">';
       h += useTag;
@@ -670,7 +672,8 @@ function _flHistLoName(id){
 }
 
 function _flHistoryHtml(){
-  const all = (state.loanerAssigns || []).slice();
+  /* 🅿 v2.40.0 貸出履歴に仮押さえは出さない（貸した記録ではない） */
+  const all = (state.loanerAssigns || []).filter(function(a){ return a && !a.hold; });
   /* 新しい順（貸した日）。同じ日なら返却日の新しい順 */
   all.sort(function(a, b){
     const x = String(b.fromDate || ''), y = String(a.fromDate || '');
@@ -740,7 +743,8 @@ function _flHistoryHtml(){
 
 /* 🔴 v1.144.0 その車の**貸出実績**の件数（返却済みも数える＝「1回でも貸したか」を見る） */
 function _flUsedCount(id){
-  return (state.loanerAssigns || []).filter(function(a){ return a && a.loanerId === id; }).length;
+  /* 🅿 v2.40.0 仮押さえは「貸した」ではないので数えない */
+  return (state.loanerAssigns || []).filter(function(a){ return a && !a.hold && a.loanerId === id; }).length;
 }
 window._flUsedCount = _flUsedCount;
 

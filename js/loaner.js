@@ -56,7 +56,9 @@ function _loChangedList(){ return _loDraftOrig ? (state.loanerAssigns||[]).filte
    ※同じ予約（同じ cardId）の割当どうしは「同一予約」なので衝突に数えない。 */
 function _loConflictSetFrom(list){
   const bad = new Set(), byLo = {};
-  (list || []).forEach(function(a){ (byLo[a.loanerId] = byLo[a.loanerId] || []).push(a); });
+  /* 🅿 v2.40.0 仮押さえ（hold）は札を出さないので、二重貸しの赤には数えない。
+     ⚠ 「貸出の窓で警告する」ほうは今までどおり効く（pitLoanerConflicts は仮押さえも返す）。 */
+  (list || []).forEach(function(a){ if (a && a.hold) return; (byLo[a.loanerId] = byLo[a.loanerId] || []).push(a); });
   Object.keys(byLo).forEach(function(lo){
     const arr = byLo[lo].slice().sort(function(x,y){ return x.fromDate < y.fromDate ? -1 : 1; });
     for (let i=0;i<arr.length;i++) for (let j=i+1;j<arr.length;j++){
@@ -119,7 +121,8 @@ function _loName(id){
 function _loAbbr(s, n){ s = String(s == null ? '' : s); return s.length > n ? (s.slice(0, n) + '…') : s; }
 /* 当日かぶり（後発）：この割当の開始日に、同じ代車で別予約の返却(toDate)が重なるか＝後発は初日が「耳」・実質翌日開始 */
 function _loHandoffLater(a){
-  return (state.loanerAssigns || []).some(function(x){ return x.id !== a.id && x.loanerId === a.loanerId && x.toDate === a.fromDate; });
+  /* 🅿 v2.40.0 仮押さえは札を出さない＝当日かぶりの耳も作らない */
+  return (state.loanerAssigns || []).some(function(x){ return x.id !== a.id && !x.hold && x.loanerId === a.loanerId && x.toDate === a.fromDate; });
 }
 function _loEffStart(a){ return _loHandoffLater(a) ? ymd(addDays(_loPd(a.fromDate), 1)) : a.fromDate; }
 function _loTeamColor(a){
@@ -622,8 +625,22 @@ function _loRenderDays(start, n){
              + (o.fromDate===dStr ? '<span class="lo-gh-tag">元 ' + _loEsc(_loAssignLabel(g)) + '</span>' : '');
         }
       }
-      // この代車・この日を覆う割当（当日かぶり対応）
-      const covering = (state.loanerAssigns || []).filter(function(x){ return x.loanerId === l.id && x.fromDate <= dStr && x.toDate >= dStr; });
+      /* 🅿 v2.40.0 仮押さえ＝色つきの網掛け。**札（.lo-badge）は出さない**＝ドラッグで動かすものではない。
+         🔴 「空いているか」の物差し（loaner-free.js）では貸出と同じ「埋まり」に数えている。ここは見た目だけ。 */
+      const hold = (state.loanerAssigns || []).find(function(x){ return x && x.hold && x.loanerId === l.id && x.fromDate <= dStr && x.toDate >= dStr; }) || null;
+      let hv = '', hCls = '';
+      if (hold){
+        hCls = ' lo-holdday' + (hold.fromDate === dStr ? ' lo-hold-start' : '') + (hold.toDate === dStr ? ' lo-hold-end' : '');
+        hv += '<span class="lo-holdbg"></span>';
+        if (hold.fromDate === dStr){
+          /* 2日以上押さえている時は、下に余白があるのでメモを2行まで出す（1日だけなら1行） */
+          const wide = (hold.toDate > hold.fromDate) ? ' lo-hold-w' : '';
+          hv += '<span class="lo-hold-tag' + wide + '" title="' + _loEsc(hold.memo || '仮押さえ') + '" onclick="loHoldMenu(event,\'' + hold.id + '\')">'
+              + '<span class="lo-hold-k">仮</span><span class="lo-hold-memo">' + _loEsc(hold.memo || '仮押さえ') + '</span></span>';
+        }
+      }
+      // この代車・この日を覆う割当（当日かぶり対応）／🅿 仮押さえは札にしないので外す
+      const covering = (state.loanerAssigns || []).filter(function(x){ return x.loanerId === l.id && !x.hold && x.fromDate <= dStr && x.toDate >= dStr; });
       // バーの主役＝実効開始(effStart)がこの日以前で覆う割当（後発の同日かぶりは初日を除外＝翌日からバー）
       const a = covering.find(function(x){ return _loEffStart(x) <= dStr; }) || null;
       if (a){
@@ -669,7 +686,7 @@ function _loRenderDays(start, n){
         const isBad = (confSet && confSet.has(a.id)) || isDup;
         const isChg = _loAssignChanged(a);
         const hoverAttr = compact ? (' onmouseenter="loInfoHover(this,\'' + (a.id || '') + '\')" onmouseleave="loInfoHide()"') : '';
-        h += '<div class="lo-cell lo-bk' + (isStart ? ' bk-start' : '') + (isEnd ? ' bk-end' : '') + (single ? ' bk-single' : '') + (compact ? ' bk-compact' : ' bk-full') + (fixed ? ' lo-fixed' : '') + (returned ? ' lo-returned' : '') + (isToday ? ' lo-today' : '') + (isBad?' lo-bad':(isChg?' lo-chg':'')) + (isDup?' lo-dup':'') + evCls + dayMods + '"' + attrs
+        h += '<div class="lo-cell lo-bk' + (isStart ? ' bk-start' : '') + (isEnd ? ' bk-end' : '') + (single ? ' bk-single' : '') + (compact ? ' bk-compact' : ' bk-full') + (fixed ? ' lo-fixed' : '') + (returned ? ' lo-returned' : '') + (isToday ? ' lo-today' : '') + (isBad?' lo-bad':(isChg?' lo-chg':'')) + (isDup?' lo-dup':'') + evCls + hCls + dayMods + '"' + attrs
            + ' style="--lo-team:' + teamColor + '">' + dayBg + '<i class="lo-fill"></i>' + gh;
         /* 🔴 二重貸しの日は「2」の印を出す（押すと何と重なっているかを出す） */
         if (isDup){
@@ -684,9 +701,12 @@ function _loRenderDays(start, n){
              ⚠ 中にアイコンを入れない。入れると線のV字が戻って、また先が浮いて見える。 */
           h += '<span class="lo-end"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '" title="下へドラッグで返却日を伸ばせます"></span>';
         }
-        h += ov + '</div>';
+        h += ov + hv + '</div>';
       } else {
-        h += '<div class="lo-cell lo-free' + (isToday ? ' lo-today' : '') + evCls + dayMods + '"' + attrs + '>' + dayBg + gh + ov + '</div>';
+        /* 🅿 v2.40.0 仮押さえの日は `.lo-free` を付けない
+           ＝ドラッグの範囲選択に入らない（押したら「解除」の窓が開く）。 */
+        h += '<div class="lo-cell ' + (hold ? 'lo-hold' : 'lo-free') + (isToday ? ' lo-today' : '') + evCls + hCls + dayMods + '"' + attrs
+           + (hold ? ' onclick="loHoldMenu(event,\'' + hold.id + '\')"' : '') + '>' + dayBg + gh + ov + hv + '</div>';
       }
     });
   }
@@ -765,12 +785,17 @@ function loBindDnd(grid){
     _loSel.b = c.getAttribute('data-ld');
     _loPaintSel();
   });
-  document.addEventListener('mouseup', function(){
+  document.addEventListener('mouseup', function(e){
     if (!_loSel) return;
     const sel = _loSel; _loSel = null; _loClearSel();
     const from = sel.a <= sel.b ? sel.a : sel.b;
     const to   = sel.a <= sel.b ? sel.b : sel.a;
-    if (window.loAddManualBlock) loAddManualBlock({ loId: sel.lo, from: from, to: to });
+    /* 🅿 v2.40.0（ゆうた指定 2026-08-31）**いきなり貸出の窓を開かない。**
+       その手前に「仮押さえ」「予約以外で代車を貸出」の2択を1回だけ出す。
+       ⚠ 貸出の側は中身も見た目も今までのまま（loAddManualBlock を素通しで呼ぶ）。 */
+    if (e && e.clientX != null) _loPopXY = { x: e.clientX, y: e.clientY };
+    if (window.loPickFree) loPickFree(sel.lo, from, to);
+    else if (window.loAddManualBlock) loAddManualBlock({ loId: sel.lo, from: from, to: to });
   });
 
   // v0.99.17 左の日付＝ドラッグで範囲／1日クリックで1日選択（同じ1日を再クリックで解除）
@@ -1058,7 +1083,7 @@ function _loBadgePopOpen(html){
 window.loShowDup = function(loanerId, ds){
   const lo = (state.loaners || []).find(function(l){ return l.id === loanerId; });
   const list = (state.loanerAssigns || []).filter(function(x){
-    return x.loanerId === loanerId && x.fromDate <= ds && x.toDate >= ds && _loEffStart(x) <= ds;
+    return x.loanerId === loanerId && !x.hold && x.fromDate <= ds && x.toDate >= ds && _loEffStart(x) <= ds;
   });
   const name = lo ? (window.pitVehLabel ? pitVehLabel(lo) : (lo.name || '代車')) : '代車';
   pitAlert(_loMD(ds) + ' は貸出が ' + list.length + ' 件重なっています', {
@@ -1334,6 +1359,8 @@ function _loEventMsg(list){
 }
 function _loConflictMsg(list){
   const lines = list.slice(0, 3).map(function(a){
+    /* 🅿 v2.40.0 仮押さえは「誰に貸したか」が無いので、メモをそのまま出す */
+    if (a.hold) return '・' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate) + '　仮押さえ' + (a.memo ? '（' + a.memo + '）' : '');
     const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
     const nm = card ? ((window.pitCustSurname ? pitCustSurname(card) : (card.customer || '')) || '予約') : (a.customer || '貸出');
     return '・' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate) + '　' + nm + (a.purpose ? '（' + a.purpose + '）' : (card ? ' 様' : ''));
@@ -1386,6 +1413,134 @@ window.loSaveManualBlock = function(){
   if (window.PitDB) PitDB.save();
   _loModalClose(); renderLoaner();
   }
+};
+
+
+/* ===========================================================
+   🅿 仮押さえ（v2.40.0・ゆうた指定 2026-08-31）
+   -----------------------------------------------------------
+   🗣「予定が入っていないところをクリックorドラッグすると、予約以外での貸し出しが入れられる。
+   　　これを一段階層下げて、その手前にポップアップの選択肢を追加。
+   　　『仮押さえ』『予約以外で代車を貸出』でメニュー化。貸出の方は既存のまま、仮押さえの方が新設。
+   　　簡単な一言メモをそえて埋めるだけ。カレンダー自体を色付きの網掛けにして、
+   　　新規予約などからその部分は埋まっているのと同義で扱ってほしい。
+   　　一言メモがカレンダーから直接見れて、クリック→解除→でなくなる」
+
+   🔴🔴 置き場所＝**貸出（loanerAssigns）と同じ箱に `hold:true` で入れる。新しい箱は作らない。**
+      箱を増やすと「空いているか」の物差し（loaner-free.js）と読み込み（db-pit.js の7つ）を
+      両方いじることになり、宿題の「開くたびに全件を2回読む」をさらに重くする。
+      同じ箱なら **pitLoanerBusyOn / pitLoanerConflicts が何も直さなくても仮押さえを「埋まり」に数える**
+      ＝新規予約・最短入庫日・空きカレンダーから、そのまま埋まって見える（ゆうた指定のとおり）。
+
+   🔴 そのかわり「**貸出として数えてはいけない所**」だけを名指しで外してある：
+      ・カレンダーの札（.lo-badge）／二重貸しの赤／当日かぶりの耳（このファイル）
+      ・車両管理の貸出回数・貸出履歴（fleet.js）
+      ・データチェックの「代車のダブり」（inspect-rules.js の L02）
+      ⚠ ここを増やす時は**この一覧も増やすこと。**忘れると「仮押さえが貸出1件として数えられる」形で出る。
+
+   ⚠ 仮押さえは**ドラッグで動かせない**（札を出していないので掴む所が無い）。直すのは窓から。
+   =========================================================== */
+
+/* 空きをクリック／ドラッグし終えた所で出す2択 */
+window.loPickFree = function(loId, from, to){
+  const per = (from === to) ? _loMD(from) : (_loMD(from) + '〜' + _loMD(to));
+  _loBadgePopOpen(
+    '<div class="lo-bpop-h">' + _loEsc(_loName(loId)) + ' <small>' + per + '</small></div>'
+    + '<button class="lo-bpop-b" onclick="loHoldFromPick(\'' + loId + '\',\'' + from + '\',\'' + to + '\')"><span class="lo-hold-k">仮</span> 仮押さえ</button>'
+    + '<button class="lo-bpop-b" onclick="loLendFromPick(\'' + loId + '\',\'' + from + '\',\'' + to + '\')"><i data-ic=car data-ics=16></i> 予約以外で代車を貸出</button>'
+    + '<div class="lo-bpop-note">仮押さえ＝お客様の登録はせず、ひとことメモだけで枠を押さえます。</div>'
+  );
+};
+window.loHoldFromPick = function(loId, from, to){ _loBadgePopClose(); loAddHold({ loId:loId, from:from, to:to }); };
+window.loLendFromPick = function(loId, from, to){ _loBadgePopClose(); loAddManualBlock({ loId:loId, from:from, to:to }); };
+
+/* 仮押さえの窓（新規／直し 兼用）。prefill.id があれば直し */
+window.loAddHold = function(prefill){
+  prefill = prefill || {};
+  const cur = prefill.id ? (state.loanerAssigns || []).find(function(x){ return x.id === prefill.id && x.hold; }) : null;
+  const today = ymd(new Date());
+  const from0 = (cur && cur.fromDate) || prefill.from || today;
+  const to0   = (cur && cur.toDate)   || prefill.to   || today;
+  const loId  = (cur && cur.loanerId) || prefill.loId || '';
+  const memo0 = (cur && cur.memo) || '';
+  const opts = _loFiltered().filter(function(l){ return !l.emergency; })
+    .map(function(l){ const sel = (loId && l.id === loId) ? ' selected' : ''; return '<option value="' + l.id + '"' + sel + '>' + _loEsc((String(l.name||'').replace('代車','')) + ' ' + (l.model||'')) + '</option>'; }).join('');
+  _loModalOpen(
+    '<h3 class="lo-modal-h"><span class="lo-hold-k">仮</span> ' + (cur ? '仮押さえを直す' : '仮押さえ') + '</h3>'
+    + '<label class="lo-modal-f">代車<select id="lhd-lo">' + opts + '</select></label>'
+    + '<label class="lo-modal-f">ひとことメモ<input id="lhd-memo" maxlength="40" placeholder="例：田中様の車検で押さえ" value="' + _loEsc(memo0) + '"></label>'
+    + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="lhd-from" value="' + from0 + '"></label><label class="lo-modal-f">まで<input type="date" id="lhd-to" value="' + to0 + '"></label></div>'
+    + '<div class="lo-modal-note">この期間は、新規予約や最短入庫日からも<b>埋まっている</b>ものとして扱われます。お客様・車の登録はしません。</div>'
+    + '<div class="lo-modal-foot"><button onclick="loCloseModal()">キャンセル</button><button class="primary" onclick="loSaveHold(\'' + (cur ? cur.id : '') + '\')">' + (cur ? '直す' : '押さえる') + '</button></div>'
+  );
+  setTimeout(function(){ const el = document.getElementById('lhd-memo'); if (el) el.focus(); }, 30);
+};
+
+window.loSaveHold = function(id){
+  const g = function(k){ const el = document.getElementById(k); return el ? el.value : ''; };
+  const lo = g('lhd-lo'), memo = String(g('lhd-memo') || '').trim(), from = g('lhd-from'), to = g('lhd-to');
+  if (!lo || !from || !to){ pitAlert('代車と期間を入れてください', { code:'PF-3040' }); return; }
+  if (to < from){ pitAlert('「まで」は「から」以降にしてください', { code:'PF-3041' }); return; }
+  /* 🔴 メモは必須。あとで見た人が「なぜ押さえたか」分からない仮押さえは、誰も解除できずに残る。 */
+  if (!memo){ pitAlert('ひとことメモを入れてください', { code:'PF-3042',
+      detail:'あとで見た人が「なぜ押さえたか」分かるように、ひとことだけ入れてください。' }); return; }
+  const conf = _loConflictAssigns(lo, from, to, id || undefined);
+  const evs  = _loConflictEvents(lo, from, to);
+  if (conf.length || evs.length){
+    const parts = [];
+    if (conf.length) parts.push('すでに他の貸出・仮押さえと重複します：\n' + _loConflictMsg(conf));
+    if (evs.length)  parts.push('この代車自身の予定と重なります：\n' + _loEventMsg(evs));
+    pitAsk('それでも押さえますか？', { code:'PF-3043', title:'期間が重複します', danger:true, ok:'押さえる',
+            detail:'この代車は選んだ期間、\n\n' + parts.join('\n\n') })
+      .then(function(yes){ if (yes) _go(); });
+    return;
+  }
+  _go();
+  function _go(){
+    state.loanerAssigns = state.loanerAssigns || [];
+    const a = id ? state.loanerAssigns.find(function(x){ return x.id === id && x.hold; }) : null;
+    if (a){ a.loanerId = lo; a.memo = memo; a.purpose = memo; a.fromDate = from; a.toDate = to; }
+    else {
+      state.loanerAssigns.push({ id:'lh' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+        loanerId:lo, cardId:null, hold:true, memo:memo,
+        /* customer / purpose ＝古い画面（貸出として並べる所）でも空欄にならないための保険 */
+        customer:'仮押さえ', purpose:memo,
+        fromDate:from, toDate:to, manual:true, createdAt:new Date().toISOString() });
+    }
+    if (window.PitDB) PitDB.save();
+    try { if (window.pitLog) pitLog(a ? '仮押さえを直した' : '仮押さえ', { kind:'loaner',
+      label: _loName(lo) + ' ' + _loMD(from) + '〜' + _loMD(to) + '（' + memo + '）' }); } catch (e) {}
+    _loModalClose(); renderLoaner();
+  }
+};
+
+/* カレンダーの網掛け（またはメモの札）を押した時の窓 */
+window.loHoldMenu = function(ev, id){
+  if (ev){ ev.stopPropagation(); ev.preventDefault(); if (ev.clientX != null) _loPopXY = { x: ev.clientX, y: ev.clientY }; }
+  const a = (state.loanerAssigns || []).find(function(x){ return x.id === id && x.hold; });
+  if (!a) return;
+  loInfoHide();
+  _loBadgePopOpen(
+    '<div class="lo-bpop-h"><span class="lo-hold-k">仮</span> 仮押さえ <small>' + _loEsc(_loName(a.loanerId)) + '　' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate) + '</small></div>'
+    + '<div class="lo-bpop-note">' + _loEsc(a.memo || '（メモなし）') + '</div>'
+    + '<button class="lo-bpop-b" onclick="loHoldEdit(\'' + id + '\')"><i data-ic=clipboard data-ics=16></i> メモ・期間を直す</button>'
+    + '<button class="lo-bpop-b danger" onclick="loReleaseHold(\'' + id + '\')"><i data-ic=ban data-ics=16></i> 仮押さえを解除する</button>'
+  );
+};
+window.loHoldEdit = function(id){ _loBadgePopClose(); loAddHold({ id:id }); };
+
+/* 解除＝消すだけ。**確認は挟まない**（ゆうた指定「クリック→解除→でなくなる」）。
+   ⚠ 貸出（loCancelLoaner）と違って、仮押さえは記録として残す値打ちが無いので消し切る。
+      誰がいつ解除したかは操作ログ（pitLog）に残る。 */
+window.loReleaseHold = function(id){
+  const a = (state.loanerAssigns || []).find(function(x){ return x.id === id && x.hold; });
+  if (!a) return;
+  _loBadgePopClose();
+  state.loanerAssigns = (state.loanerAssigns || []).filter(function(x){ return x.id !== id; });
+  if (window.PitDB) PitDB.save();
+  try { if (window.pitLog) pitLog('仮押さえを解除', { kind:'loaner',
+    label: _loName(a.loanerId) + ' ' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate) + '（' + (a.memo || '') + '）' }); } catch (e) {}
+  renderLoaner();
 };
 
 /* 🚨 緊急車両を追加（社用車から選ぶ or 手入力）＝一番左に列・返車で消える（履歴は残す） */

@@ -52,6 +52,10 @@
      ② その日、ふさがっているか
      ふさがる理由は2つ。**どちらも「貸せない日」として同じに扱う。**
        ・貸出（loanerAssigns）
+         🅿 v2.40.0 **仮押さえ（hold:true）も同じ箱に入っている＝ここでは貸出と同じ「埋まり」。**
+         　 ゆうた指定「新規予約などからその部分は埋まっているのと同義で扱ってほしい」がこれ。
+         　 ⚠ わざと分けていない。分けると、この物差しを使う画面すべてに
+         　 　「仮押さえも見る」を足して回る羽目になり、必ずどこかで抜ける。
        ・代車自身の予定（fleetEvents＝車検入庫・12ヶ月点検・リースアップ等）
      ⚠ opt.ignoreAssignId … その1件は無いものとして見る（自分自身を数えないため）
      ⚠ opt.noEvents      … 代車自身の予定は見ない（カレンダーの塗り分け用）
@@ -78,7 +82,9 @@
       if (skip && x.id === skip) return false;
       return x.loanerId === l.id && x.fromDate <= ds && x.toDate >= ds;
     });
-    if (a) return { kind: 'assign', assign: a };
+    /* 🅿 v2.40.0 仮押さえも kind は 'assign' のまま返す（呼ぶ側の分岐を増やさない）。
+       見た目を変えたい画面は `why.assign.hold` を見る＝card-detail の空きガントがそれ。 */
+    if (a) return { kind: 'assign', assign: a, hold: !!a.hold };
     var e = arr(w.state && w.state.fleetEvents).find(function (x) {
       return x.vehicleId === l.id && x.fromDate <= ds && x.toDate >= ds;
     });

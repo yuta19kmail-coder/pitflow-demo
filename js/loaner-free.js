@@ -112,11 +112,40 @@
        opt.noEvents       … 代車自身の予定は見ない（カレンダーの塗り分け用）
        opt.kinds          … 欲しい種類だけ（例 ['event']）
      ================================================================== */
+  /* 🔴 `busy` ＝ **その日、代車として貸せないか**。
+     ⚠ 🔧整備の枠の「候補」だけ false。理由は下の「候補は塞がない」を読むこと。 */
   var KINDS = {
-    lend:  { label: '貸出',   busy: true },
-    hold:  { label: '仮押さえ', busy: true },
-    event: { label: '予定',   busy: true }
+    lend:  { label: '貸出',    busy: true  },
+    hold:  { label: '仮押さえ', busy: true  },
+    event: { label: '予定',    busy: true  },
+    maint: { label: '整備の枠', busy: null  }   /* null＝status で決まる（下の _maintBusy） */
   };
+
+  /* ==================================================================
+     🔧 整備の枠（v2.43.0・2026-08-31 ゆうた確定）
+     ------------------------------------------------------------------
+     🗣「Aという代車の車検が10月です → 結局予定が詰まってるし、緊急で出さなきゃならない場合もあるしで、
+     　4〜6／12〜16／22〜24 が空いてるからここのどこかで車検して！ みたいなスケジュールになる事が多い。
+     　だから黄色の枠でとっておいて、そこから実際に作業する場合はタスクボードにカードとして入庫する」
+
+     ◎3つの顔（同じ1件が、決まり具合で見え方を変える）
+       'month'     … 月の目標（10月に車検）。**日はまだ無い**
+                     🔴 **保存しない。**満了日・12ヶ月点検日から**計算で出す**（裏で勝手に書かない）
+                     🔴 **日のカレンダーには出さない**（縮尺が違うものを日軸に乗せると必ず破綻する）
+       'candidate' … 日の候補（飛び地でいくつでも）。**人が手で置く**＝保存する
+       'fixed'     … 確定（実際に入庫した期間）。1つだけ
+
+     🔴🔴 **候補は代車を塞がない（ゆうた確定＝C案）。**
+        ただし **「代車ありの最短入庫日」の案内からは外す**（planWindow が避ける）。
+        ＝ 現場が手で貸すのは自由。自動で「この日に入庫できます」と**約束する側**だけが遠慮する。
+        ⚠ 候補も塞ぐと、候補3本で10月がほぼ全滅に見えて最短入庫日が後ろに飛ぶ。
+        ⚠ 逆にどこにも効かせないと、全部の候補日を埋めてしまって車検に出す日が無くなる。
+
+     🔴🔴 **車検の満了を過ぎても、貸出は止めない。**（ゆうた指定 2026-08-31）
+        🗣「どんなにあっても、もともと生命線だから落とすことはない」
+        ＝ 出すのは**警告だけ**。`pitLoanerUsable` からは外さない。**ここに貸出停止を書き足さないこと。**
+     ================================================================== */
+  function _maintBusy(it) { return it && it.status === 'fixed'; }
 
   function _assignItem(a) {
     return {
@@ -126,6 +155,21 @@
       emergency: !!a.emergency, returned: !!a.returned,
       memo: a.hold ? (a.memo || '') : (a.purpose || ''),
       label: a.hold ? '仮押さえ' : (a.customer || (a.emergency ? '緊急' : '貸出'))
+    };
+  }
+  /* fleetEvents の中の「整備の枠」（`maint:true` が目印）。⚠ 既存の予定と同じ箱に入れて、箱は増やさない。 */
+  function _maintItem(e) {
+    return {
+      kind: 'maint', id: e.id, from: e.fromDate, to: e.toDate,
+      event: e, maintOf: e,
+      status: e.status || 'candidate',
+      work: e.work || '',            /* shaken / 12pt / general / bp / fix */
+      groupId: e.groupId || e.id,
+      urgent: !!e.urgent,
+      skipped: Array.isArray(e.skipped) ? e.skipped : [],
+      memo: e.memo || '',
+      label: e.label || '整備の枠',
+      color: '#d6a846'
     };
   }
   function _eventItem(e) {
@@ -146,9 +190,11 @@
       items = items.filter(function (x) { return opt.kinds.indexOf(x.kind) >= 0; });
     }
     if (opt && opt.noEvents) items = items.filter(function (x) { return x.kind !== 'event'; });
-    /* 並びは 貸出 → 仮押さえ → 予定（画面が「主役」を取りたい時は先頭を見る） */
-    var ord = { lend: 0, hold: 1, event: 2 };
-    return items.slice().sort(function (a, b) { return (ord[a.kind] - ord[b.kind]) || (a.from < b.from ? -1 : 1); });
+    /* 並びは 貸出 → 整備の確定 → 仮押さえ → 整備の候補 → 予定
+       （画面が「主役」を取りたい時は先頭を見る。**決まっているものほど前**） */
+    var ord = { lend: 0, maintFixed: 1, hold: 2, maint: 3, event: 4 };
+    var rank = function (x) { return ord[(x.kind === 'maint' && x.status === 'fixed') ? 'maintFixed' : x.kind]; };
+    return items.slice().sort(function (a, b) { return (rank(a) - rank(b)) || (a.from < b.from ? -1 : 1); });
   }
   function _collect(loanerId, from, to, opt) {
     var skip = opt && opt.ignoreAssignId;
@@ -162,7 +208,8 @@
     arr(w.state && w.state.fleetEvents).forEach(function (e) {
       if (!e || e.vehicleId !== loanerId) return;
       if (!(e.fromDate <= to && e.toDate >= from)) return;
-      out.push(_eventItem(e));
+      /* 🔧 整備の枠は kind を分ける＝「代車自身の予定（車検入庫の青帯）」と混ぜない */
+      out.push(e.maint ? _maintItem(e) : _eventItem(e));
     });
     return _pick(out, opt);
   }
@@ -175,7 +222,20 @@
       holds:  items.filter(function (x) { return x.kind === 'hold'; }),
       events: items.filter(function (x) { return x.kind === 'event'; }),
       main:   items[0] || null,
-      busy:   items.some(function (x) { return KINDS[x.kind] && KINDS[x.kind].busy; })
+      maints: items.filter(function (x) { return x.kind === 'maint'; }),
+      /* 🔴 貸せないか。整備の枠は **確定だけ** 数える（候補は塞がない＝ゆうた確定） */
+      busy:   items.some(function (x) {
+                var k = KINDS[x.kind];
+                if (!k) return false;
+                return (k.busy === null) ? _maintBusy(x) : !!k.busy;
+              }),
+      /* 案内（最短入庫日）で避けたいか＝塞がるもの ＋ **整備の候補**も避ける */
+      avoid:  items.some(function (x) {
+                var k = KINDS[x.kind];
+                if (!k) return false;
+                if (k.busy === null) return true;   /* 整備の枠は候補も確定も避ける */
+                return !!k.busy;
+              })
     };
   }
   function spanOf(loanerId, from, to, opt) { return _collect(loanerId, from, to, opt); }
@@ -191,6 +251,12 @@
   }
   function _add(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
 
+  /* 🔧 v2.43.0 **案内（最短入庫日）は `avoid` を見る**＝整備の枠は候補でも避ける。
+     ⚠ 「実際に貸せるか」は今までどおり `busyOn`（候補では塞がらない）。**2つを取り違えないこと。** */
+  function avoidOn(l, ds, opt) {
+    if (!l || !ds) return false;
+    return dayOf(l.id, ds, opt).avoid;
+  }
   function freeRun(startStr, days, opt) {
     var n = Math.max(1, +days || 1);
     var ls = usableList(opt);
@@ -198,7 +264,7 @@
     var base = _pd(startStr);
     return ls.some(function (l) {
       for (var j = 0; j < n; j++) {
-        if (busyOn(l, _ymd(_add(base, j)), opt)) return false;
+        if (avoidOn(l, _ymd(_add(base, j)), opt)) return false;
       }
       return true;
     });
@@ -287,13 +353,84 @@
     var car = null;
     ls.some(function (l) {
       for (var x = new Date(from); x <= to; x = _add(x, 1)) {
-        if (busyOn(l, _ymd(x), opt)) return false;
+        if (avoidOn(l, _ymd(x), opt)) return false;   /* 🔧 整備の候補も避ける（案内だけ） */
       }
       car = l; return true;
     });
     return { ok: !!car, from: _ymd(from), to: _ymd(to), days: need.days, why: need.why, car: car };
   }
   function planOk(dateStr, hold, opt) { return planWindow(dateStr, hold, opt).ok; }
+
+
+  /* ==================================================================
+     🔧 月の目標（v2.43.0）＝「10月に車検」。**保存しない。計算で出す。**
+     ------------------------------------------------------------------
+     🔴 裏で勝手にレコードを書かない＝開いただけでクラウドに書き込まないため。
+        保存するのは、人が作った **日の候補・確定・修理・「今日はやらない」** だけ。
+     🔴 **日のカレンダーには出さない**（月の目標を日軸に乗せると必ず破綻する）。
+        出すのは **作業予定ボード** と **月カレンダーのバッジ**。
+
+     ◎車検（ゆうた確定 2026-08-31）
+       「車検は満了日から2ヵ月前から」＝ 受けられるのは **満了の2ヶ月前 〜 満了日**。
+       バッジを立てるのは **満了月＋その前2ヶ月の3ヶ月**（満了 10/31 なら 8月・9月・10月）。
+       🔴 満了を過ぎたら **翌月へスライドしない。赤の別扱い。**
+       🔴🔴 ただし **貸出は止めない**（🗣「どんなにあっても、もともと生命線だから落とすことはない」）。
+     ◎12ヶ月点検
+       日は `pitTenkenFromShaken` が出す（車検の手前／過ぎていれば次の年）。
+       できなかった月は **翌月へスライド**＋ボードで警告（回数は数えない＝ゆうた指定）。
+     ⚠ `pitTenkenFromShaken` は loaner.js の側にある（このファイルより後ろで読む）。
+        **呼ばれる時には居る**ので typeof で見る。`w.` 経由では取らない。
+     ================================================================== */
+  function _ym(ds) { return String(ds || '').slice(0, 7); }
+  function _ymAdd(ym, n) {
+    var p = String(ym).split('-'), y = +p[0], m = +p[1] - 1 + n;
+    y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+    return y + '-' + String(m + 1).padStart(2, '0');
+  }
+  function _monthAgo(ds, n) {
+    var p = String(ds).split('-'); if (p.length !== 3) return '';
+    var d = new Date(+p[0], +p[1] - 1 - n, +p[2]);
+    /* 末日はみ出し（3/31 の2ヶ月前＝1/31）は Date が勝手に繰り上げるので戻す */
+    if (d.getDate() !== +p[2]) d = new Date(+p[0], +p[1] - 1 - n + 1, 0);
+    return _ymd(d);
+  }
+  var MAINT_WORKS = {
+    shaken: { label: '車検',      slide: false },
+    '12pt': { label: '12ヶ月点検', slide: true  },
+    general:{ label: '一般',      slide: true  },
+    bp:     { label: 'B.P',       slide: true  },
+    fix:    { label: '修理',      slide: true  }
+  };
+  function maintPlans(v, todayStr) {
+    var today = todayStr || _ymd(new Date());
+    var out = [];
+    if (!v) return out;
+    if (v.shakenDate) {
+      var openFrom = _monthAgo(v.shakenDate, 2);
+      out.push({
+        work: 'shaken', label: '車検', vehicleId: v.id,
+        dueDate: v.shakenDate, openFrom: openFrom, openTo: v.shakenDate,
+        months: [_ymAdd(_ym(v.shakenDate), -2), _ymAdd(_ym(v.shakenDate), -1), _ym(v.shakenDate)],
+        ym: _ym(v.shakenDate),
+        overdue: today > v.shakenDate,           /* 🚨 満了超過（赤・スライドしない） */
+        slipped: false,
+        inWindow: (today >= openFrom && today <= v.shakenDate)
+      });
+      var tk = (typeof pitTenkenFromShaken === 'function') ? pitTenkenFromShaken(v.shakenDate) : '';
+      if (tk) {
+        var slip = tk < today;
+        out.push({
+          work: '12pt', label: '12ヶ月点検', vehicleId: v.id,
+          dueDate: tk, openFrom: _ym(tk) + '-01', openTo: tk,
+          months: [_ym(tk)],
+          ym: slip ? _ym(today) : _ym(tk),       /* できなかったら今の月へスライド */
+          overdue: false, slipped: slip,
+          inWindow: (_ym(today) === _ym(tk)) || slip
+        });
+      }
+    }
+    return out;
+  }
 
   /* ------------------------------------------------------------------
      ④ 2つの期間がぶつかるか
@@ -448,6 +585,9 @@
   w.pitLoanerBusyWhy     = busyWhy;
   /* 🧩 v2.42.0 「その日／その期間に何が乗っているか」＝画面はこれを呼ぶ */
   w.pitLoanerDay         = dayOf;
+  w.pitLoanerAvoidOn     = avoidOn;      /* 案内で避けるか（整備の候補も避ける） */
+  w.pitLoanerMaintPlans  = maintPlans;   /* 🔧 月の目標（計算・保存しない） */
+  w.PIT_MAINT_WORKS      = MAINT_WORKS;
   w.pitLoanerSpan        = spanOf;
   w.PIT_LOANER_KINDS     = KINDS;
   w.pitLoanerFreeRun     = freeRun;

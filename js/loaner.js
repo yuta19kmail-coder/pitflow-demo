@@ -12,10 +12,15 @@ let _loCats = { kei:false, normal:false, import:false, commercial:false };   // 
 let _loSortKey = null;   // 並べ替え（低い順）：'height'|'width'|'length'|'seats'|null
 /* 🔎🔍 v2.41.0（ゆうた指定 2026-08-31）上のバー＝探す・畳む・縮尺 */
 let _loQ = '';           // 探している言葉（小文字）
-let _loZoom = 23;        // 縮尺 0〜100。**23 が直す前とまったく同じ見た目**（1日 38px・列 112px）
-const LO_ZOOM_KEY = 'pitflow_lo_zoom_v1';
-const LO_DAY_MIN = 28, LO_DAY_MAX = 72;   /* 1日の高さの両端 */
-const LO_COL_MIN = 96, LO_COL_MAX = 166;  /* 列の幅の両端（1日の高さと連動） */
+/* 🔍 縮尺は**段**（ゆうた指定 2026-08-31「吸着でいい」）。
+   ⚠ 前は 0〜100 の連続にしていたが、28〜72px を100段に割ったせいで
+      **1px 動かすと 0.4px しか変わらない**＝細かすぎて狙った大きさに合わせられなかった。
+   🔴 **[1日の高さ, 列の幅]。真ん中（LO_ZOOM_DEF＝2）が直す前とまったく同じ 38px / 112px。**
+   🔴 **端末に覚えない**（ゆうた指定「保存しないで、基本的には読み込みでデフォルトに戻る」）
+      ＝ その場で見たいから広げる／詰めるだけのもの。次に開いた時はいつも同じ見え方から始まる。 */
+const LO_STEPS = [[28,96],[34,104],[38,112],[46,126],[56,144],[72,166]];
+const LO_ZOOM_DEF = 2;
+let _loZoom = LO_ZOOM_DEF;   // 段の番号（0〜5）
 let _loVehBound = false;
 let _loPrepending = false;
 
@@ -324,11 +329,9 @@ window.loSearchClear = function(){
    🔴 **1日の高さ（--lo-dayh）だけが元。**列の幅も札の高さもここから割り出す（CSS 側の calc）。
    🔴 つまんでいる間は**描き直さない**＝CSS変数と列幅を書き換えるだけ。
       描き直すと20台×56日ぶんのHTMLを毎フレーム作ることになり、指について来なくなる。 */
-function _loDayH(){ return Math.round(LO_DAY_MIN + (LO_DAY_MAX - LO_DAY_MIN) * (_loZoom / 100)); }
-function _loColW(){ return Math.round(LO_COL_MIN + (LO_COL_MAX - LO_COL_MIN) * (_loZoom / 100)); }
-function _loZoomLoad(){
-  try { const v = localStorage.getItem(LO_ZOOM_KEY); if (v != null && v !== '') _loZoom = Math.max(0, Math.min(100, +v || 0)); } catch (e) {}
-}
+function _loZoomStep(){ return LO_STEPS[Math.max(0, Math.min(LO_STEPS.length - 1, _loZoom))]; }
+function _loDayH(){ return _loZoomStep()[0]; }
+function _loColW(){ return _loZoomStep()[1]; }
 function _loApplyZoom(){
   document.documentElement.style.setProperty('--lo-dayh', _loDayH() + 'px');
   const g = document.getElementById('loaner-grid');
@@ -337,12 +340,15 @@ function _loApplyZoom(){
     g.style.gridTemplateColumns = '64px repeat(' + Math.max(1, _loFiltered().length) + ', minmax(' + cw + 'px, ' + cw + 'px))';
   }
   const el = document.getElementById('lo-zoom');
-  if (el){ if (el.value != _loZoom) el.value = _loZoom; el.style.setProperty('--lo-zfill', _loZoom + '%'); }
+  if (el){
+    if (el.value != _loZoom) el.value = _loZoom;
+    el.style.setProperty('--lo-zfill', Math.round(_loZoom / (LO_STEPS.length - 1) * 100) + '%');
+  }
 }
 window.loZoom = function(v){
-  _loZoom = Math.max(0, Math.min(100, +v || 0));
-  try { localStorage.setItem(LO_ZOOM_KEY, String(_loZoom)); } catch (e) {}
-  _loApplyZoom();
+  const n = Math.round(+v);
+  _loZoom = Math.max(0, Math.min(LO_STEPS.length - 1, isFinite(n) ? n : LO_ZOOM_DEF));
+  _loApplyZoom();   /* 🔴 覚えない。次に開いた時は必ず既定から */
 };
 /* 緊急車両：返車（割当の toDate を過ぎた）が済んだら列ごと消す（retired）。割当・車両データは履歴として残す。 */
 function _loProcessEmergency(){
@@ -592,8 +598,12 @@ function renderLoaner(){
     if (a && !a.id) a.id = 'la' + Date.now().toString(36) + i.toString(36);
   });
   _loEnsureOpts();
-  /* 🔍 v2.41.0 端末に覚えさせた縮尺を先に当てる（描いたあとだと一瞬前の大きさが見える） */
-  _loZoomLoad();
+  /* 新しく開いたか（下の _fresh と同じ物差し。縮尺を戻すのに先に要る） */
+  const _w0 = document.getElementById('loaner-scroll');
+  const _fresh0 = (window._pitPrevView !== 'loaner') || !_w0 || !_w0.querySelector('.lo-date');
+  /* 🔍 v2.41.1 縮尺は**覚えない**＝画面を開き直したら必ず既定に戻す（ゆうた指定）。
+     ⚠ 描いたあとに当てると一瞬前の大きさが見えるので、ここで先に当てる。 */
+  if (_fresh0) _loZoom = LO_ZOOM_DEF;
   document.documentElement.style.setProperty('--lo-dayh', _loDayH() + 'px');
   _loDedupeAssigns();         // 同一予約の二重割当を掃除（日数調整が重複扱いされる不具合の元）
   _loProcessReplacements();   // 入替日を過ぎた予定を確定

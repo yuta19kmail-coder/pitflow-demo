@@ -2450,8 +2450,22 @@
     if(window.closeDetail) closeDetail(); else save();
   };
 
+  /* 🗑🗑 v2.47.0（ゆうた報告 2026-08-31「消去できない」）**消去が1度も通っていなかった。**
+     ◎なにが起きていたか（v1.136.0 で2枚にした日から、全部のカードで）
+       1枚目（`UI.confirm`）の「それでも消去する」を押す
+         → `ui-dialog.js` が **その click ハンドラの中で resolve** する
+         → `.then` は**マイクロタスク**なので、click が document へ上がる**前**に走る
+         → 2枚目（`.cv-delpop`）に `show` が付く
+         → そのあと**同じ click** が document まで上がってきて、ここが `closeAllPop()`
+         → **開いた瞬間に閉じる。** 押しても何も起きない＝消去できない。
+       ⚠ Chromium で実際に確かめた（uid-ok: resolve → .then: 開く → document: 閉じる の順）。
+     🔴 直し方＝**窓の中を押したのを「カードの外を押した」ことにしない。**
+        `#uid-ov`（UI.confirm / UI.alert の覆い）を、ここの「無視する場所」に足す。
+     ⚠ `ui-dialog.js` 側で `stopPropagation` してはいけない。
+        エラー番号のコピー（`coreflow-errcode.js`）が document で click を待っていて、
+        止めると窓の中の番号が押せなくなる。**止めるのではなく、こちらが見分ける。** */
   document.addEventListener('click', function(e){
-    if(e.target && e.target.closest && e.target.closest('.cv-fusenpop,.cv-delpop,.cv-optmenu,.cv-optwrap')) return;
+    if(e.target && e.target.closest && e.target.closest('.cv-fusenpop,.cv-delpop,.cv-optmenu,.cv-optwrap,#uid-ov')) return;
     closeAllPop();
   });
 

@@ -63,7 +63,18 @@ function renderFleet(){
     h += flMonthCalHtml();
   } else {
     const y = _flDay.getFullYear(), m = _flDay.getMonth();
-    h += '<div class="fl-h"><span><button class="vh-btn" onclick="flBackMonth()">← 月表示</button>　<i data-ic=calendar data-ics=16></i> ' + y + '年' + (m+1) + '月（日別）</span><span class="fl-note">セルをクリック＝イベント追加／チップ＝編集</span></div>';
+    /* 🔴 v2.52.0（ゆうた 2026-09-01）**日ビューから月をまたげるようにした。**
+       🗣「候補を置くをクリックして日に入るんだけど、**単月しか見れなくて詰んでる**。
+       　　車検とかだと月をまたいで入力したい。月表示に戻るボタンと月の間に先月と来月ボタンがほしい」
+       ◎前まで … 日ビューに入ると、入った月から動けなかった。
+         月をまたぐ整備（車検で月末〜翌月頭など）は、**置く場所が画面に出てこない**＝詰む。
+       ⚠ 「月表示」に戻って別の月を押し直す道はあったが、**候補を置く途中では戻れない**（やり直しになる）。
+       ⚠ 車の行の強調（_flHlVeh）は月を動かしても**そのまま**＝どの車を触っているか見失わない。 */
+    h += '<div class="fl-h"><span><button class="vh-btn" onclick="flBackMonth()">← 月表示</button>　'
+       + '<button class="vh-btn" onclick="flDayShift(-1)" title="先月へ">‹ 先月</button>'
+       + '<button class="vh-btn" onclick="flDayShift(1)" title="来月へ">来月 ›</button>　'
+       + '<i data-ic=calendar data-ics=16></i> ' + y + '年' + (m+1) + '月（日別）</span>'
+       + '<span class="fl-note">セルをクリック＝イベント追加／チップ＝編集／月をまたぐ時は先月・来月で移動</span></div>';
     h += flDayCalHtml(y, m);
   }
   h += '</div>';
@@ -332,6 +343,17 @@ window.flZoomTo = function(vehId, y, m){
   }, 0);
 };
 function flBackMonth(){ _flMode = 'month'; renderFleet(); }
+/* 🔧 v2.52.0 日ビューのまま隣の月へ（月をまたぐ整備の候補を置くため）。
+   ⚠ `_flHlVeh`（どの車を触っているか）は消さない。消すと、月を動かした瞬間にどの行か分からなくなる。 */
+function flDayShift(n){
+  _flDay = new Date(_flDay.getFullYear(), _flDay.getMonth() + (n || 0), 1);
+  renderFleet();
+  setTimeout(function(){
+    var el = document.querySelector('.fl-cal-name.fl-hl');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block:'center' });
+  }, 0);
+}
+window.flDayShift = flDayShift;
 
 /* ===== イベント 追加・編集ポップアップ ===== */
 let _flEvtEditId = null;

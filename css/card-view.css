@@ -103,6 +103,15 @@
 .cv-wframe{ margin-top:13px; background:var(--bg1); border:1px solid var(--border); border-left:3px solid #ef4444; border-radius:13px; padding:12px 14px; }
 .cv-wftop{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
 .cv-wftype{ font-size:22px; font-weight:900; display:inline-flex; align-items:center; gap:7px; }
+/* 🎨 v2.51.0（A-4・ゆうた 2026-09-01）作業タイプを**それぞれの色**で出す。
+   ⚠ 色は付けない（マスターの色を inline で当てている）。ここでは**大きさと余白だけ**。 */
+.cv-wftype .cv-wt1{ font-size:22px; font-weight:900; }
+/* 🔴 「＋」は残すが**小さく・余白を詰める**（札が色を持つと、間の＋が目立ちすぎるため） */
+.cv-wftype .cv-wtplus{ font-size:13px; font-weight:700; opacity:.5; margin:0 1px; vertical-align:2px; }
+/* 🔴 H：検切＝この予約だけの印。車両注意の箱に、赤で先頭に出す（1文字にはしない） */
+.cv-drv.cv-drv-exp{ background:#ef444422; color:#ef4444; border-color:#ef4444; font-weight:800; }
+/* 🔴 H：表紙チェックの「車検切れ」トグル（押すと赤くなる／もう一度で消える） */
+.cv-chip.cv-chip-exp.on{ background:#ef444422; color:#ef4444; border-color:#ef4444; }
 .cv-wfbadges{ display:inline-flex; gap:6px; flex-wrap:wrap; align-items:center; margin-left:auto; }
 .cv-bdg{ font-size:12px; font-weight:800; padding:3px 10px; border-radius:7px; border:1px solid; white-space:nowrap; }
 .cv-bdg.cv-drop{ background:rgba(38,162,105,.14); color:#5fcfa0; border-color:rgba(38,162,105,.45); }

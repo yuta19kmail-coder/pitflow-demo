@@ -134,6 +134,10 @@
    ⚠ 予約カードの耳の注意タブ（polish.css の `.pcm-caut`）と同じ塗り＝`#f59e0b` ＋ 濃い字 `#1c1300`。
       色を変える時は**両方**（と card-hover.css の `.ph-b-cau`）をそろえること。 */
 .shk-ca.cau{ background:#f59e0b; color:#1c1300; border:1px solid #f59e0b; font-weight:800; }
+/* 🔴 v2.51.0（H・ゆうた「他の車両注意と同じように車検予定画面にも各カードに表示するように」）
+   検切＝赤。車両注意（アンバー）と並ぶが、**車ごとではなくこの予約だけの印**。
+   ⚠ 色を変える時は polish.css の `.pcm-caut-exp`／card-hover.css の `.ph-b-exp` も一緒に。 */
+.shk-ca.exp{ background:#ef4444; color:#fff; border:1px solid #ef4444; font-weight:800; }
 .shk-gsc{ flex:0 0 var(--SUB); min-width:0; overflow:hidden; border-right:1px solid var(--border2,#232c34); padding:8px 3px; display:flex; align-items:center; }
 .shk-gsc.pm{ border-right:1px solid var(--daybd); }
 .shk-gcar .shk-gsc:last-child{ border-right:0; }

@@ -338,8 +338,13 @@
   flex:1 1 auto;
   min-height:0;
 }
+/* 🔴 v2.51.0（C-1・ゆうた 2026-09-01）**コンパクトなカードの幅を 204px に一本化。**
+   列 220→222px にすると、中のカードが 202→204px になる（padding 8×2 と border 1×2 のぶん）。
+   🗣「全体の列幅は広げて基本を204にあわせる。オレンジ枠はそれに合わせて広げるが、**縮小する仕組み自体は同じ**」
+   ⚠ 画面に並ぶ列の本数は変わらない（1440pxで5本・1920pxで7本／実測）。
+   ⚠ 試運転の枠（.kanban-td2-box）の中は、枠のぶん31px狭いまま（171→173px）＝**縮む仕組みはそのまま**。 */
 .kanban-col{
-  flex:0 0 220px;
+  flex:0 0 222px;
   min-width:0;            /* ★中身（長い車種名など）で列が広がらない＝規定220px固定。はみ出しは…で省略 */
   background:var(--bg2);
   border:1px solid var(--border);
@@ -738,6 +743,13 @@
    ⚠ 枠の大きさ（26px）は変えない＝当日ビューの札は全部そろえてある。 */
 .tag-work.long{ font-size:10px; line-height:1.02; white-space:normal; word-break:break-word; padding:0 2px; }
 .tr-tag-work.multi .tag-work.long{ font-size:9px; white-space:normal; text-overflow:clip; }
+/* 🔴 v2.51.0（B-2・ゆうた 2026-09-01）**当日ビューで札が2つ並んでも「車検」を小さくしない。**
+   🗣「CSSって本当にあってる？　であると当日ボードの車検とかの字が小さいと思う」
+   ◎前 … 1つなら13px、2つ並ぶと10px（4文字はさらに9px）。
+     この縮みは「長い札が幅を食う」ための逃げだった。
+   ◎今 … B-1 で4文字の札を26px固定の2行にしたので**幅を食わない＝縮める理由が無くなった**。
+   ⚠ 4文字（.long）は今までどおり小さいまま＝2行に折るために小さくしている。 */
+.today-row .tr-tag-work.multi .tag-work:not(.long){ font-size:13px; }
 
 /* 休憩ゾーン：全体が黄色の斜めストライプの連続ブロック。中のカードもその上に乗る。
    ゾーンの一番下に明るい黄色の点線（休憩の終わりの目印） */
@@ -832,7 +844,8 @@
 .os-none{ font-size:12px; color:var(--text3); padding:6px 2px; }
 /* タスクボードと同じコンパクトカード＋右側に完了予定・何日目 */
 .os-item{ display:flex; align-items:stretch; }
-.os-item .pit-card.pcm{ width:200px; border-top-right-radius:0; border-bottom-right-radius:0; }
+/* 🔴 v2.51.0（C-1）204px に一本化（前は200px） */
+.os-item .pit-card.pcm{ width:204px; border-top-right-radius:0; border-bottom-right-radius:0; }
 /* 外注ビューは右側BOXに外注先・日数を出すので、カード下の外注ラベルは隠す（重複回避） */
 .os-item .pcm-out{ display:none; }
 /* 横BOXは「耳（予約番号タブ）」の分だけ下げてカード本体と高さを揃える（耳ありカードは margin-top:9px） */

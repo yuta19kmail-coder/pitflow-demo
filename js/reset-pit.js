@@ -127,7 +127,9 @@
       if (old && old.parentNode) old.parentNode.removeChild(old);
       return;
     }
-    var host = d.getElementById('view-settings-body');
+    /* 🗂 v2.50.0 設定画面がグループに分かれたので、**「危ないもの」の中**に入る（いちばん下・たたんである）。
+       ⚠ 場所が無い版でも落ちないように、無ければ今までどおり一番下へ。 */
+    var host = d.getElementById('ps-danger-body') || d.getElementById('view-settings-body');
     if (!host) return;
     if (d.getElementById('pit-reset-box')) return;
     injectCSS();

@@ -466,9 +466,9 @@ function reserveNext(){
 
 function cardHtml(c, opts){
   opts = opts || {};
-  const wt = state.workTypes.find(w => w.id === c.workType);
+  /* ⚠ v2.51.0 `wt` と `accent` は片づけたフルカードでしか使っていなかったので外した（A-2）。
+     コンパクト側は左の色を `teamColor`（国産/輸入）で決めていて、作業タイプの色は使っていない。 */
   const dt = state.dropTypes.find(d => d.id === c.dropType);
-  const accent = wt ? wt.color : 'var(--brand)';
 
   /* 🆕 v1.149.0「未完」＝盤面のまま確定返車日だけ入っている車。
      🔴 **返車系の画面から呼ばれた時だけ**グレーにする（opts.retView）。
@@ -511,10 +511,23 @@ function cardHtml(c, opts){
       top += (window.pitDropBadges ? pitDropBadges(c, function(o){ const dc = DROP_COLOR[o.id] || 'var(--text2)'; return '<span class="pcm-drop" style="background:' + dc + '22;color:' + dc + ';border-color:' + dc + '66;">' + o.label + '</span>'; })
                                    : '<span class="pcm-drop">' + dt.label + '</span>');
     }
-    wts.slice(0, 2).forEach(function(id){
-      const w = state.workTypes.find(x => x.id === id);
+    /* 🏷 v2.51.0（A-3・ゆうた 2026-09-01）**他の作業タイプがある時は出さない印**を先に外す。
+       🔴 **CSSで隠さない。描く前に外す。**隠すと「幅は食っているのに見えない」という別の崩れになる。
+       🔴 **'carsale' と名指ししない。**マスターの `hideWhenOthers` を見るだけ（state.js）。
+       ⚠ 隠す仲間しかいない時は隠さない（全部消えて何も出ない、を防ぐ）。 */
+    var _M = state.workTypes || [];
+    var _isHide = function(id){ var m = _M.find(function(x){ return x.id === id; }); return !!(m && m.hideWhenOthers); };
+    var _wtsC = wts;
+    if (_wtsC.some(function(id){ return !_isHide(id); })) _wtsC = _wtsC.filter(function(id){ return !_isHide(id); });
+    /* ⚠ 打ち切りは 2つのまま（A-1・ゆうた「今のままでいい／正確な情報は詳細かホバーで見るスタイル」）。
+       同じ打ち切りが avail.js（空きカレンダー・2つ）と weekMiniCard（週ビュー・3つ）にもある。
+       いつか直す時は**3か所とも**直すこと。 */
+    _wtsC.slice(0, 2).forEach(function(id){
+      const w = _M.find(x => x.id === id);
       if (w){ const _cd = ((id==='coat1y'||id==='coat3m') && c.coatingDone) ? ' pcm-done' : '';   // コーティング完了＝済
-        top += '<span class="pcm-wt' + _cd + '" style="background:' + w.color + '22;color:' + w.color + ';border-color:' + w.color + '66;">' + w.label + '</span>'; }
+        /* 🏷 v2.51.0（A-5）B.P＋保険＝保険板金／一般＋保証＝保証修理。表は pit-share.js の1本 */
+        const _lb = window.pitWtLabel ? pitWtLabel(c, id, _M) : w.label;
+        top += '<span class="pcm-wt' + _cd + '" style="background:' + w.color + '22;color:' + w.color + ';border-color:' + w.color + '66;">' + _lb + '</span>'; }
     });
     const staff = c.frontStaff || c.staff || '';
     const placed = !!(opts.kanban && c.bayId && window.PitPip && PitPip.isOpen());   // PITボード(PiP)が開いている時だけグレーアウト（閉じてる時は普通表示）
@@ -524,11 +537,15 @@ function cardHtml(c, opts){
     const _clickC = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");
     let h = '<div class="pit-card pcm' + (c.codeRed ? ' pcm-claim' : '') + (c.resNo ? ' pcm-tab' : '') + (placed ? ' pcm-placed' : '') + (c.tentative ? ' is-tentative' : '') + _pendCls + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="' + _pendDrag + '" data-card-id="' + c.id + '"' + _reorderAttr + ' onclick="' + _clickC + '" style="border-left-color:' + teamColor + ';">';
     h += (c.resNo ? '<div class="pcm-ear" style="border-left-color:' + (c.codeRed ? '#ef4444' : teamColor) + (c.codeRed ? ';border-top-color:#ef4444' : '') + '">' + at(c.resNo) + '</div><i class="pcm-ear-slide"></i>' : '');
-    /* 車両注意タブ（左/M/T/車高/土禁・左M/T合体・最大3・該当時のみ・耳の右の上辺）
-       🔴 v1.121.0 言い方は **pit-share.js の `pitCarCautions` 1本**にした（車検予定と同じ言葉になる）。
-       ⚠ ここに条件を書き戻さないこと。出るものは今までと1文字も変わっていない。 */
-    var _ct = (window.pitCarCautions ? pitCarCautions(c) : []);
-    if (_ct.length) h += '<div class="pcm-cau">' + _ct.map(function(x){ return '<span class="pcm-caut">' + x + '</span>'; }).join('') + '</div>';
+    /* 耳の右の上辺のタブ＝車両注意（左/M/T/車高/土禁）＋ 🆕 v2.51.0 検切（赤・この予約だけ）
+       🔴 中身も言い方も **pit-share.js の `pitCardTabs` 1本**（車検予定・ホバー・予約詳細と同じ）。
+       　 ここに条件を書き戻さないこと。
+       🔴 v2.51.0 **4つ以上になったら1文字に縮める。押し出して消さない**（ゆうた 2026-09-01）
+       　 ＝ narrow を渡すのがその合図。縮め方は pit-share.js の表1本。 */
+    var _ct = (window.pitCardTabs ? pitCardTabs(c, { narrow:true })
+                                  : (window.pitCarCautions ? pitCarCautions(c) : []).map(function(x){ return { label:x }; }));
+    if (_ct.length) h += '<div class="pcm-cau">' + _ct.map(function(o){
+      return '<span class="pcm-caut' + (o.exp ? ' pcm-caut-exp' : '') + '">' + o.label + '</span>'; }).join('') + '</div>';
     /* 名前・車種・担当の title は撤去（ホバー情報カード card-hover.js で全文表示するため二重ツールチップを防ぐ） */
     var _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
     /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
@@ -555,41 +572,20 @@ function cardHtml(c, opts){
     return h;
   }
 
-  /* === 返車ビュー（returnView）：入庫カードと同じ作りのまま、時刻＝返車時刻・左アクセント＝緑で統一 === */
-  const isRet = !!opts.returnView;
-  const accent2 = isRet ? 'var(--green)' : accent;
-  /* 🔴 v1.150.0 返車時間が無い車を**入庫時刻で代用しない**（言葉は return-slot.js の1本） */
-  const timeStr = isRet ? (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || ''))
-                        : (c.reserveTime || '');
-
-  let html = '';
-  const _clickJs = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");
-  html += '<div class="pit-card' + (isRet ? ' return' : '') + (c.urgent ? ' is-urgent' : '') + (c.tentative ? ' is-tentative' : '') + _pendCls + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="' + _pendDrag + '" data-card-id="' + c.id + '" onclick="' + _clickJs + '" style="min-width:200px;border-left-color:' + accent2 + ';">';
-  if (c.tentative) html += '<span class="kari-stamp">仮</span>';   // 仮予約スタンプ v0.100.0
-  if (window.pitApprovalBadge) html += pitApprovalBadge(c, 'stamp');   // 🔵 v1.74.0 承認待ちスタンプ
-  html += '<div class="pc-line1">';
-  html += '<span class="pc-time">' + timeStr + '</span>';
-  /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
-  html += '<span class="pc-status" style="--sc:' + statusColor(c.status) + ';">' + (window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</span>';
-  html += _pendBadge;   /* 🆕 v1.149.0 未完 */
-  if (c.urgent) html += '<span class="pc-urg">緊急</span>';
-  html += '</div>';
-  html += '<div class="pc-customer">' + ((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</div>';
-  html += '<div class="pc-car">' + (c.car || '') + (c.menu ? ' ／ ' + c.menu : '') + '</div>';
-  html += '<div class="pc-tags">';
-  if (wt) html += '<span class="tag-work" style="background:' + wt.color + '22;color:' + wt.color + ';border-color:' + wt.color + ';">' + wt.label + '</span>';
-  if (dt) html += (window.pitDropBadges ? pitDropBadges(c, function(o){ return '<span class="pc-tag drop">' + o.label + '</span>'; }) : '<span class="pc-tag drop">' + dt.label + '</span>');
-  if (c.needLoaner) html += '<span class="pc-tag soft loaner">代車</span>';
-  if (c.needWash)   html += '<span class="pc-tag soft wash">洗車</span>';
-  if (c.staff)      html += '<span class="pc-tag staff">' + c.staff + '</span>';
-  html += '</div>';
-  if (opts.kanban){
-    html += '<div class="pc-kbtns" onclick="event.stopPropagation()">';
-    html += '<button class="pc-kbtn" title="前の工程へ" onclick="advanceCard(\'' + c.id + '\',-1)"><i data-ic=chevLeft data-ics=16></i></button>';
-    html += '<button class="pc-kbtn next" title="次の工程へ" onclick="advanceCard(\'' + c.id + '\',1)">次へ <i data-ic=chevRight data-ics=16></i></button>';
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
+  /* ===================================================================
+     🗑 v2.51.0（A-2・ゆうた 2026-09-01）**使われていない「フルカード」を片づけた。**
+     -------------------------------------------------------------------
+     ここには v0.45.0 のころの「フルカード」（時刻・状態・お客様名・車種・札を縦に並べる形）が
+     残っていた。呼び出し側は**全部 compact に移っていて、1か所も呼んでいなかった**。
+     ◎片づける前に本番で数えた（2026-09-01・v2.50.0）… **画面に出ているフルカードは0枚。**
+     ◎「フルカードが作業タイプを1つしか出さない」という指摘は、**この使われていない部品の中**の話だった。
+       直しても画面は1ドットも変わらないので、直すのではなく外した。
+     ⚠ 使っていない部品を残すと、次に見た人がまた「バグがある」と読んで、
+        決めなくていいことを決めることになる（今回それが起きた）。
+     ⚠ 一緒に外したもの … `return.js` の `returnCardHtml`（同じく呼び出し0）
+        ／ `views.css` `polish.css` の `.pc-line1` `.pc-tags` など、ここでしか使っていない見た目。
+     ⚠ 残したもの … `opts.retView`（**コンパクト側が使っている**。`opts.returnView` とは別物）。
+     =================================================================== */
+  return '';
 }
 window.cardHtml = cardHtml;

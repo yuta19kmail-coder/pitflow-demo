@@ -403,8 +403,8 @@ function returnToday(){
   renderReturn();
 }
 
-/* v0.45.0：返車カードを入庫(予約)ビューと同じリッチカードに統一。
-   返車時刻を表示し、左アクセントは緑（返車アイデンティティを維持）。 */
-function returnCardHtml(c){
-  return (typeof cardHtml === 'function') ? cardHtml(c, { returnView: true }) : '';
-}
+/* 🗑 v2.51.0（A-2）`returnCardHtml` を外した。
+   フルカード（cardHtml の returnView 側）を呼ぶための入口だったが、**ここを呼ぶ所が1か所も無かった**。
+   返車ビューのカードは今も昔も `cardHtml(c, { compact:true, retView:true })`。
+   ⚠ `retView`（コンパクトの未完グレー）と `returnView`（片づけたフルカード）は**別物**。混ぜないこと。
+   */

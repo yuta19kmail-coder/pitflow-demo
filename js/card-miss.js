@@ -54,6 +54,18 @@
        ・中古／内部 … 単独で立つ＝**作業タイプは要らない**（区分そのものが中身）
        ・代車       … 車検／12点／一般／B.P のどれか **1つが必須**（＝「代車車検」等のセット）
        ⚠ 区分かどうかは intern-pit.js に聞く（ここで c.internKind を直に見ない）。 */
+    /* 📦📦 v2.51.0（G-2・ゆうた 2026-09-01）**物販は車の情報が入らないことがある。**
+       🗣「顧客名は入るが、それ以外のカルテナンバー、車種名などは入らないことがある」
+       → **メーカー・車種だけ外す。**
+       🔴🔴 **課（国産車／輸入車）は外さない。**
+       　 🗣「課は**売上の計でずれる**からどちらかに振るようにしよう」
+       　 ＝ 空のままにすると課別の売上の合計が合わなくなる。車が無くてもどちらかに振ること。
+       ⚠ 入庫時刻も外さない（付ける・付けないは今までどおり自由）。
+       ⚠ カルテNoは、そもそもこの表に無い。 */
+    if (w.pitCardGoods && w.pitCardGoods(c)) {
+      need = need.filter(function (n) { return n.key !== 'maker' && n.key !== 'car'; });
+    }
+
     var internKind = w.pitInternKind ? w.pitInternKind(c) : '';
     if (internKind) {
       need = need.filter(function (n) { return n.key !== 'workType'; });

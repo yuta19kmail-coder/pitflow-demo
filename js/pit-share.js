@@ -431,6 +431,63 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitCardNoSaleMarked = pitCardNoSaleMarked;
 
   /* ===================================================================
+     🔧 v2.49.0 **代車・自社車両の整備の予定＝ふつうの予約カード**（ゆうた確定 2026-08-31）
+     -------------------------------------------------------------------
+     🗣「というか表示しているのは代車作業予定ボード。という扱いにはできない？」
+     🗣「候補日範囲指定と繰り返しの飛び地候補にはどう対応できる？」
+
+     ◎形（v2.48.0 までは state.fleetEvents の別レコードだった。**カードに引っ越した。**）
+       カード1枚 ＝ 作業1本（例：ハイゼットの車検）
+         internKind : 'loanercar'（社内区分「代車」・v2.6.0 のまま）
+         maintVehId : どの代車・社用車か
+         maintYm    : どの月の目標に対するものか
+         maintSpans : [{ sid, from, to }, …]  ← **飛び地の候補ぜんぶ。1枚に何本でも**
+         maintFixSid: 確定した候補の sid（確定＝reserveDate が入って intakeTbd:false）
+         maintSkipped: ['2026-08-31', …]      ← 「今日はやらない」を押した日
+       ⚠ **カードは増やさない。**候補を3本置いてもカードは1枚＝予約カレンダーが代車で埋まらない。
+
+     🔴 **「その日に出すか」の物差しはここ1本。** PitFlow の当日ビューも MHS の Today ボードも
+        これを借りる（MHS は pit-share.js をそのまま読み込んでいる＝写しを作らない）。
+     =================================================================== */
+  function pitCardMaint(c){ return !!(c && c.internKind === 'loanercar' && Array.isArray(c.maintSpans)); }
+  w.pitCardMaint = pitCardMaint;
+
+  /* この整備カードは、その日に「まだ入っていないもの」として出すか。
+     ◎出す条件
+       ・整備カードである
+       ・入庫していない（actualInAt が無い＝ふつうの予約と同じ見方）
+       ・その日が候補（または確定）の期間に入っている
+       ・その日を「今日はやらない」で見送っていない
+     ⚠ 確定していても**期間で見る**（確定＝reserveDate はその期間の初日でしかない）。 */
+  function pitMaintSpanOn(c, ds){
+    if (!pitCardMaint(c)) return null;
+    if (c.status !== 'reserved') return null;      /* 入庫済み以降はここには出ない */
+    if (c.actualInAt) return null;                 /* 🔴 入庫した実績があるものは動かさない（v2.22.0 の決めごと） */
+    if ((c.maintSkipped || []).indexOf(ds) >= 0) return null;
+    var sp = null;
+    (c.maintSpans || []).forEach(function(x){
+      if (!x || !x.from || !x.to) return;
+      if (x.from <= ds && ds <= x.to && !sp) sp = x;
+    });
+    if (!sp) return null;
+    return { span: sp, fixed: !!(c.maintFixSid && c.maintFixSid === sp.sid) };
+  }
+  w.pitMaintSpanOn = pitMaintSpanOn;
+
+  /* その日に出す整備カードを全部（PitFlow の当日ビューと MHS が同じ並びで使う）。
+     ⚠ 並び＝確定が先・急ぎが先（見る人がまず知りたい順）。 */
+  function pitMaintCardsOn(cards, ds){
+    var out = [];
+    (cards || []).forEach(function(c){
+      var hit = pitMaintSpanOn(c, ds);
+      if (hit) out.push({ card: c, span: hit.span, fixed: hit.fixed, urgent: !!c.urgent });
+    });
+    out.sort(function(a, b){ return (b.fixed - a.fixed) || (b.urgent - a.urgent); });
+    return out;
+  }
+  w.pitMaintCardsOn = pitMaintCardsOn;
+
+  /* ===================================================================
      🗑 v2.13.2 **もう無い機能の記録は、画面に出さない**（ゆうた 2026-08-25）
      -------------------------------------------------------------------
      🗣「支払方法に関してはアーカイブも含めて既存の表示も消したいんだけど」
@@ -630,7 +687,7 @@ w.pitDivisionColor = pitDivisionColor;
     estHoldDays:'概算 預かり日数', paymentSeparate:'支払い分割',
     earlyDiscount:'早期割', amountInsurance:'保険', insurancePaidAt:'保険の入金日',
     noSale:'売上なし', noSaleAt:'売上なしにした日', noSaleBy:'売上なしにした人',
-    salesReq:'車販依頼', salesReqMemo:'車販依頼メモ',
+    salesReq:'車販依頼', salesReqMemo:'車販依頼メモ', salesReqTouched:'車販依頼を決めた', shakenExpired:'車検切れ',
     /* 外注 */
     outsourceNote:'外注メモ'
   };
@@ -972,6 +1029,124 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitCarCautions = pitCarCautions;
   w.PIT_CAUTION_BG = '#f59e0b';   /* 注意の塗り（耳のタブと同じ）。CSS に写す時はこの色 */
   w.PIT_CAUTION_FG = '#1c1300';
+
+  /* ===================================================================
+     🔴 v2.51.0（H・ゆうた 2026-09-01）**検切＝車検が切れている**
+     -------------------------------------------------------------------
+     🗣「車両注意と違うのは**車に保存しない**。この予約にだけ有効。
+     　　あくまで車検切れなので、**返車するときにはそうじゃなくなっている**から」
+     ＝ 左ハンドル・M/T・車高・土禁は **車ごと**の性質。検切は **この入庫ごと**。
+     🔴🔴 見た目が同じタブなので、**車両属性（c.drive）の側に足さないこと。**
+     　 足すと、一度車検切れで入庫した車が、次に来た時も車検切れのまま出る。
+     ⚠ 入口は予約詳細の「表紙チェック」のトグル1つ。**予約の段階では行そのものを出さない**
+        （入庫してから。まだ入庫していない車の車検が切れているかは、その時にならないと分からない）。
+     =================================================================== */
+  function pitCardExpired(c){ return !!(c && c.shakenExpired); }
+  w.pitCardExpired = pitCardExpired;
+  w.PIT_EXPIRED_BG = '#ef4444';   /* 検切の塗り（赤）。CSS に写す時はこの色 */
+  w.PIT_EXPIRED_FG = '#ffffff';
+
+  /* 短い言い方（狭い所で4つ以上並ぶ時だけ使う） */
+  var PIT_TAB_SHORT = { '検切':'切', '車高':'高', '土禁':'土', '左M/T':'左MT' };
+  w.PIT_TAB_SHORT = PIT_TAB_SHORT;
+
+  /* 🔴 耳のタブ・車検予定・ホバー・予約詳細が**全部ここを見る**。
+     返すのは [{ label, exp }]。exp:true が検切（赤）、false が車両注意（黄）。
+     opt.narrow … 狭い所（耳のタブ・車検予定の1行）で true。
+        **4つ以上になったら1文字ずつに縮める。押し出して消さない**（ゆうた 2026-09-01）。
+     ⚠ ホバーと予約詳細では narrow を渡さない＝「検切」のまま出す。 */
+  function pitCardTabs(c, opt){
+    opt = opt || {};
+    var out = [];
+    if (pitCardExpired(c)) out.push({ label:'検切', exp:true });
+    pitCarCautions(c).forEach(function(x){ out.push({ label:x, exp:false }); });
+    if (opt.narrow && out.length >= 4){
+      out = out.map(function(o){ return { label: PIT_TAB_SHORT[o.label] || o.label, exp:o.exp }; });
+    }
+    return out;
+  }
+  w.pitCardTabs = pitCardTabs;
+
+  /* ===================================================================
+     🏷 v2.51.0（A-5・ゆうた 2026-09-01）**作業タイプ＋付加の言い換え**
+     -------------------------------------------------------------------
+     🗣「Bp+保険が選ばれたとき、コンパクトビューは 保険板金 に名前が変わる」
+     🗣「その要領で 一般+保証 → 保証修理」
+     ◎なぜ要るか＝**コンパクトなカードには付加（保証・保険・社員）の札がそもそも出ない**
+       （出るのはホバーと予約詳細だけ）。だから作業タイプの名前に混ぜて伝える。
+     🔴🔴 **名前を変える所と、付加のバッジを消す所が、この表1つを見ること。**
+     　 片方だけ直すと「保証修理なのに保証バッジも出る」が起きる。
+     ⚠ 表に無い組み合わせは何も起きない（一般＋保険は「一般」＋「保険」のまま）。
+     ⚠ ホバーは**言い換えない**（ゆうた「ホバーだけ俯瞰して全データを見るイメージ」）。
+     =================================================================== */
+  var PIT_WT_PAIRS = [
+    { work:'bp',      special:'insurance', label:'保険板金' },
+    { work:'general', special:'warranty',  label:'保証修理' }
+  ];
+  w.PIT_WT_PAIRS = PIT_WT_PAIRS;
+
+  /* 当てはまる組み合わせを返す（無ければ null）。カード1枚に1つだけ当たる想定 */
+  function pitWtPair(c){
+    if (!c) return null;
+    var ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes
+            : (c.workType ? [c.workType] : []);
+    var sp  = Array.isArray(c.workSpecials) ? c.workSpecials : [];
+    var hit = null;
+    PIT_WT_PAIRS.forEach(function(x){
+      if (!hit && ids.indexOf(x.work) >= 0 && sp.indexOf(x.special) >= 0) hit = x;
+    });
+    return hit;
+  }
+  w.pitWtPair = pitWtPair;
+
+  /* 作業タイプ1つぶんの、その場で出す名前。組み合わせに当たっていれば言い換える */
+  function pitWtLabel(c, id, master){
+    var pair = pitWtPair(c);
+    if (pair && pair.work === id) return pair.label;
+    var m = (master || []).find(function(x){ return x.id === id; });
+    return m ? m.label : id;
+  }
+  w.pitWtLabel = pitWtLabel;
+
+  /* 言い換えに使われた付加は、その画面ではバッジを出さない（二重に言わない） */
+  function pitSpecialHidden(c, id){
+    var pair = pitWtPair(c);
+    return !!(pair && pair.special === id);
+  }
+  w.pitSpecialHidden = pitSpecialHidden;
+
+  /* ===================================================================
+     💰 v2.51.0（D-1・ゆうた 2026-09-01）**車販部署が動けるか＝受注が取れたか**
+     -------------------------------------------------------------------
+     🗣「バッジにしろ工程にしろ**受注後に発生**でしょ？受注前には結局は手はかけられない
+     　　んだから、まだ直近1か月にいていい。**受注が取れた段階で車販部署としても実際に
+     　　動ける**わけだから、コーティング・その他依頼に入れば成立しない？」
+     🔴 **バッジと工程の印は重複ではなく、同じ1つのことの前半と後半だった。**
+     　 ・作業タイプの「車販依頼」バッジ … 予定側（拾い上げて予定を組む）
+     　 ・工程の窓の「その他 車販依頼」   … 受注側（受注が取れた＝動ける）
+     ＝ 段を分ける軸は**受注が取れたか**の1本。入庫したかどうかでは分けない。
+     =================================================================== */
+  function pitCarSalesOrdered(c){ return !!(c && (c.coatingOK || c.salesReq)); }
+  w.pitCarSalesOrdered = pitCarSalesOrdered;
+
+  /* ===================================================================
+     📦 v2.51.0（G・ゆうた 2026-09-01）**物販＝物だけを売った時**
+     -------------------------------------------------------------------
+     🔴🔴 **中古（社内区分）と混ぜないこと。**
+     　 「常に単独で立つ」という見た目は中古そっくりだが、**物販は売上が立ち、実績にも入る**。
+     　 `pitCardNoSale`（売上に数えない側）へ合流させると、**物販まで売上から静かに消える**。
+     　 画面では何も起きないので気づけない。ここは必ず別の物差しにしておくこと。
+     ⚠ 物販のときに出さないもの … 作業者（点検/整備担当）・洗車・車販部門への依頼
+     ⚠ データチェックから外すもの … メーカー・車種。**課（国産/輸入）は外さない**
+        （🗣「課は売上の計でずれるからどちらかに振るようにしよう」）
+     =================================================================== */
+  function pitCardGoods(c){
+    if (!c) return false;
+    var ids = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes
+            : (c.workType ? [c.workType] : []);
+    return ids.indexOf('goods') >= 0;
+  }
+  w.pitCardGoods = pitCardGoods;
 
   /* 🔴 車検の担当＝**陸運局へ車を持って行く（行った）人＝回送の担当**
      （ゆうた確定 2026-08-16／2026-08-18「担当者というのは実際に車検に行く、回送の担当者ね」）。

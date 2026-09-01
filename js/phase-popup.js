@@ -175,6 +175,8 @@
             まだ決まっていない車が全部「洗車しない」で確定してしまう。
          ⚠ すでに決まっている車（完TELを通った・要になっている・備考が入っている）は、
             その状態を光らせて開く＝**入れ直させない**。 */
+      /* 📦 v2.51.0（G）物販は洗車も車販部門への依頼も出さない（物だけ売った車） */
+      var _goods = !!(window.pitCardGoods && pitCardGoods(card));
       var _wDecided = !!(card.returnStage || card.needWash === true || (card.washNote || '').trim());
       _washPick = _wDecided ? (card.needWash ? '1' : '0') : null;
       var _wh = '<div class="pp-saleshd"><i data-ic=sparkle data-ics=16></i> 洗車</div>'
@@ -184,14 +186,24 @@
         + '</div>'
         + '<input class="pp-salesmemo" id="pp-washnote" type="text" placeholder="洗車の備考（1行・任意）" value="' + esc(card.washNote || '') + '">'
         + '<div class="pp-washhint">既に決まっていれば入力してください。洗車依頼枠に表示されます。後から変更もできます。</div>';
-      if (_wf){ _wf.innerHTML = _wh; _wf.style.display = ''; }
+      if (_wf){ if (_goods){ _wf.innerHTML = ''; _wf.style.display = 'none'; } else { _wf.innerHTML = _wh; _wf.style.display = ''; } }
 
       var _sh = '<div class="pp-saleshd"><i data-ic=cart data-ics=16></i> 車販部門への依頼</div>';
       if (_isShaken) _sh += '<label class="pp-check"><input type="checkbox" id="pp-headlight"' + (card.headlight ? ' checked' : '') + '> <i data-ic=search data-ics=16></i> 車検ヘッドライト磨き</label>';
       if (_hasCoat)  _sh += '<label class="pp-check"><input type="checkbox" id="pp-coatingok"' + (card.coatingOK ? ' checked' : '') + '> <i data-ic=sparkle data-ics=16></i> コーティング受注OK</label>';
-      _sh += '<label class="pp-check"><input type="checkbox" id="pp-salesreq"' + (card.salesReq ? ' checked' : '') + '> <i data-ic=cart data-ics=16></i> その他 車販依頼</label>';
+      /* 🔴 v2.51.0（D-1・ゆうた 2026-09-01）**バッジが付いている車は、最初からチェックを入れて開く。**
+         🗣「バッジがある車はデフォでチェックを入れておいて」
+         ＝ 予約のときに「車販依頼」の作業タイプで拾い上げた車は、受注のここで押し忘れると
+            **予定の段（直近1か月）に残り続けて、誰も動かない**。だから既定でON。要らなければその場で外せる。
+         ⚠ 一度でも触ったカード（salesReq が入っている／メモがある）は、その値のまま開く。 */
+      var _csBadge = ((Array.isArray(card.workTypes) && card.workTypes.length) ? card.workTypes
+                     : (card.workType ? [card.workType] : [])).indexOf('carsale') >= 0;
+      /* ⚠ `salesReq` は既定 false で入っているので「まだ触っていない」と見分けが付かない。
+         　 この窓で一度でも保存したら `salesReqTouched` を立てて、次からはその人の答えを尊重する。 */
+      var _srOn = card.salesReqTouched ? !!card.salesReq : (!!card.salesReq || _csBadge);
+      _sh += '<label class="pp-check"><input type="checkbox" id="pp-salesreq"' + (_srOn ? ' checked' : '') + '> <i data-ic=cart data-ics=16></i> その他 車販依頼</label>';
       _sh += '<input class="pp-salesmemo" id="pp-salesmemo" type="text" placeholder="依頼メモ（1行・任意）" value="' + esc(card.salesReqMemo || '') + '">';
-      if (_sf){ _sf.innerHTML = _sh; _sf.style.display = ''; }
+      if (_sf){ if (_goods){ _sf.innerHTML = ''; _sf.style.display = 'none'; } else { _sf.innerHTML = _sh; _sf.style.display = ''; } }
     } else if (mode === 'quick'){
       /* 🔴 v1.62.0 クイック受注＝受注の関門（パーツ待ち）を飛び越えた時。
          聞くのは**受注金額ひとつだけ**。見積額には同じ値を入れる（見積＝受注の扱い）。 */
@@ -318,7 +330,7 @@
           if (r) card.returnDatePlan = r;
           var _hl = el('pp-headlight'); if (_hl) card.headlight = _hl.checked;
           var _co = el('pp-coatingok'); if (_co) card.coatingOK = _co.checked;
-          var _sr = el('pp-salesreq');  if (_sr) card.salesReq  = _sr.checked;
+          var _sr = el('pp-salesreq');  if (_sr) { card.salesReq = _sr.checked; card.salesReqTouched = true; }
           var _sm = el('pp-salesmemo'); if (_sm) card.salesReqMemo = _sm.value.trim();
           /* 🔴 v1.122.0 洗車＝**押された時だけ**書き換える（押していなければ今までのまま）。
              ⚠ 備考はいまの値を入れて開いているので、そのまま保存してよい（消したい時も消せる）。 */

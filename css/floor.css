@@ -123,7 +123,10 @@
 .ptl-c2 .ptl-col-h{ color:#ec4899; border-bottom-color:rgba(236,72,153,.35); }
 .ptl-col-n{ font-weight:400; color:var(--text3); }
 .ptl-col-body{ display:flex; gap:8px; flex-wrap:wrap; align-content:flex-start; min-height:56px; padding:10px; }
-/* トレイのカードはタスクボード（看板列220px−余白16px=204px）と同じ幅を常にキープ＝名前の長短で縮まない・耳/注意タブの被り防止 */
+/* トレイのカードはタスクボード（看板列222px−余白16px−枠2px=204px）と同じ幅を常にキープ
+   ＝名前の長短で縮まない・耳/注意タブの被り防止
+   ⚠ v2.51.0（C-1）で列を 220→222px にした。**前はここのコメントが「220−16=204」と書いてあったが、
+      現物は202pxで、書いてあることと合っていなかった。**いまは本当に204px。 */
 .ptl-col-body .pit-card.pcm{ flex:0 0 204px; width:204px; max-width:204px; }
 .ptl-col-body.dnd-over{ background:rgba(29,185,122,.1); box-shadow:0 0 0 2px rgba(29,185,122,.35) inset; }
 .ptl-empty{ font-size:11px; color:var(--text3); padding:8px; }

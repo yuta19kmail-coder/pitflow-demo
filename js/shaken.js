@@ -51,7 +51,14 @@
           （左とM/Tが両方なら「左M/T」に合体・車高・土禁も出る・多くても3つ）。ここで書き直さない。
         ・色も**塗りアンバー**に揃える（CSS の `.shk-ca.cau`）。
      ⚠ **12点は車両注意ではない**（やる作業の種類）ので、今までどおり地味な灰色のまま分けて出す。 */
-  function carCautions(c){ return window.pitCarCautions ? pitCarCautions(c) : []; }
+  /* 🔴 v2.51.0（H・ゆうた 2026-09-01）**検切もここに出す**（他の車両注意と同じように）。
+     中身は pit-share.js の `pitCardTabs` 1本＝予約カードの耳のタブとまったく同じ。
+     ⚠ ここは1行に押し込む狭い所なので、耳と同じ narrow（4つ以上なら1文字）で受ける。
+     ⚠ 検切は**この予約だけの印**。車ごとの注意（c.drive）とは別物なので混ぜない。 */
+  function carCautions(c){
+    if (window.pitCardTabs) return pitCardTabs(c, { narrow:true });
+    return (window.pitCarCautions ? pitCarCautions(c) : []).map(function(x){ return { label:x }; });
+  }
   function carOthers(c){
     var out=[], ids=(Array.isArray(c.workTypes)&&c.workTypes.length)?c.workTypes:[];
     if(ids.indexOf('12pt')>=0) out.push('12点');
@@ -59,7 +66,7 @@
   }
   /* チップ用の小さいバッジ。注意はアンバー、それ以外は灰色。 */
   function attrChips(c){
-    return carCautions(c).map(function(x){ return '<span class="shk-ca cau">'+esc(x)+'</span>'; }).join('')
+    return carCautions(c).map(function(o){ return '<span class="shk-ca '+(o.exp?'exp':'cau')+'">'+esc(o.label)+'</span>'; }).join('')
          + carOthers(c).map(function(x){ return '<span class="shk-ca">'+esc(x)+'</span>'; }).join('');
   }
 

@@ -108,6 +108,17 @@
 
   /* ===== 実際に動かす ===== */
 
+  /* 🔧 v2.49.0 代車の整備＝確定した日を過ぎたら**未定（候補待ち）に戻す。**
+     🔴 自動でやったことも必ず記録に残す（v2.22.0 の決めごと。人の名前は押さない）。
+     ⚠ 消すのは**確定の印だけ**。候補（maintSpans）は1本も触らない＝次の候補日をそのまま待つ。 */
+  function 未定へ戻す(c, td){
+    var was = c.reserveDate;
+    if (w.pitMaintUnfix) w.pitMaintUnfix(c);
+    else { c.maintFixSid = ''; c.reserveDate = ''; c.reserveTime = ''; c.intakeTbd = true; }
+    flow(c, '確定していた ' + was + ' に入庫しなかったので、未定（候補待ち）へ戻した（自動）');
+    op('代車の整備を未定へ戻した（自動）', c, '確定日 ' + was + ' を過ぎたため');
+  }
+
   /* 1台ぶんの入れ替え（判定は済んでいる前提。ここでは判定しない） */
   function 未入庫へ(c, td){
     var was = c.reserveDate;
@@ -137,7 +148,12 @@
     var out = [];
     cards().forEach(function (c) {
       if (!c || !c.id) return;
-      if (pitIntakeOverdue(c, td)) out.push({ id: c.id, kind: 'in' });
+      /* 🔧 v2.49.0（ゆうた確定）**代車の整備は未入庫に落とさず「未定（候補待ち）」へ戻す。**
+         🗣「未定に戻る（候補待ちへ）」
+         ⚠ 追いかける相手がいないので、未入庫に溜めても誰も見ない。次の候補日を待つのが正しい。
+         ⚠ 判定は同じ関門（`pitIntakeOverdue`）を通す＝実入庫日がある車は絶対に動かさない（v2.22.0）。 */
+      if (!pitIntakeOverdue(c, td)) return;
+      out.push({ id: c.id, kind: (w.pitCardMaint && w.pitCardMaint(c)) ? 'maintTbd' : 'in' });
     });
     return out;
   }
@@ -147,6 +163,7 @@
       var c = cards().filter(function (y) { return y && y.id === x.id; })[0];
       if (!c) return;
       if (x.kind === 'in') { 未入庫へ(c, td); n++; }
+      else if (x.kind === 'maintTbd') { 未定へ戻す(c, td); n++; }
     });
     if (n && w.PitDB && w.PitDB.save) PitDB.save();
     return n;

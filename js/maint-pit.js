@@ -23,7 +23,9 @@
    🔴🔴 **車検の満了を過ぎても貸出は止めない**（ゆうた指定「どんなにあっても、もともと生命線だから落とすことはない」）。
       ここは **赤で知らせるだけ**。`pitLoanerUsable` には絶対に手を出さないこと。
 
-   ⚠ 置き場所は `state.fleetEvents` に `maint:true`（箱を増やさない＝「開くたび全件2回読む」の宿題を重くしない）。
+   🔴🔴 v2.49.0 **置き場所は `state.cards`（ふつうの予約カード）。** fleetEvents ではもう無い。
+      カード1枚＝作業1本、候補（飛び地）はそのカードの `maintSpans` 配列。形は pit-share.js に書いた。
+      ＝箱は増えないどころか**1つ減った**し、MHS は pitCards を読んでいるので**連動もタダ**。
    ⚠ 読み込みは loaner-free.js より後ろ・fleet.js より前。
    ======================================== */
 (function (w) {
@@ -50,10 +52,84 @@
   function vehNo(v){ return (v && v.number != null && v.number !== '') ? String(v.number) : ''; }
   function isLoaner(v){ return arr(w.state && w.state.loaners).some(function(x){ return x.id === v.id; }); }
 
-  /* 保存してあるもの（fleetEvents の maint:true） */
-  function recs(){ return arr(w.state && w.state.fleetEvents).filter(function(e){ return e && e.maint; }); }
-  /* 同じ整備予定どうしを束ねる鍵。**計算で決まる**ので、月の目標を保存しなくても候補と結べる */
+  /* ==================================================================
+     🔴🔴 v2.49.0（ゆうた確定 2026-08-31）**保存先を「カード」にした。**
+     ------------------------------------------------------------------
+     🗣「というか表示しているのは代車作業予定ボード。という扱いにはできない？」
+     🗣「予約カードとしては存在している、ただし、表示はさせない」
+
+     ◎前まで（v2.48.0）
+       整備の枠は `state.fleetEvents` の別レコードだった。だから
+       ・当日ビュー・MHS・予約カレンダーに出すには、**そのつど専用の道**が要った
+       ・入庫のたびに**カードを新しく作っていた**（＝二重にできる穴があった。v2.48.0 で塞いだ）
+       ・「消える／消えない」を status ではなく自前の印で持っていた
+
+     ◎いま
+       **カード1枚 ＝ 作業1本。** 形は pit-share.js の `pitCardMaint` の所に書いた。
+       ・候補（飛び地）は **1枚のカードの `maintSpans` 配列**。何本置いてもカードは1枚
+       ・確定 ＝ `reserveDate` が入って `intakeTbd:false` ＝ **ふつうの予約に変わるだけ**
+       ・入庫 ＝ `status` を進めるだけ（**カードを作らない**＝二重入庫が構造的に起きない）
+       ・MHS は `pitCards` を読んでいるので、**MHS 側は1行も触らずに**乗る
+
+     ⚠ このファイルの組み立て（ボード・バッジ・日ビュー）は `recs()` の形に乗っているので、
+        **`recs()` がカードから同じ形を作る**ことで、そこから先は前のまま使える。
+        ＝ 直した所を最小にするための作り。**ここの形を変えるときは下も一緒に見ること。**
+     ================================================================== */
+
+  /* 整備カード（＝1作業1枚）。予約の段階のものだけ。 */
+  function mcards(){
+    return arr(w.state && w.state.cards).filter(function(c){
+      return w.pitCardMaint ? w.pitCardMaint(c) : !!(c && c.internKind === 'loanercar' && Array.isArray(c.maintSpans));
+    });
+  }
+  function cardOf(id){ return mcards().filter(function(c){ return c.id === id; })[0] || null; }
+  /* 候補1本ごとに新しい鍵を振る。**並び順（index）で指さない**＝1本消すと他がずれるため。 */
+  function newSid(){ return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
+  /* rec の id ＝ カードid ＋ 候補の鍵。ここ以外で組み立てない。 */
+  function recId(c, sp){ return c.id + '#' + sp.sid; }
+  function splitRecId(id){ var i = String(id).indexOf('#'); return i < 0 ? { cid:String(id), sid:'' } : { cid:String(id).slice(0,i), sid:String(id).slice(i+1) }; }
+  function spanOf(id){
+    var k = splitRecId(id), c = cardOf(k.cid); if (!c) return null;
+    var sp = (c.maintSpans || []).filter(function(x){ return x.sid === k.sid; })[0];
+    return sp ? { card:c, span:sp } : null;
+  }
+
+  /* 🔴 **前と同じ形**（stage / fromDate / toDate / groupId …）に見せる。
+        こうしておくと、ボード・バッジ・日ビューの組み立てを書き換えずに済む。 */
+  function recs(){
+    var out = [];
+    mcards().forEach(function(c){
+      var started = !!c.actualInAt || (c.status !== 'reserved');
+      var done    = (c.status === 'returned');
+      /* ① 月の目標（手で入れたもの）＝候補が1本も無いカード */
+      if (!(c.maintSpans || []).length){
+        out.push({ id:c.id, card:c, cardId:c.id, vehicleId:c.maintVehId, maint:true, stage:'month',
+                   work:c.workType, ym:c.maintYm, urgent:!!c.urgent, memo:c.memo || '',
+                   fromDate:(c.maintYm || '') + '-01', toDate:(c.maintYm || '') + '-28',
+                   skipped:arr(c.maintSkipped), started:started, done:done, groupId:c.id });
+        return;
+      }
+      /* ② 候補・確定＝候補1本＝1レコード */
+      (c.maintSpans || []).forEach(function(sp){
+        out.push({ id:recId(c, sp), card:c, cardId:c.id, sid:sp.sid, vehicleId:c.maintVehId, maint:true,
+                   stage:(c.maintFixSid === sp.sid ? 'fixed' : 'candidate'),
+                   work:c.workType, ym:c.maintYm, urgent:!!c.urgent, memo:c.memo || '',
+                   fromDate:sp.from, toDate:sp.to, skipped:arr(c.maintSkipped),
+                   started:started, done:done, groupId:c.id });
+      });
+    });
+    return out;
+  }
+  /* 束ねる鍵＝**カードid そのもの**（1作業1カードなので、計算で作る鍵はもう要らない）。
+     ⚠ まだカードが無い（月の目標が計算だけで出ている）ものは、下の `groupIdOf` の形で仮の鍵を作る。 */
   function groupIdOf(vehId, work, ym){ return 'mg_' + vehId + '_' + work + '_' + ym; }
+  /* 仮の鍵から、実体のカードを探す（無ければ null＝まだ1本も置いていない） */
+  function cardForPlan(vehId, work, ym){
+    return mcards().filter(function(c){
+      return c.maintVehId === vehId && c.workType === work && c.maintYm === ym && c.status === 'reserved';
+    })[0] || null;
+  }
+  function saveCards(){ if (w.PitDB) w.PitDB.save(); }
 
   /* 🔴 作業タイプは **社内区分「代車」の相方4つ（PIT_LOANER_MATES）と同じ**にそろえる。
      ＝入庫でカードを起こす時、そのまま `workType` に渡せる（変換表を持たない）。
@@ -86,17 +162,22 @@
         if (!p.overdue && !p.slipped && p.ym > horizon) return;   /* 半年より先はまだ出さない */
         out.push(buildRow(v, p, td));
       });
-      /* ② 修理など＝手で入れた月の目標（保存してある） */
-      recs().forEach(function(r){
-        if (r.vehicleId !== v.id || (r.stage || '') !== 'month') return;
-        if (r.done) return;
-        var ym = r.ym || ymOf(r.fromDate);
+      /* ② 計算で出ない予定＝**カードが実体を持っているもの**（修理・B.P、手で足した車検 など）
+         🔴 v2.49.0 前は「候補が1本も無いカード（stage:'month'）」だけを拾っていた。
+            それだと**候補を1本置いた瞬間に、この行がボードから消えた**（①でも②でも拾えなくなる）。
+            いまは**計算の目標と噛み合わないカードを全部**ここで拾う。 */
+      mcards().forEach(function(c){
+        if (c.maintVehId !== v.id) return;
+        if (c.status !== 'reserved') return;                 /* 入庫したらボードの仕事は終わり */
+        var matched = plans.some(function(p){ return p.work === c.workType && p.ym === c.maintYm; });
+        if (matched) return;                                 /* ①がもう出している */
+        var ym = c.maintYm || ymOf(td);
         var slip = ym < ymOf(td);
         out.push(buildRow(v, {
-          work: r.work || 'general', label: WORK_LB[r.work || 'general'] || '整備', vehicleId: v.id,
+          work: c.workType || 'general', label: WORK_LB[c.workType || 'general'] || '整備', vehicleId: v.id,
           dueDate: '', openFrom: (slip ? ymOf(td) : ym) + '-01', openTo: '',
           months: [ym], ym: (slip ? ymOf(td) : ym), overdue: false, slipped: slip,
-          inWindow: true, manualId: r.id, urgent: !!r.urgent, memo: r.memo || ''
+          inWindow: true, manualId: c.id, urgent: !!c.urgent, memo: c.memo || ''
         }, td));
       });
     });
@@ -109,7 +190,11 @@
   }
 
   function buildRow(v, p, td){
-    var gid = p.manualId || groupIdOf(v.id, p.work, p.ym);
+    /* 🔴 v2.49.0 束ねる鍵＝**実体のカードがあればそのid**。まだ1本も置いていなければ計算の仮鍵。
+       ⚠ 仮鍵のまま置きにいくと、置く時に「どの月の目標か」が分からなくなる（PF-3056）。
+          なので `flMaintPlaceSave` は vehId / work / ym から実体を作る（または探す）。 */
+    var _card = p.manualId ? cardOf(p.manualId) : cardForPlan(v.id, p.work, p.ym);
+    var gid = (_card && _card.id) || p.manualId || groupIdOf(v.id, p.work, p.ym);
     var mine = recs().filter(function(r){
       if (r.vehicleId !== v.id) return false;
       if ((r.stage || '') === 'month') return false;
@@ -296,31 +381,67 @@
     if (!veh || !work || !ym){ w.pitAlert('車両・作業・いつまでに を入れてください', { code:'PF-3050' }); return; }
     if (!memo){ w.pitAlert('ひとことメモを入れてください', { code:'PF-3051',
       detail:'あとで見た人が「何の作業か」分かるように、ひとことだけ入れてください。' }); return; }
-    if (!Array.isArray(w.state.fleetEvents)) w.state.fleetEvents = [];
-    var p = ym.split('-'), last = new Date(+p[0], +p[1], 0).getDate();
-    w.state.fleetEvents.push({
-      id: 'mm' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-      vehicleId: veh, maint: true, stage: 'month', work: work, ym: ym,
-      urgent: urgent, memo: memo, label: (WORK_LB[work] || '整備'),
-      fromDate: ym + '-01', toDate: ym + '-' + String(last).padStart(2,'0')
-    });
-    if (w.PitDB) w.PitDB.save();
+    newMaintCard(veh, work, ym, { urgent: urgent, memo: memo });
+    saveCards();
     try { if (w.pitLog) w.pitLog('代車の作業予定を足した', { kind:'loaner', label: (WORK_LB[work]||'') + ' ' + ym + '（' + memo + '）' }); } catch(e){}
     flMaintClose(); if (w.renderFleet) w.renderFleet();
   };
-  w.flMaintDrop = function(id){
-    var r = recs().filter(function(x){ return x.id === id; })[0];
-    if (!r) return;
+  /* 🔴 v2.49.0（ゆうた確定）取り下げ＝**カードごと消去する。**
+     🗣「消去する」
+     ⚠ 代車の整備予定は売上も来店履歴も持たないので、予約キャンセルで残しても読む人がいない。
+        年に何十本も建つので、残すとアーカイブが代車で溢れる。
+     ⚠ 予約番号は**欠番として残る**（再利用しない＝ふつうのカードの消去と同じ）。 */
+  w.flMaintDrop = function(cardId){
+    var c = cardOf(cardId);
+    if (!c) return;
     w.pitAsk('この予定を取り下げますか？', { code:'PF-3052', title:'作業予定の取り下げ', danger:true, ok:'取り下げる',
-      detail:(WORK_LB[r.work] || '整備') + '　' + (r.ym || '') + '\n' + (r.memo || '') })
+      detail:(WORK_LB[c.workType] || '整備') + '　' + (c.maintYm || '') + '\n' + (c.memo || '')
+           + '\n\n候補も一緒に消えます。カードごと無くなり、元に戻せません。' })
       .then(function(yes){
         if (!yes) return;
-        w.state.fleetEvents = arr(w.state.fleetEvents).filter(function(x){ return x.id !== id && x.groupId !== id; });
-        if (w.PitDB) w.PitDB.save();
-        try { if (w.pitLog) w.pitLog('代車の作業予定を取り下げた', { kind:'loaner', label:(WORK_LB[r.work]||'') + ' ' + (r.ym||'') }); } catch(e){}
+        var lb = (WORK_LB[c.workType]||'') + ' ' + (c.maintYm||'');
+        /* ⚠ 代車の予定も外す（ふつうのカードの消去と同じ道・v1.154.0） */
+        if (w.pitLoanerReleaseForCard) w.pitLoanerReleaseForCard(c.id, '整備予定の取り下げ');
+        w.state.cards = arr(w.state.cards).filter(function(x){ return x.id !== c.id; });
+        saveCards();
+        try { if (w.pitLog) w.pitLog('代車の作業予定を取り下げた（カードを消去）', { kind:'delete', label:lb }); } catch(e){}
         if (w.renderFleet) w.renderFleet();
+        if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
       });
   };
+
+  /* ==================================================================
+     整備カードを1枚作る（**ここ1か所だけ**）
+     🔴 予約番号は「候補を置いた時に振る」（ゆうた確定）＝カードが生まれる時に振る。
+     ⚠ お客様欄は入庫の時にナンバーで引き当てて上書きする（`_ownerFill`）。
+        ここでは自社の名前で置いておく＝**空のカードを作らない**（v1.56.1 の教訓）。
+     ================================================================== */
+  function newMaintCard(vehId, work, ym, opt){
+    opt = opt || {};
+    var v = vehOf(vehId);
+    var c = {
+      id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      resNo: (w.pitGenResNo ? w.pitGenResNo() : ''),
+      status: 'reserved',
+      intakeTbd: true,                    /* 🔴 日はまだ決まっていない＝予約カレンダーには乗らない */
+      boardId: 'default', bayId: null, division: null,
+      internKind: 'loanercar',            /* 🔴 売上・台数・突合から外れる受け皿（v2.6.0） */
+      customer: '自社代車', customerId: '', kana: '', tel: '',
+      maker: (v && v.maker) || '', car: vehName(v), plate: (v && v.plate) || '', karteNo: '',
+      workType: work, workTypes: [work],
+      reserveDate: '', reserveTime: '', returnDate: '',
+      maintVehId: vehId, maintYm: ym, maintSpans: [], maintFixSid: '', maintSkipped: [],
+      urgent: !!opt.urgent, memo: opt.memo || '',
+      consult: false, needLoaner: false, needWash: false,
+      workSpecials: [], tentative: false, approvalPending: false,
+      log: [{ label: '代車の作業予定を立てた（' + (WORK_LB[work] || '整備') + '・' + ym + '）', at: Date.now() }]
+    };
+    if (!Array.isArray(w.state.cards)) w.state.cards = [];
+    w.state.cards.push(c);
+    try { if (w.pitLog) w.pitLog('代車の作業予定を足した', { cardId:c.id, kind:'loaner',
+      label:(WORK_LB[work]||'') + ' ' + ym + (opt.memo ? '（' + opt.memo + '）' : '') }); } catch(e){}
+    return c;
+  }
 
   /* 「日を決める」＝**いまもある「月をクリック → 日ビュー」をそのまま使う**（ゆうた指定 2026-08-31）。
      🔴 代車カレンダーへは飛ばさない。車両管理の中で完結させる。
@@ -372,9 +493,9 @@
     var per = (ds === to) ? md(ds) : (md(ds) + '〜' + md(to));
     var h = '<div class="lo-bpop-h">' + esc(per) + (ds === to ? '' : '<small>（' + (Math.round((_pd(to) - _pd(ds)) / 86400000) + 1) + '日）</small>') + '</div>';
     ps.forEach(function(r){
-      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\',\'' + to + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\',\'' + to + '\',\'' + r.plan.ym + '\')">'
          + '<span class="mb-dot"></span>🔧 ' + esc(r.workLabel) + ' の<b>候補</b>を置く<small>この期間のどこかでやる、の提示</small></button>';
-      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'fixed\',\'\',\'' + r.work + '\',\'' + to + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'fixed\',\'\',\'' + r.work + '\',\'' + to + '\',\'' + r.plan.ym + '\')">'
          + '<span class="mb-dot fixed"></span>🔧 ' + esc(r.workLabel) + ' を<b>ここで確定</b><small>枠を押さえる（代車は貸せなくなる）</small></button>';
     });
     if (!ps.length){
@@ -388,7 +509,7 @@
   /* 置く／直す の窓（期間） */
   /* ⚠ `work` は**呼ぶ側から渡す**。ここで groupId から引き直すと、
      引けなかった時に黙って「一般」に落ちる（画面には出るので気づけない）。 */
-  w.flMaintPlace = function(gid, vehId, ds, mode, recId, work, dsTo){
+  w.flMaintPlace = function(gid, vehId, ds, mode, recId, work, dsTo, ym){
     flMaintPopClose();
     var cur = recId ? recs().filter(function(r){ return r.id === recId; })[0] : null;
     var from = cur ? cur.fromDate : ds, to = cur ? cur.toDate : (dsTo || ds);
@@ -404,36 +525,54 @@
             + '「代車ありの最短入庫日」の案内からは外れます。')
       + '</div>'
       + '<div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
-      + '<button class="primary" onclick="flMaintPlaceSave(\'' + gid + '\',\'' + vehId + '\',\'' + mode + '\',\'' + (recId || '') + '\',\'' + (work || (cur && cur.work) || '') + '\')">'
+      + '<button class="primary" onclick="flMaintPlaceSave(\'' + gid + '\',\'' + vehId + '\',\'' + mode + '\',\'' + (recId || '') + '\',\'' + (work || (cur && cur.work) || '') + '\',\'' + (ym || (cur && cur.ym) || '') + '\')">'
       + (cur ? '直す' : '置く') + '</button></div>'
     );
   };
-  w.flMaintPlaceSave = function(gid, vehId, mode, recId, work){
+  /* 🔴 v2.49.0 保存先はカード。**まだカードが無ければ、ここで1枚作る**（＝候補を置いた時に生まれる）。
+     ⚠ `work` と `ym` は呼ぶ側から来る。ここで鍵から引き直さない（引けないと黙って「一般」に落ちる）。 */
+  w.flMaintPlaceSave = function(gid, vehId, mode, recId, work, ym){
     var g = function(id){ var e = document.getElementById(id); return e ? e.value : ''; };
     var from = g('mbp-from'), to = g('mbp-to');
     if (!from || !to){ w.pitAlert('期間を入れてください', { code:'PF-3053' }); return; }
     if (to < from){ w.pitAlert('「まで」は「から」以降にしてください', { code:'PF-3054' }); return; }
-    if (!work){
-      var r0 = rows(today()).filter(function(x){ return x.groupId === gid; })[0];
-      work = r0 ? r0.work : '';
-    }
     if (!work){ w.pitAlert('どの作業か分かりませんでした', { code:'PF-3056',
       detail:'作業予定ボードの「日を決める」から置き直してください。' }); return; }
-    if (!Array.isArray(w.state.fleetEvents)) w.state.fleetEvents = [];
-    var cur = recId ? recs().filter(function(x){ return x.id === recId; })[0] : null;
-    if (cur){ cur.fromDate = from; cur.toDate = to; cur.stage = mode; }
-    else {
-      w.state.fleetEvents.push({
-        id: 'mc' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-        vehicleId: vehId, maint: true, stage: mode, work: work, groupId: gid,
-        fromDate: from, toDate: to, skipped: [], label: (WORK_LB[work] || '整備')
-      });
+
+    if (recId){                                   /* 直す */
+      var hit = spanOf(recId);
+      if (!hit){ w.pitAlert('この候補が見つかりません', { code:'PF-3059' }); return; }
+      hit.span.from = from; hit.span.to = to;
+      if (mode === 'fixed') _fixSpan(hit.card, hit.span);
+      else if (hit.card.maintFixSid === hit.span.sid) _unfixCard(hit.card);
+      else if (hit.card.reserveDate) hit.card.reserveDate = hit.card.reserveDate;   /* 触らない */
+    } else {                                      /* 新しく置く */
+      var c = cardOf(gid) || cardForPlan(vehId, work, ym || ymOf(from));
+      if (!c) c = newMaintCard(vehId, work, ym || ymOf(from), {});
+      if (!Array.isArray(c.maintSpans)) c.maintSpans = [];
+      var sp = { sid: newSid(), from: from, to: to };
+      c.maintSpans.push(sp);
+      if (mode === 'fixed') _fixSpan(c, sp);
     }
-    if (w.PitDB) w.PitDB.save();
+    saveCards();
     try { if (w.pitLog) w.pitLog(mode === 'fixed' ? '整備の枠を確定した' : '整備の候補を置いた',
       { kind:'loaner', label:(WORK_LB[work]||'') + ' ' + md(from) + '〜' + md(to) }); } catch(e){}
     flMaintClose(); if (w.renderFleet) w.renderFleet();
+    if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
   };
+
+  /* 確定＝**ふつうの予約に変わる**。ここ1か所だけが reserveDate を入れる。 */
+  function _fixSpan(c, sp){
+    c.maintFixSid = sp.sid;
+    c.reserveDate = sp.from;      /* 期間の初日を入庫日にする（当日ビューは期間で見るので中日でも出る） */
+    c.intakeTbd   = false;        /* 🔴 これで予約カレンダー・MHS に乗る */
+    if (w.logFlow) try { w.logFlow(c, '整備の枠を確定した（' + md(sp.from) + '〜' + md(sp.to) + '）'); } catch(e){}
+  }
+  /* 確定をやめる＝未定（候補待ち）に戻す。 */
+  function _unfixCard(c){
+    c.maintFixSid = ''; c.reserveDate = ''; c.reserveTime = ''; c.intakeTbd = true;
+  }
+  w.pitMaintUnfix = _unfixCard;
 
   /* 日ビューの黄色いチップを押した時 */
   w.flMaintChip = function(recId){
@@ -443,24 +582,33 @@
     _pop('<div class="lo-bpop-h">🔧 ' + esc(WORK_LB[r.work] || '整備') + ' <small>' + md(r.fromDate) + '〜' + md(r.toDate)
         + '（' + (isC ? '候補' : '確定') + '）</small></div>'
       + (isC ? '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintFix(\'' + recId + '\')"><span class="mb-dot fixed"></span>この枠で確定する</button>' : '')
-      + '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintPlace(\'' + r.groupId + '\',\'' + r.vehicleId + '\',\'' + r.fromDate + '\',\'' + (r.stage||'candidate') + '\',\'' + recId + '\',\'' + (r.work||'') + '\')">期間を直す</button>'
+      + '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintPlace(\'' + r.groupId + '\',\'' + r.vehicleId + '\',\'' + r.fromDate + '\',\'' + (r.stage||'candidate') + '\',\'' + recId + '\',\'' + (r.work||'') + '\',\'\',\'' + (r.ym||'') + '\')">期間を直す</button>'
       + '<button class="lo-bpop-b danger" onclick="flMaintPopClose();flMaintDelRec(\'' + recId + '\')">この' + (isC ? '候補' : '確定') + 'を取り消す</button>');
   };
   w.flMaintFix = function(recId){
-    var r = recs().filter(function(x){ return x.id === recId; })[0];
-    if (!r) return;
-    r.stage = 'fixed';
-    if (w.PitDB) w.PitDB.save();
-    try { if (w.pitLog) w.pitLog('整備の枠を確定した', { kind:'loaner', label:(WORK_LB[r.work]||'') + ' ' + md(r.fromDate) + '〜' + md(r.toDate) }); } catch(e){}
+    var hit = spanOf(recId);
+    if (!hit) return;
+    _fixSpan(hit.card, hit.span);
+    saveCards();
+    try { if (w.pitLog) w.pitLog('整備の枠を確定した', { cardId:hit.card.id, kind:'loaner',
+      label:(WORK_LB[hit.card.workType]||'') + ' ' + md(hit.span.from) + '〜' + md(hit.span.to) }); } catch(e){}
     if (w.renderFleet) w.renderFleet();
+    if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
   };
+  /* 候補を1本取り消す。
+     ⚠ 最後の1本を取り消しても**カードは消さない**（＝月の目標として残る）。
+        カードごと無くすのはボードの「取り下げ」だけ＝**消える道を増やさない**（v2.22.0）。 */
   w.flMaintDelRec = function(recId){
-    var r = recs().filter(function(x){ return x.id === recId; })[0];
-    if (!r) return;
-    w.state.fleetEvents = arr(w.state.fleetEvents).filter(function(x){ return x.id !== recId; });
-    if (w.PitDB) w.PitDB.save();
-    try { if (w.pitLog) w.pitLog('整備の枠を取り消した', { kind:'loaner', label:(WORK_LB[r.work]||'') + ' ' + md(r.fromDate) + '〜' + md(r.toDate) }); } catch(e){}
+    var hit = spanOf(recId);
+    if (!hit) return;
+    var c = hit.card, sp = hit.span;
+    c.maintSpans = arr(c.maintSpans).filter(function(x){ return x.sid !== sp.sid; });
+    if (c.maintFixSid === sp.sid) _unfixCard(c);
+    saveCards();
+    try { if (w.pitLog) w.pitLog('整備の枠を取り消した', { cardId:c.id, kind:'loaner',
+      label:(WORK_LB[c.workType]||'') + ' ' + md(sp.from) + '〜' + md(sp.to) }); } catch(e){}
     if (w.renderFleet) w.renderFleet();
+    if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
   };
 
   /* ==================================================================
@@ -477,32 +625,25 @@
      ================================================================== */
   function vehOf(id){ return vehicles().filter(function(v){ return v.id === id; })[0] || null; }
 
+  /* 🔴🔴 v2.49.0 **「その日に出すか」は pit-share.js の `pitMaintSpanOn` 1本。**
+     ここで条件を書かない＝ MHS の Today ボードが**まったく同じものを借りる**（写しを作らない）。
+     ⚠ ゆうた確定「ここは PitFlow の当日も揃えて、言ったように特例として出してほしい」
+        ＝ 日がまだ確定していない候補も、その日が期間に入っていれば**当日ビューに出す**。
+           これは代車の**特例**（ふつうの車は日が決まっていないと出ない）。 */
   function todayList(ds){
+    var cards = arr(w.state && w.state.cards);
+    var hits = w.pitMaintCardsOn ? w.pitMaintCardsOn(cards, ds) : [];
     var out = [];
-    recs().forEach(function(r){
-      var st = r.stage || 'candidate';
-      if (st === 'month' || r.done) return;
-      /* 🔴🔴 v2.48.0（ゆうた報告 2026-08-31「消えないのも変」）**入庫したら、ここから消える。**
-         ◎なにが起きていたか
-           `入庫する` を押すと枠は `started` になるが、この一覧は `done`（完TEL）まで消していなかった。
-           ＝ **入庫したのに当日ビューの入庫欄に残り続け、もう一度押せばカードが2枚できた。**
-           入庫の「代車 ◯」の数も減らなかった。
-         🔴 当日ビューの入庫欄は「**まだ入っていないもの**」を並べる場所。
-            ふつうの車が `status:'reserved'` の間だけ並ぶのと、意味をそろえる。
-         ⚠ 枠を消すのではない。入庫後の姿は**タスクボードのカード**が持つ（＝居場所は1つ）。 */
-      if (r.started) return;
-      if (!(r.fromDate <= ds && r.toDate >= ds)) return;
-      if (arr(r.skipped).indexOf(ds) >= 0) return;      /* 「今日はやらない」を押した日 */
-      var v = vehOf(r.vehicleId); if (!v || v.retired) return;
-      out.push({ rec:r, veh:v, work:r.work, label:(WORK_LB[r.work] || '整備'),
-                 fixed:(st === 'fixed'), urgent:!!r.urgent, memo:r.memo || '' });
+    hits.forEach(function(x){
+      var v = vehOf(x.card.maintVehId); if (!v || v.retired) return;
+      out.push({ rec:{ id: recId(x.card, x.span), card:x.card, cardId:x.card.id, sid:x.span.sid,
+                       fromDate:x.span.from, toDate:x.span.to, work:x.card.workType },
+                 veh:v, work:x.card.workType, label:(WORK_LB[x.card.workType] || '整備'),
+                 fixed:x.fixed, urgent:!!x.card.urgent, memo:x.card.memo || '' });
     });
-    /* 確定が先・急ぎが先 */
-    out.sort(function(a,b){ return (b.fixed - a.fixed) || (b.urgent - a.urgent); });
     return out;
   }
 
-  /* 当日ビューの1行。**既存のカードと同じ見た目**（クラスをそのまま借りる） */
   /* 🔴🔴 v2.48.0（ゆうた指摘「網掛けがはいった変な表示」）
      **ふつうの入庫行と同じ骨格で組む。**
      ◎前まで
@@ -593,15 +734,15 @@
 
   /* 「今日はやらない」＝その日だけ消す（枠そのものは残る） */
   w.pitMaintSkip = function(recId, ds){
-    var r = recs().filter(function(x){ return x.id === recId; })[0];
+    var hit = spanOf(recId);
     if (w.pitTodayActionClose) w.pitTodayActionClose();   /* ⚠ v2.48.0 共通シートから押される */
-    if (!r) return;
-    var d = ds || today();
-    if (!Array.isArray(r.skipped)) r.skipped = [];
-    if (r.skipped.indexOf(d) < 0) r.skipped.push(d);
-    if (w.PitDB) w.PitDB.save();
-    try { if (w.pitLog) w.pitLog('整備の枠を今日は見送った', { kind:'loaner',
-      label:(WORK_LB[r.work]||'') + ' ' + md(d) }); } catch(e){}
+    if (!hit) return;
+    var c = hit.card, d = ds || today();
+    if (!Array.isArray(c.maintSkipped)) c.maintSkipped = [];
+    if (c.maintSkipped.indexOf(d) < 0) c.maintSkipped.push(d);
+    saveCards();
+    try { if (w.pitLog) w.pitLog('整備の枠を今日は見送った', { cardId:c.id, kind:'loaner',
+      label:(WORK_LB[c.workType]||'') + ' ' + md(d) }); } catch(e){}
     if (w.renderToday) w.renderToday();
   };
 
@@ -634,18 +775,18 @@
   }
   w.pitMaintOwner = ownerOf;
 
+  /* 🔴🔴 v2.49.0 **入庫は `status` を進めるだけ。カードは作らない。**
+     ＝ v2.48.0 で塞いだ「二重にカードができる」穴が、**構造的に起きえなくなった。**
+     ⚠ ふつうの車の `pitTodayCheckIn` と同じことをしている（予約 → 点検待ち）。
+        別の道を作っているのではなく、**同じ階段を、代車の窓から上っている**だけ。 */
   w.pitMaintIntake = function(recId){
-    var r = recs().filter(function(x){ return x.id === recId; })[0];
-    if (!r) return;
-    var v = vehOf(r.vehicleId);
+    var hit = spanOf(recId);
+    if (!hit){ w.pitAlert('この枠が見つかりません', { code:'PF-3060',
+      detail:'画面を開き直してください。' }); return; }
+    var c = hit.card, sp = hit.span;
+    var v = vehOf(c.maintVehId);
     if (!v){ w.pitAlert('この車両が見つかりません', { code:'PF-3055' }); return; }
-    /* 🔴🔴 v2.48.0 **もう入庫している枠は、ここでも止める。**
-       ◎なぜ「行を隠す」だけでは足りないか
-         行が消えるのは**次に描き直した時**。押した直後の連打・別の端末・古い画面・
-         直リンクからは、この関数が**そのまま呼べてしまう**＝カードが2枚できる。
-       ⚠ v2.46.0 までの「消えない」不具合で実際に起きた事故と同じ形。
-          **ボタンを消すだけにしない**（PitFlow のいつもの決めごと）。 */
-    if (r.started){
+    if (c.status !== 'reserved' || c.actualInAt){
       w.pitAlert('この枠はもう入庫しています', { code:'PF-3058',
         detail:'タスクボードにカードがあります。そちらから進めてください。' });
       return;
@@ -653,42 +794,32 @@
     var td = today();
     var own = ownerOf(v);
     var det = 'お客様＝自社（社内区分「代車」）。売上・完TEL・洗車・伝票はありません。\n'
-            + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）')) : '⚠ ナンバーで顧客控えを引けませんでした（カードは作れます）');
-    /* ⚠ v2.48.0 当日ビューの共通シートから呼ばれる＝**先にシートを閉じてから**聞く
-       （窓が2枚重なると、どちらを押しているのか分からなくなる）。 */
+            + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）')) : '⚠ ナンバーで顧客控えを引けませんでした（そのまま入庫できます）');
     if (w.pitTodayActionClose) w.pitTodayActionClose();
-    w.pitAsk('この代車を入庫させますか？', { title:(WORK_LB[r.work] || '整備') + '　' + vehName(v), ok:'入庫する', detail:det })
-      .then(function(yes){ if (yes) _intakeGo(r, v, own, td); });
+    w.pitAsk('この代車を入庫させますか？', { title:(WORK_LB[c.workType] || '整備') + '　' + vehName(v), ok:'入庫する', detail:det })
+      .then(function(yes){ if (yes) _intakeGo(c, sp, v, own, td); });
   };
-  function _intakeGo(r, v, own, td){
-    /* ① 枠を「確定・作業中」にする（④ 実際に合わせて縮む／伸びるのはここから始まる） */
-    r.stage = 'fixed'; r.started = true;
-    r.fromDate = td;
-    if (r.toDate < td) r.toDate = td;
+  function _intakeGo(c, sp, v, own, td){
+    /* ① その候補で確定させ、期間を実際に合わせる（④で完TELのときにもう一度縮む／伸びる） */
+    c.maintFixSid = sp.sid;
+    sp.from = td; if (sp.to < td) sp.to = td;
     /* ② 見つかったら代車マスタに覚える（人が押した操作の中なので書いてよい） */
-    if (own && own.cust){ v.custId = own.cust.id; if (own.veh) v.custVehId = own.veh.id; }
-    /* ③ カードを起こす＝**社内区分「代車」**。受け皿は v2.6.0 のまま使う */
-    var card = {
-      id: 'c' + Date.now(), resNo: (w.pitGenResNo ? w.pitGenResNo() : ''),
-      status: 'check',                      /* 入庫済み＝タスクの最初の工程（点検待ち） */
-      boardId: 'default', bayId: null, division: null,
-      customer: (own && own.cust && own.cust.name) ? own.cust.name : '自社代車',
-      customerId: (own && own.cust) ? own.cust.id : '',
-      kana: '', tel: '', maker: v.maker || '', car: vehName(v), plate: v.plate || '',
-      karteNo: (own && own.veh && own.veh.karteNo) ? own.veh.karteNo : '',
-      reserveDate: td, reserveTime: '', bookedAt: td, actualInAt: td, returnDate: '',
-      workType: r.work, workTypes: [r.work], dropType: null,
-      internKind: 'loanercar',              /* 🔴 これで売上・台数・突合から外れる（v2.6.0） */
-      consult:false, needLoaner:false, needWash:false, urgent: !!r.urgent,
-      memo: r.memo || '', workSpecials: [], tentative:false, approvalPending:false,
-      maintGroupId: r.groupId, maintRecId: r.id,
-      log: [{ label:'代車の整備で入庫', at: Date.now() }]
-    };
-    if (!Array.isArray(w.state.cards)) w.state.cards = [];
-    w.state.cards.push(card);
-    if (w.PitDB) w.PitDB.save();
-    try { if (w.pitLog) w.pitLog('代車を整備で入庫した', { cardId:card.id, kind:'in',
-      label: vehName(v) + ' / ' + (WORK_LB[r.work] || '整備') }); } catch(e){}
+    if (own && own.cust){
+      v.custId = own.cust.id; if (own.veh) v.custVehId = own.veh.id;
+      c.customer   = own.cust.name || c.customer;
+      c.customerId = own.cust.id;
+      if (own.veh && own.veh.karteNo) c.karteNo = own.veh.karteNo;
+    }
+    /* ③ 🔴 カードを作らない。**status を進めるだけ**（ふつうの車と同じ階段） */
+    c.status      = 'check';
+    c.intakeTbd   = false;
+    c.reserveDate = td;
+    c.bookedAt    = c.bookedAt || td;
+    c.actualInAt  = td;
+    if (w.logFlow) try { w.logFlow(c, '代車の整備で入庫した'); } catch(e){}
+    saveCards();
+    try { if (w.pitLog) w.pitLog('代車を整備で入庫した', { cardId:c.id, kind:'in',
+      label: vehName(v) + ' / ' + (WORK_LB[c.workType] || '整備') }); } catch(e){}
     if (w.pitToast) w.pitToast('入庫しました → タスク「点検待ち」へ');
     if (w.renderToday) w.renderToday();
     if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
@@ -698,22 +829,179 @@
      ＋ ④ 本黄色を**実際の入庫〜返車に合わせる**。
      ⚠ 呼ぶのは intern-pit.js（社内車両の実績化）の1か所だけ。ここに条件を書き写さない。 */
   w.pitMaintOnComplete = function(c){
-    if (!c || !c.maintGroupId) return;
+    if (!c || !(w.pitCardMaint ? w.pitCardMaint(c) : Array.isArray(c.maintSpans))) return;
     var td = today();
-    var gone = 0;
-    arr(w.state && w.state.fleetEvents).forEach(function(r){
-      if (!r.maint || r.groupId !== c.maintGroupId) return;
-      if (r.id === c.maintRecId){
-        r.done = true; r.stage = 'fixed';
-        r.toDate = c.returnDate || c.completedAt || td;   /* 実際に合わせて縮む／伸びる */
-        if (r.toDate < r.fromDate) r.toDate = r.fromDate;
-      } else if ((r.stage || 'candidate') === 'candidate'){ r._drop = true; gone++; }
-    });
-    if (gone) w.state.fleetEvents = arr(w.state.fleetEvents).filter(function(r){ return !r._drop; });
-    if (w.PitDB) w.PitDB.save();
+    var keep = (c.maintSpans || []).filter(function(x){ return x.sid === c.maintFixSid; });
+    var gone = (c.maintSpans || []).length - keep.length;
+    if (keep[0]){
+      keep[0].to = c.returnDate || c.completedAt || td;      /* 実際に合わせて縮む／伸びる */
+      if (keep[0].to < keep[0].from) keep[0].to = keep[0].from;
+    }
+    c.maintSpans = keep;                                     /* 🔴 残りの候補はここで消える */
+    c.maintDone  = true;
+    saveCards();
     try { if (w.pitLog && gone) w.pitLog('整備が終わったので残りの候補を消した', { cardId:c.id, kind:'loaner',
       label:'候補 ' + gone + '本' }); } catch(e){}
   };
+
+  /* ==================================================================
+     🚚 v2.49.0 **引っ越し（fleetEvents の整備の枠 → 予約カード）**
+     ------------------------------------------------------------------
+     🔴 **自動で走らせない。**人が設定画面のボタンを押した時だけ動く。
+        画面を開いただけでクラウドに書く道は作らない（v2.22.0・「勝手に動く」を一番嫌う所）。
+     🔴 元のレコードは**消さずに `migrated` の印を付けるだけ**。取り違えても元が残る。
+     ⚠ 束ね方＝**同じ groupId のものが1枚のカード**（1作業＝1カード）。
+        stage:'month' しか無いものも、候補が無いカードとして1枚作る。
+     ================================================================== */
+  function migrateList(){
+    return arr(w.state && w.state.fleetEvents).filter(function(e){ return e && e.maint && !e.migrated; });
+  }
+  w.pitMaintMigrateCount = function(){
+    var g = {}; migrateList().forEach(function(e){ g[e.groupId || e.id] = 1; });
+    return { recs: migrateList().length, cards: Object.keys(g).length };
+  };
+  w.pitMaintMigrate = function(){
+    var list = migrateList();
+    if (!list.length) return { cards:0, recs:0 };
+    var groups = {};
+    list.forEach(function(e){
+      var k = e.groupId || e.id;
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(e);
+    });
+    var made = 0;
+    Object.keys(groups).forEach(function(k){
+      var es = groups[k];
+      var month = es.filter(function(e){ return (e.stage||'') === 'month'; })[0] || null;
+      var head  = month || es[0];
+      var ym    = (month && month.ym) || ymOf(head.fromDate);
+      var c = newMaintCard(head.vehicleId, head.work || 'general', ym,
+                           { urgent: !!head.urgent, memo: head.memo || '' });
+      es.forEach(function(e){
+        if ((e.stage||'') === 'month') return;
+        var sp = { sid: newSid(), from: e.fromDate, to: e.toDate };
+        c.maintSpans.push(sp);
+        if (e.stage === 'fixed') _fixSpan(c, sp);
+        arr(e.skipped).forEach(function(d){ if (c.maintSkipped.indexOf(d) < 0) c.maintSkipped.push(d); });
+      });
+      es.forEach(function(e){ e.migrated = true; });
+      made++;
+    });
+    saveCards();
+    try { if (w.pitLog) w.pitLog('整備の枠をカードに引っ越した', { kind:'clean',
+      label: made + ' 枚（元 ' + list.length + ' 件）' }); } catch(e){}
+    return { cards: made, recs: list.length };
+  };
+
+  /* 設定画面に「引っ越し」の入口を出す。
+     🔴🔴 v2.49.1（ゆうた報告「これがでないよ」）**必ず何か出す。**
+     ◎やってしまったこと
+       v2.49.0 は「引っ越すものが0件なら箱ごと出さない」作りだった。
+       すると **「もう済んでいる」と「読み込めていない・壊れている」の区別がつかない。**
+       押す人は「出ないんだけど」としか言いようがなくなる。
+     🔴 だから**3つの顔を必ず出す**：やることがある／済んでいる／そもそも前の形が無い。
+        ＝ **この箱が1つも出ない＝ v2.49.x が読み込まれていない**、と分かるようにする。
+     ⚠ 見た目は自前で持つ。**他の機能のCSSを借りない**
+        （前は blank-cards.js の `.pit-blank-box` を借りていたので、
+          あちらが出ていない時は**枠も色も付かない裸の文字**になっていた）。 */
+  function migCss(){
+    if (document.getElementById('pit-maint-mig-css')) return;
+    var st = document.createElement('style'); st.id = 'pit-maint-mig-css';
+    st.textContent = [
+      '.pit-mig-box{margin:18px 0;padding:14px 16px;border:1px solid var(--border,rgba(255,255,255,.14));',
+      '  border-radius:12px;background:var(--bg2,#141a22);line-height:1.7}',
+      '.pit-mig-box h4{margin:0 0 8px;font-size:14px;font-weight:800;display:flex;align-items:center;gap:6px}',
+      '.pit-mig-box p{margin:0 0 10px;font-size:12.5px;color:var(--text2,#9aa7b4)}',
+      '.pit-mig-box .pit-mig-n{font-weight:800;color:var(--text,#e6edf3)}',
+      '.pit-mig-box .pit-mig-go{border:1px solid var(--accd);background:var(--accd);color:#fff;',
+      '  border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}',
+      '.pit-mig-box .pit-mig-go:hover{filter:brightness(1.12)}',
+      '.pit-mig-box.done{opacity:.75}',
+      /* ⚠ 色は必ず変数から。ここに緑やピンクの数字を書かない（test_pit_rules が見張っている） */
+      '.pit-mig-box .pit-mig-ok{font-size:12.5px;color:var(--green);font-weight:700}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+  function appendMigrateBox(){
+    /* 🗂 v2.50.0 設定画面がグループに分かれたので、**「道具」の中**に入る。
+       ⚠ 場所が無い版（古い端末・別の並び）でも落ちないように、無ければ今までどおり一番下へ。 */
+    var host = document.getElementById('ps-tools-body') || document.getElementById('view-settings-body');
+    var old = document.getElementById('pit-maint-mig');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!host) return;
+    migCss();
+    /* 🔴🔴 v2.49.2 **読み終わる前に「無い」と言わない。**
+       v1.2.1 の決めごと（読む前に書かない）は、**数えて言い切る時にも同じ**。
+       クラウドを読み終わる前に開くと、まだ空の手元を見て
+       「前の形が1件も見つかりません」と**嘘をつく**（そして押す人はそれを信じる）。 */
+    if (w.PIT_CLOUD && w.PitDB && !w.PitDB._loaded){
+      var wait = document.createElement('div');
+      wait.id = 'pit-maint-mig'; wait.className = 'pit-mig-box done';
+      wait.innerHTML = '<h4><i data-ic=wrench data-ics=16></i> 代車の整備の枠を、予約カードに引っ越す</h4>'
+        + '<p>まだクラウドを読み終わっていません。読み終わったらここに件数が出ます。'
+        + '（この画面を開き直してください）</p>';
+      host.appendChild(wait);
+      try { if (w.icoBoot) w.icoBoot(wait); } catch (e) {}
+      return;
+    }
+    var all  = arr(w.state && w.state.fleetEvents).filter(function(e){ return e && e.maint; });
+    var done = all.filter(function(e){ return e.migrated; }).length;
+    var n = w.pitMaintMigrateCount();
+    var cards = mcards().length;
+
+    var body;
+    if (n.recs){
+      body = '<p>v2.49.0 から、代車・自社車両の整備の予定は<b>ふつうの予約カード</b>になりました。'
+           + 'それより前に置いた枠が <span class="pit-mig-n">' + n.recs + '</span> 件（作業 '
+           + '<span class="pit-mig-n">' + n.cards + '</span> 本）残っています。<br>'
+           + '押すと<b>作業1本につきカード1枚</b>を作り、候補（飛び地）はそのカードにまとめます。<br>'
+           + '⚠ 元のデータは<b>消しません</b>（済みの印を付けるだけ）。取り違えても元が残ります。</p>'
+           + '<button class="pit-mig-go" onclick="pitMaintMigrateGo()">この ' + n.cards + ' 本を引っ越す…</button>';
+    } else if (done){
+      body = '<p class="pit-mig-ok">✅ 引っ越し済みです（元データ ' + done + ' 件はそのまま残してあります）。</p>'
+           + '<p>いま整備のカードは <span class="pit-mig-n">' + cards + '</span> 枚です。'
+           + '作業予定ボード・当日ビュー・予約▸未定の「代車・自社車両」BOX で見られます。</p>';
+    } else {
+      body = '<p>引っ越すものはありません。<b>前の形（v2.48.0 まで）の枠が1件も見つかりません。</b><br>'
+           + 'いま整備のカードは <span class="pit-mig-n">' + cards + '</span> 枚です。'
+           + (cards ? 'こちらはもう新しい形なので、そのまま使えます。'
+                    : '⚠ 心当たりがあるのに0枚なら、まだクラウドを読み終わっていないか、'
+                      + '前の枠が消えている可能性があります。'
+                      + '画面を開き直しても0枚のままなら、そう伝えてください。')
+           + '</p>';
+    }
+    var box = document.createElement('div');
+    box.id = 'pit-maint-mig';
+    box.className = 'pit-mig-box' + (n.recs ? '' : ' done');
+    box.innerHTML = '<h4><i data-ic=wrench data-ics=16></i> 代車の整備の枠を、予約カードに引っ越す</h4>' + body;
+    host.appendChild(box);
+    try { if (w.icoBoot) w.icoBoot(box); } catch (e) {}
+  }
+  w.pitMaintMigrateGo = function(){
+    var n = w.pitMaintMigrateCount();
+    if (!n.recs) return;
+    w.pitAsk('整備の枠を予約カードに引っ越しますか？', {
+      title:'代車の整備の引っ越し', ok:'引っ越す',
+      detail:'作業 ' + n.cards + ' 本ぶんのカードを作ります（元の ' + n.recs + ' 件は消さずに残します）。\n'
+           + '引っ越したあとは、作業予定ボード・当日ビュー・未定タブの「代車・自社車両」BOX で見られます。'
+    }).then(function(yes){
+      if (!yes) return;
+      var r = w.pitMaintMigrate();
+      if (w.pitToast) w.pitToast('引っ越しました（カード ' + r.cards + ' 枚）');
+      if (w.showView) w.showView('settings');
+    });
+  };
+  /* ⚠ 掛かったら止める。掛かっていない時だけ待つ（前は掛かったあとも待ち続けていた）。 */
+  (function hookSettings(){
+    if (typeof w.renderSettings === 'function'){
+      if (w.renderSettings.__pitMaintMig) return;                /* もう掛かっている */
+      var orig = w.renderSettings;
+      var f = function(){ var r = orig.apply(this, arguments); try { appendMigrateBox(); } catch(e){} return r; };
+      f.__pitMaintMig = 1; w.renderSettings = f;
+      return;
+    }
+    setTimeout(hookSettings, 400);
+  })();
 
   /* 小窓（代車カレンダーのものを借りる） */
   function _pop(html){
@@ -737,6 +1025,7 @@
   w.pitMaintPlansFor  = plansFor;
 
   w.pitMaintRows   = rows;
+  w.pitMaintRecs   = recs;      /* ⚠ 見張り用。画面からは呼ばない（カードを直に見ればよい） */
   w.pitMaintBadges = badges;
   w.flMaintBoardHtml = boardHtml;
   w.PIT_MAINT_WORK_LB = WORK_LB;

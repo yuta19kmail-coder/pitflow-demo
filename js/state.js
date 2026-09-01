@@ -191,19 +191,20 @@ window.state = {
     reserveCap: { default: 5, import: 3 },   // 1日の予約上限（default＝国産 / import＝輸入・人が別なのでチーム別）
     // 概算預かり日数の既定（作業タイプ別・入庫予約時の初期値。_default＝表にないタイプ用）
     // 概算預かり日数の既定（team別＝default:国産 / import:輸入。作業タイプ別・_default＝表にないタイプ用）
-    estHold: { default:{ shaken:5, general:6, bp:12, oil:0, '12pt':0, coat1y:3, coat3m:2, _default:5 },
-               import:{ shaken:5, general:6, bp:12, oil:0, '12pt':0, coat1y:3, coat3m:2, _default:5 } },
+    estHold: { default:{ shaken:5, general:6, bp:12, oil:0, '12pt':0, coat1y:3, coat3m:2, goods:0, _default:5 },
+               import:{ shaken:5, general:6, bp:12, oil:0, '12pt':0, coat1y:3, coat3m:2, goods:0, _default:5 } },
     // 💴 概算金額の既定（作業タイプ別・円・税抜）。カードの「概算金額」の初期値＝台単価
     // 初期値＝令和8年1〜6月の実売上6か月(全999伝票)から算出した「税抜・法定費用除く・中央値」。国産/輸入別。
     //   板金は保険案件で幅が大きく参考値（輸入はGクラス550万の異常値を除外して算出・サンプル少）。設定画面で調整可。
     //   詳細＝D:\アプリ開発\PitFlow\台単価分析_国産輸入_2026上期.xlsx（2026-07-05）
     // 概算金額の既定（team別＝default:国産 / import:輸入・円）
-    estAmount: { default:{ shaken:70100, '12pt':21200, general:26800, oil:8900, bp:400000, coat1y:35000, coat3m:20000, _default:40000 },
-                 import:{ shaken:140800, '12pt':43200, general:62000, oil:19200, bp:760800, coat1y:45000, coat3m:26000, _default:80000 } },
+    /* ⚠ goods（物販）＝0。売る物の値段はカードの金額欄で入れる（概算では持たない） */
+    estAmount: { default:{ shaken:70100, '12pt':21200, general:26800, oil:8900, bp:400000, coat1y:35000, coat3m:20000, goods:0, _default:40000 },
+                 import:{ shaken:140800, '12pt':43200, general:62000, oil:19200, bp:760800, coat1y:45000, coat3m:26000, goods:0, _default:80000 } },
     // 🔍 点検料（作業タイプ別・円・税抜）＝メカニック実績の配分で「点検者ぶん」として先に抜く額。
     //   車検1.5万／12点・一般1万／オイル・板金・コーティングは純作業で0。確定売上が点検料未満なら点検/作業50:50。
     //   詳細＝mech-summary.js の配分エンジン。設定画面から調整できる（未設定はここの初期値）。
-    inspectFee: { shaken:15000, '12pt':10000, general:10000, oil:0, bp:0, coat1y:0, coat3m:0, _default:0 },
+    inspectFee: { shaken:15000, '12pt':10000, general:10000, oil:0, bp:0, coat1y:0, coat3m:0, goods:0, _default:0 },
     // 売上目標（円/月）＝最低目標〜最高目標(天井)。クォーター換算は÷4（売上表Excel 4年分の実績から）
     target: { monthMin: 15000000, monthMax: 20000000 },
     // 平均単価の初期値（円・チーム別）。実績が貯まれば pitUnitPrice() が直近3ヶ月平均に自動切替
@@ -282,8 +283,23 @@ window.state = {
           「車販」だけだと**部門名**に読めて、社内区分の「中古（自社の販売車両）」と
           取りちがえられる。この印の意味は「**車販部門に、コーティング以外の作業を依頼する**」。
           ⚠ **id（carsale）は変えない。** 変えると過去のカードと車販作業ビューの拾い上げが切れる。 */
-    { id: 'carsale', label: '車販依頼', color: '#06b6d4', combinable: true,
+    /* 🏷 v2.51.0（A-3・ゆうた 2026-09-01）**コンパクトなカードでは、他の作業タイプがある時に出さない。**
+       🗣「コンパクトなカード類には、その他の作業タイプが入ってない時にしか出さない。
+       　　車検等他が入った場合は非表示。ホバーなどのフルでは表示する」
+       🔴 **描く側（reserve.js）に 'carsale' と書かない。**この印を見るだけにする。
+       　 名指しすると、次に長い作業タイプが増えた時に必ず書き忘れる。 */
+    { id: 'carsale', label: '車販依頼', color: '#06b6d4', combinable: true, hideWhenOthers: true,
       desc: '艶出し・ルークリなど車販に依頼する作業（確定でなくてもチェックする）' },
+    /* 📦 v2.51.0（G・ゆうた 2026-09-01）**物販＝単純に物だけ売った時。**
+       ・`alone`  … **常に単独。**選ぶと他の作業タイプは全部おりて、押せなくなる
+       ・`drawer` … 基本チップにも併用チップにも出さず、**「その他」の引き出しの3段目**に置く
+       🔴🔴 **中古（社内区分）とは違う。物販は売上が立ち、実績にも入る。**
+       　 「単独で立つ」という見た目が中古そっくりなので、`pitCardNoSale` の側へ合流させないこと。
+       　 合流させると**物販まで売上から静かに消える**（画面では気づけない）。
+       ・作業者・洗車・車販依頼の欄は出さない（card-detail.js / card-view.js）
+       ・データチェックは メーカー・車種 を外す。**課（国産/輸入）は外さない**＝課別の売上がずれるため */
+    { id: 'goods',   label: '物販',     color: '#14b8a6', alone: true, drawer: true,
+      desc: '物だけを売った時（作業なし）' },
   ],
 
   dropTypes: [
@@ -319,7 +335,7 @@ window.PIT_WORK_TYPES = window.state.workTypes.map(function (w) {
      （本番で meta=2.8.0・js=2.8.1 を見た）。一覧そのものに版を持たせること。
    ⚠ 上げ忘れると、名前を変えたのにクラウドへ行き渡らない（＝MHS の当日ビューが古い名前のまま）。
      見張り＝`test_worktype_pingpong.mjs`。 */
-window.PIT_WORK_TYPES_VER = '2.13.0';
+window.PIT_WORK_TYPES_VER = '2.51.0';   /* v2.51.0 物販を足した・車販依頼に hideWhenOthers */
 
 /* 作業タイプ「特殊」＝保証／保険（v0.116.0）。
    ・単体では選べず、作業タイプ（基本 or 併用可）が1つ以上ある時だけ付けられる。

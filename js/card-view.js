@@ -101,6 +101,7 @@
     if(c.paymentSeparate == null) c.paymentSeparate = false;   // 入金日を分ける（売掛）v0.121.0
     if(c.paymentDate === undefined) c.paymentDate = null;       // 入金日（未入金は null）
     if(c.salesReq == null) c.salesReq = false;
+    if(c.shakenExpired == null) c.shakenExpired = false;   /* 🆕 v2.51.0 検切（この予約だけ） */
     if(c.salesReqMemo == null) c.salesReqMemo = '';
     if(c.headlight == null) c.headlight = false;
     if(c.coatingOK == null) c.coatingOK = false;
@@ -131,11 +132,22 @@
           「作業」という言い訳の文字＋一般の緑色が出ていた。
        🔴 v2.9.7（ゆうた指定「両方出す」）併用も**全部並べる**。
           「車検＋B.P」で B.P が消えていた＝予約カードのバッジと言うことが違っていた。
-       ⚠ 色は先頭（基本タイプ）のもの。枠の左線と字の色をここから取る。 */
+       🎨 v2.51.0（A-4・ゆうた 2026-09-01）**それぞれの色を使う。**
+       　 🗣「車検+車販依頼（赤）になるが、車検（赤）+車販依頼（青）とそれぞれの色を使うように」
+       　 ◎前まで … 名前を1本の文字列に繋いで、**先頭の色でまとめて塗っていた**＝車販依頼まで赤かった。
+       　 ◎今 … 1つずつ span にして、**色はマスターから引く**（ここに色を書かない）。
+       　 ⚠ 「＋」は残すが**小さく・余白を詰める**（札が色を持つと、間の＋が目立ちすぎるため）。
+       　 ⚠ 枠の左の縦線は1本しか無いので、**そこは先頭の色のまま**。 */
     const wts = (window.pitCardWorkTypes ? pitCardWorkTypes(c) : []);
     const wt = wts[0] || null;
     const wtColor = wt ? wt.color : '#84cc16';
-    const wtLabel = wts.length ? wts.map(function(x){ return x.label; }).join('＋') : '作業';
+    /* 🏷 v2.51.0（A-5）B.P＋保険＝保険板金／一般＋保証＝保証修理。表は pit-share.js の1本 */
+    const wtLabel = wts.length
+      ? wts.map(function(x){
+          var lb = window.pitWtLabel ? pitWtLabel(c, x.id, wts) : x.label;
+          return '<span class="cv-wt1" style="color:' + x.color + '">' + esc(lb) + '</span>';
+        }).join('<span class="cv-wtplus">＋</span>')
+      : '<span class="cv-wt1">作業</span>';
     const dt = dropType(c);
     let h = '';
 
@@ -165,7 +177,11 @@
     if (c.consult) badges += '<span class="cv-bdg cv-consult"><i data-ic=comment data-ics=16></i> 相談</span>';
     // 特殊（保証/保険）＝作業タイプとセットの時だけ付く。グレーのアウトライン表示 v0.116.0
     if (Array.isArray(c.workSpecials) && c.workSpecials.length){
-      c.workSpecials.forEach(function(id){ var lb = window.pitSpecialLabel ? pitSpecialLabel(id) : ''; if (lb) badges += '<span class="cv-bdg cv-special">'+esc(lb)+'</span>'; });
+      /* 🏷 v2.51.0（A-5）言い換えに使った付加は出さない（「保証修理」なのに「保証」も出る、を防ぐ）。
+         🔴 判断は pit-share.js の表1本。ここで 'insurance' などと書き分けない。 */
+      c.workSpecials.forEach(function(id){
+        if (window.pitSpecialHidden && pitSpecialHidden(c, id)) return;
+        var lb = window.pitSpecialLabel ? pitSpecialLabel(id) : ''; if (lb) badges += '<span class="cv-bdg cv-special">'+esc(lb)+'</span>'; });
     }
     /* 🏢 v2.6.0 社内区分（中古／代車車検／内部）＝この車は売上が立たない、を一目で */
     if (window.pitCardIntern && pitCardIntern(c)){
@@ -174,7 +190,7 @@
     if (c.earlyDiscount) badges += '<span class="cv-bdg cv-early"><i data-ic=tag data-ics=16></i> 早期割</span>';
     if (!c.needLoaner) badges += '<span class="cv-bdg cv-none">代車なし</span>';
     h += '<div class="cv-wframe" style="border-left-color:'+wtColor+'">'
-       + '<div class="cv-wftop"><span class="cv-wftype" style="color:'+wtColor+'"><i data-ic=wrench data-ics=16></i> '+esc(wtLabel)+'</span>'
+       + '<div class="cv-wftop"><span class="cv-wftype" style="color:'+wtColor+'"><i data-ic=wrench data-ics=16></i> '+wtLabel+'</span>'
        + '<span class="cv-wfbadges">'+badges+'</span></div></div>';
 
     // 代車メーター
@@ -221,8 +237,12 @@
   function driveNoteHtml(c){
     const arr = Array.isArray(c.drive) ? c.drive : [];
     const tags = ['leftHand','mt','lowCar','noShoes'].filter(function(k){ return arr.indexOf(k)>=0; });
-    if (!tags.length) return '';
+    /* 🔴 v2.51.0（H）検切もここに出す。**ただし1文字にしない**＝縮めるのは狭い耳のタブだけ。
+       ⚠ 検切は**この予約だけの印**（c.drive には入れない）。車ごとの注意と混ぜないこと。 */
+    const exp = !!(window.pitCardExpired && pitCardExpired(c));
+    if (!tags.length && !exp) return '';
     return '<div class="cv-drvbox"><div class="cv-drvh"><i data-ic=warn data-ics=16></i> 車両注意</div><div class="cv-drvrow">'
+      + (exp ? '<span class="cv-drv cv-drv-exp">車検切れ</span>' : '')
       + tags.map(function(k){ return '<span class="cv-drv">'+DRIVE_LABELS[k]+'</span>'; }).join('')
       + '</div></div>';
   }
@@ -745,6 +765,8 @@
       h += (_archEditFor === c.id && canEditResultDate())
         ? archiveEditHtml(c, _csShaken, _csCoat)
         : archiveHtml(c, _csShaken, _csCoat);
+    } else if (window.pitCardGoods && pitCardGoods(c)){
+      /* 📦 v2.51.0（G）物販は車販部門への依頼を出さない */
     } else {
       h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=cart data-ics=16></i> 車販部門への依頼</div>';
       if (_csShaken) h += pickRow('車検ライト磨き', [['1','する'],['0','しない']], c.headlight?'1':'0', 'headlight');
@@ -815,9 +837,21 @@
       h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=phone data-ics=16></i> 表紙チェック（手書き表紙のデジタル版）</div>';
       h += pickRow('完TEL', [['done','済'],['ng','未']], c.coverCall.done?'done':'ng', 'call')
          + (c.coverCall.done && c.coverCall.at ? '<div class="cv-callat">'+esc(c.coverCall.at)+(c.coverCall.staff?'・'+esc(c.coverCall.staff):'')+'</div>' : '');
-      h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
-      h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
-         + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
+      /* 🔴 v2.51.0（H・ゆうた 2026-09-01）**車検切れ**＝この予約だけの印。押すと耳に赤いタブが出る。
+         ⚠ **予約の段階（status==='reserved'）では行そのものを出さない。**
+            まだ入庫していない車の車検が切れているかは、その時にならないと分からない。
+         ⚠ トグル1つ（押す＝切れている／もう一度押す＝取り消す）。「切れていない」というボタンは作らない。 */
+      if (c.status !== 'reserved'){
+        h += '<div class="cv-pickrow"><span class="cv-pk">車検切れ</span><div class="cv-chips">'
+           + '<button class="cv-chip cv-chip-exp' + (c.shakenExpired ? ' on' : '') + '" onclick="cvExpiredToggle()">車検切れ</button>'
+           + '</div></div>';
+      }
+      /* 📦 v2.51.0（G）物販は洗車を出さない（物だけ売った車は洗わない） */
+      if (!(window.pitCardGoods && pitCardGoods(c))){
+        h += pickRow('洗車', [['1','要'],['0','不要']], c.needWash?'1':'0', 'wash');
+        h += '<div class="cv-pickrow"><span class="cv-pk">洗車備考</span><div class="cv-chips" style="flex:1">'
+           + '<input class="cv-fixinput" type="text" value="'+esc(c.washNote||'')+'" placeholder="洗車の備考（1行・任意）" onchange="cvWashNote(this.value)" style="flex:1;min-width:180px"></div></div>';
+      }
       h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line',
                    (window.pitThanksLineWhy ? pitThanksLineWhy(c) : ''));
       h += '<div class="cv-hint">※ パターン（型）で選ぶ方式。選択肢は将来 <i data-ic=settings data-ics=16></i>設定で増減できる想定。</div></div>';
@@ -1204,7 +1238,8 @@
       const on = window.pitMaintChecked ? pitMaintChecked(c, it.key) : false;
       return '<div class="cv-chk'+(on?' on':'')+'" onclick="cvMaint(\''+it.key+'\',this)"><span class="cv-box">'+(on?'✓':'')+'</span>'+esc(it.label)+'</div>';
     }).join('');
-    return mechSectionHtml(c)
+    /* 📦 v2.51.0（G）物販は作業者を出さない（作業が無いので担当も無い） */
+    return ((window.pitCardGoods && pitCardGoods(c)) ? '' : mechSectionHtml(c))
       + '<div class="cv-sec"><div class="cv-sect"><i data-ic=wrench data-ics=16></i> 作業チェック</div>'
       + '<div class="cv-prog">'+n+' / '+items.length+' 完了</div><div class="cv-checks">'+h2+'</div></div>';
   }
@@ -1926,6 +1961,18 @@
         label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + word });
     } catch(e){}
   }
+
+  /* 🔴 v2.51.0（H）車検切れのトグル。**印はカードに持つ。車両には保存しない。** */
+  window.cvExpiredToggle = function(){
+    if (!_archGuard()) return;
+    var from = _c.shakenExpired ? 'あり' : 'なし';
+    _c.shakenExpired = !_c.shakenExpired;
+    if (_c.status === 'returned') _archLog('車検切れ', from, _c.shakenExpired ? 'あり' : 'なし');
+    try { if (window.logFlow) logFlow(_c, _c.shakenExpired ? '車検切れにした' : '車検切れを取り消した'); } catch(e){}
+    if (window.PitDB) PitDB.save();
+    if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+    if (window.renderAll) renderAll();
+  };
 
   // ===== 表紙チェック =====
   window.cvPick = function(group, val, el){

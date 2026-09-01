@@ -137,6 +137,32 @@
 .pit-card.pcm.pcm-claim .pcm-ear-slide{ background:#ef4444; }
 /* 車両注意タブ（左/M/T/車高）＝耳と同じ上辺ライン・右側・最大2・アンバー。折り返し禁止でブレ防止 */
 .pcm-cau{ position:absolute; top:-13px; right:6px; display:flex; gap:3px; z-index:3; white-space:nowrap; pointer-events:none; }
+/* ===================================================================
+   🔴 v2.51.0 の追加ぶん（札まわりのまとめ直し）
+   =================================================================== */
+
+/* 🔴 H：検切＝**赤**の耳タブ（車両注意はアンバー）。色は pit-share.js の PIT_EXPIRED_BG と揃えること */
+.pcm-cau .pcm-caut.pcm-caut-exp{ background:#ef4444; border-color:#ef4444; color:#fff; }
+
+/* 🔴 B-1：当日ビューの入庫・返車だけ、4文字の札を**2文字ずつ**で折る（ゆうた 2026-09-01）
+   ◎前 … `word-break:break-word` なので「車販依／頼」と 3文字＋1文字 に割れていた
+   ◎今 … 26px 固定の箱に入れて「車販／依頼」に折る。**言葉は変えない。折る位置だけ。**
+   ⚠ **当日ビューの中だけ**に効かせる（`.tag-work.long` は他の画面でも使っている）。
+   ⚠ 「車販依頼」を名指ししない＝4文字の作業タイプが増えても同じ規則で折れる。 */
+.today-row .tr-tag-work .tag-work.long{
+  flex:0 0 auto !important; box-sizing:border-box;
+  font-size:10px; line-height:1.05;
+  white-space:normal !important; word-break:break-all !important;
+  width:26px; min-width:26px; padding:1px 2px; text-align:center;
+}
+
+/* 🔴 D-2：車販作業ビューの「他にもあり」＝同じ車が別の段にも出ている印
+   ⚠ **完了ボタンの下**に置くこと（上に置くと車ごとに高さが変わってボタンの列がガタつく） */
+.cs-dup{ margin:3px 2px 0; font-size:10.5px; line-height:1.4; color:#f59e0b;
+         background:#f59e0b14; border:1px solid #f59e0b3d; border-radius:5px; padding:2px 6px; }
+/* 畳んだ「その他依頼事項」から引っ越してきた依頼メモ */
+.cs-memo{ margin-top:3px; font-size:11px; color:var(--text2); }
+
 .pcm-cau .pcm-caut{ flex:0 0 auto; width:auto; max-width:none; height:16px; display:flex; align-items:center; white-space:nowrap; word-break:keep-all; padding:0 6px 1px; font:800 9px/1 -apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif; letter-spacing:0; color:#1c1300; background:#f59e0b; border:1px solid #f59e0b; border-bottom:none; border-radius:6px 6px 0 0; }
 
 /* ===== 作業ビュー（PIT枠） ===== */
@@ -1064,6 +1090,28 @@
 .ps-bar-note{ font-size:12px; color:var(--text2); }
 .ps-status{ font-size:12.5px; font-weight:700; color:#1db97a; opacity:0; transition:opacity .25s; margin-left:auto; }
 .ps-status.show{ opacity:1; }
+/* 🗂 v2.50.0（ゆうた指定）設定画面のグループ分け。
+   ◎見出し（① 毎日の設定／② 見え方）と、たたむ2つ（道具／危ないもの）。
+   ⚠ サイドバーは付けない。13枚では「どこに何があるか」を覚える手間のほうが大きい。 */
+.ps-sec{ display:flex; align-items:baseline; gap:10px; margin:26px 0 10px; padding-bottom:6px;
+  border-bottom:1px solid var(--border); }
+.ps-sec:first-of-type{ margin-top:8px; }
+.ps-sec-t{ font-size:13.5px; font-weight:800; color:var(--text); letter-spacing:.02em; }
+.ps-sec-n{ font-size:11.5px; color:var(--text3); font-weight:600; }
+.ps-fold{ margin:22px 0 0; border:1px solid var(--border); border-radius:var(--r); background:var(--bg2); }
+.ps-fold > summary{ list-style:none; cursor:pointer; padding:13px 16px; font-size:13.5px; font-weight:800;
+  display:flex; align-items:center; gap:8px; border-radius:var(--r); }
+.ps-fold > summary::-webkit-details-marker{ display:none; }
+.ps-fold > summary::after{ content:'▾'; margin-left:auto; color:var(--text3); font-size:12px; transition:transform .15s; }
+.ps-fold[open] > summary::after{ transform:rotate(180deg); }
+.ps-fold > summary:hover{ background:var(--bg3); }
+.ps-fold-b{ padding:2px 14px 14px; }
+.ps-fold-b .ps-card{ margin-bottom:12px; }
+.ps-fold-b .ps-card:last-child{ margin-bottom:0; }
+/* ⚠ 危ないものは、たたんである時から**危ないと分かる**ようにしておく（開かないと分からない、をやらない） */
+.ps-fold-danger{ border-color:rgba(239,68,68,.4); }
+.ps-fold-danger > summary{ color:var(--red); }
+
 .ps-card{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:16px 18px; margin-bottom:14px; }
 .ps-h{ font-size:14.5px; font-weight:700; margin-bottom:6px; }
 .ps-desc{ font-size:12px; color:var(--text2); line-height:1.7; margin-bottom:12px; }
@@ -1367,7 +1415,8 @@ th.cfs-lg-d{ z-index:3; }
 .cs-sec-body{ display:flex; flex-wrap:wrap; gap:8px; align-content:flex-start; }
 .cs-subh{ flex:1 1 100%; font-size:11px; font-weight:700; color:var(--text2); margin-top:4px; }
 .cs-empty{ flex:1 1 100%; font-size:11px; color:var(--text3); padding:8px 2px; }
-.cs-item{ width:224px; flex:0 0 224px; display:flex; flex-direction:column; gap:4px; }
+/* 🔴 v2.51.0（C-1）204px に一本化（前は224px） */
+.cs-item{ width:204px; flex:0 0 204px; display:flex; flex-direction:column; gap:4px; }
 .cs-cardwrap{ position:relative; }
 .cs-extra{ font-size:11px; color:var(--text2); margin-top:3px; line-height:1.5; }
 .cs-done{ align-self:stretch; font-size:12px; font-weight:700; padding:5px 0; border-radius:7px; cursor:pointer;
@@ -1517,7 +1566,9 @@ th.cfs-lg-d{ z-index:3; }
 .ret-tbd-h small{ font-size:10.5px; font-weight:600; color:var(--text3); }
 .ret-tbd-h .und-cnt{ margin-left:auto; }
 .ret-tbd-body{ display:flex; flex-wrap:wrap; gap:8px; min-height:40px; align-content:flex-start; }
-.ret-tbd-body .pit-card{ width:224px; flex:0 0 224px; min-width:0; }
+/* 🔴 v2.51.0（C-1）204px に一本化（前は224px）。
+   ⚠ すぐ下に `.ret-tbd-body .rtbd-item .pit-card{width:100%}` があって、箱の中では器なりになる。 */
+.ret-tbd-body .pit-card{ width:204px; flex:0 0 204px; min-width:0; }
 .ret-tbd-body .today-empty{ flex:1 1 100%; }
 
 /* ===== 完TEL済／依頼ポップアップ（return-popup.js・pp-* を流用） ===== */

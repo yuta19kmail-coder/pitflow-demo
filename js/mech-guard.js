@@ -50,6 +50,9 @@
   function needed(c, to){
     if (!c || !to) return false;
     if (to !== doneColId(c)) return false;
+    /* 📦 v2.51.0（G）物販は作業者そのものが無い（カード詳細にも欄を出していない）。
+       ここで止めると「入れる所が無いのに入れろと言われる」になるので出さない。 */
+    if (window.pitCardGoods && pitCardGoods(c)) return false;
     return window.PitMechPick ? (PitMechPick.unsettled(c).length > 0) : false;
   }
 

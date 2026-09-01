@@ -51,56 +51,34 @@
        + '<span class="ps-status" id="ps-status"></span>'
        + '<button class="vh-btn" onclick="pitSettingsReset()">↩ 初期値に戻す</button></div>';
 
-    /* ===== 📣 全端末を今すぐ更新する（v2.8.2・2026-08-25 ゆうた指定） =====
-       🗣「強制リロードを全端末でかけるデプロイはできない？」
-       🔴 出したあと、全部の端末を**その場で**読み直させる。1時間待たない。
-       ⚠ 押すのは**出したあと**。出す前に押しても、同じ版を読み直すだけで意味がない。
-       🔴 2026-08-29：判断も入口も **全アプリ共通の coreflow-power.js の1本**に寄せた
-          （PitFlow だけが自前の仕掛け force-reload-pit.js を持っていて、二重だった）。
-          ⚠ ここは呼ぶだけ。**いつ読み直すか・二度反応しないか・打ち込み中は待つ、を here に書かないこと。** */
-    if (window.PIT_CLOUD && window.pitIsAdmin && pitIsAdmin() && window.CFPower && window.CFPower.force) {
-      h += '<div class="ps-card">';
-      h += '<div class="ps-h"><i data-ic=refresh data-ics=16></i> 全端末を今すぐ更新する</div>';
-      h += '<div class="ps-desc">新しい版を<b>出したあと</b>に押すと、開いている<b>全部の端末</b>が1〜2秒で最新版を読み直します。'
-         + 'ふだんは自動更新（1時間に1回）に任せていて問題ありません。'
-         + '<b>版のちがう端末が混ざって困っている時</b>のための手です。'
-         + '<br>⚠ 打ち込み中の端末は、手が空いてから（最大60秒）読み直します。</div>';
-      h += '<div style="margin-top:8px"><button class="vh-btn" onclick="CFPower.force(\'app\')">'
-         + '<i data-ic=refresh data-ics=16></i> 全端末を今すぐ更新する</button></div>';
-      h += '</div>';
-    }
 
-    /* ===== 🗃 v2.12.0 過去の伝票を取り込む（PitFlow を始める前のぶん・管理だけ） =====
-       🗣 ゆうた「PitFlowの始動前のデータ、**車体番号と履歴の挿入**を」
-       🔴 入れるのは**ナンバーとお名前が両方合ったものだけ**。判断は past-import.js の1本。 */
-    if (window.pitPastImportOpen && window.pitIsAdmin && pitIsAdmin()) {
-      h += '<div class="ps-card">';
-      h += '<div class="ps-h"><i data-ic=box data-ics=16></i> 過去の伝票を取り込む</div>';
-      h += '<div class="ps-desc">PitFlow を始める前の<b>売上チェックリストPDF</b>から、'
-         + '<b>車体番号</b>と<b>作業の履歴</b>を入れます。'
-         + '入れるのは<b>ナンバーとお名前が両方合ったものだけ</b>です。</div>';
-      h += '<div style="margin-top:8px"><button class="vh-btn" onclick="pitPastImportOpen()">'
-         + '<i data-ic=box data-ics=16></i> 取り込む画面を開く</button></div>';
-      h += '</div>';
-    }
+    /* ==================================================================
+       🗂 v2.50.0（ゆうた指定 2026-09-01）**設定画面をグループに分けた。**
+       🗣「今みたいな単機能を機能つける時に使ったりしてるから、今後使わないであろうものも結構あるはず」
+       🗣「あとサイドバーを付けた方がいいのか？」→ **要らない**（13枚では覚える手間が増えるだけ）。
+          代わりに**見出しで4つに分け、下の2つはたたむ**。普段見えるのが13枚→7枚になる。
+       ◎分け方は「見え方／データ」ではなく**開いた時の目的**で分けた。
+         設定を開く理由は「数字を直したい」か「道具を使いたい」のどちらかで、
+         「見え方かデータか」では分かれないため。
+       ⚠ 順番を変えただけ。**中身は1つも触っていない**（保存する所も同じ）。
+       ================================================================== */
 
+    /* 🗑 v2.50.0（ゆうた確定 2026-09-01）**「過去の伝票を取り込む」を外した。**
+       PitFlow を始める前のデータを入れる**1回きりの道具**で、もう済んでいる。
+       ⚠ `js/past-import.js` は `_to_delete` へ移してある（消していない）。
+          また要るようになったら、そこから戻して index.html に読み込みを足す。 */
+
+    /* 🗑 v2.50.0（ゆうた確定）**「作業タイプ（見るだけ）」を外した。**
+       ここは**見るだけの写し**で、本体は🧩ルールページにある。
+       🔴 見るだけの写しが2か所にあると、**どちらが本体か分からなくなる**（この画面の一番の敵）。
+       ⚠ ルールページへの案内はこの上に残してある。 */
+
+    h += '<div class="ps-sec"><span class="ps-sec-t">① 毎日の設定</span><span class="ps-sec-n">数字とルール</span></div>';
     /* ===== 入庫まわりは🧩ルールページへ集約（2026-06-04 ゆうた指示） ===== */
     h += '<div class="ps-card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
     h += '<div style="font-size:13px;color:var(--text2);line-height:1.7;flex:1;min-width:240px"><i data-ic=download data-ics=16></i> <b>入庫に関する設定（予約枠・売上目標・平均単価・曜日ルールなど）は「<i data-ic=puzzle data-ics=16></i> ルール」ページに集約</b>しました。入庫のアルゴリズムはすべてそちらで調整します。</div>';
     h += '<button class="vh-btn primary" onclick="showView(\'rules\')"><i data-ic=puzzle data-ics=16></i> ルールページを開く</button>';
     h += '</div>';
-
-    /* ===== 顧客データ取込（テスト・ファイルから） =====
-       v1.3.0：本番では出さない（本番用は「顧客データの取込（本番）」＝import-cloud.js が設定の下に出す） */
-    if (!window.PIT_CLOUD) {
-    h += '<div class="ps-card">';
-    h += '<div class="ps-h"><i data-ic=card data-ics=16></i> 顧客データ取込（テスト）</div>';
-    h += '<div class="ps-desc">bizcloud から書き出した顧客JSON（<code>顧客車両_bizcloud_*.json</code>）を読み込み、<b>この端末のブラウザ内（localStorage）だけ</b>に反映します。本番DBには送りません。現在の顧客控えは<b>全置き換え</b>されます。</div>';
-    h += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">';
-    h += '<button class="vh-btn primary" onclick="pitImportCustomersFromFile()"><i data-ic=download data-ics=16></i> 顧客JSONを選んで取込</button>';
-    h += '<span class="ps-status" id="ps-import-status" style="font-size:12px;color:var(--text2)">現在 ' + ((state.customers||[]).length) + ' 件</span>';
-    h += '</div></div>';
-    }
 
     /* ===== 置き場 ===== */
     const lc = s.lotCap || { pit: 4, yard: 12, parking: 8, extra: 4 };
@@ -127,63 +105,6 @@
     h += '</div>';
     h += '<div class="ps-hint">※ 空き0台まではずっと<b style="color:#1db97a">緑</b>。ちょい超過は緊急＋α・コインパで吸収できる「普通」なので、赤を安売りして受付が萎縮しないように（間の台数は濃いオレンジ）。</div>';
     h += '</div>';
-
-    /* ===== 🚙 代車リミットの色（閾値） ===== */
-    const lcl = s.loanerColors || { greenMin: 4, amberMin: 2 };
-    h += '<div class="ps-card">';
-    h += '<div class="ps-h"><i data-ic=van data-ics=16></i> 代車リミットの色（残り日数）</div>';
-    h += '<div class="ps-desc">代車の返却まで残り日数で色が変わります。<b style="color:#1db97a">緑</b>＝余裕／<b style="color:#f59e0b">黄</b>＝注意／<b style="color:#ef4444">赤</b>＝間近／<b style="color:#9fa8c7">黒</b>＝超過（返却日を過ぎた）。</div>';
-    h += '<div class="ps-grid">';
-    h += '<label class="ps-lb"><i data-ic=dot data-ics=12 style=color:#22c55e></i> 緑：残り ' + numIn('ps-loan-green', lcl.greenMin != null ? lcl.greenMin : 4, 1, 60) + '<span class="ps-unit">日 以上</span></label>';
-    h += '<label class="ps-lb"><i data-ic=dot data-ics=12 style=color:#eab308></i> 黄：残り ' + numIn('ps-loan-amber', lcl.amberMin != null ? lcl.amberMin : 2, 1, 59) + '<span class="ps-unit">日 以上</span></label>';
-    h += '</div>';
-    h += '<div class="ps-hint">※ 黄の日数〜緑の手前＝黄、それ未満（当日0日含む）＝赤、返却日を過ぎる＝黒（超過）。</div>';
-    h += '</div>';
-
-    /* ===== 🏭 PIT配置図（専用エディタを別画面で開く・v0.47.0） ===== */
-    var pitN = (window.PitFloorEditor && PitFloorEditor.countPits) ? PitFloorEditor.countPits() : (Array.isArray(state.bays) ? state.bays.length : 0);
-    h += '<div class="ps-card">';
-    h += '<div class="ps-h"><i data-ic=factory data-ics=16></i> PIT配置図（工場の簡易レイアウト）</div>';
-    h += '<div class="ps-desc">工場の<b>簡易的な平面図</b>を作ります。専用の編集画面で、PIT枠（平PIT／リフトPIT）をグリッドに沿って並べ、建物・ドア・シャッター・通路も置けます。ここで作った図に、作業中の車（カード）をはめていきます（次の段で「Pitリスト」「PITボード」に表示）。</div>';
-    h += '<div class="pf-launch">';
-    h += '<button class="vh-btn primary" onclick="if(window.PitFloorEditor)PitFloorEditor.open()"><i data-ic=factory data-ics=16></i> PIT配置図を編集する</button>';
-    h += '<span class="pf-launch-meta">現在のPIT枠：' + pitN + ' 個</span>';
-    h += '</div>';
-    h += '</div>';
-
-    /* ===== 作業タイプ（**見るだけ**・v2.5.0／2026-08-24 ゆうた指定） =====
-       🔴 ここからは足せない・消せない・名前も色も変えられない。正は state.js の PIT_WORK_TYPES。
-          理由＝作業タイプの id には挙動（諸費用の必須・車検予定・洗車/コーティング・
-          データチェックの見張り・MHS への出し方）が結びついていて、
-          名前と色だけ足しても、その挙動は1つも付いてこないため。 */
-    h += '<div class="ps-card">';
-    h += '<div class="ps-h"><i data-ic=wrench data-ics=16></i> 作業タイプ（メニュー）<span class="ps-ro-tag">見るだけ</span></div>';
-    h += '<div class="ps-desc">入庫カードの「作業タイプ」に出る選択肢です。<b>ここからは増やせません・変えられません。</b><br>'
-       + '作業タイプは、諸費用の必須・車検予定への載り方・洗車やコーティングの段取り・データチェックの見張り・MHSへの出し方まで、'
-       + 'アプリのあちこちに挙動が結びついています。名前と色だけ足しても、その挙動は付いてきません。'
-       + '<b>足したい／名前や色を変えたいときは開発（Claude）に言ってください。</b>'
-       + '<br><b>「併用可」</b>＝他の作業を選んでいても“追加で”選べる作業（例：車検＋3M）。'
-       + '<br><b>「旧」</b>＝いまのアプリには無い、昔ここから足された型。過去カードのために残してあります。</div>';
-    (state.workTypes || []).forEach(function (w) {
-      h += '<div class="ps-wt-row ps-wt-ro">'
-         + '<span class="ps-wt-dot" style="background:' + esc(w.color || '#64748b') + '"></span>'
-         + '<span class="ps-wt-name">' + esc(w.label) + '</span>'
-         + (w.combinable ? '<span class="ps-wt-tag">併用可</span>' : '')
-         + (w.legacy ? '<span class="ps-wt-tag ps-wt-old">旧</span>' : '')
-         + '<span class="ps-wt-id">' + esc(w.id) + '</span>'
-         + '</div>';
-    });
-    h += '</div>';
-
-    /* ===== 🧪 開発用サンプル（予約の作り直し） =====
-       v1.2.1：本番（クラウド保存）では出さない＝実データの中にサンプルを作ってしまう事故を防ぐ */
-    if (!window.PIT_CLOUD) {
-    h += '<div class="ps-card">';
-    h += '<div class="ps-h"><i data-ic=flask data-ics=16></i> 開発用サンプル</div>';
-    h += '<div class="ps-desc">今のサンプル予約（カード）を全部消して、<b>今の顧客データから</b>直近の入庫実績っぽいサンプルを作り直します。残った車は預かり中ボードに散らします。<br>※開発・動作確認用。実データ運用前の見栄え確認に。</div>';
-    h += '<button class="vh-btn" onclick="if(window.seedSampleReservations)seedSampleReservations()"><i data-ic=refresh data-ics=16></i> 予約サンプルを作り直す（顧客データから）</button>';
-    h += '</div>';
-    }
 
     /* ===== 概算預かり日数の初期値 ===== */
     h += '<div class="ps-card">';
@@ -260,6 +181,49 @@
     h += (window.ParkingView ? ParkingView.settingsCardHtml() : '');
     // 設定の引っ越し（開発サイト → 本番サイト）
     h += (window.pitTransferCardHtml ? pitTransferCardHtml() : '');
+
+    h += '<div class="ps-sec"><span class="ps-sec-t">② 見え方</span><span class="ps-sec-n">画面の見た目だけ。数字は変わりません</span></div>';
+    /* ===== 🚙 代車リミットの色（閾値） ===== */
+    const lcl = s.loanerColors || { greenMin: 4, amberMin: 2 };
+    h += '<div class="ps-card">';
+    h += '<div class="ps-h"><i data-ic=van data-ics=16></i> 代車リミットの色（残り日数）</div>';
+    h += '<div class="ps-desc">代車の返却まで残り日数で色が変わります。<b style="color:#1db97a">緑</b>＝余裕／<b style="color:#f59e0b">黄</b>＝注意／<b style="color:#ef4444">赤</b>＝間近／<b style="color:#9fa8c7">黒</b>＝超過（返却日を過ぎた）。</div>';
+    h += '<div class="ps-grid">';
+    h += '<label class="ps-lb"><i data-ic=dot data-ics=12 style=color:#22c55e></i> 緑：残り ' + numIn('ps-loan-green', lcl.greenMin != null ? lcl.greenMin : 4, 1, 60) + '<span class="ps-unit">日 以上</span></label>';
+    h += '<label class="ps-lb"><i data-ic=dot data-ics=12 style=color:#eab308></i> 黄：残り ' + numIn('ps-loan-amber', lcl.amberMin != null ? lcl.amberMin : 2, 1, 59) + '<span class="ps-unit">日 以上</span></label>';
+    h += '</div>';
+    h += '<div class="ps-hint">※ 黄の日数〜緑の手前＝黄、それ未満（当日0日含む）＝赤、返却日を過ぎる＝黒（超過）。</div>';
+    h += '</div>';
+
+    /* ===== 🏭 PIT配置図（専用エディタを別画面で開く・v0.47.0） ===== */
+    var pitN = (window.PitFloorEditor && PitFloorEditor.countPits) ? PitFloorEditor.countPits() : (Array.isArray(state.bays) ? state.bays.length : 0);
+    h += '<div class="ps-card">';
+    h += '<div class="ps-h"><i data-ic=factory data-ics=16></i> PIT配置図（工場の簡易レイアウト）</div>';
+    h += '<div class="ps-desc">工場の<b>簡易的な平面図</b>を作ります。専用の編集画面で、PIT枠（平PIT／リフトPIT）をグリッドに沿って並べ、建物・ドア・シャッター・通路も置けます。ここで作った図に、作業中の車（カード）をはめていきます（次の段で「Pitリスト」「PITボード」に表示）。</div>';
+    h += '<div class="pf-launch">';
+    h += '<button class="vh-btn primary" onclick="if(window.PitFloorEditor)PitFloorEditor.open()"><i data-ic=factory data-ics=16></i> PIT配置図を編集する</button>';
+    h += '<span class="pf-launch-meta">現在のPIT枠：' + pitN + ' 個</span>';
+    h += '</div>';
+    h += '</div>';
+
+
+    /* ③ 道具＝**たまにしか使わないもの**。普段はたたんでおく。
+       ⚠ 外から足す箱（引っ越し・初期化）も、ここに入る場所（`ps-tools-body` / `ps-danger-body`）を用意してある。 */
+    h += '<details class="ps-fold"><summary><i data-ic=wrench data-ics=16></i> 道具 <span class="ps-sec-n">たまに使うもの</span></summary><div class="ps-fold-b">';
+    /* 🗑 v2.50.0（ゆうた指摘 2026-09-01「これも今は電源ボタンにあるから消去でいいでしょ？」）
+       **「全端末を今すぐ更新する」を外した。**
+       🔴 まったく同じものが**電源ボタンのメニュー**にある（「全員の この画面を更新」／「全員の 全アプリを更新」）。
+       　 中身はどちらも `coreflow-power.js` の `doForce` 1本＝**入口だけが2つあった。**
+       ⚠ 入口が2つあると、片方だけ直したり、片方だけ権限がずれたりする。**入口も1本にする。**
+       ⚠ 消したのは入口だけ。`CFPower.force` は電源メニューから今までどおり使える。 */
+
+    h += '<div id="ps-tools-body"></div>';
+    h += '</div></details>';
+
+    /* ④ 危ないもの＝押すと戻せないもの。**いちばん下・たたむ**。 */
+    h += '<details class="ps-fold ps-fold-danger"><summary><i data-ic=warn data-ics=16></i> 危ないもの <span class="ps-sec-n">押すと戻せません</span></summary><div class="ps-fold-b">';
+    h += '<div id="ps-danger-body"></div>';
+    h += '</div></details>';
 
     body.innerHTML = h;
 

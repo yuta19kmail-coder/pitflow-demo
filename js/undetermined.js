@@ -73,7 +73,17 @@ function renderReserveTbd(){
   const approval  = state.cards.filter(c => c.approvalPending && !c.archived
                                             && c.status !== 'returned' && c.status !== 'cancelled' && c.status !== 'scrap');
   const tentative = state.cards.filter(c => c.status === 'reserved' && c.tentative && !c.approvalPending);
-  const intakeTbd = state.cards.filter(c => c.status === 'reserved' && c.intakeTbd && !c.tentative);
+  /* 🔧🔧 v2.49.0（ゆうた指定 2026-08-31）**代車・自社車両は自分のBOXへ。**
+     🗣「では逆に未定にタブのBOXに代車・自社車両を新設したらどう？」
+     ◎なぜ隠すのではなく分けるか
+       隠すと「代車を未定BOXから外す」という**例外**が1つ増える。分ければ **`pitCardIntern` 1本での振り分け**で済む。
+       例外は増えるほど食い違うが、振り分けは物差しが1本のまま。
+     ⚠ 代車の整備は「候補日は決まっているが、どの日にやるかは現場が決める」＝**入庫日は未定**。
+        だから `intakeTbd` に乗る意味そのものは、お客様の車とまったく同じ。
+     ⚠ ボタンは「入庫日を入れる」ではなく **「日を決める」**（候補が飛び地であるので、作業予定ボードで選ばせる）。 */
+  const _intern    = c => !!(window.pitCardIntern && pitCardIntern(c));
+  const intakeTbd  = state.cards.filter(c => c.status === 'reserved' && c.intakeTbd && !c.tentative && !_intern(c));
+  const internTbd  = state.cards.filter(c => c.status === 'reserved' && c.intakeTbd && !c.tentative &&  _intern(c));
   /* 🔴 v1.101.0 未入庫＝**来なかっただけ**の車。
      ⚠ 人が押した「予約キャンセル」（`cancelled:true`）は、押した時点でアーカイブして
         お客様の来店履歴へ移すので、ここには並べない（＝もう待たないから）。 */
@@ -101,6 +111,15 @@ function renderReserveTbd(){
   h += col('<i data-ic=parking data-ics=16></i> 未定 <small>（パーツ待ち・入庫日決まらず）</small>', intakeTbd.length,
     intakeTbd.length ? intakeTbd.map(c => item(c, '<button class="rtbd-act" onclick="event.stopPropagation();pitUndSetIntake(\'' + c.id + '\')"><i data-ic=calendar data-ics=16></i> 入庫日を入れる</button>')).join('') : empty,
     'カードの<i data-ic=calendar data-ics=16></i>で入庫日を入れると予約カレンダーへ移ります。');
+
+  /* 🔧 代車・自社車両（社内区分「代車」「中古車」「内部」）＝ここが**予約側の居場所**。
+     ⚠ 「日を決める」は作業予定ボードへ。候補が飛び地であるので、日付ピッカー1つでは決められない。 */
+  h += col('<i data-ic=wrench data-ics=16></i> 代車・自社車両 <small>（日が決まっていない整備）</small>', internTbd.length,
+    internTbd.length ? internTbd.map(c => item(c, '<button class="rtbd-act" onclick="event.stopPropagation();pitUndMaintGo(\'' + c.id + '\')"><i data-ic=calendar data-ics=16></i> 日を決める</button>')).join('') : empty,
+    '自社の代車・社用車の整備（車検・12ヶ月点検・修理・B.P）です。'
+    + '<b>売上・台数・突合には数えません</b>（社内区分「代車」）。<br>'
+    + '候補日は<b>飛び地で何本でも</b>持てます。日が決まると予約カレンダー・当日ビュー・MHS に出ます。<br>'
+    + '⚠ 候補の期間は<b>代車を貸せなくはしません</b>（確定した枠だけ押さえます）。');
 
   h += col('<i data-ic=ban data-ics=16></i> 未入庫 <small>（来店なし）</small>', noShow.length,
     noShow.length ? noShow.map(c => item(c, _undNoShowActs(c))).join('') : empty,
@@ -419,4 +438,13 @@ window.pitUndComplete = function(id){
     renderReturnTbd();
     if (window.pitToast) pitToast(''+ c.returnDate + 'の返車予定に入れました');
   });
+};
+
+/* 🔧 v2.49.0 代車・自社車両BOXの「日を決める」＝車両管理の作業予定ボードへ。
+   ⚠ 飛び先は maint-pit.js の `flMaintGoto` 1本（ここで画面遷移を組み立てない）。 */
+window.pitUndMaintGo = function(cardId){
+  const c = (state.cards || []).find(x => x.id === cardId);
+  if (!c) return;
+  if (window.flMaintGoto) flMaintGoto(c.maintVehId, c.maintYm || '');
+  else if (window.showView) showView('fleet');
 };

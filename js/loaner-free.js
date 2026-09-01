@@ -166,20 +166,21 @@
       label: a.hold ? '仮押さえ' : (a.customer || (a.emergency ? '緊急' : '貸出'))
     };
   }
-  /* fleetEvents の中の「整備の枠」（`maint:true` が目印）。⚠ 既存の予定と同じ箱に入れて、箱は増やさない。 */
-  function _maintItem(e) {
+  /* 🔴🔴 v2.49.0 **整備の枠は「予約カードの候補」から作る**（fleetEvents ではもう無い）。
+     カード1枚＝作業1本、候補（飛び地）は `maintSpans` の1本ずつ。形は pit-share.js に書いた。
+     ⚠ 名前は**作業タイプから出す**（書き込み忘れで「整備の枠」に落ちると、何の作業か分からなくなる）。 */
+  function _maintItem(c, sp) {
+    var work = c.workType || '';
     return {
-      kind: 'maint', id: e.id, from: e.fromDate, to: e.toDate,
-      event: e, maintOf: e,
-      stage: e.stage || 'candidate',
-      work: e.work || '',            /* shaken / 12pt / general / bp / fix */
-      groupId: e.groupId || e.id,
-      urgent: !!e.urgent,
-      skipped: Array.isArray(e.skipped) ? e.skipped : [],
-      memo: e.memo || '',
-      /* ⚠ 名前は**作業タイプから出す**。`label` の書き込み忘れで「整備の枠」に落ちると、
-         日ビューでもボードでも何の作業か分からなくなる（古いデータにも label は無い）。 */
-      label: e.label || (MAINT_WORKS[e.work] && MAINT_WORKS[e.work].label) || '整備の枠',
+      kind: 'maint', id: c.id + '#' + sp.sid, from: sp.from, to: sp.to,
+      card: c, maintOf: c, cardId: c.id, sid: sp.sid,
+      stage: (c.maintFixSid === sp.sid) ? 'fixed' : 'candidate',
+      work: work,                    /* shaken / 12pt / general / bp */
+      groupId: c.id,
+      urgent: !!c.urgent,
+      skipped: Array.isArray(c.maintSkipped) ? c.maintSkipped : [],
+      memo: c.memo || '',
+      label: (MAINT_WORKS[work] && MAINT_WORKS[work].label) || '整備の枠',
       color: '#d6a846'
     };
   }
@@ -216,18 +217,27 @@
       if (!(a.fromDate <= to && a.toDate >= from)) return;
       out.push(_assignItem(a));
     });
+    /* 代車自身の予定（車検入庫・リースアップなど）＝いままでどおり fleetEvents */
     arr(w.state && w.state.fleetEvents).forEach(function (e) {
       if (!e || e.vehicleId !== loanerId) return;
       if (!(e.fromDate <= to && e.toDate >= from)) return;
-      if (e.maint){
-        /* 🔴 **月の目標（stage:'month'）は日の軸には出さない。**
-           縮尺が違うものを日のカレンダーに乗せると必ず破綻する（2026-08-31 の整理）。
-           出すのは作業予定ボードと月カレンダーだけ＝そちらは opt.withMonth を付けて呼ぶ。 */
-        if ((e.stage || 'candidate') === 'month' && !(opt && opt.withMonth)) return;
-        out.push(_maintItem(e));   /* 整備の枠は「代車自身の予定（青帯）」と kind を分ける */
-      } else {
-        out.push(_eventItem(e));
-      }
+      if (e.maint) return;   /* ⚠ v2.49.0 まで整備の枠もここに居た。**もうカードにある**ので拾わない */
+      out.push(_eventItem(e));
+    });
+    /* 🔧 整備の枠＝予約カードの候補（v2.49.0）。
+       🔴 **月の目標（候補が1本も無いカード）は日の軸には出ない**（配列が空なので自然に出ない）。
+          縮尺が違うものを日のカレンダーに乗せると必ず破綻する（2026-08-31 の整理）。
+       ⚠ v2.48.0 まではここに `opt.withMonth` という逃げ道があった。月と日が同じ箱に居たため。
+          **カードに分けたら要らなくなったので消した。**（逃げ道は要らなくなったら残さない） */
+    arr(w.state && w.state.cards).forEach(function (c) {
+      if (!c || c.internKind !== 'loanercar' || !Array.isArray(c.maintSpans)) return;
+      if (c.maintVehId !== loanerId) return;
+      if (c.status === 'cancelled' || c.status === 'scrap') return;
+      arr(c.maintSpans).forEach(function (sp) {
+        if (!sp || !sp.from || !sp.to) return;
+        if (!(sp.from <= to && sp.to >= from)) return;
+        out.push(_maintItem(c, sp));   /* 整備の枠は「代車自身の予定（青帯）」と kind を分ける */
+      });
     });
     return _pick(out, opt);
   }

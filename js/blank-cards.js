@@ -213,99 +213,26 @@
   w.addEventListener('beforeunload', function () { try { keepDraft(); } catch (e) {} });
 
   /* =========================================================
-     ② 設定：v1.16.0 より前に溜まった空カードの消去
+     ② 設定の「空カード消去」は v2.50.0 で外した（下のコメント参照）
+     ⚠ ここにあった `canShow` / `blanks` / `injectCSS` は**どこからも呼ばれなくなったので消した。**
+        使われない関数を残すと、次に読む人が「まだ生きている」と勘違いする。
      ========================================================= */
-  function isCloud() { return !!w.PIT_CLOUD; }
-  function isAdmin() { return !w.pitIsAdmin || w.pitIsAdmin(); }
-  function canShow() { return isCloud() && isAdmin(); }
-  function blanks() { return ((w.state && w.state.cards) || []).filter(function (c) { return !c._draft && isBlank(c); }); }
 
-  function injectCSS() {
-    if (d.getElementById('pit-blank-css')) return;
-    var st = d.createElement('style');
-    st.id = 'pit-blank-css';
-    st.textContent =
-      '.pit-blank-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-top:14px}' +
-      '.pit-blank-box h4{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:6px}' +
-      '.pit-blank-box p{margin:0 0 12px;font-size:12px;color:var(--text2);line-height:1.7}' +
-      '.pit-blank-box .pb-n{font-weight:800;color:var(--brand)}' +
-      '.pit-blank-box .pb-go{padding:8px 14px;border-radius:8px;border:1px solid var(--border);' +
-        'background:var(--bg3);color:var(--text);font-size:13px;font-weight:600;cursor:pointer}' +
-      '.pit-blank-box .pb-go:disabled{opacity:.45;cursor:default}' +
-      '.pit-blank-list{margin:0 0 12px;font-size:12px;color:var(--text3);line-height:1.8;max-height:150px;overflow:auto}';
-    (d.head || d.documentElement).appendChild(st);
-  }
-
-  function appendBox() {
-    var old = d.getElementById('pit-blank-box');
-    if (!canShow()) { if (old && old.parentNode) old.parentNode.removeChild(old); return; }
-    var host = d.getElementById('view-settings-body');
-    if (!host) return;
-    if (old && old.parentNode) old.parentNode.removeChild(old);   /* 件数を出すので毎回作り直す */
-    injectCSS();
-    var list = blanks();
-    var rows = list.slice(0, 30).map(function (c) {
-      return '・' + esc(c.resNo || '(番号なし)') + '　入庫日 ' + esc(c.reserveDate || '未設定');
-    }).join('<br>');
-    var box = d.createElement('div');
-    box.id = 'pit-blank-box';
-    box.className = 'pit-blank-box';
-    box.innerHTML =
-      '<h4><i data-ic=trash data-ics=16></i> 空の予約カードを消去する</h4>' +
-      '<p>v1.17.0 より前に、「＋ 新規予約」を開いて<b>何も入れずにやめた</b>ぶんのカードです。' +
-      'お客様も車も作業内容も入っていないのに、<b>「今日の入庫」「預かり中」に数えられて</b>しまいます。' +
-      '予約ビューには時間が無いので出てこないため、ここから消去します。<br>' +
-      '<b>いまは保存を押すまでカードができない作りなので、これ以上増えることはありません。</b><br>' +
-      '何か1つでも入力があるカードは対象になりません。</p>' +
-      '<p>いま <span class="pb-n">' + list.length + '</span> 枚あります。</p>' +
-      (rows ? '<div class="pit-blank-list">' + rows + (list.length > 30 ? '<br>ほか ' + (list.length - 30) + ' 枚' : '') + '</div>' : '') +
-      '<button class="pb-go" onclick="pitOpenBlankClean()"' + (list.length ? '' : ' disabled') + '>' +
-      (list.length ? 'この ' + list.length + ' 枚を消去する…' : '消去するものはありません') + '</button>';
-    host.appendChild(box);
-    try { if (w.icoBoot) w.icoBoot(box); } catch (e) {}
-  }
-
-  w.pitOpenBlankClean = function () {
-    if (!canShow()) return;
-    var list = blanks();
-    if (!list.length) return;
-    confirmBox('空の予約カードを ' + list.length + ' 枚 消去します。', {
-      title: '空の予約カードを消去する',
-      detail: 'お客様・車・作業内容など、何か1つでも入っているカードは含まれていません。消去したものは戻せません。',
-      ok: '消去する', danger: true
-    }).then(function (ok) {
-      if (!ok) return;
-      var ids = {}; list.forEach(function (c) { ids[c.id] = 1; });
-      w.state.cards = w.state.cards.filter(function (c) { return !ids[c.id]; });
-      try { if (w.PitDB) w.PitDB.save(true); } catch (e) { console.warn('[draft] 保存でエラー', e); }
-      try { if (w.pitLog) w.pitLog('空の予約カードを消去した', { label: list.length + ' 枚', kind: 'clean' }); } catch (e) {}
-      try { if (w.showToast) w.showToast('空の予約カードを ' + list.length + ' 枚 消去しました'); } catch (e) {}
-      try { if (w.showView) w.showView('settings'); } catch (e) {}
-      console.log('[draft] 消去完了：' + list.length + ' 枚');
-    });
-  };
-
-  /* ---- 設定画面が描かれるたびに入口を足す（reset-pit.js と同じやり方） ---- */
-  function hookRender() {
-    if (typeof w.renderSettings !== 'function' || w.renderSettings.__pitBlank) return false;
-    var orig = w.renderSettings;
-    var f = function () {
-      var r = orig.apply(this, arguments);
-      try { appendBox(); } catch (e) { console.warn('[draft] 入口の追加でエラー', e); }
-      return r;
-    };
-    f.__pitBlank = 1;
-    w.renderSettings = f;
-    return true;
-  }
+  /* 🗑 v2.50.0（ゆうた確定 2026-09-01）**設定画面の「空の予約カードを消去する」を外した。**
+     ◎なぜ
+       これは **v1.17.0 より前に溜まったぶんの後始末**で、
+       このファイル自身が「いまは保存を押すまでカードができない作りなので、
+       **これ以上増えることはありません**」と書いていた＝**1回きりの道具**。
+       済んだ道具を設定画面に置き続けると、毎日開く人の目には**ただの雑音**になる。
+     🔴 **空のカードを作らせない仕掛け（下の hookOpeners / hookLeave / hookSave）は残してある。**
+        外したのは「溜まったものを掃除するボタン」だけ。**防ぐ側は現役。**
+     ⚠ また掃除が要るようになったら、`_to_delete` ではなくここの履歴から戻すこと。 */
 
   function boot() {
     hookOpeners();
     hookLeave();
     var a = hookSave();
-    var b = hookRender();
-    if (!a || !b) setTimeout(boot, 300);   /* まだ読み込まれていない物があれば少し待って掛け直す */
-    try { appendBox(); } catch (e) {}
+    if (!a) setTimeout(boot, 300);   /* まだ読み込まれていない物があれば少し待って掛け直す */
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', boot);
   else boot();

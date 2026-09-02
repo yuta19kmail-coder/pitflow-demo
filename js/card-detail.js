@@ -1891,13 +1891,33 @@ function otherPanelHtml(c){
   h += '<div class="cf-other-sec">';
   h += '<div class="cf-other-lb">社内区分<span>自社の車。売上には数えません（実績には残ります）</span></div>';
   h += '<div class="cf-chips" data-key="internKind" data-intern="1">';
+  /* 🔴🔴 v2.53.0（ゆうた 2026-09-01）**代車はここから選べない。**
+     🗣「新規予約や通常の予約詳細編集画面から代車は非表示でいいのでは？
+     　　入力は全部ここ（作業予定ボード）から。でここで終わりってことになるでしょ？」
+     ◎なぜ塞ぐか
+       代車の整備カードは**作業予定ボードで生まれて、ボードの「完了する」で終わる**。
+       ここからも作れると入口が2つになり、実際に
+       「候補ゼロ・入庫日未定なのに作業中」という**どの画面にも出てこない迷子**ができた（2026-09-01・J72348）。
+     ◎見えるけど押せない（ゆうた指定）
+       すでに代車になっているカードを開いた時に**何のカードか分からなくなる**ため、札は出す。
+     ⚠ 中古・内部はそのまま選べる。
+        中古は作業予定ボードに出てこない（代車・社用車ではない）ので、塞ぐと作る道が無くなる。 */
   (window.PIT_INTERN_KINDS || []).forEach(function (it) {
     var active = (kind === it.id);
+    var lock   = (it.id === 'loanercar');
     var style  = active ? ('background:#0f766e;color:#fff;border-color:#0f766e;')
                         : ('border-color:#0f766e;color:#0f766e;');
-    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '"'
-       + ' data-val="' + it.id + '"' + _chipTitle(it.id, '') + ' style="' + style + '">' + it.label + '</button>';
+    if (lock && !active) style += 'opacity:.35;';
+    if (lock) style += 'cursor:default;';
+    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + (lock ? ' cf-chip-lock' : '') + '"'
+       + ' data-val="' + it.id + '"' + (lock ? ' disabled' : '')
+       + _chipTitle(it.id, lock ? '代車の整備は「代車・自社車両管理」の作業予定ボードから足します（ここでは選べません）' : '')
+       + ' style="' + style + '">' + it.label + '</button>';
   });
+  if (kind === 'loanercar'){
+    h += '<div class="cf-other-note">この予約は<b>代車の整備</b>です。日を決めるのも終わらせるのも'
+       + '<b>代車・自社車両管理の「代車作業予定」</b>から行います。ここでは変えられません。</div>';
+  }
   h += '</div>';
   if (kind === 'loanercar'){
     var mate = window.pitInternMate ? pitInternMate(c) : '';

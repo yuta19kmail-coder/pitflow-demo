@@ -160,6 +160,11 @@
       var plans = (w.pitLoanerMaintPlans ? w.pitLoanerMaintPlans(v, td) : []);
       plans.forEach(function(p){
         if (!p.overdue && !p.slipped && p.ym > horizon) return;   /* 半年より先はまだ出さない */
+        /* 🔴 v2.53.0 この月・この作業の「完了する」を押してあれば、もう出さない。
+           ⚠ 車検は満了日を進めれば勝手に消えるが、**12ヶ月点検は満了日から計算している**ので
+              満了日が動かない＝押した印を見ないと永久に出続ける。 */
+        var _done = cardForPlan(v.id, p.work, p.ym);
+        if (_done && _done.maintDone) return;
         out.push(buildRow(v, p, td));
       });
       /* ② 計算で出ない予定＝**カードが実体を持っているもの**（修理・B.P、手で足した車検 など）
@@ -168,7 +173,14 @@
             いまは**計算の目標と噛み合わないカードを全部**ここで拾う。 */
       mcards().forEach(function(c){
         if (c.maintVehId !== v.id) return;
-        if (c.status !== 'reserved') return;                 /* 入庫したらボードの仕事は終わり */
+        /* 🔴🔴 v2.53.0（ゆうた 2026-09-01）**入庫では消さない。「完了する」を押すまで残す。**
+           ◎前まで … `status !== 'reserved'` で外していた（＝入庫した瞬間にボードから消えた）。
+             そのせいで「終わったのかどうか」をボードで確かめられず、
+             車検は満了日が動かないので**別の行がずっと残る**、という食い違いが起きていた。
+           ◎いま … 終わりを名乗れるのは**「完了する」を押した時（maintDone）だけ**。
+             🗣「押し忘れて残っているのが目に入るほうが良い」＝自動では消さない。
+           ⚠ だから入庫中・返車済みの行もここに出る。状態は buildRow が出し分ける。 */
+        if (c.maintDone) return;                             /* 完了を押した＝ボードの仕事は終わり */
         var matched = plans.some(function(p){ return p.work === c.workType && p.ym === c.maintYm; });
         if (matched) return;                                 /* ①がもう出している */
         var ym = c.maintYm || ymOf(td);
@@ -182,7 +194,8 @@
       });
     });
     /* 並び＝赤 → 警告 → 動いているもの → まだ先。同じ強さなら期限が近い順 */
-    var rank = { bad:0, warn:1, doing:2, go:3, idle:4 };
+    /* 🔴 v2.53.0 「完了する」待ちは**いちばん上**。押し忘れが目に入るように（ゆうた指定） */
+    var rank = { done:0, bad:1, warn:2, doing:3, go:4, idle:5 };
     out.sort(function(a, b){
       return (rank[a.level] - rank[b.level]) || (String(a.sortKey) < String(b.sortKey) ? -1 : 1);
     });
@@ -207,7 +220,14 @@
     var live = cands.filter(function(r){ return r.toDate >= td; });     /* まだ来ていない候補 */
     var level = 'idle', msg = '', msgCls = 'g';
 
-    if (fixed && fixed.started){ level = 'doing'; msg = '作業中。完TELを通ると、残っている候補は消えます'; }
+    /* 🔴🔴 v2.53.0 **実績（数えない側）に入った＝「完了する」を聞く番。**
+       ここが「終わり」を名乗れる唯一の場所。押すまで行は消えない。 */
+    var doneReady = !!(_card && _card.status === 'returned' && !_card.maintDone);
+    if (doneReady){
+      level = 'done'; msgCls = 'g';
+      msg = '実績に入りました。内容を確かめて「完了する」を押してください';
+    }
+    else if (fixed && fixed.started){ level = 'doing'; msg = '作業中。完TELを通ると、残っている候補は消えます'; }
     else if (fixed){ level = 'go'; msg = '当日ビューに出ます。入庫したらタスクボードへカードが起きます'; }
     else if (p.overdue){
       level = 'bad'; msgCls = 'b';
@@ -235,6 +255,7 @@
       work: p.work, workLabel: p.label || WORK_LB[p.work] || '整備',
       groupId: gid, plan: p, candidates: cands, live: live, fixed: fixed,
       level: level, msg: msg, msgCls: msgCls,
+      card: _card || null, doneReady: doneReady,
       urgent: !!p.urgent, memo: p.memo || '',
       sortKey: p.dueDate || (p.ym + '-99')
     };
@@ -340,8 +361,11 @@
 
       if (r.msg) h += '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>';
       h += '</div><div class="mb-act">'
-        + (r.fixed ? '' : '<button class="vh-btn" onclick="flMaintGoto(\'' + r.vehicleId + '\',\'' + p.ym + '\')">日を決める</button>')
-        + (p.manualId ? '<button class="vh-btn mb-del" onclick="flMaintDrop(\'' + p.manualId + '\')">取り下げ</button>' : '')
+        /* 🔴 v2.53.0 実績に入ったら、ここが「完了する」に変わる（日を決める・取り下げは出さない） */
+        + (r.doneReady
+            ? '<button class="vh-btn mb-done" onclick="flMaintFinish(\'' + (r.card && r.card.id) + '\')"><i data-ic=check data-ics=16></i> 完了する</button>'
+            : ((r.fixed ? '' : '<button class="vh-btn" onclick="flMaintGoto(\'' + r.vehicleId + '\',\'' + p.ym + '\')">日を決める</button>')
+             + (p.manualId ? '<button class="vh-btn mb-del" onclick="flMaintDrop(\'' + p.manualId + '\')">取り下げ</button>' : '')))
         + '</div></div>';
     });
     h += '</div></div>';
@@ -828,6 +852,90 @@
   /* 🏁 完TEL関門を通った時＝**残りの候補をまとめて消す**（ゆうた指定「入庫時ではなく完TELで」）。
      ＋ ④ 本黄色を**実際の入庫〜返車に合わせる**。
      ⚠ 呼ぶのは intern-pit.js（社内車両の実績化）の1か所だけ。ここに条件を書き写さない。 */
+  /* ==================================================================
+     🏁 v2.53.0（ゆうた 2026-09-01）**「完了する」＝ボードで終わりを名乗る唯一の場所**
+     ------------------------------------------------------------------
+     🗣「実績（非カウント）に送られた時点で、代車作業予定のカードが完了に切替わり、
+     　　2年足した満了日を表示。問題なければ『完了する』みたいなボタンがあって、
+     　　押したら更新され、カードが消える。満了日が変わるようであればピッカーで選んで完了する」
+     🗣「12点や一般等であれば、日付が出なくて『非実績に乗った日に終わりました』みたいな聞き方。挙動は同じ」
+
+     ◎なぜ人に押させるのか
+       車検は**更新**なので、新しい満了日は「通した日＋2年」ではなく「**いまの満了日＋2年**」。
+       ただし車種や状況で1年のこともあるので、**必ず目で確かめてもらう**（既定を出して、違えば直す）。
+     ◎押すと何が起きるか
+       ・車検 … 車両の満了日を進める → 計算の目標が次の年へ動く＝行が消える
+       ・12点 … 満了日は動かないので、**カードに済んだ印**（maintDone）を付けて行を消す
+       ・一般・B.P・手で足したもの … 同じく済んだ印だけ
+     ⚠ 自動では消さない。押し忘れて残っているのは**目に入ったほうが良い**（ゆうた指定）。
+     ================================================================== */
+  w.flMaintFinish = function(cardId){
+    var c = cardOf(cardId);
+    if (!c){ if (w.pitAlert) w.pitAlert('カードが見つかりません', { code:'PF-3062' }); return; }
+    var v = vehOf(c.maintVehId);
+    var isShaken = (c.workType === 'shaken');
+    var cur = (v && v.shakenDate) || '';
+    var next = cur ? _plus2y(cur) : '';
+    var endDay = c.completedAt || c.returnDate || today();
+
+    var h = '<h3 class="lo-modal-h"><i data-ic=check data-ics=16></i> ' + esc(WORK_LB[c.workType] || '整備') + ' を完了にする</h3>'
+      + '<div class="lo-modal-b">'
+      + '<div class="lo-modal-note">' + esc(vehName(v)) + '　' + esc(md(endDay)) + ' に終わりました。</div>';
+    if (isShaken){
+      h += '<div class="lo-modal-note">車検は<b>更新</b>なので、新しい満了日は「いまの満了日 ' + esc(cur || '（まだ入っていません）') + ' の2年後」です。'
+         + '車検証と違っていたら直してください。</div>'
+         + '<div class="lo-modal-row"><label class="lo-modal-f">新しい車検満了日'
+         + '<input type="date" id="mbf-shaken" value="' + esc(next) + '"></label></div>';
+    } else {
+      h += '<div class="lo-modal-note">この作業には満了日がありません。日付は動きません。</div>';
+    }
+    h += '</div><div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
+       + '<button class="primary" onclick="flMaintFinishSave(\'' + c.id + '\')">完了する</button></div>';
+    _modal(h);
+  };
+
+  /* いまの満了日の2年後（2/29 は 2/28 に寄せる） */
+  function _plus2y(iso){
+    var p = String(iso || '').split('-'); if (p.length !== 3) return '';
+    var d = new Date(+p[0] + 2, +p[1] - 1, +p[2]);
+    if (d.getMonth() !== (+p[1] - 1)) d = new Date(+p[0] + 2, +p[1], 0);   /* 末日はみ出し（2/29→2/28）を戻す */
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  w.flMaintFinishSave = function(cardId){
+    var c = cardOf(cardId); if (!c) return;
+    var v = vehOf(c.maintVehId);
+    var isShaken = (c.workType === 'shaken');
+    var newDue = '';
+    if (isShaken){
+      var el = document.getElementById('mbf-shaken');
+      newDue = el ? String(el.value || '').trim() : '';
+      if (!newDue){ if (w.pitAlert) w.pitAlert('新しい車検満了日を入れてください', { code:'PF-3063' }); return; }
+      var cur = (v && v.shakenDate) || '';
+      if (cur && newDue <= cur){
+        if (w.pitAlert) w.pitAlert('新しい満了日が、いまの満了日（' + cur + '）より前になっています。'
+          + '車検は更新なので、ふつうは先の日付になります。', { code:'PF-3064' }); return;
+      }
+    }
+    /* ① 車検なら車両の満了日を進める（12ヶ月点検の目安もここから計算されるので一緒に動く） */
+    if (isShaken && v){
+      var before = v.shakenDate || '';
+      v.shakenDate = newDue;
+      if (w.PitDB) w.PitDB.save();
+      try { if (w.pitLog) w.pitLog('車検満了日を更新した', { kind:'loaner',
+        label: vehName(v) + '　' + (before || '（空）') + ' → ' + newDue }); } catch(e){}
+    }
+    /* ② 済んだ印＝ボードから行が消える唯一の合図 */
+    c.maintDone = true;
+    c.maintDoneAt = today();
+    saveCards();
+    try { if (w.pitLog) w.pitLog('代車の作業予定を完了にした', { cardId:c.id, kind:'loaner',
+      label: (WORK_LB[c.workType] || '整備') + '　' + vehName(v) + (isShaken ? ('　次の満了 ' + newDue) : '') }); } catch(e){}
+    flMaintClose();
+    if (w.renderFleet) w.renderFleet();
+    if (w.pitToast) w.pitToast('完了にしました' + (isShaken ? ('（次の車検満了 ' + newDue + '）') : ''));
+  };
+
   w.pitMaintOnComplete = function(c){
     if (!c || !(w.pitCardMaint ? w.pitCardMaint(c) : Array.isArray(c.maintSpans))) return;
     var td = today();
@@ -838,7 +946,11 @@
       if (keep[0].to < keep[0].from) keep[0].to = keep[0].from;
     }
     c.maintSpans = keep;                                     /* 🔴 残りの候補はここで消える */
-    c.maintDone  = true;
+    /* ⚠⚠ v2.53.0 **ここで `maintDone` を立てない。**
+       `maintDone` は「ボードで**完了するを押した**」という意味に変わった（flMaintFinish）。
+       実績に入っただけで立ててしまうと、**車検満了日を進める前に行が消える**＝
+       次の年の目標が出てこないまま、誰も気づけない。
+       ここがやるのは「残りの候補を消す」と「期間を実際に合わせる」だけ。 */
     saveCards();
     try { if (w.pitLog && gone) w.pitLog('整備が終わったので残りの候補を消した', { cardId:c.id, kind:'loaner',
       label:'候補 ' + gone + '本' }); } catch(e){}

@@ -500,7 +500,10 @@
   //   ダッシュボードの今週の暫定返車予定(.rp-car) v2.21.1。
   //   🔴 **ホバー情報カードを出す所はこの1行だけ。** 画面ごとに別の tooltip を作らない（二重に出る）。
   //   予約(status:reserved)は fill() 側で「予約専用（予約日だけ）」表示になる。
-  var HOVER_SEL = '.pit-card.pcm, .pfv-card, .rml-ev, .reserve-month-event, .rwk-card, .lo-badge, .shk-chip, .shk-bar, .shk-gcar, .shk-uchip, .skl-chip, .rp-car';
+  /* 🔴 v2.54.0（ゆうた指定 2026-09-02）車検予定のガントは **`.shk-gcar`（行ぜんぶ）→ `.shk-gut.gcar`（一番左だけ）**。
+     ⚠ 行ぜんぶに出していた時は、マスを押そうとするたびに大きな情報カードが被っていた。
+        v2.54.0 でマスを押す意味ができた（暫定予定を置く）ので、被ると押せない。 */
+  var HOVER_SEL = '.pit-card.pcm, .pfv-card, .rml-ev, .reserve-month-event, .rwk-card, .lo-badge, .shk-chip, .shk-bar, .shk-gut.gcar, .shk-uchip, .skl-chip, .rp-car';
   document.addEventListener('mouseover', function(e){
     if (window.pitDragging){ hide(); return; }   // ドラッグ中は他カードのホバー詳細を出さない v0.124.3
     var card = e.target.closest && e.target.closest(HOVER_SEL);

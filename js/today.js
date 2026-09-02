@@ -491,6 +491,12 @@ function _todReturnGate(c){
 function _pitTodayReturnGo(c){
   if (!c) return;
   if (!_todReturnGate(c)) return;   /* ボタンを消しただけにしない＝固める所でも見る */
+  /* 🏢 v2.53.0（ゆうた 2026-09-01）**社内車両はどの道から返しても「そのまま実績化します」を聞く。**
+     🗣「代車などは完TEL依頼でも実績化を聞くようにして。そうすれば4本とも抜けなく非カウント実績に入る」
+     ◎前まで … この窓を出していたのは**完TEL済／依頼へドラッグした時だけ**。
+       ここから返すと、金額も完TELも触らない代わりに**残りの整備の候補も消えなかった**。
+     🔴 中身は intern-pit.js の `pitInternReturn` 1本。ここに書き写さない。 */
+  if (window.pitInternReturn && pitInternReturn(c)) return;
   const t = ymd(new Date());
   c.status = 'returned';
   c.returnDate = c.returnDate || t;

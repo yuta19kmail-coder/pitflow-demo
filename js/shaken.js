@@ -2,7 +2,11 @@
    shaken.js  -  車検予定（整備の俯瞰）/ PitFlow v1.125.0
    ・上＝決定カレンダー（各日を<i data-ic=sunrise data-ics=16></i>午前｜<i data-ic=sunrise data-ics=16></i>午後に縦割り／予定決定・完了・再検）
    ・下＝可能性ガント（行＝車、帯＝「行ける枠」＝予約詳細 inspSchedule.slots）
-   ・🔴 v1.118.0 予定（候補）の枠＝**押して入れる／押して外す**（ドラッグの範囲塗りは廃止）。
+   ・🔴🔴 v2.54.0（ゆうた指定 2026-09-02）**この表から「行ける枠」は入れ替えられない＝見るだけ。**
+     　入れ替えは**予約詳細の窓**（同じAM/PMの表・一括指定つき）だけ。左端の車名を押すとそこへ行ける。
+   ・🔴🔴 v2.54.0 **マスを押す＝暫定予定（仮押さえ）を置く。** 上の決定カードと同じ形のカードが下に出る。
+     　仮押さえ止まり＝MHS・当日ビュー・前日LINEには出ない。**上の「決定」へ運んで初めて本決まり。**
+   ・🔴 v1.118.0 予定（候補）の枠＝押して入れる／押して外す（ドラッグの範囲塗りは廃止）→ **v2.54.0 で廃止**。
    ・🔴 v1.118.0 決定への移動＝**ドラッグだけ**。帯を押しても決定しない（押し間違いで陸運局の日が変わらないように）。
    ・決定チップのタップで完了/再検/取消。決定チップを「予定」へドロップで候補に戻す。
    ・配車（誰が運ぶ）は扱わない＝MHSの領分。ここは整備が段取りを目で見る場所。
@@ -100,9 +104,10 @@
       var rows = window.pitShakenOnDate ? pitShakenOnDate(state.cards||[], d.iso) : [];
       rows.forEach(function(r){ var k=d.iso+'|'+r.slot; (decCell[k]=decCell[k]||[]).push({c:r.card,kind:r.state,row:r}); });
     });
-    var cands=[], empties=[], unsched=[], cnt={decided:0,done:0,recheck:0,cand:0,unset:0};
+    var cands=[], empties=[], unsched=[], cnt={decided:0,done:0,recheck:0,cand:0,unset:0,tent:0};
     shakenCars().forEach(function(c){ var s=ins(c);
       (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date){ cnt.recheck++; } });
+      if(window.pitShakenTentOf && pitShakenTentOf(s)) cnt.tent++;   /* 🅿 v2.54.0 暫定（仮押さえ）の数 */
       if(s.result==='done'){ cnt.done++; return; }
       if(s.decided){ cnt.decided++; return; }
       var pos=whereIs(c);
@@ -192,6 +197,24 @@
     return h ? '<div class="shk-meta">'+h+'</div>' : '';
   }
 
+  /* 🅿 v2.54.0 暫定予定（仮押さえ）の読み出し。**中身は pit-share.js の物差し1本**。
+     ⚠ ここで `c.inspSchedule.tent` を直に読まないこと（決定ずみの車を弾く判断が抜ける）。 */
+  function tentOf(c){ var s=ins(c); return window.pitShakenTentOf ? pitShakenTentOf(s) : null; }
+
+  /* 🅿 v2.54.0 暫定のカード＝**上の決定カードと同じ形**（ゆうた指定）。
+     ⚠ 決定チップと同じ `shk-chip` なので、**そのまま上の「決定」へドラッグできる**（掴む口は下の pointerdown）。
+     ⚠ 「未定 回送・R」は出さない（kind が 'decided' の時だけ出る作り）＝仮押さえの段階で急かさない。 */
+  function tentChip(c){
+    var car=carLabel(c);
+    return '<div class="shk-chip shk-tent shk-drag" draggable="false" data-card-id="'+c.id+'"'
+      + ' onclick="event.stopPropagation();shkTentMenu(\''+c.id+'\')"'
+      + ' title="暫定予定（仮押さえ）。上の「決定」へ運ぶと本決まりになります"'
+      + ' style="border-left-color:'+team(c)+'">'
+      + '<div class="shk-nm"><span class="shk-mk shk-mk-tent">暫定</span>'+esc(surname(c))+'様</div>'
+      + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div>'
+      + chipMeta(c, 'tent') + '</div>';
+  }
+
   /* 🔴 v1.108.0 印（済／再検）を必ず出す。ゆうた確定＝**両方出すが、印を付けて区別する**。 */
   function decChip(c, kind){ var car=carLabel(c);
     var mark = (window.PIT_SHAKEN_MARK && PIT_SHAKEN_MARK[kind]) || '';
@@ -241,8 +264,8 @@
     var h='';
     // ヘッダ操作
     h+='<div class="shk-head"><div class="shk-nav"><button onclick="shkShift(-7)"><i data-ic=chevLeft data-ics=16></i> 前週</button><b>'+fmtMD(days[0].iso)+' 〜</b><button onclick="shkShift(7)">次週 <i data-ic=chevRight data-ics=16></i></button><button class="shk-now" onclick="shkShift(0)">今週</button></div>';
-    h+='<div class="shk-legend"><span class="shk-lg dc">決定</span><span class="shk-lg dn">完了</span><span class="shk-lg re">再検</span><span class="shk-lg cd">予定枠</span></div>';
-    h+='<div class="shk-sum">決定'+cnt.decided+'／完了'+cnt.done+'／再検'+cnt.recheck+'／候補'+cnt.cand+'／未設定'+cnt.unset+'</div></div>';
+    h+='<div class="shk-legend"><span class="shk-lg dc">決定</span><span class="shk-lg dn">完了</span><span class="shk-lg re">再検</span><span class="shk-lg tt">暫定</span><span class="shk-lg cd">予定枠</span></div>';
+    h+='<div class="shk-sum">決定'+cnt.decided+'／完了'+cnt.done+'／再検'+cnt.recheck+'／暫定'+cnt.tent+'／候補'+cnt.cand+'／未設定'+cnt.unset+'</div></div>';
     /* 🔴 v1.116.0 入庫待ちの帯は**表のいちばん下**へ移した（ゆうた指定
        「上からメインの表、今週、来週、と下に続くように」）。組み立ては下の buildWait()。 */
     // スクロール表
@@ -270,27 +293,48 @@
     // 可能性ガント
     h+='<div class="shk-row shk-bandrow shk-gantt-drop"><div class="shk-band"><i data-ic=clock data-ics=16></i> 予定</div><div class="shk-bandfill"><span class="shk-drophint">↩ 決定チップをこの「予定」エリアへ運ぶ＝候補（行ける日）に戻す</span></div></div>';
     var ganttCars = data.cands.concat(data.empties);
+    /* 🅿 v2.54.0 **暫定が乗っている車は必ず行を出す**（保険）。
+       ⚠ 行ける枠を予約詳細で全部外すと、その車は「入庫待ち」側へ移る作り。
+          そこで行が消えると、置いた暫定が**見えないのに残る**＝外す道が無くなる。 */
+    data.unsched.forEach(function(c){ if(tentOf(c) && ganttCars.indexOf(c)<0) ganttCars.push(c); });
     ganttCars.forEach(function(c){ var s=ins(c); var isEmpty=data.empties.indexOf(c)>=0;
+      var tnt = tentOf(c);
       function son(di,slot){ var day=days[di]; if(!day||day.off) return false; return (s.slots[day.iso]||[]).indexOf(slot)>=0; }
       /* 🔴 v1.121.0 車両注意（アンバー）は attrChips 1本。未設定・再検回数はこの画面だけの印なので別に足す。 */
       var pre=[]; if(isEmpty)pre.push('未設定');
-      var rc=(s.history||[]).filter(function(x){return x.result==='recheck';}).length; var post=rc?['再'+rc]:[];
+      /* 🔴 v2.54.0 「再2」の吹き出しに**落ちた理由（1行メモ）**を出す（ゆうた指定）。
+         ⚠ 画面には出さない＝この列は1行しか無いので、字を増やすと車名が消える。読むのは吹き出しで。 */
+      var rcA=(s.history||[]).filter(function(x){return x.result==='recheck';});
+      var rcTip=rcA.map(function(x){ return fmtMD(x.date)+' '+(x.slot==='pm'?'PM':'AM')+(x.note?'：'+x.note:''); }).join('\n');
+      var post=rcA.length?['再'+rcA.length]:[];
       var subH = pre.map(function(x){return '<span class="shk-ca unset">'+x+'</span>';}).join('')
                + attrChips(c)
-               + post.map(function(x){return '<span class="shk-ca">'+x+'</span>';}).join('');
-      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'"><div class="shk-gut gcar"><div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+subH+'</div></div>'
+               + post.map(function(x){return '<span class="shk-ca" title="'+esc(rcTip)+'">'+x+'</span>';}).join('');
+      /* 🔴🔴 v2.54.0 **一番左（車名の欄）を押すと予約詳細が開く**（ゆうた指定）。
+         ⚠ ホバーの情報カードも**ここだけ**に付け替えた（card-hover.js の HOVER_SEL）。
+            行ぜんぶに出していた時は、マスを押そうとするたびに大きな情報カードが被っていた。
+         ⚠ 行ける枠の入れ替えは**この先の予約詳細だけ**＝この表からは触れない（下のマスの説明を読む）。 */
+      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'">'
+        + '<div class="shk-gut gcar clk" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" title="押すと予約詳細（行ける枠の入れ替えもここ）">'
+        + '<div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+subH+'</div></div>'
         + days.map(function(x,di){ if(x.off) return '<div class="shk-off2"></div>';
             return ['am','pm'].map(function(slot){
               var on=son(di,slot);
-              /* 🔴 v1.118.0 予定（候補）の付け外しは**押すだけ**（ゆうた指定）。
-                 ⚠ ドラッグで塗る作りはやめた＝表の中で掴むのは「決定へ動かす」時だけにする。 */
               var ap=(slot==='am'?'午前':'午後');
-              if(!on) return '<div class="shk-gsc slotcell'+(slot==='pm'?' pm':'')+'" onclick="shkSlot(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="押すと '+fmtMDW(x.iso)+' '+ap+' を「行ける枠」に入れる"></div>';
+              var pm=(slot==='pm'?' pm':'');
+              /* 🅿🅿 v2.54.0 **マスを押す＝暫定予定（仮押さえ）を置く。**（ゆうた指定 2026-09-02）
+                 🔴 「行ける枠」の付け外しは**もうここではやらない**（v1.118.0 の作りを覆した）。
+                    入れ替えは予約詳細だけ＝**この表で数字が変わるのは暫定だけ**。
+                 ⚠ 帯（行ける枠）も押せるが、やることは同じ＝暫定を置く。帯は消えない。 */
+              if(tnt && tnt.date===x.iso && tnt.slot===slot){
+                return '<div class="shk-gsc tentcell'+pm+'" data-iso="'+x.iso+'" data-slot="'+slot+'">'+tentChip(c)+'</div>';
+              }
+              var put='押すと '+fmtMDW(x.iso)+' '+ap+' に暫定予定（仮押さえ）を置く';
+              if(!on) return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="'+put+'"></div>';
               var pOn = slot==='am'? son(di-1,'pm') : son(di,'am');
               var nOn = slot==='am'? son(di,'pm') : son(di+1,'am');
-              /* 🔴 v1.118.0 帯を押しても**決定しない**（ゆうた指定「予定部分をクリックで飛ばないように」）。
-                 押す＝その枠を外すだけ。決定は**決定バンドへドラッグ**したときだけ。 */
-              return '<div class="shk-gsc'+(slot==='pm'?' pm':'')+'"><div class="shk-bar'+(c.boardId==='import'?' imp':'')+(pOn?'':' l')+(nOn?'':' r')+'" draggable="false" data-card-id="'+c.id+'" data-iso="'+x.iso+'" data-slot="'+slot+'" onclick="shkSlot(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="押すと '+fmtMDW(x.iso)+' '+ap+' の枠を外す／上の「決定」へドラッグで決定"></div></div>';
+              /* ⚠ 帯そのものは**見るだけ**（押しても外れない）。掴んで上の「決定」へ運ぶのは今までどおり。 */
+              return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="行ける枠：'+fmtMDW(x.iso)+' '+ap+'（入れ替えは予約詳細から）／'+put+'"><div class="shk-bar'+(c.boardId==='import'?' imp':'')+(pOn?'':' l')+(nOn?'':' r')+'" draggable="false" data-card-id="'+c.id+'" data-iso="'+x.iso+'" data-slot="'+slot+'"></div></div>';
             }).join('');
           }).join('')+'</div>';
     });
@@ -317,6 +361,8 @@
        ⚠ 担当・陸運局・R は日を動かしても**消さない**（同じ車検の話なので持ち回る）。 */
     var isNew = !s.decided;
     s.decided=iso; s.decidedSlot=(slot==='pm'?'pm':'am'); s.result=''; s.resultDate=''; s.resultSlot='';
+    /* 🅿 v2.54.0 本決まりになったら**暫定は必ず落とす**（決定と暫定が両方ある状態を作らない） */
+    s.tent=''; s.tentSlot='';
     save(); renderShaken();
     if(isNew) setTimeout(function(){ shkDecidePop(id); }, 60);
   }
@@ -440,7 +486,8 @@
       _autoScrollStart();   /* 🔴 v1.123.0 端まで来たら自分でスクロールする */
       /* 🔴 v1.124.0 帯（候補）を掴んだ時は、決定の行を先に見えるところへ出す。
          ⚠ 決定チップを掴んだ時はやらない（もともとその行にいる＝画面が跳ねるだけ）。 */
-      if(_srcEl && _srcEl.classList && _srcEl.classList.contains('shk-bar')) _ensureDecideVisible();
+      /* 🅿 v2.54.0 暫定カードも**下の行にいる**＝帯と同じで、決定の行を先に見えるところへ出す。 */
+      if(_srcEl && _srcEl.classList && (_srcEl.classList.contains('shk-bar') || _srcEl.classList.contains('shk-tent'))) _ensureDecideVisible();
     }
     e.preventDefault();
     _lastPt={x:e.clientX, y:e.clientY};
@@ -464,20 +511,41 @@
     if(host&&host.contains(e.target)){ e.stopPropagation(); e.preventDefault(); }
   }, true);
 
-  /* ===== 「行ける枠」の付け外し＝**押すだけ**（v1.118.0・ゆうた指定） =====
-     🗣「ドラッグの挙動は候補日を増やすのはなし。あくまで**予定側の枠をクリックするのみ**」
-     🔴 空いているマスを押す → その枠を入れる／すでに帯があるマスを押す → その枠を外す。
-     ⚠ **範囲ドラッグで塗る作りは廃止した。** 表の中で掴む操作は「決定へ動かす」1つだけにする、
-        というのが今回の決めごと。塗りを戻すと、掴んだつもりが塗りになって事故る。
-     ⚠ 帯を押した時に決定へ飛ばないこと（`shkFix` を廃止した理由と同じ）。
+  /* ═══ 🅿🅿 v2.54.0 マスを押す＝**暫定予定（仮押さえ）** ═══（ゆうた指定 2026-09-02）
+     🗣「予定一覧で候補日の修正が出来ないようにする。ただし、車種×日の１セルに対してクリックする事で
+     　　暫定予定として上の決定カードのような形のものを下にも設置できるようにする」
+
+     🔴 **`shkSlot`（押して行ける枠を付け外し・v1.118.0）は廃止した。**
+        入れ替えは**予約詳細の窓だけ**＝入口を1本にする。復活させないこと。
+        （入口が2つあると、片方だけ直る／片方だけ権限がずれる＝v2.50.0 の決めごとと同じ筋）
+     🔴 決めごとの中身は **pit-share.js の `pitShakenTent` 1本**。ここで条件を書き直さない。
+        ・1台につき1つ／同じマスをもう一度押すと外れる／決まっている車には置けない
      ⚠ ドラッグして離した直後の空クリックは `_suppressClick` が止める＝ここには来ない。 */
-  window.shkSlot=function(id,iso,slot){
+  window.shkTent=function(id,iso,slot){
     var c=card(id); if(!c) return; var s=ins(c);
-    if(!s.slots[iso]) s.slots[iso]=[];
-    var i=s.slots[iso].indexOf(slot);
-    if(i>=0){ s.slots[iso].splice(i,1); if(!s.slots[iso].length) delete s.slots[iso]; }
-    else s.slots[iso].push(slot);
+    var r=window.pitShakenTent ? pitShakenTent(s, iso, slot) : null;
+    if(!r) return;
+    c.inspSchedule=r.insp;
+    if(r.log && window.logFlow) logFlow(c, r.log);
     save(); renderShaken();
+    if(window.pitToast) pitToast(r.on ? '暫定予定を置きました（まだ決定ではありません）' : '暫定予定を外しました');
+  };
+
+  /* 暫定カードを押した時。⚠ ここに「決定にする」は置かない＝
+     決定は**上の「決定」へ運んだ時だけ**（押し間違いで陸運局の日が決まらないように・v1.118.0 の決めごと）。 */
+  window.shkTentMenu=function(id){
+    var c=card(id); if(!c) return; var t=tentOf(c); if(!t) return;
+    pop('暫定予定（仮押さえ）',
+      '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+(c.plate?' / '+esc(c.plate):'')+'</div>'
+      + '<div class="shk-pnote">暫定：'+fmtMDW(t.date)+' '+(t.slot==='pm'?'午後':'午前')+'</div>'
+      + '<div class="shk-phint">まだ決定ではありません。MHS・当日ビュー・前日LINEには出ません。'
+      + '上の「決定」へ運ぶと本決まりになります。</div>'
+      + '<button class="shk-pbtn" onclick="shkTentDrop(\''+id+'\')">この暫定を外す</button>'
+      + '<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>');
+  };
+  window.shkTentDrop=function(id){
+    var c=card(id); if(!c) return; var t=tentOf(c); if(!t) return;
+    closePop(); window.shkTent(id, t.date, t.slot);   /* 同じマス＝外れる */
   };
 
   /* ══ 回送の担当・陸運局・R の入力欄（v1.119.0） ══
@@ -546,6 +614,10 @@
         + fieldsHtml(c)
         + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+id+'\')">この内容で保存</button>'
         + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（受かった）</button>'
+        /* 🔴 v2.54.0（ゆうた指定 2026-09-02）**再検にする時、落ちた理由を1行だけ書ける。**
+           ⚠ 空のままでも押せる（＝今までどおり記録できる）。書いた分は予約詳細の再検履歴に残る。 */
+        + '<label class="shk-plabel">再検の理由（1行・空でもOK）</label>'
+        + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
         + '<button class="shk-pbtn re" onclick="shkAct(\''+id+'\',\'recheck\')">↺ 再検（落ちた・候補へ戻す）</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'flip\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'tocand\')">↩ 候補（行ける日）に戻す</button>'
@@ -569,11 +641,14 @@
     var stEl=document.getElementById('shk-staff'); var staff=stEl?stEl.value:'';
     var ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
     var off=ofEl?(ofEl.value||''):null;
+    /* 🔴 v2.54.0 再検の理由（1行）。窓に欄が無い時（完了・変更など）は渡さない。 */
+    var ntEl=document.getElementById('shk-note');
     var r=window.pitShakenApply ? pitShakenApply(s, act, {
       staff: stEl?staff:null,
       office: off,
       officeName: off ? ((window.pitLocName?pitLocName(off):'')||s.officeName||'') : '',
       round: rdEl?Number(rdEl.value||0):null,
+      note: (act==='recheck' && ntEl) ? ntEl.value : null,
       today: todayIso()
     }) : null;
     if(!r) return;

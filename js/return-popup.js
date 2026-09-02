@@ -256,6 +256,14 @@
         ? (window.state && state.cards || []).find(function(x){ return x.id === cardOrId; })
         : cardOrId;
       if (!card) return;
+      /* 🏢 v2.53.0（ゆうた 2026-09-01）**社内車両（中古・代車・内部）はこの窓を出さない。**
+         「この車両は◯◯なので、そのまま実績化します」の窓を1枚だけ出して実績にする。
+         🗣「代車などは完TEL依頼でも実績化を聞くようにして。そうすれば4本とも抜けなく非カウント実績に入る」
+         ◎前まで … 出していたのは**完TEL済／依頼へドラッグした時だけ**。
+           この窓から返すと、金額も完TELも無いはずの車に返車の窓が出て、
+           しかも**残りの整備の候補が消えなかった**（消す処理が実績化の道にしか付いていなかった）。
+         🔴 中身は intern-pit.js の `pitInternReturn` 1本。ここに条件を書き写さない。 */
+      if (window.pitInternReturn && pitInternReturn(card)) return;
       pending = { card: card, mode: mode || 'callDone', toResult: false };
       if (needKind(card)){ openKind(card, pending.mode); return; }
       openModal(card, pending.mode, false);

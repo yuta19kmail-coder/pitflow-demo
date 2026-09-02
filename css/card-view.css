@@ -389,7 +389,14 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-shwhere{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .cv-shw{ display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color:var(--text2);
          background:rgba(255,255,255,.06); border-radius:6px; padding:2px 8px; }
-.cv-shrc{ font-size:11.5px; color:#f8a866; margin-top:5px; }
+.cv-shrc{ font-size:11.5px; color:#f8a866; margin-top:5px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+/* 🔴🔴 v2.55.0 再検の記録は**1本ずつ押せる**（押すと直す・取り消す窓）。
+   ⚠ 前はただの文字だったので「押せる」と分かる見た目にする＝枠を付けて、乗せると光らせる。 */
+.cv-shrc-i{ display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px;
+            border:1px solid rgba(248,168,102,.45); background:rgba(249,115,22,.10); cursor:pointer; }
+.cv-shrc-i:hover{ background:rgba(249,115,22,.20); border-color:#f8a866; }
+/* 取り消しは**離して赤く**置く＝「直す」と間違えて押さないように */
+.cv-shrc-del{ display:block; width:100%; margin-top:10px; text-align:center; }
 /* 🔴 v2.54.0 再検の理由（1行）＝日付・担当のうしろに、地の色で小さく付ける（ゆうた指定 2026-09-02） */
 .cv-shrc-n{ margin-left:5px; padding:0 5px; border-radius:4px; background:rgba(255,255,255,.07); color:var(--text2); }
 .cv-shact{ display:flex; gap:8px; margin-top:10px; }
@@ -403,7 +410,10 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-shpb{ padding:14px 16px 16px; }
 .cv-shpb label{ display:block; font-size:11.5px; color:var(--text3); font-weight:600; margin:10px 0 4px; }
 .cv-shpb label:first-child{ margin-top:0; }
-.cv-shpb input[type=date], .cv-shpb select{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:14px; }
+/* 🔴 v2.55.0 1行の入力（再検の理由）も**同じ見た目**にする。
+   ⚠ v2.54.0 で欄を足した時、ここに `input[type=text]` を書き忘れていて、
+      窓の中で1つだけ素っ気ない箱になっていた（＝「欄が無い」ように見える）。 */
+.cv-shpb input[type=date], .cv-shpb input[type=text], .cv-shpb select{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:14px; box-sizing:border-box; font-family:inherit; }
 .cv-shslot{ display:flex; gap:8px; }
 .cv-shslot button{ flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text2); border-radius:8px; padding:8px 0; font-size:14px; font-weight:700; cursor:pointer; }
 .cv-shslot button.on{ background:var(--brand,#1f7a4d); border-color:var(--brand,#1f7a4d); color:#fff; }

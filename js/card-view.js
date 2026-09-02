@@ -793,7 +793,9 @@
       const _rcTxt = _rcH.map(function(r){
         /* 🔴 v1.127.0 カード詳細は**フルネーム**（ゆうた指定）。狭い枠だけ通称＆苗字。 */
       var ex = [ (r.staff ? (window.pitStaffFull?pitStaffFull(r.staff):r.staff) : ''), _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
-        return (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'');
+        /* 🔴 v2.54.0 落ちた理由（1行）を後ろに出す。**入っているものだけ**出す
+           （古い記録には入っていない＝無いものに「—」を書かない・2026-08-13 の決めごと）。 */
+        return (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'')+(r.note?'<span class="cv-shrc-n">'+esc(r.note)+'</span>':'');
       }).join('　');
       if (_si.result==='done'){
         // 済＝「いつ行く？」は非表示。実施サマリのみ。
@@ -2640,6 +2642,10 @@
         + '<option value="">（未定）</option>'
         + [1,2,3,4].map(function(n){ return '<option value="'+n+'"'+(Number(s.round)===n?' selected':'')+'>'+n+'R</option>'; }).join('')
         + '</select>'
+      /* 🔴 v2.54.0（ゆうた指定 2026-09-02）**再検の時だけ、落ちた理由を1行だけ書ける。**
+         ⚠ 空のままでも記録できる（今までどおり）。書いた分は下の再検履歴に出る。
+         ⚠ 済（受かった）には出さない＝書くことが無い。 */
+      + (isDone ? '' : '<label>再検の理由（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">')
       + '<div class="cv-shpb-act"><button class="cv-shbtn '+(isDone?'ok':'re')+'" onclick="cvShConfirm(\''+kind+'\')">記録する</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
       + '</div>';
     let back=document.getElementById('cv-shpop');
@@ -2662,13 +2668,20 @@
     if(!Array.isArray(s.history)) s.history=[];
     if(kind==='done'){
       s.result='done'; s.resultDate=iso; s.resultSlot=slot; s.resultStaff=staff; s.decided=iso; s.decidedSlot=slot;
+      s.tent=''; s.tentSlot='';   /* 🅿 v2.54.0 終わったら暫定は落とす */
       if(window.logFlow) logFlow(_c, '車検 済 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+_wh);
     } else {
       /* ⚠ 再検の記録にも、その回どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
-      s.history.push({date:iso, slot:slot, result:'recheck', staff:staff, office:s.office||'', officeName:s.officeName||'', round:s.round||0});
+      /* 🔴 v2.54.0 落ちた理由（1行）。改行は潰して120字で切る＝**車検予定の画面と同じ切り方**
+         （pit-share.js の `pitShakenApply` と揃える。片方だけ長く入るのを作らない）。 */
+      const _ntEl=document.getElementById('cv-shnote');
+      const _note=_ntEl ? String(_ntEl.value||'').replace(/[\r\n\t]+/g,' ').trim().slice(0,120) : '';
+      s.history.push({date:iso, slot:slot, result:'recheck', staff:staff, office:s.office||'', officeName:s.officeName||'', round:s.round||0, note:_note});
       s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
+      /* 🅿 v2.54.0 暫定（仮押さえ）も落とす＝車検予定の画面の物差しと同じ */
+      s.tent=''; s.tentSlot='';
       /* ⚠ 陸運局とRは残す＝次に決め直す時、たいてい同じ所へ行くので入れ直させない（車検予定の画面と同じ考え方） */
-      if(window.logFlow) logFlow(_c, '車検 再検 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+_wh);
+      if(window.logFlow) logFlow(_c, '車検 再検 '+_mdOf(iso)+' '+(slot==='pm'?'PM':'AM')+_wh+(_note?'／'+_note:''));
     }
     save(); cvShClose(); renderCardView(_c,'md-body-modal');
     if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();

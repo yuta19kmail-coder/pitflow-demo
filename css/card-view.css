@@ -390,6 +390,8 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-shw{ display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; color:var(--text2);
          background:rgba(255,255,255,.06); border-radius:6px; padding:2px 8px; }
 .cv-shrc{ font-size:11.5px; color:#f8a866; margin-top:5px; }
+/* 🔴 v2.54.0 再検の理由（1行）＝日付・担当のうしろに、地の色で小さく付ける（ゆうた指定 2026-09-02） */
+.cv-shrc-n{ margin-left:5px; padding:0 5px; border-radius:4px; background:rgba(255,255,255,.07); color:var(--text2); }
 .cv-shact{ display:flex; gap:8px; margin-top:10px; }
 .cv-shbtn{ border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-weight:700; padding:8px 14px; border-radius:9px; cursor:pointer; }
 .cv-shbtn:hover{ border-color:var(--brand,#1f7a4d); }

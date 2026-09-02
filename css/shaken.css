@@ -192,3 +192,24 @@
          font-size:9px; font-weight:800; line-height:1.5; vertical-align:1px; }
 .shk-mk-done{ background:rgba(120,120,120,.22); color:var(--text2); }
 .shk-mk-recheck{ background:rgba(239,68,68,.18); color:#ef4444; }
+
+/* ══════════════════════════════════════════════════════════════════
+   🅿🅿 v2.54.0 暫定予定（仮押さえ）＋ 一番左を押すと予約詳細（ゆうた指定 2026-09-02）
+   ------------------------------------------------------------------
+   🔴 暫定カードは **上の決定カードと同じ形**（`.shk-chip` をそのまま使う）。
+      違いは **点線の枠＋「暫定」の札**だけ＝一目で「まだ決まっていない」と分かるように。
+   ⚠ マス（`.shk-gsc`）は帯を縦まん中に置くために flex。**暫定カードが入るマスだけ**
+      ふつうの箱（block）に戻す。全部のマスを block にしないこと（帯が上に寄る）。
+   ══════════════════════════════════════════════════════════════════ */
+.shk-lg.tt{ color:#c9a6f5; }
+.shk-gsc.tentcell{ display:block; padding:4px 5px 5px; }
+.shk-gsc.tentcell .shk-chip{ margin-bottom:0; }
+.shk-chip.shk-tent{ background:rgba(168,120,240,.14); border-style:dashed; }
+.shk-chip.shk-tent:hover{ filter:brightness(1.12); }
+.shk-mk-tent{ background:rgba(168,120,240,.28); color:#c9a6f5; }
+/* 一番左（車名の欄）＝押すと予約詳細。押せる所だと分かるように色を変える。 */
+.shk-gut.gcar.clk{ cursor:pointer; }
+.shk-gut.gcar.clk:hover{ background:var(--bg4,#26313b); }
+/* 窓の中の1行入力（再検の理由）。プルダウン（.shk-psel）と同じ見た目にそろえる。 */
+.shk-pinput{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text);
+             border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:10px; }

@@ -2410,6 +2410,12 @@ th.cfs-lg-d{ z-index:3; }
 .cf-other-note.warn{ color:#b45309; background:rgba(245,158,11,.12); }
 /* 押せないチップ（社内車両を選んでいる間の作業タイプなど） */
 .cf-chip-off{ cursor:not-allowed !important; }
+/* 🔴 v2.53.0 代車＝見えるけど押せない（すでに代車のカードで「何のカードか」を見失わないため）。
+   ⚠ `.cf-chip-off`（使えない）とは意味が違う＝こちらは「ここでは決めない」。 */
+.cf-chip-lock{ cursor:default !important; }
+/* 🏁 v2.53.0 作業予定ボードの「完了する」＝実績に入った行だけに出る */
+.mb-row.mb-done{ border-left-color:#1db97a; }
+.vh-btn.mb-done{ background:#1db97a22; color:#1db97a; border-color:#1db97a; font-weight:800; }
 /* 入れられない欄のグレーの箱（概算・代車） */
 .cf-offbox{ height:34px; display:flex; align-items:center; padding:0 10px; border:1px dashed var(--border); border-radius:8px; background:var(--bg3); color:var(--text3); font-size:13px; }
 

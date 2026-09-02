@@ -1385,7 +1385,10 @@ w.pitDivisionColor = pitDivisionColor;
        insp … いまの `card.inspSchedule`（無ければ null でよい）
        act  … 'done'（✓完了）／'recheck'（↺再検）／'flip'（午前⇄午後）
                ／'cancel'（予定を取り消す）／'reopen'（済 → 予定に戻す）
-       opt  … { staff, office, officeName, round, today }
+       opt  … { staff, office, officeName, round, today, note }
+               🔴 note ＝ **再検の理由（1行）**。v2.54.0 で追加（ゆうた指定
+                  「再検のチェック時→1行でいいからその内容をかけるようにする」）。
+                  ⚠ 使うのは 'recheck' の時だけ。ほかの指示では見ない。
                ⚠ 窓に出ている担当・陸運局・R も**一緒に確定する**（別々に保存させない）。
      ◎返すもの
        { insp: 新しい inspSchedule, log: フローに残す1行, act: 受け取った act }
@@ -1444,11 +1447,15 @@ w.pitDivisionColor = pitDivisionColor;
     } else if (act === 'recheck'){
       var d2 = s.decided || today, sl2 = s.decidedSlot || 'am';
       /* ⚠ その時どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
+      /* 🔴 v2.54.0 **落ちた理由を1行だけ**（ゆうた指定）。改行は潰して1行にする。
+         ⚠ 長さは120字で切る＝履歴は狭い所に何行も並ぶので、書ける量そのもので抑える。 */
+      var note2 = (opt.note != null) ? String(opt.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120) : '';
       s.history.push({ date: d2, slot: sl2, result: 'recheck', staff: staff,
-                       office: s.office || '', officeName: s.officeName || '', round: s.round || 0 });
+                       office: s.office || '', officeName: s.officeName || '', round: s.round || 0,
+                       note: note2 });
       s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
       /* ⚠ 陸運局とRは**残す**＝次に決め直す時、たいてい同じ所へ行くので入れ直させない */
-      log = '車検 再検 ' + _shkMD(d2) + ' ' + _shkSlotT(sl2) + wh;
+      log = '車検 再検 ' + _shkMD(d2) + ' ' + _shkSlotT(sl2) + wh + (note2 ? '／' + note2 : '');
     } else if (act === 'cancel'){
       var d3 = s.decided || '', sl3 = s.decidedSlot || '';
       s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = '';
@@ -1465,9 +1472,61 @@ w.pitDivisionColor = pitDivisionColor;
           「担当を選んでから “午後に変更” を押すと担当が消える」状態だった。
        ⚠ 再検・予定に戻す は**わざと担当を空にする**指示なので、ここでは戻さない。 */
     if (opt.staff != null && act !== 'recheck' && act !== 'reopen') s.resultStaff = staff;
+    /* 🔴 v2.54.0 **暫定予定（仮押さえ）は、決まった・終わった・取り消した で必ず落とす。**
+       ⚠ 残すと「決定と暫定が両方ある」状態ができて、どちらが本当か読めなくなる。 */
+    if (act === 'done' || act === 'recheck' || act === 'cancel'){ s.tent = ''; s.tentSlot = ''; }
     return { insp: s, log: log, act: act };
   }
   w.pitShakenApply = pitShakenApply;
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     🅿 v2.54.0（ゆうた指定 2026-09-02）**暫定予定＝仮押さえ止まり。**
+     -------------------------------------------------------------------------
+     🗣「車種×日の１セルに対してクリックする事で暫定予定として
+     　　上の決定カードのような形のものを下にも設置できるようにする」
+     🗣（どこまでのものか）「**仮押さえ止まり**」＝上の「決定」へ運んで初めて本決まり。
+
+     ◎決めごと（ゆうた確定）
+       🔴 **1台につき1つだけ。** 別のマスを押したら、そこへ**移る**（増えない）
+       🔴 **同じマスをもう一度押したら外れる**
+       🔴 **まだ決まっていない車だけ。** 決定ずみ・済の車には置けない
+          （置けると「決定と暫定のどちらが本当か」が読めなくなる）
+       🔴🔴 **ここから先へは出さない。** MHS・当日ビュー・前日LINE・予約カレンダーは
+          `decided` と `result` しか見ていないので、暫定を足しても**何も出ないのが正しい**。
+          ＝ 暫定を「その日に行く」と読ませたくなったら、それは**決定へ上げる時**。
+          ⚠ ここを他の画面に出したくなったら、必ず先に相談すること。仮押さえの意味が消える。
+
+     ◎渡すもの  insp（いまの inspSchedule）／iso（YYYY-MM-DD）／slot（'am'|'pm'）
+     ◎返すもの  { insp, log, on }  on=true ＝置いた／false ＝外した。置けない時は null
+     ⚠ 渡した insp は書き換えない（写しを返す）。呼ぶ側が入れ替える。
+     ══════════════════════════════════════════════════════════════════════════ */
+  function pitShakenTent(insp, iso, slot){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return null;
+    var s = {};
+    for (var k in (insp || {})) if (Object.prototype.hasOwnProperty.call(insp, k)) s[k] = insp[k];
+    if (!s.slots || typeof s.slots !== 'object') s.slots = {};
+    s.history = Array.isArray(s.history) ? s.history.slice() : [];
+    if (s.decided || s.result === 'done') return null;   /* 決まっている車には置かない */
+    var sl = (slot === 'pm') ? 'pm' : 'am';
+    if (s.tent === iso && (s.tentSlot === 'pm' ? 'pm' : 'am') === sl){
+      s.tent = ''; s.tentSlot = '';
+      return { insp: s, log: '車検の暫定予定を外した（' + _shkMD(iso) + ' ' + _shkSlotT(sl) + '）', on: false };
+    }
+    var moved = !!s.tent;
+    s.tent = iso; s.tentSlot = sl;
+    return { insp: s, on: true,
+             log: '車検の暫定予定' + (moved ? 'を動かした' : '') + '（' + _shkMD(iso) + ' ' + _shkSlotT(sl) + '）' };
+  }
+  w.pitShakenTent = pitShakenTent;
+
+  /* 暫定予定の読み出し（無ければ null）。画面はこの1本で読む。
+     ⚠ 決定ずみ・済の車は null を返す＝古い暫定が残っていても画面には出さない（保険）。 */
+  function pitShakenTentOf(insp){
+    var s = insp || {};
+    if (!s.tent || s.decided || s.result === 'done') return null;
+    return { date: s.tent, slot: (s.tentSlot === 'pm') ? 'pm' : 'am' };
+  }
+  w.pitShakenTentOf = pitShakenTentOf;
 
   /* 📍 陸運局の一覧・名前＝**場所の表を渡せば、どのアプリでも同じ答え**（v1.160.0）
      🔴 「陸運支局のバッジが付いている・有効なもの」＋並び（よく使う→並び順→名前）はここ1本。

@@ -503,7 +503,11 @@
   /* 🔴 v2.54.0（ゆうた指定 2026-09-02）車検予定のガントは **`.shk-gcar`（行ぜんぶ）→ `.shk-gut.gcar`（一番左だけ）**。
      ⚠ 行ぜんぶに出していた時は、マスを押そうとするたびに大きな情報カードが被っていた。
         v2.54.0 でマスを押す意味ができた（暫定予定を置く）ので、被ると押せない。 */
-  var HOVER_SEL = '.pit-card.pcm, .pfv-card, .rml-ev, .reserve-month-event, .rwk-card, .lo-badge, .shk-chip, .shk-bar, .shk-gut.gcar, .shk-uchip, .skl-chip, .rp-car';
+  /* 🔴 v2.54.1（ゆうた 2026-09-02「予定バーの所でもホバーがでるのはやめてほしい」）
+     **帯（.shk-bar）からも外した。** 帯は押すと暫定予定を置く所になったので、
+     カーソルを乗せただけで大きな情報カードが出ると、置きたいマスの上に被る。
+     ⚠ 車の中身を見たい時は**一番左（.shk-gut.gcar）**に乗せる／押すと予約詳細。 */
+  var HOVER_SEL = '.pit-card.pcm, .pfv-card, .rml-ev, .reserve-month-event, .rwk-card, .lo-badge, .shk-chip, .shk-gut.gcar, .shk-uchip, .skl-chip, .rp-car';
   document.addEventListener('mouseover', function(e){
     if (window.pitDragging){ hide(); return; }   // ドラッグ中は他カードのホバー詳細を出さない v0.124.3
     var card = e.target.closest && e.target.closest(HOVER_SEL);

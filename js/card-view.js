@@ -780,7 +780,11 @@
     // 車検スケジュール / 実施記録（車検タイプのみ表示）
     if (_csShaken){
       const _si = c.inspSchedule || {};
-      const _rcH = (Array.isArray(_si.history)?_si.history:[]).filter(function(x){return x&&x.result==='recheck';});
+      /* 🔴 v2.55.0 **何番目の記録か**を持ったまま並べる（あとで直す・取り消すのに要る）。
+         ⚠ 絞ったあとの番号ではなく、**もとの並びの番号**を渡すこと。 */
+      const _rcH = (Array.isArray(_si.history)?_si.history:[])
+        .map(function(x,i){ return { x:x, i:i }; })
+        .filter(function(o){ return o.x && o.x.result==='recheck'; });
       const _slT = function(sl){ return sl==='pm'?'PM':'AM'; };
       /* 🔴 v1.120.0（ゆうた指定）**済にした時点で、陸運局とラウンドも予約詳細に残す。**
          ⚠ 担当は前から出ていた。足すのは「どこへ行ったか」と「何Rだったか」。
@@ -790,13 +794,20 @@
             **入っているものだけ**出す（無いものを「未定」と書かない＝2026-08-13 の決めごと）。 */
       const _ofOf = function(o){ return o ? ((window.pitLocName?pitLocName(o.office||''):'') || o.officeName || '') : ''; };
       const _rdOf = function(o){ var n = o ? Number(o.round) : 0; return (n>=1&&n<=4) ? n+'R' : ''; };
-      const _rcTxt = _rcH.map(function(r){
+      /* 🔴🔴 v2.55.0（ゆうた指定 2026-09-02）**1本ずつ押せる。** 押すと直す・取り消す窓が出る。
+         🗣「既に再検にしちゃったもの、逆に再検をキャンセルしたり、日付を変えたりもできないかも」
+         ⚠ 前は**ただの文字**だった＝押し間違えた再検を、アプリのどこからも戻せなかった。 */
+      const _rcTxt = _rcH.map(function(o){
+        var r = o.x;
         /* 🔴 v1.127.0 カード詳細は**フルネーム**（ゆうた指定）。狭い枠だけ通称＆苗字。 */
       var ex = [ (r.staff ? (window.pitStaffFull?pitStaffFull(r.staff):r.staff) : ''), _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
         /* 🔴 v2.54.0 落ちた理由（1行）を後ろに出す。**入っているものだけ**出す
            （古い記録には入っていない＝無いものに「—」を書かない・2026-08-13 の決めごと）。 */
-        return (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'')+(r.note?'<span class="cv-shrc-n">'+esc(r.note)+'</span>':'');
-      }).join('　');
+        return '<span class="cv-shrc-i" onclick="cvShReOpen('+o.i+')" title="押すと、この記録を直す・取り消す">'
+          + (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'')
+          + (r.note?'<span class="cv-shrc-n">'+esc(r.note)+'</span>':'')
+          + '</span>';
+      }).join('');
       if (_si.result==='done'){
         // 済＝「いつ行く？」は非表示。実施サマリのみ。
         const _of = window.pitShakenOffice ? pitShakenOffice(c) : _ofOf(_si);
@@ -2686,6 +2697,95 @@
     save(); cvShClose(); renderCardView(_c,'md-body-modal');
     if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();
   };
+  /* ══════════════════════════════════════════════════════════════════════════
+     ↺ v2.55.0 **再検の記録を、あとから直す・取り消す**（ゆうた指定 2026-09-02）
+     --------------------------------------------------------------------------
+     🗣「既に再検にしちゃったもの、逆に再検をキャンセルしたり、日付を変えたりもできないかも」
+     ◎決めごと（ゆうた確定）
+       🔴 直せるのは**中身ぜんぶ**（行った日・時間帯・担当・陸運局・R・理由）＋**取り消し**
+       🔴 取り消したら、その日を**「決定」に戻す**＝押す前の姿に戻す
+          ⚠ ただし**もう別の日で決め直している／済んでいる時は戻さない**（今の予定を上書きしない）
+     🔴 中身の作り方は **pit-share.js の `pitShakenApply`（'reedit' / 'redrop'）1本**。ここで組み立てない。
+     ⚠ 窓の部品（日・時間帯・担当・陸運局・R・理由）は**記録する窓と同じ id を使い回す**
+        ＝ 出し方が2通りにならない（片方だけ直る、が起きない）。
+     ══════════════════════════════════════════════════════════════════════════ */
+  window.cvShReOpen = function(i){
+    if(!_c) return;
+    const s=_c.inspSchedule||{};
+    const h=(Array.isArray(s.history)?s.history:[])[i];
+    if(!h || h.result!=='recheck') return;
+    /* 🔴 開いた時の日と時間帯を控える＝保存する時に「まだ同じ記録か」を確かめる関門になる */
+    window._cvShReAt = { i:i, date:h.date||'', slot:(h.slot==='pm')?'pm':'am' };
+    window._cvShSlot = (h.slot==='pm')?'pm':'am';
+    const staffOpts = '<option value="">（未定）</option>'
+      + (state.staff||[]).map(function(m){ return '<option value="'+esc(m.name)+'"'+(h.staff===m.name?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
+    const body = '<div class="cv-shpb">'
+      + '<label>行った日</label><input type="date" id="cv-shdate" value="'+esc(h.date||'')+'">'
+      + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(window._cvShSlot==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(window._cvShSlot==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
+      + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      + '<label>陸運局</label><select id="cv-shoffice"><option value="">（未定）</option>'
+        + (window.pitRikuunList?pitRikuunList():[]).map(function(o){ return '<option value="'+esc(o.id)+'"'+(h.office===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')
+        + '</select>'
+      + '<label>R（ラウンド）</label><select id="cv-shround"><option value="">（未定）</option>'
+        + [1,2,3,4].map(function(n){ return '<option value="'+n+'"'+(Number(h.round)===n?' selected':'')+'>'+n+'R</option>'; }).join('')
+        + '</select>'
+      + '<label>再検の理由（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" value="'+esc(h.note||'')+'" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
+      + '<div class="cv-shpb-act"><button class="cv-shbtn ok" onclick="cvShReSave()">この内容で直す</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
+      + '<button class="cv-shbtn re cv-shrc-del" onclick="cvShReDrop()">🗑 この再検の記録を取り消す</button>'
+      + '</div>';
+    let back=document.getElementById('cv-shpop');
+    if(!back){ back=document.createElement('div'); back.id='cv-shpop'; back.className='modal-backdrop'; pitModalOutside(back, cvShClose); document.body.appendChild(back); }
+    back.innerHTML='<div class="pdp-box cv-shbox"><div class="pdp-head"><span>↺ 再検の記録を直す</span><button class="pdp-x" onclick="cvShClose()"><i data-ic=close data-ics=16></i></button></div>'+body+'</div>';
+    back.classList.add('show');
+  };
+
+  /* 直した中身を書き戻す。⚠ 先に誰かが直していたら物差しが null を返す＝**何もしない**で知らせる。 */
+  function _cvShReApply(act, opt){
+    const at=window._cvShReAt; if(!_c||!at) return;
+    const s=_c.inspSchedule||(_c.inspSchedule={mode:'manual',slots:{},history:[]});
+    const r=window.pitShakenApply ? pitShakenApply(s, act, Object.assign({ at:at }, opt||{})) : null;
+    if(!r){
+      if(window.UI&&UI.alert) UI.alert('この記録は、ほかの端末で先に直されたようです。',
+        { detail:'いったん閉じて、カードを開き直してから、もう一度やってください。' });
+      return;
+    }
+    _c.inspSchedule=r.insp;
+    if(r.log && window.logFlow) logFlow(_c, r.log);
+    save(); cvShClose(); window._cvShReAt=null;
+    renderCardView(_c,'md-body-modal');
+    if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();
+  }
+
+  window.cvShReSave = function(){
+    const off=(document.getElementById('cv-shoffice')||{}).value||'';
+    _cvShReApply('reedit', { patch:{
+      date : (document.getElementById('cv-shdate')||{}).value || (window._cvShReAt||{}).date,
+      slot : (window._cvShSlot==='pm')?'pm':'am',
+      staff: (document.getElementById('cv-shstaff')||{}).value || '',
+      office: off,
+      officeName: off ? ((window.pitLocName?pitLocName(off):'')||'') : '',
+      round: Number((document.getElementById('cv-shround')||{}).value||0),
+      note : (document.getElementById('cv-shnote')||{}).value || ''
+    }});
+  };
+
+  window.cvShReDrop = function(){
+    const at=window._cvShReAt; if(!_c||!at) return;
+    const s=_c.inspSchedule||{};
+    /* 「押す前の姿に戻す」は、いま行く日が決まっていない時だけ（決め直していたら上書きしない） */
+    const canBack = !s.decided && s.result!=='done';
+    const md = window.fmtMD ? fmtMD(at.date) : at.date;
+    const go = function(){ _cvShReApply('redrop', { restore:true }); };
+    if(window.UI && UI.confirm){
+      UI.confirm('この再検の記録を取り消しますか？', {
+        detail: canBack
+          ? (md+' の記録を消して、その日を「決定（これから行く）」に戻します。担当も戻します。')
+          : (md+' の記録を消します。行く日はいまの予定のままです（もう決め直しているため）。'),
+        ok:'取り消す', cancel:'やめる', danger:true
+      }).then(function(k){ if(k) go(); });
+    } else go();
+  };
+
   window.cvShakenReopen = function(){
     if(!_c) return; const s=_c.inspSchedule||{};
     s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';

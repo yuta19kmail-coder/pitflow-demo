@@ -1386,6 +1386,15 @@ w.pitDivisionColor = pitDivisionColor;
        act  … 'done'（✓完了）／'recheck'（↺再検）／'flip'（午前⇄午後）
                ／'cancel'（予定を取り消す）／'reopen'（済 → 予定に戻す）
        opt  … { staff, office, officeName, round, today, note }
+               🔴 at / patch / restore ＝ **再検の記録1本を指す・直す**（v2.55.0・'reedit' と 'redrop' だけ）。
+                  at      … { i:何番目, date:'YYYY-MM-DD', slot:'am'|'pm' }
+                            🔴 **番号だけで指さない。** 開いた時の日と時間帯も一緒に渡して、
+                               合わなければ**何もしないで null を返す**。
+                               ＝ 別の端末が先に直していた時に、違う行を消さないための関門
+                               （v2.24.0「古い画面が他人の作業をまるごと消す」と同じ筋）。
+                  patch   … 直す中身 { date, slot, staff, office, officeName, round, note }（'reedit'）
+                  restore … true ＝ 取り消した記録の日を「決定」に戻す（'redrop'）。
+                            ⚠ **すでに別の日で決め直していたら戻さない**（今の予定を上書きしない）。
                🔴 note ＝ **再検の理由（1行）**。v2.54.0 で追加（ゆうた指定
                   「再検のチェック時→1行でいいからその内容をかけるようにする」）。
                   ⚠ 使うのは 'recheck' の時だけ。ほかの指示では見ない。
@@ -1399,7 +1408,10 @@ w.pitDivisionColor = pitDivisionColor;
         🔴 ゆうた「**候補に戻すは MHS 上だと分からないので要らない**」＝MHSには出さない。
         PitFlow 側は今までどおり shaken.js の `unassign` が受け持つ。
      ══════════════════════════════════════════════════════════════════════════ */
-  var PIT_SHAKEN_ACTS = ['done', 'recheck', 'flip', 'cancel', 'reopen'];
+  /* 🔴 v2.55.0（ゆうた指定 2026-09-02）**再検の記録そのものを、あとから直す・取り消す。**
+     'reedit' … 再検の記録1本の中身（日・時間帯・担当・陸運局・R・理由）を直す
+     'redrop' … 再検の記録1本を取り消す（opt.restore で、その日を「決定」に戻せる） */
+  var PIT_SHAKEN_ACTS = ['done', 'recheck', 'flip', 'cancel', 'reopen', 'reedit', 'redrop'];
   w.PIT_SHAKEN_ACTS = PIT_SHAKEN_ACTS;
 
   function _shkSlotT(sl){ return sl === 'pm' ? '午後' : '午前'; }
@@ -1424,6 +1436,48 @@ w.pitDivisionColor = pitDivisionColor;
     s.history = Array.isArray(s.history) ? s.history.slice() : [];
     if (!s.mode) s.mode = 'manual';
     if (s.cutBefore == null) s.cutBefore = '';
+
+    /* ══ 🔴 v2.55.0 再検の記録1本を直す／取り消す ══
+       ⚠ この2つは**下の「窓に出ている担当・陸運局・R を一緒に確定する」に乗せない。**
+          直すのは**その記録の中身**であって、車のいまの陸運局やRではない（混ぜると別物が書き換わる）。 */
+    if (act === 'reedit' || act === 'redrop'){
+      var at = opt.at || {};
+      var ix = Number(at.i);
+      var row = s.history[ix];
+      if (!row || row.result !== 'recheck') return null;                       /* もう無い */
+      if (at.date && row.date !== at.date) return null;                        /* 先に誰かが直した */
+      if (at.slot && (row.slot === 'pm' ? 'pm' : 'am') !== (at.slot === 'pm' ? 'pm' : 'am')) return null;
+      if (act === 'reedit'){
+        var q = opt.patch || {}, r2 = {};
+        for (var k2 in row) if (Object.prototype.hasOwnProperty.call(row, k2)) r2[k2] = row[k2];
+        if (q.date != null && /^\d{4}-\d{2}-\d{2}$/.test(String(q.date))) r2.date = String(q.date);
+        if (q.slot != null) r2.slot = (q.slot === 'pm') ? 'pm' : 'am';
+        if (q.staff != null) r2.staff = String(q.staff);
+        if (q.office != null){
+          r2.office = String(q.office || '');
+          r2.officeName = r2.office ? String(q.officeName || r2.officeName || '') : '';
+        }
+        if (q.round != null){ var rn = Number(q.round || 0); r2.round = (rn >= 1 && rn <= 4) ? rn : 0; }
+        if (q.note != null) r2.note = String(q.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
+        s.history[ix] = r2;
+        return { insp: s, act: act,
+                 log: '車検 再検の記録を直した ' + _shkMD(r2.date) + ' ' + _shkSlotT(r2.slot)
+                      + '（回送:' + (r2.staff || '—') + '／' + (r2.officeName || '陸運局未定')
+                      + '／' + (r2.round ? r2.round + 'R' : 'R未定') + '）' + (r2.note ? '／' + r2.note : '') };
+      }
+      s.history.splice(ix, 1);
+      /* 🔴 押し間違いを「押す前の姿」に戻す（ゆうた確定 2026-09-02）。
+         ⚠ ただし**もう別の日で決め直している／済んでいる時は戻さない**。今の予定を上書きしない。 */
+      var back = false;
+      if (opt.restore && !s.decided && s.result !== 'done'){
+        s.decided = row.date; s.decidedSlot = (row.slot === 'pm') ? 'pm' : 'am';
+        if (row.staff) s.resultStaff = row.staff;
+        back = true;
+      }
+      return { insp: s, act: act,
+               log: '車検 再検の記録を取り消した（' + _shkMD(row.date) + ' ' + _shkSlotT(row.slot) + '）'
+                    + (back ? '／予定に戻した' : '') };
+    }
 
     var today = opt.today || _shkToday();
     /* 🔴 窓に出ている3つは、どの指示でも一緒に確定する（v1.119.0 の決めごとをそのまま） */
@@ -1527,6 +1581,24 @@ w.pitDivisionColor = pitDivisionColor;
     return { date: s.tent, slot: (s.tentSlot === 'pm') ? 'pm' : 'am' };
   }
   w.pitShakenTentOf = pitShakenTentOf;
+
+  /* 🔎 v2.55.0 「その日・その時間帯の再検の記録」が何番目かを探す。
+     ◎返すもの  { i:番号 } ／ 見つからない＝null ／ 同じものが2本以上＝{ amb:true }
+     🔴 **2本以上ある時は番号を返さない。** どちらを消していいか決められないので、
+        呼ぶ側（MHS）は「PitFlow の予約詳細で選んでください」と言って引き下がること。
+     ⚠ PitFlow の予約詳細は**1行ずつ押す**ので、これを使わない（番号がそのまま分かる）。 */
+  function pitShakenReFind(insp, iso, slot){
+    var hist = (insp && Array.isArray(insp.history)) ? insp.history : [];
+    var sl = (slot === 'pm') ? 'pm' : 'am', hit = [];
+    for (var i = 0; i < hist.length; i++){
+      var h = hist[i];
+      if (h && h.result === 'recheck' && h.date === iso && ((h.slot === 'pm') ? 'pm' : 'am') === sl) hit.push(i);
+    }
+    if (!hit.length) return null;
+    if (hit.length > 1) return { amb: true };
+    return { i: hit[0] };
+  }
+  w.pitShakenReFind = pitShakenReFind;
 
   /* 📍 陸運局の一覧・名前＝**場所の表を渡せば、どのアプリでも同じ答え**（v1.160.0）
      🔴 「陸運支局のバッジが付いている・有効なもの」＋並び（よく使う→並び順→名前）はここ1本。

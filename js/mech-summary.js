@@ -195,6 +195,19 @@
     return h;
   }
 
+  /* 🔴🔴 v2.58.0（ゆうた指定 2026-09-04）**一番上を「整備」と「車検ライン」の2つに分けた。**
+     🗣「作業サマリー画面の一番上に 整備 と 車検ライン の大きく2つに分かれる」
+     🗣「整備の方の内容は既存のものと何も変えない」
+     ⚠ 整備側は**1行も変えていない**（この上のタブが増えただけ）。
+     ⚠ 期間（当月／年度・月送り）は**下のタブ1本で両方に効く**＝期間の出し方を2か所に書かない。 */
+  function topTabs(){
+    var t = window._wsTop || 'mech';
+    return '<div class="sv-toptabs">'
+      + '<button class="sv-toptab'+(t==='mech'?' on':'')+'" onclick="wsSetTop(\'mech\')"><i data-ic=wrench data-ics=17></i> 整備</button>'
+      + '<button class="sv-toptab'+(t==='line'?' on':'')+'" onclick="wsSetTop(\'line\')"><i data-ic=search data-ics=17></i> 車検ライン</button>'
+      + '</div>';
+  }
+
   function header(){
     var mode = window._wsMode || 'month';
     var ym = window._wsYM;
@@ -243,7 +256,7 @@
     var moS = ymdL(new Date(ym.y, ym.m, 1));
     var moE = ymdL(new Date(ym.y, ym.m+1, 0));
     var d = collect(moS, moE);
-    var h = header();
+    var h = topTabs() + header();
 
     h += '<div class="sv-hero"><div class="sv-hero-row">';
     h += '<div class="sv-hero-main"><div class="sv-hero-lb">作業売上（配分対象・返車済み）</div>'
@@ -275,7 +288,7 @@
     var moE = ymdL(new Date(Y, 10, 30+1));   // 11月末を含める（安全側で12/1未満判定）
     moE = ymdL(new Date(Y, 11, 0));          // 11月末日
     var d = collect(moS, moE);
-    var h = header();
+    var h = topTabs() + header();
     h += '<div class="sv-hero"><div class="sv-hero-row">';
     h += '<div class="sv-hero-main"><div class="sv-hero-lb">年度 作業売上（'+(Y-1)+'/12〜'+Y+'/11・返車ベース）</div>'
        + '<div class="sv-hero-num" style="color:#1db97a">'+man(d.totalAmt)+'<span>円</span></div>'
@@ -302,10 +315,29 @@
     if(!window._wsMode) window._wsMode = 'month';
     if(!window._wsYM)   window._wsYM = { y:now.getFullYear(), m:now.getMonth() };
     if(!window._wsYear) window._wsYear = (now.getMonth()===11) ? now.getFullYear()+1 : now.getFullYear();
+    if(!window._wsTop)  window._wsTop  = 'mech';
+    /* 🔍 v2.58.0 車検ラインは別ファイル（shaken-line.js）。
+       ⚠ 期間はここで出して**渡す**＝向こうで月の出し方を書き直さない（年度＝12月〜翌11月もここが正）。 */
+    if(window._wsTop==='line'){
+      var lS, lE, lFoot;
+      if(window._wsMode==='year'){
+        var Y2=window._wsYear;
+        lS=ymdL(new Date(Y2-1,11,1)); lE=ymdL(new Date(Y2,11,0));
+        lFoot='年度＝会計年度（'+(Y2-1)+'年12月〜'+Y2+'年11月）。';
+      } else {
+        var y2=window._wsYM;
+        lS=ymdL(new Date(y2.y,y2.m,1)); lE=ymdL(new Date(y2.y,y2.m+1,0));
+        lFoot=y2.y+'年'+(y2.m+1)+'月ぶん。';
+      }
+      if(window.renderShakenLine){ renderShakenLine(wrap, topTabs(), header(), lS, lE, lFoot); }
+      else { wrap.innerHTML = topTabs() + '<div class="sv-card"><div class="sv-empty">車検ラインの部品を読み込み中です…</div></div>'; }
+      return;
+    }
     if(window._wsMode==='year') renderYear(wrap); else renderMonth(wrap);
   }
   window.renderWorkSummary = renderWorkSummary;
 
+  window.wsSetTop     = function(t){ window._wsTop = t; renderWorkSummary(); };
   window.wsSetMode    = function(m){ window._wsMode = m; renderWorkSummary(); };
   window.wsShiftMonth = function(dir){ var now=new Date(); if(dir===0){ window._wsYM={y:now.getFullYear(),m:now.getMonth()}; } else { var d=new Date(window._wsYM.y, window._wsYM.m+dir, 1); window._wsYM={y:d.getFullYear(),m:d.getMonth()}; } renderWorkSummary(); };
   window.wsShiftYear  = function(dir){ var now=new Date(); var cur=(now.getMonth()===11)?now.getFullYear()+1:now.getFullYear(); window._wsYear=(dir===0)?cur:(window._wsYear+dir); renderWorkSummary(); };

@@ -218,5 +218,15 @@
 .shk-gut.gcar.clk{ cursor:pointer; }
 .shk-gut.gcar.clk:hover{ background:var(--bg4,#26313b); }
 /* 窓の中の1行入力（再検の理由）。プルダウン（.shk-psel）と同じ見た目にそろえる。 */
+/* 🔴 v2.57.0（ゆうた指定 2026-09-04）窓を3つの塊に分ける線。
+   ⚠ 上＝いま決まっていることを直す／中＝予定を動かす／下＝帰ってきた結果を入れる。
+      線が無いと、押し間違いが「直すつもりで完了させた」の形で出る。 */
+.shk-psep{ height:1px; background:var(--border); margin:12px 0 11px; }
+/* 🔴 v2.57.0 落ちた所の窓に出す「よく使う言葉」の札（押すと足される・もう一度押すと外れる） */
+.shk-pwords{ display:flex; flex-wrap:wrap; gap:5px; margin:-4px 0 11px; }
+.shk-pw{ font-size:11.5px; padding:3px 9px; border-radius:999px; cursor:pointer;
+  background:var(--bg3); border:1px solid var(--border); color:var(--text2); }
+.shk-pw:hover{ border-color:var(--brand,#1f7a4d); color:var(--text); }
+
 .shk-pinput{ width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text);
              border-radius:8px; padding:8px 10px; font-size:13px; margin-bottom:10px; }

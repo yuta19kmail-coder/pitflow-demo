@@ -632,27 +632,133 @@
       body+='<div class="shk-pnote">'+(_rp?'再検合格':'完了')+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')
         +(_rp&&s.repassNote?'<br>落ちた所：'+esc(s.repassNote):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
     } else if(s.decided){
+      /* 🔴🔴 v2.57.0（ゆうた指定 2026-09-04）**窓を3つの塊に分けて、線で区切った。**
+         🗣「担当者やランド情報があって／この内容で保存／──線──／午後に変更／候補に戻す／
+         　　カードを開く／──線──／完了（一発合格）／完了（再検合格）／不合格（記録して候補へ戻す）」
+         ◎ 上＝**いま決まっていることを直す** ／ 中＝**予定を動かす** ／ 下＝**帰ってきた結果を入れる**
+         🔴 **「予定を取り消す」は消した**（ゆうた指定「上と実質同じなため消去」）。
+            ＝ 行く日を外す道は「候補（行ける日）に戻す」1本。⚠ MHS には候補が無いので、あちらは残す。
+         🔴 **理由の1行は、この窓から外して次の窓へ送った**（下の shkNotePop）。
+            ＝ 窓を開いただけで入力欄が見えていると、「書かないと押せない」ように読める。 */
       body+='<div class="shk-pnote">予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
         + fieldsHtml(c)
         + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+id+'\')">この内容で保存</button>'
-        + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（一発合格）</button>'
-        /* 🔴🔴 v2.56.0（ゆうた確定 2026-09-04）**帰ってきた時の押し先を3つに分けた。**
-           一発合格 ／ 再検合格（その場で直して受かった＝実質1回） ／ 不合格（戻して修理）。
-           ⚠ 下の1行は**再検合格と不合格の両方**で使う＝どちらも「何で落ちたか」は残したいから。 */
-        + '<label class="shk-plabel">落ちた所（1行・空でもOK）</label>'
-        + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
-        + '<button class="shk-pbtn ok2" onclick="shkAct(\''+id+'\',\'repass\')">✓ 完了（再検合格）</button>'
-        + '<button class="shk-pbtn re" onclick="shkAct(\''+id+'\',\'recheck\')">✕ 不合格（戻して修理・候補へ戻す）</button>'
-        + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'flip\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
+        + '<div class="shk-psep"></div>'
+        /* 🔴 v2.57.0 時間帯を変えたら、そのままラウンドを選び直す窓に切り替わる（ゆうた指定）
+           ＝ 午前と午後でラウンドが変わるのに、変えたあと入れ直す道が無かった。 */
+        + '<button class="shk-pbtn" onclick="shkFlipPop(\''+id+'\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'tocand\')">↩ 候補（行ける日）に戻す</button>'
-        + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'cancel\')">予定を取り消す</button>';
+        + '<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>'
+        + '<div class="shk-psep"></div>'
+        + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（一発合格）</button>'
+        + '<button class="shk-pbtn ok2" onclick="shkNotePop(\''+id+'\',\'repass\')">✓ 完了（再検合格）</button>'
+        + '<button class="shk-pbtn re" onclick="shkNotePop(\''+id+'\',\'recheck\')">✕ 不合格（記録して候補へ戻す）</button>';
+      pop('車検の予定', body); return;                      /* ⚠ 下の「カードを開く」は付けない（中の塊に入れた） */
     } else {
-      body+='<div class="shk-pnote">この車の再検記録です。</div><button class="shk-pbtn" onclick="shkClosePop()">閉じる</button>';
+      body+='<div class="shk-pnote">この車の不合格の記録です。</div><button class="shk-pbtn" onclick="shkClosePop()">閉じる</button>';
     }
     body+='<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>';
     pop('車検の予定', body);
   };
   function _slT(sl){ return sl==='pm'?'PM':'AM'; }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     🔴🔴 v2.57.0（ゆうた指定 2026-09-04）**窓の中で窓を切り替える2つ。**
+     --------------------------------------------------------------------------
+     🗣「午後に変更→クリック後にラウンド選択POPに切替わる（午前の場合も逆で実装）」
+     🗣「下二つはクリック後に理由POPアップに切替わる仕様」
+
+     🔴🔴 **切り替える前に、上の3つ（担当・陸運局・R）を必ず控えること。**
+        窓の中身を書き換えた瞬間、`shk-staff` などの入れ物は**消える**。
+        控えずに次の窓で確定すると、**選んだばかりの担当が空で保存される**
+        （v1.160.0「担当を選んでから午後に変更を押すと担当が消える」と同じ穴）。
+     ══════════════════════════════════════════════════════════════════════════ */
+  var _shkPend=null;                       /* 切り替える前に控えた3つ */
+  function _grabFields(){
+    var st=document.getElementById('shk-staff'), of=document.getElementById('shk-office'), rd=document.getElementById('shk-round');
+    /* ⚠ 窓に無い時は null＝「触っていない」。空文字（消す指示）と区別する。 */
+    return { staff: st?st.value:null, office: of?(of.value||''):null,
+             officeName: (of&&of.value)?((window.pitLocName?pitLocName(of.value):'')||''):'',
+             round: rd?Number(rd.value||0):null };
+  }
+  function _applyPend(id, act, note){
+    var c=card(id); if(!c) return null; var s=ins(c);
+    var o=_shkPend||{staff:null,office:null,officeName:'',round:null};
+    var r=window.pitShakenApply ? pitShakenApply(s, act, {
+      staff:o.staff, office:o.office, officeName:o.officeName, round:o.round,
+      note:(note==null?null:note), today:todayIso()
+    }) : null;
+    if(!r) return null;
+    c.inspSchedule=r.insp;
+    if(r.log && window.logFlow) logFlow(c, r.log);
+    save(); renderShaken();
+    return r;
+  }
+
+  /* 🕒 午前⇄午後を入れ替えて、そのままラウンドを選び直す窓に切り替わる。
+     ⚠ 入れ替え自体は**先に確定する**（押した時点で決まる）。ラウンドは選ばなければ今のまま。
+     ⚠ ラウンドは **1〜4R を今と同じ並びで全部出す**（ゆうた指定）。
+        午前＝1・2R／午後＝3・4R が普通だが、**例外の取り方ができなくなるので絞らない。** */
+  window.shkFlipPop=function(id){
+    _shkPend=_grabFields();
+    var r=_applyPend(id,'flip',null); if(!r) return;
+    var c=card(id); var s=ins(c);
+    var now=Number(s.round||0);
+    var slName=s.decidedSlot==='pm'?'午後':'午前';
+    var btns=[1,2,3,4].map(function(n){
+      return '<button class="shk-pbtn'+(now===n?' ok2':'')+'" onclick="shkSetRound(\''+id+'\','+n+')">'
+        + n+'R'+(now===n?'（いま）':'')+'</button>'; }).join('');
+    pop('ラウンドを選ぶ',
+      '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+'</div>'
+      + '<div class="shk-pnote">'+fmtMDW(s.decided)+' <b>'+slName+'</b> に変えました。ラウンドは？</div>'
+      + btns
+      + '<div class="shk-psep"></div>'
+      + '<button class="shk-pbtn" onclick="shkSetRound(\''+id+'\',0)">未定にする</button>'
+      + '<button class="shk-pbtn ghost" onclick="shkClosePop()">このまま（あとで入れる）</button>');
+  };
+  window.shkSetRound=function(id,n){
+    var c=card(id); if(!c) return; var s=ins(c);
+    s.round=(n>=1&&n<=4)?n:0;
+    if(window.logFlow) logFlow(c, '車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（'+_slT(s.decidedSlot)+'／'+(s.round?s.round+'R':'R未定')+'）');
+    save(); closePop(); renderShaken();
+    if(window.pitToast) pitToast(s.round?(s.round+'R にしました'):'ラウンドを未定にしました');
+  };
+
+  /* 📝 再検合格・不合格のあとに切り替わる「落ちた所」の窓。
+     ⚠ 空のままでも記録できる（今までどおり）。
+     🔴 よく使う言葉を札で出す（ゆうた指定）。押すと足される／もう一度押すと外れる。 */
+  var SHK_NG_WORDS=['光軸','サイドスリップ','排ガス','制動力','スピードメーター','ブーツ切れ','下回りのオイル漏れ','灯火類'];
+  window.shkNotePop=function(id,act){
+    _shkPend=_grabFields();                 /* 🔴 消える前に控える */
+    var c=card(id); if(!c) return; var s=ins(c);
+    var isNg=(act==='recheck');
+    pop(isNg?'✕ 不合格を記録':'✓ 完了（再検合格）',
+      '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+'</div>'
+      + '<div class="shk-pnote">'+fmtMDW(s.decided)+' '+(s.decidedSlot==='pm'?'午後':'午前')+'　'
+        + (isNg?'自社に戻して修理。行く日は候補に戻ります。':'一度落ちたが、その回で受かった記録です。')+'</div>'
+      + '<label class="shk-plabel">落ちた所（1行・空でもOK）</label>'
+      + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
+      + '<div class="shk-pwords">'+SHK_NG_WORDS.map(function(w){
+          return '<button type="button" class="shk-pw" onclick="shkAddWord(\''+w+'\')">'+w+'</button>'; }).join('')+'</div>'
+      + '<button class="shk-pbtn '+(isNg?'re':'ok2')+'" onclick="shkActNote(\''+id+'\',\''+act+'\')">記録する</button>'
+      + '<button class="shk-pbtn ghost" onclick="shkChipMenu(\''+id+'\')">← 戻る</button>');
+  };
+  /* 札を押した時＝入っていなければ足す／入っていれば外す。区切りは「・」 */
+  window.shkAddWord=function(w){
+    var el=document.getElementById('shk-note'); if(!el) return;
+    var a=String(el.value||'').split('・').map(function(x){return x.trim();}).filter(Boolean);
+    var i=a.indexOf(w);
+    if(i>=0) a.splice(i,1); else a.push(w);
+    el.value=a.join('・').slice(0,120);
+    el.focus();
+  };
+  window.shkActNote=function(id,act){
+    var el=document.getElementById('shk-note');
+    var r=_applyPend(id, act, el?el.value:'');
+    if(!r) return;
+    closePop();
+    if(window.pitToast) pitToast(act==='recheck'?'不合格を記録しました（候補に戻しました）':'再検合格で「済」にしました');
+  };
   /* 🔴🔴 v1.160.0（ゆうた指定 2026-08-20）**どう変わるかは pit-share.js の `pitShakenApply` 1本。**
      🗣「MHSに出てる当日の車検車両、入庫返車と同じように…クリックできるように」
      ＝ MHS の当日ボードからも同じ操作ができるようになった。
@@ -665,14 +771,14 @@
     var stEl=document.getElementById('shk-staff'); var staff=stEl?stEl.value:'';
     var ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
     var off=ofEl?(ofEl.value||''):null;
-    /* 🔴 v2.54.0 再検の理由（1行）。窓に欄が無い時（完了・変更など）は渡さない。 */
-    var ntEl=document.getElementById('shk-note');
+    /* ⚠ v2.57.0 落ちた所（理由）は**この道では渡さない**。
+       再検合格・不合格は窓が切り替わる作りになったので、記録するのは shkActNote の側。
+       ここに残っているのは 完了（一発合格）・予定に戻す・候補に戻す だけ。 */
     var r=window.pitShakenApply ? pitShakenApply(s, act, {
       staff: stEl?staff:null,
       office: off,
       officeName: off ? ((window.pitLocName?pitLocName(off):'')||s.officeName||'') : '',
       round: rdEl?Number(rdEl.value||0):null,
-      note: ((act==='recheck'||act==='repass') && ntEl) ? ntEl.value : null,
       today: todayIso()
     }) : null;
     if(!r) return;

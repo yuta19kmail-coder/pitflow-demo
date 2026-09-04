@@ -104,9 +104,11 @@
       var rows = window.pitShakenOnDate ? pitShakenOnDate(state.cards||[], d.iso) : [];
       rows.forEach(function(r){ var k=d.iso+'|'+r.slot; (decCell[k]=decCell[k]||[]).push({c:r.card,kind:r.state,row:r}); });
     });
-    var cands=[], empties=[], unsched=[], cnt={decided:0,done:0,recheck:0,cand:0,unset:0,tent:0};
+    var cands=[], empties=[], unsched=[], cnt={decided:0,done:0,repass:0,recheck:0,cand:0,unset:0,tent:0};
     shakenCars().forEach(function(c){ var s=ins(c);
+      /* 🔴 v2.56.0 数えるのは「不合格」だけ（再検合格は戻していないので行き直しではない） */
       (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date){ cnt.recheck++; } });
+      if(window.pitShakenIsRepass && pitShakenIsRepass(s)) cnt.repass++;
       if(window.pitShakenTentOf && pitShakenTentOf(s)) cnt.tent++;   /* 🅿 v2.54.0 暫定（仮押さえ）の数 */
       if(s.result==='done'){ cnt.done++; return; }
       if(s.decided){ cnt.decided++; return; }
@@ -215,9 +217,22 @@
       + chipMeta(c, 'tent') + '</div>';
   }
 
-  /* 🔴 v1.108.0 印（済／再検）を必ず出す。ゆうた確定＝**両方出すが、印を付けて区別する**。 */
-  function decChip(c, kind){ var car=carLabel(c);
-    var mark = (window.PIT_SHAKEN_MARK && PIT_SHAKEN_MARK[kind]) || '';
+  /* 🔴 v1.108.0 印（済／再検）を必ず出す。ゆうた確定＝**両方出すが、印を付けて区別する**。
+     🔴🔴 v2.56.0（ゆうた確定 2026-09-04）印は **物差しが配る字をそのまま出す**
+        （不合格／再検／再検合格／済）。⚠ ここで字を組み立て直さない＝
+        MHS・前日LINEの画像と同じ字にならないと、分けた意味が消える。 */
+  function decChip(c, kind, row){ var car=carLabel(c);
+    var mark = row ? (row.mark || '') : ((window.PIT_SHAKEN_MARK && PIT_SHAKEN_MARK[kind]) || '');
+    /* 🔴 v2.56.0 色わけ＝不合格(赤)／再検(オレンジ)／再検合格(緑)／済(グレー) */
+    var mcls = (row && row.repass) ? 'repass' : (row && row.re) ? 'rego' : kind;
+    var mtip = (row && row.repass) ? '再検合格（一度落ちたが、その回で受かった）'
+             : (row && row.re)     ? ('再検（前に不合格。もう一度受験しに行く）'
+                                      + (row.reNo>=2 ? '／不合格 '+row.reNo+'回' : ''))
+             : (kind==='recheck')  ? '不合格（自社に戻して修理）' : '';
+    /* 🔴 v2.56.0 この枠は118pxしかない＝**再検合格だけ「再合」に縮める**（ゆうた指定 2026-09-04）。
+       ⚠ 4文字のままだと「五十嵐様」で車名の行まで詰まる。見本で実物の幅を出して決めた。
+       ⚠ 正式な言い方は上の吹き出しに出る（縮めた字だけを残さない）。 */
+    if (row && row.repass) mark = '再合';
     // 決定＝ドラッグ/メニューで編集可。済(done)・再検(recheck)＝ドラッグ抑制、クリックでカード詳細（編集は詳細から）。
     var editable=(kind==='decided');
     // v0.124.1 ドラッグはポインタ方式（下の shkPointer…）で行う＝ネイティブdraggableは使わない。タップ(onclick)は従来どおり。
@@ -225,7 +240,7 @@
     var onclick = editable ? 'shkChipMenu(\''+c.id+'\')' : 'openDetail(\''+c.id+'\')';
     return '<div class="'+cls+'" draggable="false" data-card-id="'+c.id+'"'
       + ' onclick="'+onclick+'" style="border-left-color:'+team(c)+'">'
-      + '<div class="shk-nm">'+(mark?'<span class="shk-mk shk-mk-'+kind+'">'+mark+'</span>':'')+esc(surname(c))+'様</div>'
+      + '<div class="shk-nm">'+(mark?'<span class="shk-mk shk-mk-'+mcls+'"'+(mtip?' title="'+esc(mtip)+'"':'')+'>'+mark+'</span>':'')+esc(surname(c))+'様</div>'
       + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div>'
       + chipMeta(c, kind) + '</div>';
   }
@@ -264,8 +279,10 @@
     var h='';
     // ヘッダ操作
     h+='<div class="shk-head"><div class="shk-nav"><button onclick="shkShift(-7)"><i data-ic=chevLeft data-ics=16></i> 前週</button><b>'+fmtMD(days[0].iso)+' 〜</b><button onclick="shkShift(7)">次週 <i data-ic=chevRight data-ics=16></i></button><button class="shk-now" onclick="shkShift(0)">今週</button></div>';
-    h+='<div class="shk-legend"><span class="shk-lg dc">決定</span><span class="shk-lg dn">完了</span><span class="shk-lg re">再検</span><span class="shk-lg tt">暫定</span><span class="shk-lg cd">予定枠</span></div>';
-    h+='<div class="shk-sum">決定'+cnt.decided+'／完了'+cnt.done+'／再検'+cnt.recheck+'／暫定'+cnt.tent+'／候補'+cnt.cand+'／未設定'+cnt.unset+'</div></div>';
+    /* 🔴 v2.56.0 凡例も3つに分けた言葉で出す（画面と凡例で言葉が違うと、凡例が嘘になる） */
+    h+='<div class="shk-legend"><span class="shk-lg dc">決定</span><span class="shk-lg re" title="不合格のあと、もう一度受験しに行く">再検</span><span class="shk-lg dn">完了</span><span class="shk-lg rp" title="一度落ちたが、その回で受かった">再合</span><span class="shk-lg ng" title="検査で駄目。自社に戻して修理">不合格</span><span class="shk-lg tt">暫定</span><span class="shk-lg cd">予定枠</span></div>';
+    /* ⚠ 再検合格は**完了の内訳**（別の台数ではない）。数え方は今までどおり完了1台。 */
+    h+='<div class="shk-sum">決定'+cnt.decided+'／完了'+cnt.done+'（うち再合'+cnt.repass+'）／不合格'+cnt.recheck+'／暫定'+cnt.tent+'／候補'+cnt.cand+'／未設定'+cnt.unset+'</div></div>';
     /* 🔴 v1.116.0 入庫待ちの帯は**表のいちばん下**へ移した（ゆうた指定
        「上からメインの表、今週、来週、と下に続くように」）。組み立ては下の buildWait()。 */
     // スクロール表
@@ -286,7 +303,7 @@
       if(x.off) return '<div class="shk-off2"></div>';
       return ['am','pm'].map(function(slot){
         var arr=decCell[x.iso+'|'+slot]||[];
-        var inner=arr.length?arr.map(function(o){ return decChip(o.c,o.kind); }).join(''):'<span class="shk-empty">－</span>';
+        var inner=arr.length?arr.map(function(o){ return decChip(o.c,o.kind,o.row); }).join(''):'<span class="shk-empty">－</span>';
         return '<div class="shk-sc'+(slot==='pm'?' pm':'')+'"><div class="shk-decell" data-iso="'+x.iso+'" data-slot="'+slot+'">'+inner+'</div></div>';
       }).join('');
     }).join('')+'</div>';
@@ -305,11 +322,13 @@
       /* 🔴 v2.54.0 「再2」の吹き出しに**落ちた理由（1行メモ）**を出す（ゆうた指定）。
          ⚠ 画面には出さない＝この列は1行しか無いので、字を増やすと車名が消える。読むのは吹き出しで。 */
       var rcA=(s.history||[]).filter(function(x){return x.result==='recheck';});
-      var rcTip=rcA.map(function(x){ return fmtMD(x.date)+' '+(x.slot==='pm'?'PM':'AM')+(x.note?'：'+x.note:''); }).join('\n');
-      var post=rcA.length?['再'+rcA.length]:[];
+      var rcTip='不合格 '+rcA.length+'回\n'+rcA.map(function(x){ return fmtMD(x.date)+' '+(x.slot==='pm'?'PM':'AM')+(x.note?'：'+x.note:''); }).join('\n');
+      /* 🔴 v2.56.0 「再1」→「不合格1」。数は物差しで数える（画面で数え直さない） */
+      var rcN=window.pitShakenReCount?pitShakenReCount(s):rcA.length;
+      var post=rcN?['不合格'+rcN]:[];
       var subH = pre.map(function(x){return '<span class="shk-ca unset">'+x+'</span>';}).join('')
                + attrChips(c)
-               + post.map(function(x){return '<span class="shk-ca" title="'+esc(rcTip)+'">'+x+'</span>';}).join('');
+               + post.map(function(x){return '<span class="shk-ca re" title="'+esc(rcTip)+'">'+x+'</span>';}).join('');
       /* 🔴🔴 v2.54.0 **一番左（車名の欄）を押すと予約詳細が開く**（ゆうた指定）。
          ⚠ ホバーの情報カードも**ここだけ**に付け替えた（card-hover.js の HOVER_SEL）。
             行ぜんぶに出していた時は、マスを押そうとするたびに大きな情報カードが被っていた。
@@ -608,17 +627,22 @@
     var slName=s.decidedSlot==='pm'?'午後':'午前';
     var body='<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+(c.plate?' / '+esc(c.plate):'')+'</div>';
     if(s.result==='done'){
-      body+='<div class="shk-pnote">完了：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
+      /* 🔴 v2.56.0 完了が「再検合格」なら、そう書く（済とひとまとめにしない） */
+      var _rp=window.pitShakenIsRepass?pitShakenIsRepass(s):!!s.repass;
+      body+='<div class="shk-pnote">'+(_rp?'再検合格':'完了')+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')
+        +(_rp&&s.repassNote?'<br>落ちた所：'+esc(s.repassNote):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
     } else if(s.decided){
       body+='<div class="shk-pnote">予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
         + fieldsHtml(c)
         + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+id+'\')">この内容で保存</button>'
-        + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（受かった）</button>'
-        /* 🔴 v2.54.0（ゆうた指定 2026-09-02）**再検にする時、落ちた理由を1行だけ書ける。**
-           ⚠ 空のままでも押せる（＝今までどおり記録できる）。書いた分は予約詳細の再検履歴に残る。 */
-        + '<label class="shk-plabel">再検の理由（1行・空でもOK）</label>'
+        + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（一発合格）</button>'
+        /* 🔴🔴 v2.56.0（ゆうた確定 2026-09-04）**帰ってきた時の押し先を3つに分けた。**
+           一発合格 ／ 再検合格（その場で直して受かった＝実質1回） ／ 不合格（戻して修理）。
+           ⚠ 下の1行は**再検合格と不合格の両方**で使う＝どちらも「何で落ちたか」は残したいから。 */
+        + '<label class="shk-plabel">落ちた所（1行・空でもOK）</label>'
         + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
-        + '<button class="shk-pbtn re" onclick="shkAct(\''+id+'\',\'recheck\')">↺ 再検（落ちた・候補へ戻す）</button>'
+        + '<button class="shk-pbtn ok2" onclick="shkAct(\''+id+'\',\'repass\')">✓ 完了（再検合格）</button>'
+        + '<button class="shk-pbtn re" onclick="shkAct(\''+id+'\',\'recheck\')">✕ 不合格（戻して修理・候補へ戻す）</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'flip\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'tocand\')">↩ 候補（行ける日）に戻す</button>'
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'cancel\')">予定を取り消す</button>';
@@ -648,7 +672,7 @@
       office: off,
       officeName: off ? ((window.pitLocName?pitLocName(off):'')||s.officeName||'') : '',
       round: rdEl?Number(rdEl.value||0):null,
-      note: (act==='recheck' && ntEl) ? ntEl.value : null,
+      note: ((act==='recheck'||act==='repass') && ntEl) ? ntEl.value : null,
       today: todayIso()
     }) : null;
     if(!r) return;

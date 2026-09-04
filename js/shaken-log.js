@@ -30,7 +30,9 @@
   function records(){
     var out=[];
     (state.cards||[]).forEach(function(c){ if(!isShaken(c)) return; var s=ins(c);
-      if(s.result==='done'){ var d=s.resultDate||s.decided; if(d) out.push({iso:d, slot:(s.resultSlot||s.decidedSlot)==='pm'?'pm':'am', c:c, result:'done', staff:s.resultStaff||''}); }
+      /* 🔴 v2.56.0 済のうち「再検合格」は分かるようにして持ってくる（数は済のまま＝1台） */
+      if(s.result==='done'){ var d=s.resultDate||s.decided; if(d) out.push({iso:d, slot:(s.resultSlot||s.decidedSlot)==='pm'?'pm':'am', c:c, result:'done', staff:s.resultStaff||'',
+        repass:(window.pitShakenIsRepass?pitShakenIsRepass(s):!!s.repass), note:s.repassNote||''}); }
       /* 🔴 v2.54.0 再検の理由（1行）も一緒に持ってくる＝吹き出しと検索で使う */
       (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date) out.push({iso:h.date, slot:h.slot==='pm'?'pm':'am', c:c, result:'recheck', staff:h.staff||'', note:h.note||''}); });
     });
@@ -48,7 +50,7 @@
     var res=recs.filter(function(r){
       var d=new Date(r.iso+'T00:00:00');
       var dstr=r.iso+' '+(d.getMonth()+1)+'/'+d.getDate()+' '+(d.getMonth()+1)+'月'+d.getDate()+'日 '+d.getFullYear();
-      var hay=[surname(r.c), r.c.customer||'', r.c.kana||'', carLabel(r.c), r.c.car||'', r.c.maker||'', r.c.plate||'', r.staff||'', r.note||'', dstr, (r.result==='done'?'済 done':'再検 recheck')].join(' ').toLowerCase();
+      var hay=[surname(r.c), r.c.customer||'', r.c.kana||'', carLabel(r.c), r.c.car||'', r.c.maker||'', r.c.plate||'', r.staff||'', r.note||'', dstr, (r.result==='done'?(r.repass?'済 done 再検合格 repass':'済 done'):'不合格 再検 recheck')].join(' ').toLowerCase();
       return terms.every(function(t){ return hay.indexOf(t)>=0; });
     }).sort(function(a,b){ return a.iso<b.iso?1:(a.iso>b.iso?-1:(a.slot<b.slot?-1:1)); });
     var h='<div class="skl-res-head">検索結果 <b>'+res.length+'</b>件</div>';
@@ -84,11 +86,13 @@
     var mRecs=recs.filter(function(r){ return r.iso.indexOf(mPrefix)===0; });
     var doneN=mRecs.filter(function(r){return r.result==='done';}).length;
     var reN=mRecs.filter(function(r){return r.result==='recheck';}).length;
+    /* 🔴 v2.56.0 再検合格は**済の内訳**（別の台数ではない） */
+    var rpN=mRecs.filter(function(r){return r.result==='done'&&r.repass;}).length;
     var byStaff={}; mRecs.forEach(function(r){ var k=r.staff||'（未記録）'; byStaff[k]=(byStaff[k]||0)+1; });
     var staffArr=Object.keys(byStaff).map(function(k){return {name:k,n:byStaff[k]};}).sort(function(a,b){return b.n-a.n;});
     var h='';
     h+='<div class="skl-head"><div class="skl-nav"><button onclick="sklShift(-1)"><i data-ic=chevLeft data-ics=16></i> 前月</button><b>'+y+'年'+(mo+1)+'月</b><button onclick="sklShift(1)">次月 <i data-ic=chevRight data-ics=16></i></button><button class="skl-now" onclick="sklShift(0)">今月</button></div>';
-    h+='<div class="skl-sum"><span class="skl-lg done">済 '+doneN+'</span><span class="skl-lg re">再検 '+reN+'</span><span class="skl-lg all">計 '+(doneN+reN)+'</span></div></div>';
+    h+='<div class="skl-sum"><span class="skl-lg done">済 '+doneN+'</span><span class="skl-lg rp">再合 '+rpN+'</span><span class="skl-lg re">不合格 '+reN+'</span><span class="skl-lg all">計 '+(doneN+reN)+'</span></div></div>';
     h+='<div class="skl-staff">'+(staffArr.length?('担当別： '+staffArr.map(function(s){return '<span class="skl-sc">'+esc(s.name)+' <b>'+s.n+'</b></span>';}).join('')):'<span class="skl-empty2">この月の実績はまだありません</span>')+'</div>';
     h+='<div class="skl-cal"><div class="skl-dows">'+DOW.split('').map(function(d,i){return '<div class="skl-dow '+(i===0?'sun':i===6?'sat':'')+'">'+d+'</div>';}).join('')+'</div><div class="skl-grid">';
     var first=new Date(y,mo,1); var start=new Date(first); start.setDate(1-first.getDay());
@@ -106,17 +110,17 @@
         /* 🔴 祝日は日付を日曜と同じ赤に。＝**火曜なのに斜線**の理由が、字を出さなくても伝わる
              （ゆうた指定「理由の字は自社の休みの時だけ」なので、色で分かるようにする）。 */
         + '<div class="skl-dh"><span class="skl-d '+(off.kind==='holiday'?'holi':(w===0?'sun':w===6?'sat':''))+'">'+d.getDate()+'</span>'+offTag+(arr.length?'<span class="skl-cnt">'+arr.length+'</span>':'')+'</div>'
-        + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?'済':'再検')+' '+(r.slot==='pm'?'PM':'AM')+(r.staff?' / '+esc(r.staff):'')+(r.note?' / '+esc(r.note):'')+'">'
+        + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?(r.repass?'再検合格':'済'):'不合格')+' '+(r.slot==='pm'?'PM':'AM')+(r.staff?' / '+esc(r.staff):'')+(r.note?' / '+esc(r.note):'')+'">'
             + '<div class="skl-r1"><span class="skl-ap '+r.slot+'">'+(r.slot==='pm'?'PM':'AM')+'</span>'
             + '<span class="skl-nm">'+esc(surname(r.c))+'様</span>'
-            + '<span class="skl-rt">'+(r.result==='done'?'済':'再')+'</span></div>'
+            + '<span class="skl-rt'+(r.repass?' rp':'')+'">'+(r.result==='done'?(r.repass?'再合':'済'):'不合')+'</span></div>'
             + '<div class="skl-r2"><span class="skl-car">'+(_car?esc(_car):'—')+'</span>'
             + (r.staff?'<span class="skl-stf">'+esc(r.staff)+'</span>':'')+'</div>'
             + '</div>'; }).join('')
         + '</div>';
     }
     h+='</div></div>';
-    h+='<div class="skl-note">※ 事実ベースの記録のみ（予定は含みません）。済＝受かって陸運局へ行った実績、再＝再検で行った実績。誰が行ったか（担当）も記録。月送りで過去すべてを振り返れます。'
+    h+='<div class="skl-note">※ 事実ベースの記録のみ（予定は含みません）。<b>済</b>＝一発で受かった／<b>再合</b>＝一度落ちたが、その回で受かった（再検合格）／<b>不合</b>＝不合格で自社に戻した実績。誰が行ったか（担当）も記録。月送りで過去すべてを振り返れます。'
       + '<br>※ 斜線は行けない日です。<b>薄い斜線＝土日祝（陸運局が休み）</b>／<b>濃い斜線＝自社の定休</b>（MHSの定休日カレンダー・理由も出ます）。'
       + '<br>※ 古い月は MHS のカレンダーが届いている範囲を外れることがあり、その時は<b>定休曜日だけ</b>の表示になります（臨時休業までは遡れません）。</div>';
     return h;

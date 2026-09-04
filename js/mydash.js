@@ -1070,15 +1070,15 @@
         var recs = shakenRecords(); var pre = C.moS.slice(0, 7);
         var mRecs = recs.filter(function (r) { return (r.iso || '').indexOf(pre) === 0; });
         var doneN = mRecs.filter(function (r) { return r.result === 'done'; }).length, reN = mRecs.filter(function (r) { return r.result === 'recheck'; }).length;
-        if (sz === 's') return kpi(doneN, '台', '今月 済・再検 ' + reN, 'g');
-        if (sz === 'm') return '<div class="md-tiny">直近の車検実績</div><div class="md-list">' + (recs.length ? recs.slice(0, 5).map(function (r) { return rowCard(r.c.id, (window.fmtMD ? fmtMD(r.iso) : r.iso) + ' ' + esc(nm(r.c)), r.result === 'done' ? '済' : '再検', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>';
+        if (sz === 's') return kpi(doneN, '台', '今月 済・不合格 ' + reN, 'g');
+        if (sz === 'm') return '<div class="md-tiny">直近の車検実績</div><div class="md-list">' + (recs.length ? recs.slice(0, 5).map(function (r) { return rowCard(r.c.id, (window.fmtMD ? fmtMD(r.iso) : r.iso) + ' ' + esc(nm(r.c)), r.result === 'done' ? '済' : '不合格', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>';
         if (sz === 'l') {
           var by = {}; mRecs.forEach(function (r) { if (r.result === 'done' && r.staff) by[r.staff] = (by[r.staff] || 0) + 1; });
           var arr = Object.keys(by).map(function (k) { return { n: k, v: by[k] }; }).sort(function (a, b) { return b.v - a.v; });
-          return '<div class="md-inline">' + kpi(doneN, '台', '今月 済', 'g') + kpi(reN, '件', '今月 再検', reN ? 'o' : 'g') + '</div>' +
+          return '<div class="md-inline">' + kpi(doneN, '台', '今月 済', 'g') + kpi(reN, '件', '今月 不合格', reN ? 'o' : 'g') + '</div>' +
             '<div class="md-tiny" style="margin-top:8px">担当別（今月・済）</div><div class="md-list">' + (arr.length ? arr.map(function (x) { return rowCard(null, esc(x.n), x.v + '台', 'tag'); }).join('') : empty('実績なし')) + '</div>' + openFoot('shakenlog', '車検履歴');
         }
-        return '<div class="md-scroll md-scroll-tall">' + (recs.length ? recs.slice(0, 40).map(function (r) { return rowCard(r.c.id, (window.fmtMD ? fmtMD(r.iso) : r.iso) + '　' + esc(nm(r.c)) + ' ' + esc(carOf(r.c)) + (r.staff ? '（' + esc(r.staff) + '）' : ''), r.result === 'done' ? '済' : '再検', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>' + openFoot('shakenlog', '車検履歴');
+        return '<div class="md-scroll md-scroll-tall">' + (recs.length ? recs.slice(0, 40).map(function (r) { return rowCard(r.c.id, (window.fmtMD ? fmtMD(r.iso) : r.iso) + '　' + esc(nm(r.c)) + ' ' + esc(carOf(r.c)) + (r.staff ? '（' + esc(r.staff) + '）' : ''), r.result === 'done' ? '済' : '不合格', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>' + openFoot('shakenlog', '車検履歴');
       },
       more: function () { return openFoot('shakenlog', '車検履歴'); }
     },

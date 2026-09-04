@@ -1313,8 +1313,38 @@ w.pitDivisionColor = pitDivisionColor;
   }
   w.pitCardActive = pitCardActive;
 
-  /* 画面に出す印。'' ＝これから行く／'済' ＝終わった／'再検' ＝落ちてもう一度 */
-  w.PIT_SHAKEN_MARK = { decided: '', done: '済', recheck: '再検' };
+  /* 🔴🔴 v2.56.0（ゆうた確定 2026-09-04）**車検の言葉を3つに分けた。**
+     🗣「まず実際に再検のパターンが2つある。なのでそもそもの言葉を2つにしよう」
+     🗣「再検→不合格からもう一度受験する行為」
+
+       不合格   … 検査で駄目。**自社に戻して修理が要る**。次は最短で当日の午後、ないし翌日以降
+                  ＝ v2.55.0 まで「再検」と出していたものは、ぜんぶこれ
+       再検     … 不合格のあと、**もう一度受験しに行く予定**＝これから行く日に付く印
+       再検合格 … 行って一度落ちたが、**時間内にその場で直してその回で受かった**。実質1回で完了
+
+     🔴🔴 前は「再検」の1語が、**落ちた日**と**行き直す日**の両方を指していた。
+        ＝ 同じ日に2台並ぶと「終わった話」か「これからの話」かを読み分けられなかった。
+     ⚠ **記録の名前（recheck）は1文字も変えていない。**画面に出る字だけを分けている
+        （過去の記録も、開いた瞬間から新しい言葉で出る）。 */
+  w.PIT_SHAKEN_MARK = { decided: '', done: '済', recheck: '不合格', repass: '再検合格' };
+
+  /* 🔴 v2.56.0 **落ちた回数はここでしか数えない。**画面ごとに数え直すと必ずズレる。
+     ⚠ 数えるのは「不合格」だけ。**再検合格は入れない**（自社に戻していないので、行き直しではない）。 */
+  function pitShakenReCount(insp){
+    var h = (insp && Array.isArray(insp.history)) ? insp.history : [];
+    var n = 0;
+    for (var i = 0; i < h.length; i++) if (h[i] && h[i].result === 'recheck') n++;
+    return n;
+  }
+  w.pitShakenReCount = pitShakenReCount;
+
+  /* 🔴 v2.56.0 その完了が「再検合格」か。
+     ⚠ **完了の記録に付ける印**であって、履歴には積まない
+        （積むと、同じ日に「完了の行」と「履歴の行」が2つ出る）。 */
+  function pitShakenIsRepass(insp){
+    return !!(insp && insp.result === 'done' && insp.repass);
+  }
+  w.pitShakenIsRepass = pitShakenIsRepass;
 
   /* 🔴🔴 その日の車検予定を返す。**絞り込み・並び・中身までここで決める。**
        戻り＝[{ id, state:'decided'|'done'|'recheck', mark, slot:'am'|'pm',
@@ -1328,8 +1358,21 @@ w.pitDivisionColor = pitDivisionColor;
     if (!iso) return [];
     var out = [];
     function row(c, state, slotRaw){
+      var s0 = c.inspSchedule || {};
+      var reNo   = pitShakenReCount(s0);                                  /* 落ちた回数 */
+      var repass = (state === 'done') && pitShakenIsRepass(s0);           /* その場で受かった */
+      /* 🔴 v2.56.0 **これから行く日に、落ちた記録があれば その予定は「再検」。**（今回の依頼そのもの）
+         🗣 ゆうた「再検になった車の次の予定の時に、この予定が再検だとわかるようにしてほしい」
+         ⚠ 回数は**2回目以降だけ**出す（ゆうた指定）＝ふだんは短く、やばい車だけ目に入る。 */
+      var isRe   = (state === 'decided') && reNo > 0;
+      var mark   = repass ? w.PIT_SHAKEN_MARK.repass
+                 : isRe   ? ('再検' + (reNo >= 2 ? reNo : ''))
+                 : (w.PIT_SHAKEN_MARK[state] || '');
       return {
-        id: c.id, card: c, state: state, mark: w.PIT_SHAKEN_MARK[state] || '',
+        id: c.id, card: c, state: state, mark: mark,
+        /* 🔴 **何の印かも一緒に配る。**字だけ渡すと、受け取る側が字を見て場合分けを始めて必ず食い違う
+           （MHS は頭の札に、前日LINEの画像は色に使う）。 */
+        re: isRe, reNo: reNo, repass: repass,
         done: (state === 'done'), slot: pitShakenSlot(slotRaw),
         name: pitCustSurname(c), car: pitCarLabel(c),
         /* 🔴 v1.130.0 当日ビュー／MHS の当日で出すもの（種類・ナンバー下4桁）も一緒に配る */
@@ -1383,7 +1426,8 @@ w.pitDivisionColor = pitDivisionColor;
 
      ◎渡すもの
        insp … いまの `card.inspSchedule`（無ければ null でよい）
-       act  … 'done'（✓完了）／'recheck'（↺再検）／'flip'（午前⇄午後）
+       act  … 'done'（✓完了・一発合格）／'repass'（✓完了・再検合格 v2.56.0）
+               ／'recheck'（✕不合格＝戻して修理）／'flip'（午前⇄午後）
                ／'cancel'（予定を取り消す）／'reopen'（済 → 予定に戻す）
        opt  … { staff, office, officeName, round, today, note }
                🔴 at / patch / restore ＝ **再検の記録1本を指す・直す**（v2.55.0・'reedit' と 'redrop' だけ）。
@@ -1397,7 +1441,7 @@ w.pitDivisionColor = pitDivisionColor;
                             ⚠ **すでに別の日で決め直していたら戻さない**（今の予定を上書きしない）。
                🔴 note ＝ **再検の理由（1行）**。v2.54.0 で追加（ゆうた指定
                   「再検のチェック時→1行でいいからその内容をかけるようにする」）。
-                  ⚠ 使うのは 'recheck' の時だけ。ほかの指示では見ない。
+                  ⚠ 使うのは 'recheck' と 'repass'（v2.56.0）の時だけ。ほかの指示では見ない。
                ⚠ 窓に出ている担当・陸運局・R も**一緒に確定する**（別々に保存させない）。
      ◎返すもの
        { insp: 新しい inspSchedule, log: フローに残す1行, act: 受け取った act }
@@ -1411,7 +1455,10 @@ w.pitDivisionColor = pitDivisionColor;
   /* 🔴 v2.55.0（ゆうた指定 2026-09-02）**再検の記録そのものを、あとから直す・取り消す。**
      'reedit' … 再検の記録1本の中身（日・時間帯・担当・陸運局・R・理由）を直す
      'redrop' … 再検の記録1本を取り消す（opt.restore で、その日を「決定」に戻せる） */
-  var PIT_SHAKEN_ACTS = ['done', 'recheck', 'flip', 'cancel', 'reopen', 'reedit', 'redrop'];
+  /* 🔴 v2.56.0 'repass' … **再検合格で完了**（一度落ちたが、その場で直して同じ回で受かった）。
+     ⚠ 'done'（一発合格）と分けたのは、**押し直した時に印を確実に消すため**。
+        1つの指示に旗を足す形にすると、一発合格で押し直しても前の印が残る道ができる。 */
+  var PIT_SHAKEN_ACTS = ['done', 'repass', 'recheck', 'flip', 'cancel', 'reopen', 'reedit', 'redrop'];
   w.PIT_SHAKEN_ACTS = PIT_SHAKEN_ACTS;
 
   function _shkSlotT(sl){ return sl === 'pm' ? '午後' : '午前'; }
@@ -1461,7 +1508,7 @@ w.pitDivisionColor = pitDivisionColor;
         if (q.note != null) r2.note = String(q.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
         s.history[ix] = r2;
         return { insp: s, act: act,
-                 log: '車検 再検の記録を直した ' + _shkMD(r2.date) + ' ' + _shkSlotT(r2.slot)
+                 log: '車検 不合格の記録を直した ' + _shkMD(r2.date) + ' ' + _shkSlotT(r2.slot)
                       + '（回送:' + (r2.staff || '—') + '／' + (r2.officeName || '陸運局未定')
                       + '／' + (r2.round ? r2.round + 'R' : 'R未定') + '）' + (r2.note ? '／' + r2.note : '') };
       }
@@ -1475,7 +1522,7 @@ w.pitDivisionColor = pitDivisionColor;
         back = true;
       }
       return { insp: s, act: act,
-               log: '車検 再検の記録を取り消した（' + _shkMD(row.date) + ' ' + _shkSlotT(row.slot) + '）'
+               log: '車検 不合格の記録を取り消した（' + _shkMD(row.date) + ' ' + _shkSlotT(row.slot) + '）'
                     + (back ? '／予定に戻した' : '') };
     }
 
@@ -1494,10 +1541,17 @@ w.pitDivisionColor = pitDivisionColor;
            + '／' + (s.round ? s.round + 'R' : 'R未定') + '）';
     var log = '';
 
-    if (act === 'done'){
+    if (act === 'done' || act === 'repass'){
       var d = s.decided || today, sl = s.decidedSlot || 'am';
       s.result = 'done'; s.resultDate = d; s.resultSlot = sl; s.resultStaff = staff;
-      log = '車検 済 ' + _shkMD(d) + ' ' + _shkSlotT(sl) + wh;
+      /* 🔴 v2.56.0 再検合格＝完了の記録に印を1つ付けるだけ（数え方は完了1台のまま＝売上も件数も動かない）。
+         ⚠ 一発合格で押した時は**必ず印を消す**（押し間違いを直せる道を、足すのと同じ回に用意する
+            ＝ v2.55.0 の教訓「記録を残すを作ったら、間違えた時にどう戻すかも同じ回に決める」）。 */
+      s.repass = (act === 'repass');
+      s.repassNote = (act === 'repass' && opt.note != null)
+        ? String(opt.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120) : '';
+      log = '車検 済' + (act === 'repass' ? '（再検合格）' : '') + ' ' + _shkMD(d) + ' ' + _shkSlotT(sl) + wh
+          + (s.repassNote ? '／' + s.repassNote : '');
     } else if (act === 'recheck'){
       var d2 = s.decided || today, sl2 = s.decidedSlot || 'am';
       /* ⚠ その時どこへ誰が行って何Rだったかを残す（あとから振り返れるように） */
@@ -1509,13 +1563,15 @@ w.pitDivisionColor = pitDivisionColor;
                        note: note2 });
       s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
       /* ⚠ 陸運局とRは**残す**＝次に決め直す時、たいてい同じ所へ行くので入れ直させない */
-      log = '車検 再検 ' + _shkMD(d2) + ' ' + _shkSlotT(sl2) + wh + (note2 ? '／' + note2 : '');
+      log = '車検 不合格 ' + _shkMD(d2) + ' ' + _shkSlotT(sl2) + wh + (note2 ? '／' + note2 : '');
     } else if (act === 'cancel'){
       var d3 = s.decided || '', sl3 = s.decidedSlot || '';
       s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = '';
       log = '車検の予定を取り消し' + (d3 ? '（' + _shkMD(d3) + ' ' + _shkSlotT(sl3) + '）' : '');
     } else if (act === 'reopen'){
       s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
+      /* 🔴 v2.56.0 **再検合格の印も一緒に落とす。**残すと「予定に戻したのに再検合格」が出る。 */
+      s.repass = false; s.repassNote = '';
       log = '車検を予定に戻した';
     } else if (act === 'flip'){
       s.decidedSlot = (s.decidedSlot === 'pm') ? 'am' : 'pm';
@@ -1528,7 +1584,7 @@ w.pitDivisionColor = pitDivisionColor;
     if (opt.staff != null && act !== 'recheck' && act !== 'reopen') s.resultStaff = staff;
     /* 🔴 v2.54.0 **暫定予定（仮押さえ）は、決まった・終わった・取り消した で必ず落とす。**
        ⚠ 残すと「決定と暫定が両方ある」状態ができて、どちらが本当か読めなくなる。 */
-    if (act === 'done' || act === 'recheck' || act === 'cancel'){ s.tent = ''; s.tentSlot = ''; }
+    if (act === 'done' || act === 'repass' || act === 'recheck' || act === 'cancel'){ s.tent = ''; s.tentSlot = ''; }
     return { insp: s, log: log, act: act };
   }
   w.pitShakenApply = pitShakenApply;

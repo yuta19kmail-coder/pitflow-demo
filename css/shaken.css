@@ -191,7 +191,14 @@
 .shk-mk{ display:inline-block; margin-right:4px; padding:0 4px; border-radius:4px;
          font-size:9px; font-weight:800; line-height:1.5; vertical-align:1px; }
 .shk-mk-done{ background:rgba(120,120,120,.22); color:var(--text2); }
-.shk-mk-recheck{ background:rgba(239,68,68,.18); color:#ef4444; }
+.shk-mk-recheck{ background:rgba(239,68,68,.18); color:#ef4444; }        /* 不合格＝戻して修理 */
+/* 🔴 v2.56.0（ゆうた確定 2026-09-04）車検の言葉を3つに分けた印。
+   ⚠ **赤は「不合格」だけ**にすること。これから行く再検まで赤にすると、
+      終わった話とこれからの話が同じ色になって、分けた意味が消える。 */
+.shk-mk-rego{ background:rgba(249,115,22,.20); color:#f8a866; }          /* 再検＝もう一度行く（これから） */
+.shk-mk-repass{ background:rgba(29,185,122,.20); color:#5fd3a6; }        /* 再検合格＝その回で受かった */
+.shk-ca.re{ background:rgba(239,68,68,.18); color:#ef8a8a; }             /* ガント左端の「不合格2」 */
+.shk-lg.ng{ color:#ef8a8a; } .shk-lg.rp{ color:#5fd3a6; }
 
 /* ══════════════════════════════════════════════════════════════════
    🅿🅿 v2.54.0 暫定予定（仮押さえ）＋ 一番左を押すと予約詳細（ゆうた指定 2026-09-02）

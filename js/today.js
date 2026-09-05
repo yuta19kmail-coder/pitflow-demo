@@ -89,9 +89,22 @@ function renderToday(){
   /* 🔴 v1.99.0 「売上なしでアーカイブ」した車は返車済みの台数に数えない（物差し＝sales-count.js の pitCardNoSale）。
      ＝当日ビューの「返車 ◯／◯台」が、売上0で片付けた車のぶんだけ増えてしまうのを防ぐ。 */
   const _noSale = c => !!(window.pitCardNoSale && pitCardNoSale(c));
+  /* 🔴🔴 v2.63.0（ゆうた報告 2026-09-05「この予約が当日ビューで2枚出てる」）
+     **代車・社用車の整備カードは、ふつうの入庫リストに入れない。**
+     ◎起きていたこと
+       整備の枠を確定すると `reserveDate` に**期間の初日**が入る（maint-pit.js の `_fixSpan`）。
+       ＝ その初日だけ、**代車の整備行（期間で出る）と ふつうの入庫行（reserveDate で出る）の2枚**が並ぶ。
+       　（U47540／自社代車 アクア／松戸 500 す 8230／9/5〜9/25 で確定 → 9/5 に2枚）
+     🔴 **出すのは代車の整備行 1本**（ゆうた確定）。期間中ずっと同じ見た目になり、
+        入庫の道も代車用の1本（`pitMaintIntake`）に揃う。
+     ⚠ 「今日はやらない」で見送った日も、ここには出さない。
+        `pitMaintSpanOn`（その日に出るか）で外すと、見送った日にふつうの行として復活してしまう。
+        ＝ 見るのは **`pitCardMaint`（整備カードかどうか）1本**。
+     ⚠ MHS は逆向き（ふつうの行を残して代車ぶんを足さない）。**どちらも「2枚出さない」で揃っている。** */
+  const _maintCard = c => !!(window.pitCardMaint && pitCardMaint(c));
   // 入庫リスト＝まだ来ていない予約（status=reserved）。入庫済みにするとタスクへ移りここから消える
   const intake = state.cards
-    .filter(c => c.reserveDate === dayStr && c.status === 'reserved')
+    .filter(c => c.reserveDate === dayStr && c.status === 'reserved' && !_maintCard(c))
     .sort((a,b) => _todMin(a.reserveTime) - _todMin(b.reserveTime));
   /* 返車リスト＝今日返車予定でまだ返していない。返車済みにすると実績へ移りここから消える
      🔴 v1.65.0 「どの日に出すか」は return-slot.js の pitReturnListDate 1本。ここで条件を書き写さない。
@@ -104,7 +117,9 @@ function renderToday(){
 
   // 入庫：今日の予約総数（返車済み含む）を固定表示。残＝まだ来ていない（status=reserved）
   const intakeTotal = state.cards.filter(c => c.reserveDate === dayStr && c.status !== 'scrap' && !_noSale(c)).length;
-  const inLeft  = state.cards.filter(c => c.reserveDate === dayStr && c.status === 'reserved').length;
+  /* ⚠ v2.63.0 整備カードは上の代車ぶん（maintN）で数えるので、ここでは数えない（二重になる）。
+     　 総数（intakeTotal）は `pitCardNoSale` で前から外れている＝残だけがズレていた。 */
+  const inLeft  = state.cards.filter(c => c.reserveDate === dayStr && c.status === 'reserved' && !_maintCard(c)).length;
   const inMoved = intakeTotal - inLeft;   // すでに入った台数（1台でも動けば残を表示）
   // 返車：今日の返車総数を固定。残＝まだ返してない
   const _retDone = c => !_noSale(c) && c.status === 'returned' && (c.completedAt === dayStr || c.returnDate === dayStr);
@@ -429,6 +444,11 @@ window.pitTodayDetail = function(id){
 window.pitTodayCheckIn = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
+  /* 🔴🔴 v2.63.0（ゆうた 2026-09-05）**代車・社用車の入庫は、代車の道しか通さない。**
+     🗣「とにかく代車、社用車の入庫予定は前回決めたフローをきっちり通るようにしてほしい」
+     ここは当日ビューだけでなく、**カードの入庫ボタン（card-view.js）と右クリック（ctxmenu-pit.js）も通る**。
+     関門は maint-pit.js の1本＝ここに条件を書き写さない。 */
+  if (window.pitMaintIntakeGuard && pitMaintIntakeGuard(c)) return;
   /* 🔵 v1.74.0（ゆうた指定）承認待ちのままなら**1回だけ聞いて通す**。止めない。
      🔴 聞き方は approval-pit.js の1本（ここに文言を書き写さない）。 */
   if (window.pitAskApprovalBeforeIntake && c.approvalPending){

@@ -738,16 +738,32 @@
       + '<button class="ta-btn primary" onclick="pitMaintIntake(\'' + recId + '\')">'
         + '<b><i data-ic=download data-ics=16></i> 入庫済みにする</b>'
         + '<span>タスクボードにカードが起きます（社内区分「代車」）</span></button>'
-      + '<button class="ta-btn" onclick="pitMaintGotoFromToday(\'' + recId + '\')">'
+      /* 🔴 v2.63.0（ゆうた確定 2026-09-05「詳細を見るをカードに向ける」）
+         ここからカードが開けなかったので、**確定した予定の中身を当日ビューから確認できなかった**
+         （確定すると未定タブの代車BOXからも消えるため、検索以外に道が無かった）。 */
+      + '<button class="ta-btn" onclick="pitMaintDetailFromToday(\'' + recId + '\')">'
         + '<b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b>'
-        + '<span>車両管理の日ビューで、この車の枠を見る・直す</span></button>'
+        + '<span>カードを開いて確認・編集</span></button>'
+      + '<button class="ta-btn" onclick="pitMaintGotoFromToday(\'' + recId + '\')">'
+        + '<b><i data-ic=calendar data-ics=16></i> 車両管理で見る</b>'
+        + '<span>日ビューで、この車の枠を見る・直す</span></button>'
       + '<button class="ta-btn danger" onclick="pitMaintSkip(\'' + recId + '\')">'
         + '<b><i data-ic=ban data-ics=16></i> 今日はやらない</b>'
         + '<span>この日ぶんだけ消えます（次の候補日を待ちます・未入庫には溜めません）</span></button>'
       + '<button class="ta-cancel" onclick="pitTodayActionClose()">閉じる</button>');
   };
 
-  /* 当日ビューの「詳細を見る」＝車両管理の日ビューへ（飛び先は flMaintGoto の1本） */
+  /* 🔴 v2.63.0 当日ビューの「詳細を見る」＝**カードを開く**（ふつうの入庫行と同じ言葉・同じ動き）。
+     ⚠ 開くのは card-detail.js の `openDetail` 1本。ここで窓を組み立てない。 */
+  w.pitMaintDetailFromToday = function(recId){
+    var hit = spanOf(recId);
+    if (w.pitTodayActionClose) w.pitTodayActionClose();
+    if (!hit){ w.pitAlert('この枠が見つかりません', { code:'PF-3067',
+      detail:'画面を開き直してください。' }); return; }
+    if (w.openDetail) w.openDetail(hit.card.id);
+  };
+
+  /* 当日ビューの「車両管理で見る」＝車両管理の日ビューへ（飛び先は flMaintGoto の1本） */
   w.pitMaintGotoFromToday = function(recId){
     var r = recs().filter(function(x){ return x.id === recId; })[0];
     if (w.pitTodayActionClose) w.pitTodayActionClose();
@@ -816,6 +832,38 @@
     w.pitAsk('この代車を入庫させますか？', { title:(WORK_LB[c.workType] || '整備') + '　' + vehName(v), ok:'入庫する', detail:det })
       .then(function(yes){ if (yes) _intakeGo(c, sp, v, own, td); });
   };
+  /* ==================================================================
+     🔴🔴 v2.63.0（ゆうた 2026-09-05）**代車・社用車の入庫は、この道1本しか通さない。**
+     ------------------------------------------------------------------
+     🗣「とにかく **代車、社用車の入庫予定は前回決めたフローをきっちり通る**ようにしてほしい」
+
+     ◎なぜ関門が要るか
+       整備カードは v2.49.0 から**ふつうの予約カード**なので、ふつうの入庫の道にも乗ってしまう。
+       ・当日ビューの「入庫済みにする」（v2.63.0 で行そのものは外したが、道は残る）
+       ・カードの中の入庫ボタン（card-view.js）
+       ・右クリックメニュー（ctxmenu-pit.js）
+       ・カード編集の「入庫中で保存」（card-detail.js）
+       そこから入ると、**代車の入庫でやっていることが丸ごと抜ける**＝
+         押す前の確認が出ない／期間を実際の日に合わせない（`sp.from`）／
+         紐づけたお客様がカードに入らない／記録が「入庫済みにした」になる。
+
+     🔴 **返り値 true ＝ ここで引き取った。呼んだ側は何もしない。**
+     ⚠ もう入庫している整備カードは引き取らない（ふつうの道で進めてよい）。
+     ================================================================== */
+  w.pitMaintIntakeGuard = function(c){
+    if (!(w.pitCardMaint && w.pitCardMaint(c))) return false;   /* 整備カードでなければ素通し */
+    if (!c || c.status !== 'reserved' || c.actualInAt) return false;   /* もう入庫している */
+    var sid = c.maintFixSid || ((arr(c.maintSpans)[0] || {}).sid || '');
+    if (!sid){
+      w.pitAlert('この整備は、まだ日が決まっていません', { code:'PF-3066',
+        detail:'車両管理 ▸ 代車作業予定ボードで日を決めてから入庫させてください。\n'
+             + '（代車・社用車の入庫は、作業予定ボード → 当日ビューの代車の行 の道を通します）' });
+      return true;
+    }
+    w.pitMaintIntake(c.id + '#' + sid);
+    return true;
+  };
+
   function _intakeGo(c, sp, v, own, td){
     /* ① その候補で確定させ、期間を実際に合わせる（④で完TELのときにもう一度縮む／伸びる） */
     c.maintFixSid = sp.sid;

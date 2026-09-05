@@ -381,6 +381,15 @@ function pitSaveInWork(alsoPrint){
 function _pitSaveInWorkGo(alsoPrint){
   const c = state.cards.find(x => x.id === _editingCardId);
   if (!c) return;
+  /* 🔴🔴 v2.63.0（ゆうた 2026-09-05）**代車・社用車の入庫は、代車の道しか通さない。**
+     🗣「とにかく代車、社用車の入庫予定は前回決めたフローをきっちり通るようにしてほしい」
+     ここから入ると、代車の入庫でやっていること（確認・期間合わせ・紐づけたお客様の写し・記録の言葉）が
+     まるごと抜ける。関門は maint-pit.js の1本＝ここに条件を書き写さない。
+     ⚠ 先にカードを閉じる＝閉じる時の記録（`pitLogCardEdit`）と顧客控えの更新を飛ばさないため。 */
+  if (window.pitCardMaint && pitCardMaint(c) && window.pitMaintIntakeGuard){
+    closeDetail();
+    if (pitMaintIntakeGuard(c)) return;
+  }
 
   if (!c.boardId){
     const msg = '先に「国産車」か「輸入車」を選んでください。';

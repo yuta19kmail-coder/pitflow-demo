@@ -329,14 +329,31 @@ function flDayCalHtml(y, mo){
   return h;
 }
 
-function flZoom(y, m){ _flMode = 'day'; _flDay = new Date(y, m, 1); renderFleet(); }
+/* 🔴🔴 v2.63.1（ゆうた報告 2026-09-05「車両管理で見るをクリックしても管理ビューに飛ばない」）
+   **別の画面から来た時は、画面を切り替えてから描く。**
+   ◎なぜ抜けていたか
+     ここを呼ぶのは長いあいだ**車両管理の中（月ヘッダ・作業予定ボード）だけ**だったので、
+     もう車両管理を見ている前提で `renderFleet()` しか呼んでいなかった。
+     ＝ v2.63.0 で**当日ビューから呼ぶ道**を作った瞬間に、
+       「見えていない車両管理を描き直して、画面はそのまま」になっていた（押しても何も起きない）。
+   🔴 日ビューの中身（`_flMode` / `_flDay` / `_flHlVeh`）は**この関数より前に決めておく**
+      ＝ `showView` が描く時にはもう効いている（二度描きしない）。
+   ⚠ すでに車両管理を見ている時は `showView` を通さない（サイドバーの点滅・スクロール位置の巻き戻しを避ける）。 */
+function _flGoFleet(){
+  if (window.state && state.currentView === 'fleet'){ renderFleet(); return; }
+  if (window.showView) showView('fleet');
+  else renderFleet();
+}
+window._flGoFleet = _flGoFleet;
+
+function flZoom(y, m){ _flMode = 'day'; _flDay = new Date(y, m, 1); _flGoFleet(); }
 /* 🔧 v2.44.0 作業予定ボードから「日を決める」＝**日ビューに切り替えて、その車の行をアクティブに**する。
    ⚠ 代車カレンダーへは飛ばさない（ゆうた指定「今も管理カレンダーの月をクリックすると日ビューにかわる仕様、
       それをそのまま使うイメージで」）。 */
 window.flZoomTo = function(vehId, y, m){
   _flHlVeh = vehId || '';
   _flMode = 'day'; _flDay = new Date(y, m, 1);
-  renderFleet();
+  _flGoFleet();   /* 🔴 v2.63.1 別の画面（当日ビュー）から来ることがある。上の注記を参照 */
   setTimeout(function(){
     var el = document.querySelector('.fl-cal-name.fl-hl');
     if (el && el.scrollIntoView) el.scrollIntoView({ block:'center' });

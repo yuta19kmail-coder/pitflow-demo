@@ -1568,13 +1568,23 @@
                   : '<button class="cd-vico cd-vico-arch" title="この車をアーカイブする" aria-label="この車をアーカイブする" onclick="event.stopPropagation();custVehArchive(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=box data-ics=14></i></button>');
         /* 🔴 v1.52.0 都度車両変動の車は、ナンバーの代わりに印を出し、車種は「毎回入力」と伝える */
         const pv = isPerVisit(v);
+        /* 🔗 v2.62.0（ゆうた指定 2026-09-05）**この車を代車・自社車両として使っているか。**
+           🗣「顧客ビュー側に これ代車としてつかってるよ アイコンかバッチがほしい」
+           🔴 出るのは **車両管理の「顧客車両との紐づけ」で人が結んだ時だけ**（ナンバーで推測しない）。
+           🔴 判定は `pitFleetLinkOfVeh`（js/fleet-link.js）1本。ここで state.loaners を舐めない。
+           🔴 **押せない印**（ゆうた指定）。色は css のクラス（.cd-pill-fleet）で持つ。 */
+        const flx = window.pitFleetLinkOfVeh ? pitFleetLinkOfVeh(cust.id, v.id) : null;
+        const flTx = flx && window.pitFleetBadgeText ? pitFleetBadgeText(flx.kind, flx.v) : '';
+        const flPill = flTx
+          ? '<span class="cd-pill cd-pill-fleet" title="車両管理で「'+esc(flTx)+'」として紐づけています"><i data-ic=van data-ics=14></i>'+esc(flTx)+'</span>'
+          : '';
         h+='<div class="cd-veh'+teamCls+(vArc?' cd-veh-arch':'')+(pv?' cd-veh-pv':'')+'">'+ vIco +
            (vSelf?'<div class="cd-varch"><i data-ic=box data-ics=14></i> '+esc(window.PitArchive?PitArchive.noteOf(v):'アーカイブ済み')+'</div>':'')+
            (pv?'<div class="cd-vplate cd-vplate-pv"><span class="cd-pvbadge"><i data-ic=swap data-ics=14></i> 都度車両変動</span></div>'
               :'<div class="cd-vplate">'+esc(v.plate||'—')+'</div>')+
            (pv?'<div class="cd-vcar cd-vcar-pv">'+(v.lastCar?('前回：'+esc(v.lastCar)):'車種は予約のたびに入力します')+'</div>'
               :'<div class="cd-vcar">'+esc(((v.maker?v.maker+' ':'')+(v.car||'')).trim()||'—')+'</div>')+
-           '<div class="cd-vpills">'+teamPill+(t.course?'<span class="cd-pill" style="background:'+esc(t.courseColor)+'22;color:'+esc(t.courseColor)+';border-color:'+esc(t.courseColor)+'66">'+esc(t.course)+'</span>':'')+(frontName(v)?'<span class="cd-vstaff" title="担当">'+esc(frontName(v))+'</span>':'')+'</div>'+
+           '<div class="cd-vpills">'+flPill+teamPill+(t.course?'<span class="cd-pill" style="background:'+esc(t.courseColor)+'22;color:'+esc(t.courseColor)+';border-color:'+esc(t.courseColor)+'66">'+esc(t.course)+'</span>':'')+(frontName(v)?'<span class="cd-vstaff" title="担当">'+esc(frontName(v))+'</span>':'')+'</div>'+
            ((v.karteNo||'').trim()?'<div class="cd-vkarte" title="カルテNo">'+esc(v.karteNo.trim())+'</div>':'')+
            /* 🚗 v2.2.0 車体番号。クォーターチェックが伝票から入れたもの（手でも直せる） */
            /* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベルを付けて、読める大きさにした */

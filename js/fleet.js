@@ -461,6 +461,83 @@ window.flPlateSync = function(){
   const cls=document.getElementById('fl-pl-cls'); if(cls) cls.value=_flZ2H(cls.value).replace(/[^0-9]/g,'').slice(0,3);
   const num=document.getElementById('fl-pl-num'); if(num) num.value=_flZ2H(num.value).replace(/[^0-9]/g,'').slice(0,4);
   const main=document.getElementById('fl-pl-main'); if(main) main.value=_flPlateJoin();
+  /* 🔗 v2.62.0 ナンバーを直したら、下の紐づけ欄の候補も出し直す。
+     ⚠ 探している最中（探す欄に文字が入っている）は書き換えない＝打っている手を止めない */
+  const _q=(document.getElementById('fl-link-q')||{}).value||'';
+  if(!_q.trim()) _flLinkRender();
+};
+
+/* =====================================================================
+   🔗 顧客車両との紐づけ（v2.62.0・ゆうた指定 2026-09-05）
+   ---------------------------------------------------------------------
+   🗣「代車の設定画面から紐づけ設定欄を作成する」／（選び方）「ナンバーの候補を出す」
+   🗣（入庫時の自動紐づけは）「やめる（手で設定したものだけ）」
+
+   🔴 **結ばれているかの判定はここに書かない。** `js/fleet-link.js` の物差し1本を呼ぶだけ。
+   🔴 **窓を閉じるまで保存しない。** 選んでも `_flLink` に控えるだけで、書くのは「保存」を押した時。
+      ＝ 途中でやめた時に結び目だけ残る、が起きない。
+   🔴 **お客様の車1台に、自社の車は1台まで。** もう掴まれている車は押せない形で出す
+      （押せてしまうと、顧客ビューの印がどちらの車のものか分からなくなる）。
+   ===================================================================== */
+let _flLink = { custId:'', custVehId:'' };
+
+function _flLinkVehText(v){
+  return _fleetEsc(((v.maker?v.maker+' ':'')+(v.car||'')).trim()||'—');
+}
+function _flLinkRow(x){
+  const nm  = _fleetEsc(x.cust.name||x.cust.kana||'(無名)');
+  const pl  = _fleetEsc(x.veh.plate||'ナンバーなし');
+  const car = _flLinkVehText(x.veh);
+  const held = (window.pitFleetHeldBy) ? pitFleetHeldBy(x.cust.id, x.veh.id, _fleetEditId||'') : null;
+  const main = '<div class="fl-link-main"><b>'+nm+' 様</b><span>'+pl+'　'+car+'</span></div>';
+  if(held){
+    const who = _fleetEsc(window.pitFleetBadgeText ? pitFleetBadgeText(held.kind, held.v) : '別の車');
+    return '<div class="fl-link-cand held">'+main+'<span class="fl-link-held">'+who+'に紐づけ済み</span></div>';
+  }
+  return '<button type="button" class="fl-link-cand" onclick="flLinkPick(\''+_fleetEsc(x.cust.id)+'\',\''+_fleetEsc(x.veh.id)+'\')">'
+       + main + '<span class="fl-link-go">紐づける</span></button>';
+}
+function _flLinkRender(){
+  const box = document.getElementById('fl-link');
+  if(!box) return;
+  const tgt = window.pitFleetLinkTarget ? pitFleetLinkTarget({ custId:_flLink.custId, custVehId:_flLink.custVehId }) : null;
+  let h = '';
+  if(tgt){
+    h += '<div class="fl-link-on"><i data-ic=link data-ics=15></i>'
+       + '<div class="fl-link-main"><b>'+_fleetEsc(tgt.cust.name||tgt.cust.kana||'(無名)')+' 様</b>'
+       + '<span>'+_fleetEsc(tgt.veh.plate||'ナンバーなし')+'　'+_flLinkVehText(tgt.veh)+'</span></div>'
+       + '<button type="button" class="fl-link-off" onclick="flLinkClear()">紐づけを外す</button></div>';
+    box.innerHTML = h;
+    if(window.icHydrate) { try { icHydrate(box); } catch(e){} }
+    return;
+  }
+  /* 🔴 前に結んでいた相手が消えている時は、黙って空にしない（気づけなくなる） */
+  if(_flLink.custId || _flLink.custVehId){
+    h += '<div class="fl-link-warn">前に紐づけていたお客様の車が見つかりません（消された／まとめられた可能性）。選び直してください。</div>';
+  }
+  const plate = _flPlateJoin();
+  const cands = window.pitFleetPlateCands ? pitFleetPlateCands(plate) : [];
+  if(cands.length){
+    h += '<div class="fl-link-lead">この車のナンバーで見つかりました。</div>';
+    if(cands.length>1) h += '<div class="fl-link-warn">同じナンバーが '+cands.length+' 件あります。ダブりかもしれません。どれか選んでください。</div>';
+    h += '<div class="fl-link-cands">'+cands.map(_flLinkRow).join('')+'</div>';
+  } else {
+    h += '<div class="fl-link-lead">'+(plate ? 'このナンバーでは顧客控えに見つかりませんでした。' : 'ナンバーを入れると候補が出ます。')+'　お名前でも探せます。</div>';
+  }
+  h += '<div class="fl-link-find"><input id="fl-link-q" class="fl-in" placeholder="お名前・ナンバー・車種で探す" autocomplete="off" oninput="flLinkSearch()">'
+     + '<div class="fl-link-cands" id="fl-link-res"></div></div>';
+  box.innerHTML = h;
+  if(window.icHydrate) { try { icHydrate(box); } catch(e){} }
+}
+window.flLinkPick  = function(custId, vehId){ _flLink = { custId:custId||'', custVehId:vehId||'' }; _flLinkRender(); };
+window.flLinkClear = function(){ _flLink = { custId:'', custVehId:'' }; _flLinkRender(); };
+window.flLinkSearch = function(){
+  const q = (document.getElementById('fl-link-q')||{}).value||'';
+  const box = document.getElementById('fl-link-res');
+  if(!box) return;
+  const res = (q.trim() && window.pitFleetSearch) ? pitFleetSearch(q, 12) : [];
+  box.innerHTML = !q.trim() ? '' : (res.length ? res.map(_flLinkRow).join('') : '<div class="fl-link-lead">見つかりませんでした。</div>');
+  if(window.icHydrate) { try { icHydrate(box); } catch(e){} }
 };
 document.addEventListener('mousedown', function(e){
   const box=document.getElementById('fl-plate');
@@ -632,6 +709,9 @@ function fleetOpenModal(id){
   document.getElementById('fl-navi').checked = !!v.navi;
   document.getElementById('fl-iso').checked  = !!v.iso;
   document.getElementById('fl-repdate').value = v.replaceDate || '';
+  /* 🔗 v2.62.0 顧客車両との紐づけ。⚠ 保存を押すまでは控え（_flLink）にしか入れない */
+  _flLink = { custId: (v.custId||''), custVehId: (v.custVehId||'') };
+  _flLinkRender();
   flNumberCheck();
   document.getElementById('fleet-modal').classList.add('show');
   const n = document.getElementById('fl-model'); if (n) n.focus();
@@ -689,6 +769,16 @@ function _fleetSubmitInner(){
   const etc=!!document.getElementById('fl-etc').checked, navi=!!document.getElementById('fl-navi').checked, iso=!!document.getElementById('fl-iso').checked;
   const camera=!!(document.getElementById('fl-camera')||{}).checked;
   if (!model){ pitAlert('車種名を入れてください（例：タント）', { code:'PF-3031' }); return false; }   /* false＝保存していない（閉じない） */
+  /* 🔗 v2.62.0 お客様の車1台に、自社の車は1台まで。
+     ⚠ 窓を開けている間に別の端末が結んだ時のため、**保存の時にもう一度見る**（画面の中だけの判定にしない）。 */
+  if (_flLink.custId && _flLink.custVehId && window.pitFleetHeldBy){
+    const _held = pitFleetHeldBy(_flLink.custId, _flLink.custVehId, _fleetEditId || '');
+    if (_held){
+      pitAlert('その車は「' + (window.pitFleetBadgeText ? pitFleetBadgeText(_held.kind, _held.v) : '別の車') + '」にもう紐づいています',
+        { code:'PF-3065', detail:'お客様の車1台に紐づけられる自社の車は1台までです。先に向こうの紐づけを外してください。' });
+      return false;
+    }
+  }
   if (!Array.isArray(state.companyCars)) state.companyCars = [];
 
   // 入替判定（新規で、その番号が既存の代車に使われている）
@@ -703,6 +793,9 @@ function _fleetSubmitInner(){
       f.v.name = (kind==='loaner'?'代車'+number:(model||f.v.name)); f.v.number = number; f.v.model = model; f.v.color = color; f.v.plate = plate;
       f.v.shakenDate = shaken; delete f.v.tenkenDate;   /* 12ヶ月点検は持たない（自動計算） */
       f.v.height=height; f.v.width=width; f.v.length=length; f.v.category=category; f.v.seats=seats; f.v.etc=etc; f.v.navi=navi; f.v.iso=iso; f.v.camera=camera;
+      /* 🔗 v2.62.0 紐づけ。外した時は欄ごと消す（空文字を残すと「結んである」と読み違える元） */
+      if (_flLink.custId && _flLink.custVehId){ f.v.custId=_flLink.custId; f.v.custVehId=_flLink.custVehId; }
+      else { delete f.v.custId; delete f.v.custVehId; }
       _flSyncVehEvent(f.v.id, 'shakenIn', shaken);
       _flSyncVehEvent(f.v.id, 'tenken', tenken);
     }
@@ -711,6 +804,8 @@ function _fleetSubmitInner(){
     const rec = { id:id, name:labelName, number:number, model:model, color:color, plate:plate, shakenDate:shaken,
       height:height, width:width, length:length, category:category, seats:seats, etc:etc, navi:navi, iso:iso, camera:camera };
     if (dupLoaner && repDate){ rec.replaceOf = dupLoaner.id; rec.replaceDate = repDate; }
+    /* 🔗 v2.62.0 紐づけ（選んでいる時だけ書く） */
+    if (_flLink.custId && _flLink.custVehId){ rec.custId=_flLink.custId; rec.custVehId=_flLink.custVehId; }
     (kind === 'loaner' ? state.loaners : state.companyCars).push(rec);
     _fleetEditId = id;   /* v1.14.2：万一もう一度押されても、増やさずに同じ車両を直す */
     _flSyncVehEvent(id, 'shakenIn', shaken);

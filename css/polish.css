@@ -772,6 +772,31 @@
 .fl-mform{ display:flex; flex-direction:column; gap:10px; }
 .fl-mlb{ font-size:12px; color:var(--text2); display:flex; flex-direction:column; gap:4px; font-weight:600; }
 .fl-bdg{ font-size:9.5px; font-weight:800; padding:2px 6px; border-radius:5px; color:#fff; white-space:nowrap; }
+
+/* ===== 🔗 v2.62.0 車両を編集の窓「顧客車両との紐づけ」 =====
+   🔴 色は必ずここ（css のクラス）で持つ。js に #hex を直書きしない（v2.58.0 の教訓）。 */
+.fl-link{ display:flex; flex-direction:column; gap:8px; }
+.fl-link-lead{ font-size:11.5px; color:var(--text3); font-weight:600; line-height:1.6; }
+.fl-link-warn{ font-size:11.5px; font-weight:700; line-height:1.6; color:#f59e0b;
+  background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.38); border-radius:9px; padding:7px 10px; }
+.fl-link-on{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px;
+  background:var(--brand-soft); border:1px solid rgba(38,162,105,.38); color:var(--brand); }
+.fl-link-main{ display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; text-align:left; }
+.fl-link-main b{ font-size:13.5px; font-weight:800; color:var(--text1); }
+.fl-link-main span{ font-size:11.5px; color:var(--text2); font-weight:600; }
+.fl-link-off{ flex:0 0 auto; font-size:11.5px; font-weight:700; padding:6px 11px; border-radius:8px; cursor:pointer;
+  background:var(--bg3); color:var(--text2); border:1px solid var(--border); }
+.fl-link-off:hover{ background:var(--bg4); color:var(--text); }
+.fl-link-cands{ display:flex; flex-direction:column; gap:6px; }
+.fl-link-cands:empty{ display:none; }
+.fl-link-cand{ display:flex; align-items:center; gap:10px; width:100%; padding:9px 12px; border-radius:10px;
+  background:var(--bg3); border:1px solid var(--border); cursor:pointer; text-align:left; }
+.fl-link-cand:hover{ background:var(--bg4); border-color:var(--brand); }
+.fl-link-cand.held{ cursor:default; opacity:.62; }
+.fl-link-cand.held:hover{ background:var(--bg3); border-color:var(--border); }
+.fl-link-go{ flex:0 0 auto; font-size:11.5px; font-weight:800; color:var(--brand); }
+.fl-link-held{ flex:0 0 auto; font-size:11px; font-weight:700; color:var(--text3); }
+.fl-link-find{ display:flex; flex-direction:column; gap:6px; }
 .fl-bdg.shaken{ background:var(--red); }
 .fl-bdg.tenken{ background:#f59e0b; }
 

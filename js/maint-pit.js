@@ -49,6 +49,14 @@
   }
   function vehicles(){ return arr(w.state && w.state.loaners).concat(arr(w.state && w.state.companyCars)); }
   function vehName(v){ return (v && (v.model || v.name)) || '（車種未登録）'; }
+  /* 🔴 v2.67.0 ボードや当日ビューに出す一言＝**作業内容の1行目**で補う。
+     ⚠ v2.67.0 で「ひとことメモ」の欄を無くし、代わりに予約と同じ「作業内容」を入れるようにした。
+        前に作ったカードには memo が入っているので、**まず memo・無ければ作業内容の1行目**の順で見る。 */
+  function memoOf(c){
+    var m = String((c && c.memo) || '').trim();
+    if (m) return m;
+    return String((c && c.menu) || '').split('\n')[0].trim();
+  }
   function vehNo(v){ return (v && v.number != null && v.number !== '') ? String(v.number) : ''; }
   function isLoaner(v){ return arr(w.state && w.state.loaners).some(function(x){ return x.id === v.id; }); }
 
@@ -104,7 +112,7 @@
       /* ① 月の目標（手で入れたもの）＝候補が1本も無いカード */
       if (!(c.maintSpans || []).length){
         out.push({ id:c.id, card:c, cardId:c.id, vehicleId:c.maintVehId, maint:true, stage:'month',
-                   work:c.workType, ym:c.maintYm, urgent:!!c.urgent, memo:c.memo || '',
+                   work:c.workType, ym:c.maintYm, urgent:!!c.urgent, memo:memoOf(c),
                    fromDate:(c.maintYm || '') + '-01', toDate:(c.maintYm || '') + '-28',
                    skipped:arr(c.maintSkipped), started:started, done:done, groupId:c.id });
         return;
@@ -113,7 +121,7 @@
       (c.maintSpans || []).forEach(function(sp){
         out.push({ id:recId(c, sp), card:c, cardId:c.id, sid:sp.sid, vehicleId:c.maintVehId, maint:true,
                    stage:(c.maintFixSid === sp.sid ? 'fixed' : 'candidate'),
-                   work:c.workType, ym:c.maintYm, urgent:!!c.urgent, memo:c.memo || '',
+                   work:c.workType, ym:c.maintYm, urgent:!!c.urgent, memo:memoOf(c),
                    fromDate:sp.from, toDate:sp.to, skipped:arr(c.maintSkipped),
                    started:started, done:done, groupId:c.id });
       });
@@ -189,7 +197,7 @@
           work: c.workType || 'general', label: WORK_LB[c.workType || 'general'] || '整備', vehicleId: v.id,
           dueDate: '', openFrom: (slip ? ymOf(td) : ym) + '-01', openTo: '',
           months: [ym], ym: (slip ? ymOf(td) : ym), overdue: false, slipped: slip,
-          inWindow: true, manualId: c.id, urgent: !!c.urgent, memo: c.memo || ''
+          inWindow: true, manualId: c.id, urgent: !!c.urgent, memo: memoOf(c)
         }, td));
       });
     });
@@ -383,39 +391,80 @@
     var td = today();
     var pick = String(vehId || '');
     var vs = vehicles().filter(function(v){ return !v.retired || v.id === pick; });
+    /* 🔴 v2.67.0（ゆうた「数字をカット、代車名だけで」）**番号は出さない。** */
     var opts = vs.map(function(v){
-      return '<option value="' + v.id + '"' + (v.id === pick ? ' selected' : '') + '>'
-           + esc(vehName(v)) + (vehNo(v) ? ('（' + esc(vehNo(v)) + '）') : '') + '</option>';
+      return '<option value="' + v.id + '"' + (v.id === pick ? ' selected' : '') + '>' + esc(vehName(v)) + '</option>';
     }).join('');
     var yms = []; for (var i = 0; i < 7; i++){ var y = ymAdd(ymOf(td), i); yms.push('<option value="' + y + '">' + y.replace('-', '年') + '月</option>'); }
+    _mbaWork = '';
     _modal(
       '<h3 class="lo-modal-h"><i data-ic=wrench data-ics=16></i> 代車の作業予定を足す</h3>'
-      + '<label class="lo-modal-f">車両<select id="mba-veh">' + opts + '</select></label>'
+      + '<div class="mba-body" id="mba-body">'
       + '<div class="lo-modal-row">'
-      + '<label class="lo-modal-f">作業<select id="mba-work">'
-      + '<option value="general">一般（修理）</option><option value="bp">B.P</option>'
-      + '<option value="12pt">12ヶ月点検</option><option value="shaken">車検</option></select></label>'
+      + '<label class="lo-modal-f">車両<select id="mba-veh">' + opts + '</select></label>'
       + '<label class="lo-modal-f">いつまでに<select id="mba-ym">' + yms + '</select></label>'
       + '</div>'
-      + '<label class="lo-modal-f">ひとことメモ<input id="mba-memo" maxlength="40" placeholder="例：エアコンが効かない"></label>'
-      + '<label class="lo-modal-f" style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="mba-urgent" style="width:auto;margin:0"> 急ぎ</label>'
-      + '<div class="lo-modal-note">ここで決めるのは<b>月の目標（やるべきこと）</b>だけです。日は「日を決める」から代車カレンダーで置きます。</div>'
+      /* 🔴 v2.67.0（ゆうた「通常の新規予約のバッチから選ばせられないかな？」）
+         **作業は予約と同じ札で選ぶ。**並びも中身も PIT_LOANER_MATES（車検→12点→一般→B.P）1本。
+         ⚠ 名前と色は state.workTypes から取る＝設定で名前や色を変えたらここも変わる。 */
+      + '<div class="lo-modal-f"><span>作業</span><div class="cf-chips" id="mba-work">' + workChips() + '</div></div>'
+      /* 🔴 v2.67.0（ゆうた「ひとことメモもカット」「通常予約画面の作業内容のバッチとテンプレをそのまま」）
+         **入庫カードの「内容」欄と同じもの**を置く。中身は work-content.js 1本（写しを作らない）。
+         ⚠ 欄の目印（class と data-key）は入庫カードと同じにする＝あちらの部品がそのまま書き込める。 */
+      + '<div class="lo-modal-f"><span>作業内容</span>'
+      +   '<textarea class="cf-input" data-key="menu" id="mba-menu" rows="3" placeholder="下の札やテンプレから選べます"></textarea>'
+      +   (w.WorkContent ? w.WorkContent.builderHtml() : '')
+      + '</div>'
+      + '</div>'
       + '<div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
       + '<button class="primary" onclick="flMaintSave()">足す</button></div>'
     );
+    /* 内容テンプレ・タグ札の置き場所を、この窓に向ける（閉じる時に戻す） */
+    if (w.WorkContent){
+      try { w.WorkContent.setHost('mba-body'); if (w.WorkContent.mount) w.WorkContent.mount(); } catch(e){}
+    }
+    if (w.icHydrate){ try { w.icHydrate(document.getElementById('mb-modal')); } catch(e){} }
   };
+  /* 作業の札＝予約と同じ4つ（車検・12点・一般・B.P）。並びは PIT_LOANER_MATES のとおり。 */
+  var _mbaWork = '';
+  function workChips(){
+    var ids = arr(w.PIT_LOANER_MATES);
+    if (!ids.length) ids = ['shaken', '12pt', 'general', 'bp'];
+    return ids.map(function(id){
+      var it = arr(w.state && w.state.workTypes).filter(function(x){ return x.id === id; })[0]
+             || { id:id, label:(WORK_LB[id] || id) };
+      var on = (_mbaWork === id);
+      var st = it.color ? (on ? ('background:' + it.color + ';color:#fff;border-color:' + it.color + ';')
+                              : ('border-color:' + it.color + ';color:' + it.color + ';')) : '';
+      return '<button type="button" class="cf-chip' + (on ? ' active' : '') + '" style="' + st + '"'
+           + ' onclick="flMaintPickWork(\'' + id + '\')">' + esc(it.label || id) + '</button>';
+    }).join('');
+  }
+  w.flMaintPickWork = function(id){
+    _mbaWork = (_mbaWork === id) ? '' : String(id || '');   /* もう一度押すと外れる */
+    var box = document.getElementById('mba-work');
+    if (box) box.innerHTML = workChips();
+  };
+
   w.flMaintSave = function(){
     var g = function(id){ var e = document.getElementById(id); return e ? e.value : ''; };
-    var veh = g('mba-veh'), work = g('mba-work'), ym = g('mba-ym'), memo = String(g('mba-memo') || '').trim();
-    var urgent = !!(document.getElementById('mba-urgent') || {}).checked;
-    if (!veh || !work || !ym){ w.pitAlert('車両・作業・いつまでに を入れてください', { code:'PF-3050' }); return; }
-    if (!memo){ w.pitAlert('ひとことメモを入れてください', { code:'PF-3051',
-      detail:'あとで見た人が「何の作業か」分かるように、ひとことだけ入れてください。' }); return; }
-    newMaintCard(veh, work, ym, { urgent: urgent, memo: memo });
+    var veh = g('mba-veh'), ym = g('mba-ym'), work = _mbaWork;
+    var menu = String(g('mba-menu') || '').trim();
+    if (!veh || !ym){ w.pitAlert('車両と「いつまでに」を選んでください', { code:'PF-3050' }); return; }
+    if (!work){ w.pitAlert('作業を選んでください', { code:'PF-3069',
+      detail:'車検・12点・一般・B.P のどれか1つを押してください。' }); return; }
+    /* 🔴 v2.67.0 一般・B.P は**何の作業か**が名前から分からないので、作業内容を必ず入れてもらう。
+       ⚠ 車検・12点は名前だけで通じるので空でよい（前は全部に「ひとことメモ」を求めていた）。 */
+    if (!menu && (work === 'general' || work === 'bp')){
+      w.pitAlert('作業内容を入れてください', { code:'PF-3051',
+        detail:'あとで見た人が「何の作業か」分かるように、下の札やテンプレから1つ以上入れてください。' });
+      return;
+    }
+    newMaintCard(veh, work, ym, { menu: menu });
     saveCards();
-    try { if (w.pitLog) w.pitLog('代車の作業予定を足した', { kind:'loaner', label: (WORK_LB[work]||'') + ' ' + ym + '（' + memo + '）' }); } catch(e){}
     flMaintClose(); if (w.renderFleet) w.renderFleet();
   };
+
   /* 🔴 v2.49.0（ゆうた確定）取り下げ＝**カードごと消去する。**
      🗣「消去する」
      ⚠ 代車の整備予定は売上も来店履歴も持たないので、予約キャンセルで残しても読む人がいない。
@@ -425,7 +474,7 @@
     var c = cardOf(cardId);
     if (!c) return;
     w.pitAsk('この予定を取り下げますか？', { code:'PF-3052', title:'作業予定の取り下げ', danger:true, ok:'取り下げる',
-      detail:(WORK_LB[c.workType] || '整備') + '　' + (c.maintYm || '') + '\n' + (c.memo || '')
+      detail:(WORK_LB[c.workType] || '整備') + '　' + (c.maintYm || '') + '\n' + memoOf(c)
            + '\n\n候補も一緒に消えます。カードごと無くなり、元に戻せません。' })
       .then(function(yes){
         if (!yes) return;
@@ -462,6 +511,7 @@
       reserveDate: '', reserveTime: '', returnDate: '',
       maintVehId: vehId, maintYm: ym, maintSpans: [], maintFixSid: '', maintSkipped: [],
       urgent: !!opt.urgent, memo: opt.memo || '',
+      menu: opt.menu || '',               /* 🔴 v2.67.0 作業内容（入庫カードの「内容」と同じ欄） */
       consult: false, needLoaner: false, needWash: false,
       workSpecials: [], tentative: false, approvalPending: false,
       log: [{ label: '代車の作業予定を立てた（' + (WORK_LB[work] || '整備') + '・' + ym + '）', at: Date.now() }]
@@ -469,7 +519,7 @@
     if (!Array.isArray(w.state.cards)) w.state.cards = [];
     w.state.cards.push(c);
     try { if (w.pitLog) w.pitLog('代車の作業予定を足した', { cardId:c.id, kind:'loaner',
-      label:(WORK_LB[work]||'') + ' ' + ym + (opt.memo ? '（' + opt.memo + '）' : '') }); } catch(e){}
+      label:(WORK_LB[work]||'') + ' ' + ym + (memoOf(c) ? '（' + memoOf(c) + '）' : '') }); } catch(e){}
     return c;
   }
 
@@ -490,7 +540,13 @@
     ov.addEventListener('click', function(e){ if (e.target === ov) flMaintClose(); });
     document.body.appendChild(ov);
   }
-  w.flMaintClose = function flMaintClose(){ var m = document.getElementById('mb-modal'); if (m) m.remove(); };
+  w.flMaintClose = function flMaintClose(){
+    /* 🔴 v2.67.0 内容テンプレの置き場所を必ず戻す（戻し忘れると、次にカードを開いた時に効かなくなる） */
+    if (w.WorkContent && w.WorkContent.setHost){
+      try { w.WorkContent.setHost(''); if (w.WorkContent.closePanel) w.WorkContent.closePanel(); } catch(e){}
+    }
+    var m = document.getElementById('mb-modal'); if (m) m.remove();
+  };
   var flMaintClose = w.flMaintClose;
 
 
@@ -669,7 +725,7 @@
       out.push({ rec:{ id: recId(x.card, x.span), card:x.card, cardId:x.card.id, sid:x.span.sid,
                        fromDate:x.span.from, toDate:x.span.to, work:x.card.workType },
                  veh:v, work:x.card.workType, label:(WORK_LB[x.card.workType] || '整備'),
-                 fixed:x.fixed, urgent:!!x.card.urgent, memo:x.card.memo || '' });
+                 fixed:x.fixed, urgent:!!x.card.urgent, memo:memoOf(x.card) });
     });
     return out;
   }

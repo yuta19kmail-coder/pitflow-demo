@@ -11,7 +11,7 @@
 .wc-trigger .wc-arr{ font-size:10px; color:var(--text3); font-weight:600; }
 .wc-trigger.on .wc-arr{ color:rgba(6,40,29,.7); }
 /* パネル位置(left/top/width/height)は JS(_placePanel)が右カラム(.cfp-side)に合わせて inline 指定 */
-.wc-panel{ position:fixed; left:0; top:0; width:360px; height:60vh; display:none; flex-direction:column; background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.55); z-index:70; overflow:hidden; }
+.wc-panel{ position:fixed; left:0; top:0; width:360px; height:60vh; display:none; flex-direction:column; background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 18px 50px rgba(0,0,0,.55); z-index:260; overflow:hidden; }
 .wc-panel.open{ display:flex; }
 .wc-panel-h{ flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:9px 12px; background:var(--bg3); border-bottom:1px solid var(--border); font-size:12px; font-weight:700; color:var(--text); }
 .wc-panel-h span{ flex:1; min-width:0; }

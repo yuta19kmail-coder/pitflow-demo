@@ -474,6 +474,16 @@
 /* 軽量モーダル（予約以外の貸出／緊急車両） */
 .lo-modal-ov{ position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; }
 .lo-modal-box{ background:var(--bg2); border:1px solid var(--border2); border-radius:14px; padding:18px 20px; width:min(420px,92vw); box-shadow:0 18px 50px rgba(0,0,0,.55); }
+
+/* 🔧 v2.67.0 代車の作業予定を足す窓＝予約と同じ「作業内容」の札とテンプレを載せたので、
+   幅を広げて、中身が長くなったら中だけスクロールさせる（画面からはみ出さない）。 */
+.lo-modal-box:has(#mba-body){ width:min(620px,94vw); }
+.mba-body{ max-height:62vh; overflow-y:auto; padding-right:4px; }
+.mba-body .lo-modal-f > span{ display:block; font-size:11px; color:var(--text3); font-weight:700; margin-bottom:4px; }
+.mba-body .cf-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.mba-body .cf-chips .cf-chip{ display:inline-flex; align-items:center; justify-content:center; height:28px;
+  padding:0 12px; font-size:12px; line-height:1; min-width:46px; box-sizing:border-box; }
+.mba-body textarea.cf-input{ width:100%; resize:vertical; }
 .lo-modal-h{ margin:0 0 12px; font-size:15px; font-weight:700; color:var(--text); }
 .lo-modal-f{ display:block; font-size:11px; color:var(--text2); margin-bottom:10px; }
 .lo-modal-f select, .lo-modal-f input{ display:block; width:100%; margin-top:3px; background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; box-sizing:border-box; }

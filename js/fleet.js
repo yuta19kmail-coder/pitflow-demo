@@ -102,6 +102,18 @@ function renderFleet(){
       const _cat = { kei: '軽自動車', normal: '普通車', import: '輸入車', commercial: '商用車' }[v.category] || '';
       const _seat = window.pitSeatsText ? pitSeatsText(v.seats) : '';
       const _tk = v.shakenDate && window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '';
+      /* 🔗 v2.64.0（ゆうた指定 2026-09-05「代車一覧の方にも紐づけ完了バッチが欲しい」）
+         🔴 判定は `pitFleetLinkTarget`（js/fleet-link.js）1本。ここで custId を見に行かない。
+         🔴 結ばれていない車は **「未紐づけ」を出す**＝2026-09-04 の大前提（抜けは0にする対象）。
+         ⚠ 引退した車は出さない（L08 も数えていない＝画面と数を揃える）。
+         ⚠ 色は css のクラス（.fl-link-bdg）で持つ。js に色を直書きしない。 */
+      const _lk = window.pitFleetLinkTarget ? pitFleetLinkTarget(v) : null;
+      const _lkBdg = _lk
+        ? '<div class="fl-card-link"><span class="fl-link-bdg on" title="顧客車両と紐づけ済み">'
+            + '<i data-ic=link data-ics=13></i>'
+            + _fleetEsc((_lk.cust.name || _lk.cust.kana || '(無名)')) + ' 様</span></div>'
+        : (v.retired ? ''
+            : '<div class="fl-card-link"><span class="fl-link-bdg off" title="編集 ▸「顧客車両との紐づけ」から結べます">未紐づけ</span></div>');
       const _dims = [
         v.length != null ? '長 ' + _fleetEsc(v.length) : '',
         v.width  != null ? '幅 ' + _fleetEsc(v.width)  : '',
@@ -116,6 +128,7 @@ function renderFleet(){
            + '<span class="fl-more"><i data-ic=right data-ics=16></i></span>'
          + '</div>'
          + (v.plate ? '<div class="fl-card-plate">' + _fleetEsc(v.plate) + '</div>' : '')
+         + _lkBdg   /* 🔗 v2.64.0 顧客車両との紐づけ */
          /* v1.14.5：社用車も代車と同じ中身を出す（入力できるものは全部見えるように） */
          + ((_cat || v.color || _seat)
              ? '<div class="fl-card-line">'
@@ -592,6 +605,15 @@ window.fleetOpenDetail = function (id) {
         + row('車種', e(v.model || ''))
         + row('色', e(v.color || ''))
         + row('ナンバー', e(v.plate || ''))
+        /* 🔗 v2.64.0 誰の車として結んであるか。一覧を押すとここが出るので、ここでも分かるようにする。
+           ⚠ 結ばれていない時も**空にしない**（空だと「項目が無い」のか「まだ結んでいない」のか分からない）。 */
+        + row('顧客車両', (function(){
+            var lk = window.pitFleetLinkTarget ? pitFleetLinkTarget(v) : null;
+            if (!lk) return '<span class="fd-nolink">未紐づけ　<i>編集 ▸「顧客車両との紐づけ」から結べます</i></span>';
+            var car = ((lk.veh.maker ? lk.veh.maker + ' ' : '') + (lk.veh.car || '')).trim();
+            return e(lk.cust.name || lk.cust.kana || '(無名)') + ' 様'
+                 + '<span class="fd-linksub">' + e(lk.veh.plate || 'ナンバーなし') + (car ? '　' + e(car) : '') + '</span>';
+          })())
         /* v1.14.5：代車／社用車のどちらでも同じ項目を出す */
         + row('区分', e(cat))
         + (seatTxt ? row('定員', e(seatTxt)) : '')

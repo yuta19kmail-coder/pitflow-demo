@@ -806,16 +806,18 @@ function _loRenderDays(start, n){
       let mtLine = '', mtTag = '';
       if (day.maints.length){
         const mt = day.maints[0];
-        const mCls = (mt.stage === 'fixed' ? 'fixed' : 'cand');
+        /* 🏁 v2.72.0 済んだもの＝グレー（ゆうた指定「グレーで終わった感じを出して」）。
+           ⚠ 確定より先に見る＝済んだ確定は緑ではなくグレーになる。 */
+        const mCls = mt.done ? 'done' : (mt.stage === 'fixed' ? 'fixed' : 'cand');
         mtLine = '<span class="lo-mtline ' + mCls + (mt.isStart ? ' st' : '') + (mt.isEnd ? ' en' : '') + '"></span>';
         if (mt.isStart){
           const _dot = (window.pitMaintWorkDot ? pitMaintWorkDot(mt.work) : 'wk-general');
           mtTag = '<span class="lo-mt ' + mCls + '" title="'
-            + _loEsc(mt.label + ' ' + mt.from + '〜' + mt.to + '（' + (mt.stage === 'fixed' ? '確定' : '予定') + '）')
+            + _loEsc(mt.label + ' ' + mt.from + '〜' + mt.to + '（' + (mt.done ? '済' : (mt.stage === 'fixed' ? '確定' : '予定')) + '）')
             + '" onclick="event.stopPropagation();flMaintChip(\'' + mt.id + '\')">'
             + '<i class="fl-dot ' + _dot + '"></i>'
             + _loEsc((window.PIT_MAINT_WORK_SHORT && PIT_MAINT_WORK_SHORT[mt.work]) || mt.label)
-            + ' ' + (mt.stage === 'fixed' ? '整備中' : '予定') + '</span>';
+            + ' ' + (mt.done ? '済' : (mt.stage === 'fixed' ? '整備中' : '予定')) + '</span>';
         }
       }
       // 車両イベント（車検・点検・修理等）の予定オーバーレイ＝日付枠で目立たせる（セル全体を色づけ＋ラベル）
@@ -1668,6 +1670,7 @@ window.loHelp = function(){
     /* 🔧 v2.70.0 この代車自身の整備予定。**縦バーだけは色の意味が別**（貸出ではない）ので、必ずここに書く。 */
     + '<div>' + sw('background:var(--pit-maint,#d6a846);width:8px') + '🔧 整備（確定）＝この期間は押さえています</div>'
     + '<div>' + sw('background:color-mix(in srgb,var(--pit-maint,#d6a846) 45%,transparent);width:8px') + '🔧 整備（予定）＝<b>まだ貸せます</b></div>'
+    + '<div>' + sw('background:rgba(148,163,184,.45);width:8px') + '🔧 整備（済）＝終わったもの</div>'
     + '</div>'
     + '<h5>さわり方</h5><div class="lo-help-kv">'
     + '<b>空きを押す／なぞる</b><span>「仮押さえ」か「予約以外で貸出」を選ぶ</span>'

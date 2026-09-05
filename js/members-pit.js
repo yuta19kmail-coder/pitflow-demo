@@ -328,7 +328,9 @@
         var m = id ? window.pitStaffById(id) : null;
         if (m && c[k] !== m.name) { c[k] = m.name; n++; }
       });
-      [['inspectors', 'inspectorIds'], ['mechanics', 'mechanicIds']].forEach(function (pair) {
+      /* ✅ v2.73.0 チェック担当も改名に追従させる（入れた人が改名しても別人にならない） */
+      [['inspectors', 'inspectorIds'], ['mechanics', 'mechanicIds'],
+       ['checkers', 'checkerIds']].forEach(function (pair) {
         var names = c[pair[0]], ids = c[pair[1]];
         if (!Array.isArray(names) || !Array.isArray(ids)) return;
         for (var i = 0; i < names.length && i < ids.length; i++) {

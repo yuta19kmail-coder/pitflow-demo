@@ -1005,6 +1005,14 @@
     if (c.earlyDiscount) tags += '<span class="ch-tag">早期割</span>';
     if (c.resNo) tags += '<span class="ch-tag no">'+esc(c.resNo)+'</span>';
     /* 🧾 v2.11.1（ゆうた）**伝票は最初から開いた形で出す。畳む動作は要らない。** */
+    /* ================================================================
+       ✅ v2.73.0（ゆうた指定 2026-09-05）**伝票のヘッダーと明細のあいだに、担当の3人を出す。**
+       🗣「顧客ビュー内の伝票画面にて、一番上からヘッダーのメイン情報、その下に詳細の明細だが、
+       　　その間に点検者、作業者、チェック者をそれぞれ表示するようにしたい」
+       🔴 出す言葉も見た目も **mech-pick.js の `pitMechLine` 1本**。ここで書き写さない。
+          ＝ 「なし」と「未入力」の言い分けが、カードの整備タブと**永遠に同じ**になる。
+       ⚠ ここは**読む所**なので押せない（直すのは予約詳細のチップ）。
+       ================================================================ */
     return '<div class="ch-item'+(den?' has-den':'')+'" id="'+oid+'">'
       + '<div class="ch-row">'
       +   '<div class="ch-dt">'+esc(dt)+'</div>'
@@ -1023,6 +1031,7 @@
       /* 💴 v2.12.2 見出しの作り方は quarter-write.js の `pitQDenHead` 1本（ここで書き写さない） */
       + (den?'<div class="ch-den">'
              + '<div class="ch-den-h">'+(window.pitQDenHead?pitQDenHead(den):'')+'</div>'
+             + (window.pitMechLine?pitMechLine(c):'')
              + (window.pitQDenTable?pitQDenTable(den):'')
            + '</div>':'')
       + '</div>';
@@ -1087,6 +1096,8 @@
       +   '<div class="ch-amt">¥'+Number(den.金額||0).toLocaleString()+'</div>'
       +   '<div class="ch-btns"></div>'
       + '</div>'
+      /* ⚠ v2.73.0 この行（PitFlow を始める前の伝票）には予約カードが無い＝担当の持ち主が居ない。
+            空の「未入力」を3つ並べても直しようが無いので、担当の行はここでは出さない。 */
       + '<div class="ch-den">'
       +   '<div class="ch-den-h">'+(window.pitQDenHead?pitQDenHead(den):'')+'</div>'
       +   (window.pitQDenTable?pitQDenTable(den):'')

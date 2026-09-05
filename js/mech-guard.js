@@ -1,6 +1,15 @@
 /* ========================================
    mech-guard.js  ── 作業完了に入れる時、担当者が空なら1回止める（PitFlow v1.97.0）
    ----------------------------------------
+   ◎✅ v2.73.0（ゆうた指定 2026-09-05）**チェック担当も同じ窓で聞く。**
+     🗣「タスクボード中のドラッグ操作で出るポップアップにも同様にチェック者の欄を追加。
+     　　無しも選べるが、未選択は警告・データチェック対象」
+     🔴 このファイルで足したのは**見出しの言葉だけ**。
+        出す・出さないの判定（`needed`）も、窓の中身（`paint`）も **mech-pick.js の
+        `unsettled` / `html` を呼んでいるだけ**なので、あちらに1つ足せばここは黙って付いてくる。
+        ⚠ ここに「チェック担当が空か」を書き足さないこと（物差しが2本になる）。
+     ⚠ 導入日より前のカードでは、チェック担当が空でも窓は出ない（`unsettled` 側で弾いている）。
+
    ◎ゆうた指定（2026-08-15）
      「タスクボードで**作業完了に入れた時点**で、点検実施者・整備実施者がそれぞれ
        **一人も入ってない場合は入力しろよって注意を促すポップアップ**を表示するように」
@@ -63,7 +72,7 @@
     bd.id = 'mg-backdrop';
     bd.innerHTML =
       '<div class="modal-box pp-box mg-box">'
-      + '<div class="modal-head"><div class="modal-title">点検担当者・整備担当者を入れてください</div>'
+      + '<div class="modal-head"><div class="modal-title">作業担当（点検・整備・チェック）を入れてください</div>'
       + '<button class="modal-close" onclick="PitMechGuard.close(0)"><i data-ic=close data-ics=16></i></button></div>'
       + '<div class="modal-body">'
       + '  <div class="pp-move" id="mg-move"></div>'

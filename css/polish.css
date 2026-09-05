@@ -797,6 +797,18 @@
 .fl-link-go{ flex:0 0 auto; font-size:11.5px; font-weight:800; color:var(--brand); }
 .fl-link-held{ flex:0 0 auto; font-size:11px; font-weight:700; color:var(--text3); }
 .fl-link-find{ display:flex; flex-direction:column; gap:6px; }
+
+/* ===== 🔗 v2.64.0 代車一覧・車両の詳細に出す「顧客車両との紐づけ」の印 =====
+   ⚠ 顧客ビューの印（.cd-pill-fleet）と同じ紫にそろえる＝同じ意味のものを同じ色で。 */
+.fl-card-link{ margin-top:7px; }
+.fl-link-bdg{ display:inline-flex; align-items:center; gap:5px; max-width:100%;
+  font-size:11px; font-weight:800; line-height:1.5; padding:2px 9px; border-radius:999px;
+  border:1px solid; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fl-link-bdg.on{ background:rgba(168,85,247,.16); color:#c4a3fb; border-color:rgba(168,85,247,.45); }
+.fl-link-bdg.off{ background:var(--bg1); color:var(--text3); border-color:var(--border2); font-weight:700; }
+.fd-nolink{ color:var(--text3); }
+.fd-nolink i{ font-style:normal; font-size:11px; }
+.fd-linksub{ display:block; font-size:11.5px; color:var(--text2); font-weight:600; margin-top:2px; }
 .fl-bdg.shaken{ background:var(--red); }
 .fl-bdg.tenken{ background:#f59e0b; }
 

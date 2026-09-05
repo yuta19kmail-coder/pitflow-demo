@@ -3,6 +3,8 @@
    ----------------------------------------
    ◎混雑度の考え方（小林モータース＝預かり中心）
      ・各車は「入庫日〜返車日」まで置き場を1台分専有する（当日仕上げは1日だけ）。
+     ・🅿 v2.74.0 「入庫日」＝**実際に入庫した日**。まだ入庫していない予約は、
+       　**今日までの台数には数えず**、明日から先の見込みにだけ入れる（下の `_dashOn`）。
      ・ある日の混雑度 ＝ その日に預かっている台数 ÷ 置ける台数(settings.lotCapacity)。
      ・最短入庫 ＝ 今日から順に、預かり期間ぶん足しても置き場が溢れない最初の日。
      ・工数(整備士)・PIT枠は将来の補助指標（今は置き場が主ボトルネック）。
@@ -17,18 +19,38 @@ function _dashHeld(c){ return !c._draft && c.status !== 'returned' && c.status !
 
 // YYYY-MM-DD をローカル日付に
 function _pd(s){ const p = String(s).split('-'); return new Date(+p[0], (+p[1]) - 1, +p[2]); }
+/* 🅿🅿 v2.74.0（ゆうた指定 2026-09-05）**入庫していないものは「預かり」ではない。**
+   -------------------------------------------------------------------
+   ◎ここには**性格の違う2つ**が同居している。混ぜると必ずどちらかが嘘になる。
+     ① **今の台数**（KPI「預かり中◯台」・チーム別）… いま工場に**実際にある**台数
+     ② **先の見込み**（2週間の混み具合・最短入庫日）… これから来る予約も**入れて**読む置き場
+   🔴 だから境目は**日付**で引く＝**今日より前・今日は①／明日から先は②**。
+      ⚠ ②から予約を外すと、予約で埋まっている置き場が見えなくなって最短入庫日が嘘になる。
+      ⚠ ①に予約を入れると、来ていない車が置き場を食っているように見える（これが今回の直し）。
+   ・占有の始まり＝**実際に入庫した日**（views.js の `pitHoldFrom`）。まだなら入庫予定日で見込む。
+   ------------------------------------------------------------------- */
+// 占有の始まり：入庫したらその日／まだなら入庫予定日（＝見込み）
+function _dashStart(c){
+  return (window.pitHoldFrom ? pitHoldFrom(c) : null) || c.reserveDate || '';
+}
 // 占有の終了日：返車日が確定していればそれ／無ければ概算預かり日数での「見込み」
 function _dashEnd(c){
   if (c.returnDate) return c.returnDate;
   const est = (c.estHoldDays != null) ? c.estHoldDays : (window.pitEstHold ? pitEstHold(c.workType, c.dropType, window.pitTeamKey?pitTeamKey(c):'default') : 3);
-  return ymd(addDays(_pd(c.reserveDate), est));
+  return ymd(addDays(_pd(_dashStart(c) || c.reserveDate), est));
+}
+/* その日その車を数えるか。dStr が今日までなら「実際にあるか」、明日から先なら「見込み」。 */
+function _dashOn(c, dStr){
+  if (!_dashHeld(c)) return false;
+  const s = _dashStart(c);
+  if (!s || s > dStr) return false;
+  /* 🔴 今日までの日に、まだ入庫していない車は数えない（来ていない＝置き場を使っていない） */
+  if (dStr <= ymd(new Date()) && !(window.pitInShop ? pitInShop(c) : true)) return false;
+  return _dashEnd(c) >= dStr;
 }
 // 指定日(YYYY-MM-DD)の預かり台数（未来は概算日数での見込み＝予想）
 function dashOccupancy(dStr){
-  return state.cards.filter(function(c){
-    if (!_dashHeld(c) || !c.reserveDate || c.reserveDate > dStr) return false;
-    return _dashEnd(c) >= dStr;
-  }).length;
+  return state.cards.filter(function(c){ return _dashOn(c, dStr); }).length;
 }
 // チーム別 その日の入庫（予約）台数
 function dashIntake(team, dStr){
@@ -38,8 +60,7 @@ function dashIntake(team, dStr){
 // チーム別の預かり台数（boardId: default＝国産 / import＝輸入）
 function _dashHeldOnTeam(board, dStr){
   return state.cards.filter(function(c){
-    if (!_dashHeld(c) || c.boardId !== board || !c.reserveDate || c.reserveDate > dStr) return false;
-    return _dashEnd(c) >= dStr;
+    return c.boardId === board && _dashOn(c, dStr);   /* 🅿 v2.74.0 数え方は _dashOn 1本 */
   }).length;
 }
 /* ===== ⏱ 最短入庫日（v0.24.0・チーム別×タイプ別） =====

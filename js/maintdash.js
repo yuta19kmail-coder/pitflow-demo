@@ -73,9 +73,12 @@ function renderMaintDash(){
 
   // 長期預かりアラート（在庫車・工程が進行中で日数が経っているもの）
   const longs = [];
+  /* 🅿 v2.74.0 起点は**実際に入庫した日**（views.js の `pitHoldFrom` 1本）。
+     ⚠ ここで `reserveDate` を直接見ない＝来ていない車が長期預かりのアラートに並ぶ。 */
   cards.forEach(function(c){
-    if (!_mdInShop(c) || !c.reserveDate) return;
-    const held = Math.round((today - _mdPd(c.reserveDate)) / 86400000);
+    const from = window.pitHoldFrom ? pitHoldFrom(c) : c.reserveDate;
+    if (!_mdInShop(c) || !from) return;
+    const held = Math.round((today - _mdPd(from)) / 86400000);
     if (held >= longN) longs.push({ c: c, held: held });
   });
   longs.sort(function(a,b){ return b.held - a.held; });

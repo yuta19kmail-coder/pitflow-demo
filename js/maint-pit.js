@@ -356,8 +356,17 @@
 
       /* 2行目＝飛び地の候補 */
       h += '<div class="mb-line"><span>候補</span><span class="mb-slots">';
+      /* 🔴 v2.69.0（ゆうた指定 2026-09-05）**確定にも × を付けた。ただしこちらは押す前に聞く。**
+         🗣「確定予定も×で消したい　こっちはPOPアップ確認を出来るようにして」
+         ⚠ 確定は**当日ビュー・予約カレンダー・MHS に出ている**＝消すと現場の見え方が変わる。
+            候補（置き直すのが軽い）とは重さが違うので、**候補は聞かない／確定は聞く**で分けている。
+         🔴 **入庫したあとは出さない。**（もうタスクボードにカードがある＝ここで消す話ではない） */
       if (r.fixed){
-        h += '<span class="mb-chip fixed">' + md(r.fixed.fromDate) + '〜' + md(r.fixed.toDate) + ' で確定</span>';
+        h += '<span class="mb-chip fixed">' + md(r.fixed.fromDate) + '〜' + md(r.fixed.toDate) + ' で確定'
+           + ((r.fixed.started || r.doneReady) ? ''
+              : '<button type="button" class="mb-x" title="この確定を取り消す" aria-label="この確定を取り消す"'
+                + ' onclick="event.stopPropagation();flMaintDelRecAsk(\'' + r.fixed.id + '\')">×</button>')
+           + '</span>';
       }
       /* 🔴 v2.68.0（ゆうた指定 2026-09-05）**候補の横に小さい × を付けた。**
          🗣「一度決めた候補を横にちっちゃい×つけて、飛び地の予定でも例えば真ん中だけ消すとかできるように」
@@ -696,6 +705,29 @@
   /* 候補を1本取り消す。
      ⚠ 最後の1本を取り消しても**カードは消さない**（＝月の目標として残る）。
         カードごと無くすのはボードの「取り下げ」だけ＝**消える道を増やさない**（v2.22.0）。 */
+  /* 🔴 v2.69.0 確定の × ＝**押す前に聞いてから**取り消す。
+     ⚠ 中身は下の `flMaintDelRec` 1本。ここで消し方を書かない。 */
+  w.flMaintDelRecAsk = function(recId){
+    var hit = spanOf(recId);
+    if (!hit){ w.pitAlert('この枠が見つかりません', { code:'PF-3071',
+      detail:'画面を開き直してください。' }); return; }
+    var c = hit.card, sp = hit.span;
+    if (c.status !== 'reserved' || c.actualInAt){
+      w.pitAlert('この枠はもう入庫しています', { code:'PF-3070',
+        detail:'タスクボードにカードがあります。取り消すのではなく、そちらから進めてください。' });
+      return;
+    }
+    var isFixed = (c.maintFixSid === sp.sid);
+    w.pitAsk('この' + (isFixed ? '確定' : '候補') + 'を取り消しますか？', {
+      title: (WORK_LB[c.workType] || '整備') + '　' + vehName(vehOf(c.maintVehId)),
+      danger: true, ok: '取り消す',
+      detail: md(sp.from) + '〜' + md(sp.to) + '\n\n'
+            + (isFixed ? '当日ビュー・予約カレンダー・MHS から消えます。押さえていた代車の枠も外れます。\n'
+                       : '')
+            + '予定そのもの（月の目標）は残るので、日を決め直せます。'
+    }).then(function(yes){ if (yes) w.flMaintDelRec(recId); });
+  };
+
   w.flMaintDelRec = function(recId){
     var hit = spanOf(recId);
     if (!hit) return;

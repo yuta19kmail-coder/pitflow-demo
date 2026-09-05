@@ -48,11 +48,18 @@
 .fl-cal-new .fl-cal-name{ font-size:13px; font-weight:700; padding:10px 12px; }
 .fl-cal-new .fl-cal-h{ font-size:12.5px; padding:9px 4px; }
 
-/* ── 1ヶ月ぶんの札（12点・一般・B.P・超過） ── */
-.fl-mb{ display:flex; align-items:center; gap:6px; border-radius:8px; padding:5px 8px;
+/* ── 1ヶ月ぶんの札（一般・B.P・超過） ──
+   🔴🔴 v2.71.1（ゆうた報告 2026-09-05「テキストが1せるだと入り切ってない」）**2行にした。**
+   ◎計算 … 列は 86px。マスの内側は 86 − 6 − 6 ＝ 74px、
+     札の内側はさらに（余白8＋8＋線1＋1）を引いて **56px しか無い**。
+     そこへ「四角9 ＋ すき間6 ＋ 一般23 ＋ すき間6 ＋ 未割当35」＝ **約79px** を1行で入れていた＝はみ出す。
+   ◎いま … **1行目＝四角＋作業名／2行目＝状態**。どちらも 56px に収まる。
+     ⚠ 字は小さくしない（11.5px は決めごと③）。**行を増やして収める。**
+     ⚠ 凡例の札には状態しか入っていない（`.st` が無い）ので、そのまま1行のまま。 */
+.fl-mb{ display:flex; align-items:center; flex-wrap:wrap; gap:2px 6px; border-radius:8px; padding:5px 8px;
   font-size:11.5px; font-weight:800; line-height:1.3; cursor:pointer; min-width:0; }
 .fl-mb b{ flex:0 0 auto; }
-.fl-mb .st{ flex:0 0 auto; margin-left:auto; font-weight:800; }
+.fl-mb .st{ flex:1 0 100%; font-weight:800; opacity:.95; }
 .fl-mb.tbd  { background:rgba(239,68,68,.16);  color:#f9a8a8; border:1px solid rgba(239,68,68,.50); }
 .fl-mb.cand { background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.50); }
 .fl-mb.fixed{ background:rgba(29,185,122,.18); color:#4ade80; border:1px solid rgba(29,185,122,.55); }
@@ -63,11 +70,15 @@
    ⚠ バーが乗るマスは上に場所を空ける（.barpad）。空けないと下の中身と重なる。
    ⚠ バーは上の 22px だけ＝その下はふつうになぞれる（日ビューの候補ドラッグ）。 */
 .fl-cal-new .fl-bar3{ position:absolute; left:6px; top:6px; height:23px; z-index:2;
-  display:flex; align-items:center; gap:6px; padding:0 9px; border-radius:8px;
+  display:flex; align-items:center; gap:6px; padding:0 7px; border-radius:8px;
   font-size:11.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   cursor:pointer; box-sizing:border-box; }
+/* 1日だけの枠＝四角だけ（v2.71.1）。中身が無いので真ん中に置く。 */
+.fl-cal-new .fl-bar3.tiny{ justify-content:center; padding:0 4px; gap:0; }
 .fl-cal-new .fl-bar3 b{ overflow:hidden; text-overflow:ellipsis; }
 .fl-cal-new .fl-bar3 .st{ margin-left:auto; }
+/* ⚠ バーは**2マス以上ある時だけ**。1マスぶんしか見えていない時は上の札（.fl-mb）で出す
+   ＝ 1マスの幅（74px）に「四角＋作業名＋状態」を1行で入れると、必ずはみ出す（v2.71.1）。 */
 .fl-cal-new .fl-bar3.tbd  { background:rgba(239,68,68,.16);  color:#f9a8a8; border:1px solid rgba(239,68,68,.50); }
 .fl-cal-new .fl-bar3.cand { background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.50); }
 .fl-cal-new .fl-bar3.fixed{ background:rgba(29,185,122,.18); color:#4ade80; border:1px solid rgba(29,185,122,.55); }
@@ -82,10 +93,14 @@
 .fl-due{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:#f9a8a8;
   border-left:3px solid var(--red); padding-left:7px; line-height:1.5; }
 
-/* ── 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） ── */
-.fl-ev{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text2);
-  min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
-.fl-ev i{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+/* ── 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） ──
+   🔴 v2.71.1 長い名前は**折り返して2行まで**出す（1行で切ると「リース…」になって、結局4文字切りと同じ）。
+   ⚠ 3行以上は他を押しのけるので、そこで止めて「…」にする。 */
+.fl-ev{ display:flex; align-items:flex-start; gap:6px; font-size:11px; font-weight:700; color:var(--text2);
+  min-width:0; cursor:pointer; line-height:1.35; }
+.fl-ev i{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; margin-top:4px; }
+.fl-ev span{ min-width:0; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical;
+  -webkit-line-clamp:2; line-clamp:2; overflow-wrap:anywhere; }
 
 /* ── 日ビュー：貸出・仮押さえ ──
    🔴 ゆうた 2026-09-05「いまの緑・やや透過の方が見やすい。もうほんとちょっと鮮やかで透過で」

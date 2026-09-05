@@ -585,7 +585,9 @@ function pitSyncLoanerAssigns(){
 window.pitSyncLoanerAssigns = pitSyncLoanerAssigns;
 
 function renderLoaner(){
-  try { if (window.pitRefreshAutoTenken) pitRefreshAutoTenken(); } catch (e) {}   /* v1.14.7：12ヶ月点検の位置を今日基準で貼り直す */
+  /* 🔴 v2.70.1 前の仕組み（v1.12）が作った車検・点検の予定を片付ける。
+     ⚠ 前は「12ヶ月点検の位置を貼り直す」だった。**その仕組みごとやめた**ので、いまは片付けるだけ。 */
+  try { if (window.pitCleanupAutoVehEvents) pitCleanupAutoVehEvents(); } catch (e) {}
   const grid = document.getElementById('loaner-grid');
   if (!grid) return;
   /* 🔴 v1.80.0 前回の下書きの控えを端末から拾い直す（リロードしても「破棄」で戻せるように）。
@@ -823,7 +825,14 @@ function _loRenderDays(start, n){
         const e0 = evs[0], c0 = e0.color || '#3b82f6';
         evCls = ' lo-evday';
         ov += '<span class="lo-evbg" style="background:' + c0 + '22;box-shadow:inset 4px 0 0 ' + c0 + ',inset -4px 0 0 ' + c0 + '"></span>';
-        if (e0.isStart) ov += '<span class="lo-evt-tag" style="background:' + c0 + '"><i data-ic=wrench data-ics=16></i> ' + _loEsc(e0.label) + '</span>';
+        /* 🔴 v2.70.1 押したら**その予定の窓が開く**ようにした（ゆうた報告 2026-09-05）。
+           ◎前まで … 代車カレンダーの予定は**見るだけ**で、消すには車両管理まで行くしか無かった。
+             だから「前の仕組みの車検の予定が残っている」と気づいても、その場では消せなかった。
+           ⚠ 窓は車両管理のものをそのまま使う（`flOpenEventModal`）。中に「削除」がある。 */
+        if (e0.isStart) ov += '<span class="lo-evt-tag" style="background:' + c0 + ';cursor:pointer"'
+          + ' title="' + _loEsc(e0.label + ' ' + e0.from + '〜' + e0.to + '／押すと直す・消せます') + '"'
+          + ' onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + e0.id + '\')">'
+          + '<i data-ic=wrench data-ics=16></i> ' + _loEsc(e0.label) + '</span>';
       }
       // 元位置ゴースト（下書きで動かした割当の、元の代車・日付）＝列の左端に点線で並べる
       let gh = '';

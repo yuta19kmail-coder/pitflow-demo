@@ -180,6 +180,8 @@
       urgent: !!c.urgent,
       skipped: Array.isArray(c.maintSkipped) ? c.maintSkipped : [],
       memo: c.memo || '',
+      /* 🏁 v2.72.0 「完了する」を押したか。押してあれば画面はグレーで出す（車両管理と同じ意味）。 */
+      done: !!c.maintDone,
       label: (MAINT_WORKS[work] && MAINT_WORKS[work].label) || '整備の枠',
       color: '#d6a846'
     };

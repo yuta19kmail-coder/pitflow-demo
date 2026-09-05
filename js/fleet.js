@@ -266,7 +266,10 @@ function flCalLegendHtml(){
      + '<span class="fl-mb tbd"><b>未割当</b></span>'
      + '<span class="fl-mb cand"><b>予定</b></span>'
      + '<span class="fl-mb fixed"><b>確定</b></span>'
-     + '<span class="fl-mb over"><b>超過</b></span></div>';
+     + '<span class="fl-mb over"><b>超過</b></span>'
+     /* 🏁 v2.72.0 済んだ整備＝グレー。数字は**タスクボードと同じ預かり日数**（泊数・当日返しは0）。 */
+     + '<span class="fl-mb done"><b>済</b></span>'
+     + '<span class="fl-lg-n">グレー＝終わった。数字は<b>預かり日数</b></span></div>';
   h += '<div class="fl-lg-g"><span class="fl-lg-t">作業</span>'
      + dot('shaken','車検') + dot('12pt','12点') + dot('general','一般') + dot('bp','B.P') + '</div>';
   if (_flMode === 'month'){

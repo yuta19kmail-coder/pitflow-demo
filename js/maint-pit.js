@@ -304,6 +304,32 @@
      ⚠ 満了日そのものはここでは返さない。**期限は「やること」ではない**ので、
         画面側が車の `shakenDate` から別の行（左に赤い縦線）で出す。
      ================================================================== */
+  /* ==================================================================
+     🏁 v2.72.0（ゆうた指定 2026-09-05）**「完了する」を押したあとの見せ方。**
+     🗣「完了するをクリックしたら　カードは消え、カレンダーのバッチは
+     　　タスクボードの預かり日数だけにしてグレーで終わった感じを出して」
+     ------------------------------------------------------------------
+     ◎前まで … 完了を押すとボードから行が消え、**カレンダーからも何も無くなっていた。**
+       ＝「今年の車検、いつやったんだっけ」が画面から消えていた。
+     ◎いま  … **預かっていた期間だけ**をグレーで残す。数字は**タスクボードと同じ預かり日数**。
+     🔴 期間も日数も**タスクボードと同じ物差し**で出す
+        （入庫日＝`reserveDate`／返車日＝実績の返車日／日数＝`pitHoldDays`＝泊数・当日返しは0）。
+        ⚠ ここで自前に数え直さない。数え方が2つあると、必ず画面ごとに違う数字が出る。
+     ================================================================== */
+  function doneOf(c){
+    if (!c || !c.maintDone) return null;
+    var f = c.reserveDate || '';
+    var t = c.returnDateFinal || c.returnDate || c.completedAt || '';
+    if (!f || !t) return null;
+    if (t < f) t = f;
+    var txt = w.pitHoldDaysText ? w.pitHoldDaysText(f, t) : '';
+    return { from: f, to: t, label: txt || '済', days: (w.pitHoldDays ? w.pitHoldDays(f, t) : null) };
+  }
+  /* その車の「済んだ整備」（＝完了するを押したもの）。 */
+  function doneCards(vehId){
+    return mcards().filter(function(c){ return c.maintVehId === vehId && c.maintDone && doneOf(c); });
+  }
+
   function calItems(v, todayStr){
     var td = todayStr || today();
     var out = [];
@@ -337,6 +363,21 @@
               : (lb + '　' + days.join(' / ')))
       });
     });
+    /* 🏁 済んだ整備＝**預かっていた月**にグレーで残す（ゆうた指定 2026-09-05）。
+       ⚠ 3ヶ月の帯にはしない。**預かり日数のぶんだけ**＝終わったことが形でも分かる。 */
+    doneCards(v.id).forEach(function(c){
+      var d = doneOf(c);
+      var ms = [], k = ymOf(d.from), end = ymOf(d.to), guard = 0;
+      while (k <= end && guard++ < 24){ ms.push(k); k = ymAdd(k, 1); }
+      out.push({
+        gid: c.id, work: c.workType, workLabel: WORK_LB[c.workType] || '整備',
+        workShort: WORK_SHORT[c.workType] || '整備', workDot: workDot(c.workType),
+        state: 'done', stateLabel: d.label, level: 'idle',
+        months: ms, bar: ms.length > 1,
+        dueDate: '', slipped: false,
+        title: (WORK_LB[c.workType] || '整備') + '　済　' + md(d.from) + '〜' + md(d.to) + '（預かり ' + d.label + '）'
+      });
+    });
     return out;
   }
 
@@ -353,20 +394,26 @@
     recs().forEach(function(r){
       if (r.vehicleId !== vehId) return;
       if ((r.stage || '') === 'month') return;
-      if (!(r.fromDate <= to && r.toDate >= from)) return;
+      /* 🏁 v2.72.0 完了を押したものは**預かっていた期間**に置き換えてグレーで出す。
+         ⚠ 期間も日数も**タスクボードと同じ物差し**（doneOf）。ここで数え直さない。 */
+      var d = doneOf(r.card);
+      var f = d ? d.from : r.fromDate;
+      var t = d ? d.to   : r.toDate;
+      if (!(f <= to && t >= from)) return;
+      var st = d ? 'done' : (r.stage === 'fixed' ? 'fixed' : 'cand');
+      var lb = d ? d.label : (r.stage === 'fixed' ? '確定' : '予定');
       out.push({
         id: r.id, gid: r.groupId, work: r.work,
         workLabel: r.workLabel || WORK_LB[r.work] || '整備',
         workShort: WORK_SHORT[r.work] || '整備', workDot: workDot(r.work),
-        stage: r.stage, fixed: (r.stage === 'fixed'),
-        state: (r.stage === 'fixed' ? 'fixed' : 'cand'),
-        stateLabel: (r.stage === 'fixed' ? '確定' : '予定'),
-        from: r.fromDate, to: r.toDate,
-        clipFrom: (r.fromDate < from ? from : r.fromDate),
-        clipTo:   (r.toDate   > to   ? to   : r.toDate),
-        cutL: (r.fromDate < from), cutR: (r.toDate > to),
-        title: (WORK_LB[r.work] || '整備') + ' ' + md(r.fromDate) + '〜' + md(r.toDate)
-               + '（' + (r.stage === 'fixed' ? '確定' : '予定') + '）'
+        stage: r.stage, fixed: (r.stage === 'fixed'), done: !!d,
+        state: st, stateLabel: lb,
+        from: f, to: t,
+        clipFrom: (f < from ? from : f),
+        clipTo:   (t > to   ? to   : t),
+        cutL: (f < from), cutR: (t > to),
+        title: (WORK_LB[r.work] || '整備') + ' ' + md(f) + '〜' + md(t)
+               + '（' + (d ? ('済・預かり ' + d.label) : lb) + '）'
       });
     });
     return out.sort(function(a, b){ return a.clipFrom < b.clipFrom ? -1 : 1; });
@@ -1138,7 +1185,18 @@
       try { if (w.pitLog) w.pitLog('車検満了日を更新した', { kind:'loaner',
         label: vehName(v) + '　' + (before || '（空）') + ' → ' + newDue }); } catch(e){}
     }
-    /* ② 済んだ印＝ボードから行が消える唯一の合図 */
+    /* ② 残っている候補はここで**必ず**消す（ゆうた指定 2026-09-05「その他の候補は勿論そこで消える」）
+       ⚠ ふつうは完TEL関門（pitMaintOnComplete）で消えている。ここは**取りこぼしの最後の関門**。
+          完TELを通らずに実績へ入った道が1つでもあると、済んだのに候補だけカレンダーに残る。 */
+    var _left = (c.maintSpans || []).filter(function(x){ return x.sid !== c.maintFixSid; }).length;
+    if (_left){
+      c.maintSpans = (c.maintSpans || []).filter(function(x){ return x.sid === c.maintFixSid; });
+      try { if (w.pitLog) w.pitLog('完了で残りの候補を消した', { cardId:c.id, kind:'loaner',
+        label:'候補 ' + _left + '本' }); } catch(e){}
+    }
+    /* ③ 済んだ印＝ボードから行が消える唯一の合図。
+       🏁 v2.72.0 消えるのは**ボードから**。カレンダーには**預かっていた期間だけ**がグレーで残る
+          （何の作業をいつやったかが、後から画面で追える）。 */
     c.maintDone = true;
     c.maintDoneAt = today();
     saveCards();

@@ -64,6 +64,11 @@
 .fl-mb.cand { background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.50); }
 .fl-mb.fixed{ background:rgba(29,185,122,.18); color:#4ade80; border:1px solid rgba(29,185,122,.55); }
 .fl-mb.over { background:var(--red); color:#fff; border:1px solid var(--red); }
+/* 🏁 v2.72.0 済んだ整備＝**グレーで終わった感じ**（ゆうた指定 2026-09-05）。
+   ⚠ ここだけ字も薄くする＝目の端に入っても「もう手を打たなくていい」と分かる。
+   ⚠ 数字はタスクボードと同じ**預かり日数**（泊数・当日返しは0）。 */
+.fl-mb.done { background:rgba(148,163,184,.12); color:var(--text3); border:1px solid rgba(148,163,184,.32); }
+.fl-mb.done .fl-dot{ opacity:.5; }
 
 /* ── ぶち抜きのバー（月ビュー＝車検の3ヶ月／日ビュー＝整備の枠の期間ぜんぶ） ──
    🔴 3ヶ月ぶん同じ札が3つ並ぶのをやめた。「これで1本の車検」だと**形**で分かる。
@@ -83,6 +88,8 @@
 .fl-cal-new .fl-bar3.cand { background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.50); }
 .fl-cal-new .fl-bar3.fixed{ background:rgba(29,185,122,.18); color:#4ade80; border:1px solid rgba(29,185,122,.55); }
 .fl-cal-new .fl-bar3.over { background:var(--red); color:#fff; border:1px solid var(--red); }
+.fl-cal-new .fl-bar3.done { background:rgba(148,163,184,.12); color:var(--text3); border:1px solid rgba(148,163,184,.32); }
+.fl-cal-new .fl-bar3.done .fl-dot{ opacity:.5; }
 /* 画面の外へ続いている側＝角を落として点線（まだ続く、が読める） */
 .fl-cal-new .fl-bar3.cutL{ border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed; }
 .fl-cal-new .fl-bar3.cutR{ border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed; }
@@ -146,9 +153,13 @@
 .lo-mtline.st{ top:3px; border-top-left-radius:3px; border-top-right-radius:3px; }
 .lo-mtline.en{ bottom:3px; border-bottom-left-radius:3px; border-bottom-right-radius:3px; }
 .lo-mtline.cand{ background:color-mix(in srgb, var(--pit-maint,#d6a846) 45%, transparent); }
+/* 🏁 v2.72.0 済んだ整備＝グレー（車両管理と同じ意味・同じ色） */
+.lo-mtline.done{ background:rgba(148,163,184,.45); }
 .lo-mt{ position:absolute; left:0; top:0; width:100%; z-index:3;
   display:flex; align-items:flex-start; gap:6px; padding:4px 6px 0 15px;
   font-size:11px; font-weight:800; color:#e8cf9a; white-space:nowrap; overflow:hidden;
   cursor:pointer; background:none; border:0; }
 .lo-mt.cand{ color:#b99a5f; font-weight:700; }
+.lo-mt.done{ color:var(--text3); font-weight:700; }
+.lo-mt.done .fl-dot{ opacity:.5; }
 .lo-mt i{ margin-top:2px; }

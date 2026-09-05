@@ -268,7 +268,9 @@
       // 実績＝完了済み。最終的な返車日・代車スケジュールから「期間」で表示（日目ではなく 〇/〇〜〇/〇・〇日間）＋確定金額 v0.119.0
       var retF = c.returnDateFinal || c.returnDate || '';
       // ① 預かり期間（入庫日〜最終返車日）
-      var hStart = c.reserveDate || '';
+      /* 🅿 v2.74.0 起点は**実際に入庫した日**（views.js の `pitHoldFrom` 1本）。
+         ⚠ ここで `reserveDate` を直接見ない＝予定より遅れて入った車の日数が水増しされる。 */
+      var hStart = (window.pitHoldFrom ? pitHoldFrom(c) : null) || c.reserveDate || '';
       /* 🔴 v1.59.0（ゆうた指定）**預かり日数は「日をまたいだ数」＝泊数**。
          朝預かって夕方返せば駐車場は日をまたがないので **0＝「当日返し」**。
          ⚠ ここは両端を数えていた（`_periodDays`）ので当日返車が「1日間」になっていた。**そこだけの食い違い。**
@@ -306,11 +308,19 @@
     } else {
 
     // ① 預かり
-    /* 🔴 v1.59.0 数え方は views.js の pitDayNo に一本化（入庫日＝1日目・カレンダー基準） */
-    var holdN = window.pitDayNo ? pitDayNo(c.reserveDate) : null;
+    /* 🔴 v1.59.0 数え方は views.js の pitDayNo に一本化（入庫日＝1日目・カレンダー基準）
+       🅿 v2.74.0 起点は**実際に入庫した日**（`pitHoldFrom`）。まだ入庫していなければ「未入庫」と出す。
+          ⚠ 「—日目」ではなく**未入庫**と言い切る＝数え損ねなのか、来ていないのかが読める。 */
+    var holdFrom = window.pitHoldFrom ? pitHoldFrom(c) : (c.reserveDate || null);
+    var holdN = (holdFrom && window.pitDayNo) ? pitDayNo(holdFrom) : null;
     h += '<div class="ph-stat s-hold"><div class="ph-stat-lb">預かり</div>'
-       + '<div class="ph-stat-num">'+(holdN!=null?holdN:'—')+'<span class="u">日目</span></div>'
-       + '<div class="ph-stat-sub">'+(c.reserveDate&&window.fmtMD?(fmtMD(c.reserveDate)+'〜'):'未定')+'</div></div>';
+       + '<div class="ph-stat-num">'
+       +   (holdFrom ? ((holdN!=null?holdN:'—')+'<span class="u">日目</span>') : '未入庫')
+       + '</div>'
+       + '<div class="ph-stat-sub">'
+       +   (holdFrom&&window.fmtMD ? (fmtMD(holdFrom)+'〜')
+           : (c.reserveDate&&window.fmtMD ? ('入庫予定 '+fmtMD(c.reserveDate)) : '未定'))
+       + '</div></div>';
 
     // ② このフェーズ（外注の時は「完了予定 〇/〇 ・ 〇日目」）
     var pms = phaseStartMs(c);

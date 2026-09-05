@@ -322,17 +322,25 @@
   }
   function pickPay() { return C.cards.filter(function (c) { return !mdNoSale(c) && c.status === 'returned' && c.paymentSeparate && !c.paymentDate; }); }
   function longHoldDays() { return (state.settings && state.settings.longHoldDays) || 7; }
+  /* 🅿 v2.74.0（ゆうた指定 2026-09-05）**預かりの日数は「実際に入庫した日」から数える。**
+     🔴 起点の決め方は views.js の `pitHoldFrom` 1本。**ここで `reserveDate` を直接見ない。**
+        ＝ 予定日に来なかった車の日数が、来ていないのに増えていくのを止めるため。 */
+  function holdDaysOf(c) {
+    var f = window.pitHoldFrom ? pitHoldFrom(c) : (c && c.reserveDate) || null;
+    return f ? daysAgo(f) : null;
+  }
+  function holdSort(a, b) { return (holdDaysOf(b) || 0) - (holdDaysOf(a) || 0); }
   function pickLongHold() {
     var lim = longHoldDays();
     return C.cards.filter(function (c) {
       if (!(window._mdInShop ? _mdInShop(c) : (TASK_ACTIVE.indexOf(c.status) >= 0))) return false;
-      var d = daysAgo(c.reserveDate); return d != null && d >= lim;
-    }).sort(function (a, b) { return (daysAgo(b.reserveDate) || 0) - (daysAgo(a.reserveDate) || 0); });
+      var d = holdDaysOf(c); return d != null && d >= lim;
+    }).sort(holdSort);
   }
   /* 預かり中＝いま工場にある車。古い（長くいる）順に出す＝手が止まっている車が先頭に来る */
   function pickHold() {
     return C.cards.filter(function (c) { return window._mdInShop ? _mdInShop(c) : (TASK_ACTIVE.indexOf(c.status) >= 0); })
-      .sort(function (a, b) { return (daysAgo(b.reserveDate) || 0) - (daysAgo(a.reserveDate) || 0); });
+      .sort(holdSort);
   }
   var ORDER_IN = ['parts', 'work', 'workDone', 'outsource'];
   function pickOrder() {
@@ -676,7 +684,7 @@
       title: '預かり中', icon: '🅿️', jump: 'dashboard', sizes: ['s', 'm', 'l'], dv: 'num',
       pick: pickHold,
       head: function (list) { var held = window.dashOccupancy ? dashOccupancy(C.tStr) : list.length; return lnum(held, '台', '置場 ' + C.cap + '台中'); },
-      chip: function (c) { var d = daysAgo(c.reserveDate), lim = longHoldDays(); return cp(c.id, cpWho(c) + wtChip(c) + cpN(d != null ? d + '日目' : ''), d != null && d >= lim); },
+      chip: function (c) { var d = holdDaysOf(c), lim = longHoldDays(); return cp(c.id, cpWho(c) + wtChip(c) + cpN(d != null ? d + '日目' : ''), d != null && d >= lim); },
       none: '預かり中の車はありません',
       body: function (sz) {
         var held = window.dashOccupancy ? dashOccupancy(C.tStr) : 0;
@@ -1005,7 +1013,7 @@
       title: '長期預かり', icon: '⏳', jump: 'work', sizes: ['s', 'm', 'l', 'xl'], dv: 'list',
       pick: pickLongHold,
       head: function (list) { return lnum(list.length, '台', longHoldDays() + '日以上'); },
-      chip: function (c) { var d = daysAgo(c.reserveDate), lim = longHoldDays(); return cp(c.id, cpWho(c) + wtChip(c) + cpN(d + '日目'), d >= lim * 2); },
+      chip: function (c) { var d = holdDaysOf(c), lim = longHoldDays(); return cp(c.id, cpWho(c) + wtChip(c) + cpN(d + '日目'), d >= lim * 2); },
       none: '長期預かりはありません',
       body: function (sz) {
         var lim = longHoldDays();
@@ -1013,7 +1021,7 @@
         if (sz === 's') return kpi(list.length, '台', lim + '日以上', list.length ? 'r' : 'g');
         if (!list.length) return empty(lim + '日以上の長期預かりはありません');
         var lm = sz === 'xl' ? 40 : (sz === 'l' ? 12 : 5);
-        return '<div class="md-' + (sz === 'xl' ? 'scroll md-scroll-tall' : 'list') + '">' + list.slice(0, lm).map(function (c) { var d = daysAgo(c.reserveDate); return rowCard(c.id, esc(nm(c)) + ' ' + esc(carOf(c)), d + '日目', d >= lim * 2 ? 'tag rd' : 'tag'); }).join('') + (list.length > lm ? '<div class="md-more-n">ほか ' + (list.length - lm) + '台</div>' : '') + '</div>';
+        return '<div class="md-' + (sz === 'xl' ? 'scroll md-scroll-tall' : 'list') + '">' + list.slice(0, lm).map(function (c) { var d = holdDaysOf(c); return rowCard(c.id, esc(nm(c)) + ' ' + esc(carOf(c)), d + '日目', d >= lim * 2 ? 'tag rd' : 'tag'); }).join('') + (list.length > lm ? '<div class="md-more-n">ほか ' + (list.length - lm) + '台</div>' : '') + '</div>';
       },
       more: function () { return openFoot('work', 'Pitリスト'); }
     },

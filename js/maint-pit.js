@@ -313,12 +313,14 @@
        ＝「今年の車検、いつやったんだっけ」が画面から消えていた。
      ◎いま  … **預かっていた期間だけ**をグレーで残す。数字は**タスクボードと同じ預かり日数**。
      🔴 期間も日数も**タスクボードと同じ物差し**で出す
-        （入庫日＝`reserveDate`／返車日＝実績の返車日／日数＝`pitHoldDays`＝泊数・当日返しは0）。
+        （入庫日＝`pitHoldFrom`＝実入庫日／返車日＝実績の返車日／日数＝`pitHoldDays`＝泊数・当日返しは0）。
         ⚠ ここで自前に数え直さない。数え方が2つあると、必ず画面ごとに違う数字が出る。
      ================================================================== */
   function doneOf(c){
     if (!c || !c.maintDone) return null;
-    var f = c.reserveDate || '';
+    /* 🅿 v2.74.0 起点は**実際に入庫した日**（views.js の `pitHoldFrom` 1本）。
+       ⚠ タスクボードと同じ物差しにする、が v2.72.0 からの決めごと。あちらが変わったのでここも同じ。 */
+    var f = (w.pitHoldFrom ? w.pitHoldFrom(c) : null) || c.reserveDate || '';
     var t = c.returnDateFinal || c.returnDate || c.completedAt || '';
     if (!f || !t) return null;
     if (t < f) t = f;

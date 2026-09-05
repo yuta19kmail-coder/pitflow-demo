@@ -155,10 +155,22 @@
 .lo-mtline.cand{ background:color-mix(in srgb, var(--pit-maint,#d6a846) 45%, transparent); }
 /* 🏁 v2.72.0 済んだ整備＝グレー（車両管理と同じ意味・同じ色） */
 .lo-mtline.done{ background:rgba(148,163,184,.45); }
+/* 🔴🔴 v2.72.1（ゆうた指定 2026-09-05）**代車カレンダーの整備は押せない。**
+   🗣「代車カレンダー本体側からは修理系のイベントはさわれなくていい。
+   　　あったとしても仮押さえみたいな通常のクリック挙動をするようにして」
+   ＝ 札も縦バーも**クリックを受けない**（pointer-events:none）。
+     押した先はマスに素通しされて、**空きマス・仮押さえと同じ動き**になる。
+   ⚠ ここは貸出を入れる画面。押した時に整備の窓が開くと、やりたいことと違う所へ飛ぶ。
+   ⚠ 直す・取り消すのは**車両管理の作業予定ボード**。ここは「入っている」を見せるだけ。
+   ⚠ 何が入っているかは**マスの title**（カーソルを乗せた時）に回してある。 */
 .lo-mt{ position:absolute; left:0; top:0; width:100%; z-index:3;
   display:flex; align-items:flex-start; gap:6px; padding:4px 6px 0 15px;
   font-size:11px; font-weight:800; color:#e8cf9a; white-space:nowrap; overflow:hidden;
-  cursor:pointer; background:none; border:0; }
+  pointer-events:none; background:none; border:0; }
+/* 代車自身の予定（車検入庫・リースアップなど）の札も同じ＝ここでは押せない。
+   ⚠ v2.70.1 で一度「押すと直す・消せる」にしたが、取り消した（v2.72.1）。
+      直す・消すのは**車両管理の月カレンダー**（そこでは今までどおり押せる）。 */
+.lo-evt-tag{ pointer-events:none; }
 .lo-mt.cand{ color:#b99a5f; font-weight:700; }
 .lo-mt.done{ color:var(--text3); font-weight:700; }
 .lo-mt.done .fl-dot{ opacity:.5; }

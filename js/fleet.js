@@ -552,10 +552,6 @@ function flEventSubmit(){
   if (window.PitDB) PitDB.save();
   flEventClose();
   renderFleet();
-  /* 🔴 v2.70.1 いま見ている画面も描き直す。
-     ⚠ この窓は**代車カレンダーからも開く**ようになった（前は車両管理からだけ）。
-        `renderFleet()` だけだと、代車カレンダーで消しても消えたように見えない。 */
-  if (window.state && state.currentView && state.currentView !== 'fleet' && window.showView) showView(state.currentView);
 }
 function flEventDelete(){
   if (!_flEvtEditId) return;
@@ -565,7 +561,6 @@ function flEventDelete(){
     if (window.PitDB) PitDB.save();
     flEventClose();
     renderFleet();
-    if (window.state && state.currentView && state.currentView !== 'fleet' && window.showView) showView(state.currentView);
   });
 }
 

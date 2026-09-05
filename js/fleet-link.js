@@ -55,13 +55,20 @@
         字を変えたくなったらここだけ直す。画面で綴らない。 */
   function kindLabel(kind){ return kind === 'company' ? '自社車両' : '代車'; }
 
-  /* 印に出す字（顧客ビューの車カード）。
-     代車＝「代車3」のように呼び名がそのまま通じるので呼び名だけ。
-     自社車両＝呼び名が車種名なので、何なのかが分かるように種別を頭に付ける。 */
-  function badgeText(kind, v){
-    var nm = t(v && (v.name || v.model));
-    if (kind === 'loaner') return nm || '代車';
-    return nm ? ('自社車両（' + nm + '）') : '自社車両';
+  /* 🔴 v2.65.0（ゆうた 2026-09-05「リンクバッジがうるさい」「自社🔗済 ／ 🔗済 ぐらいの内容で」）
+     **印は「済んでいるか」だけ。呼び名も相手の名前も出さない。**
+     ◎前（v2.62.0〜v2.64.0）
+       顧客ビュー＝「代車1」「自社車両（ハイエース）」／代車一覧＝「🔗 小林モータース 様」
+       ＝ **どの画面にも、その画面がもう出している情報が二重に載っていた**（車の名前・お客様の名前）。
+     🔴 いま＝**種別＋済**の2文字＋鎖（顧客ビュー）／**済**だけ（代車一覧＝どれも自社の車なので種別は要らない）。
+     ⚠ 種別の言い分け（代車／自社）は残す（2026-09-05 ゆうた指定）。
+     ⚠ 相手が誰かは**カーソルを乗せた時の説明（title）**に回す＝見た目は静かなまま、知りたい時は分かる。 */
+  function badgeText(kind, v){ return kindLabel(kind) === '自社車両' ? '自社' : '代車'; }
+  /* カーソルを乗せた時に出す説明（誰と結んであるか）。⚠ 画面には出さない。 */
+  function badgeTitle(kind, v){
+    var tg = targetOf(v);
+    var who = tg ? (t(tg.cust.name) || t(tg.cust.kana) || '(無名)') : '';
+    return kindLabel(kind) + 'として、お客様の車と紐づけ済み' + (who ? '（' + who + ' 様）' : '');
   }
 
   /* ===== ① お客様の車 → 代車（顧客ビューの印はこれ） ===== */
@@ -140,6 +147,7 @@
   w.pitFleetById       = byId;
   w.pitFleetKindLabel  = kindLabel;
   w.pitFleetBadgeText  = badgeText;
+  w.pitFleetBadgeTitle = badgeTitle;
   w.pitFleetLinkOfVeh  = linkOfVeh;
   w.pitFleetLinkTarget = targetOf;
   w.pitFleetLinked     = isLinked;

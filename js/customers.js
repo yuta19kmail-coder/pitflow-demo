@@ -1574,9 +1574,13 @@
            🔴 判定は `pitFleetLinkOfVeh`（js/fleet-link.js）1本。ここで state.loaners を舐めない。
            🔴 **押せない印**（ゆうた指定）。色は css のクラス（.cd-pill-fleet）で持つ。 */
         const flx = window.pitFleetLinkOfVeh ? pitFleetLinkOfVeh(cust.id, v.id) : null;
+        /* 🔴 v2.65.0（ゆうた「うるさい」）**「代車🔗済」「自社🔗済」の短い印だけ。**
+           車の呼び名は車両管理で見れば分かる＝ここでは「済んでいるか」と「どっちか」だけ出す。
+           ⚠ 誰と結んであるかは title（カーソルを乗せた時）に回す。 */
         const flTx = flx && window.pitFleetBadgeText ? pitFleetBadgeText(flx.kind, flx.v) : '';
         const flPill = flTx
-          ? '<span class="cd-pill cd-pill-fleet" title="車両管理で「'+esc(flTx)+'」として紐づけています"><i data-ic=van data-ics=14></i>'+esc(flTx)+'</span>'
+          ? '<span class="cd-pill cd-pill-fleet" title="'+esc(window.pitFleetBadgeTitle?pitFleetBadgeTitle(flx.kind,flx.v):'')+'">'
+            +esc(flTx)+'<i data-ic=link data-ics=12></i>済</span>'
           : '';
         h+='<div class="cd-veh'+teamCls+(vArc?' cd-veh-arch':'')+(pv?' cd-veh-pv':'')+'">'+ vIco +
            (vSelf?'<div class="cd-varch"><i data-ic=box data-ics=14></i> '+esc(window.PitArchive?PitArchive.noteOf(v):'アーカイブ済み')+'</div>':'')+

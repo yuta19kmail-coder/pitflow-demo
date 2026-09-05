@@ -56,7 +56,14 @@
      **別のカードの内容欄に入ってしまう**（2026-08-04 の不具合）。
      ⚠ card-detail.js 側で使わない入れ物は空にしているが、ここでも**必ず入れ物の中から探す**。
      ⚠ `_cardBodyId` は card-detail.js が持っている「いま描いている入れ物の id」。 */
+  /* 🔴 v2.67.0（ゆうた 2026-09-05）**入庫カードのフォーム以外からも使えるようにした。**
+     代車の作業予定を足す窓（車両管理）でも、同じ内容テンプレとタグチップを出すため。
+     🔴 **中身は1つのまま。**置き場所だけ外から教えてもらう（写しを作らない）。
+     ⚠ 使い終わったら必ず `setHost('')` に戻す＝戻し忘れると、
+        次にカードを開いた時に**もう無い入れ物を探しにいく**。 */
+  var _hostOverride = '';
   function hostEl() {
+    if (_hostOverride) { var o = document.getElementById(_hostOverride); if (o) return o; }
     var id = (typeof _cardBodyId !== 'undefined' && _cardBodyId) ? _cardBodyId : 'md-body';
     return document.getElementById(id) || document;
   }
@@ -161,6 +168,7 @@
     syncChips();   // v0.88.0 既に内容に入っているタグは「押した見た目」で開く
   }
   window.WorkContent = window.WorkContent || {};
+  window.WorkContent.setHost = function (id) { _hostOverride = String(id || ''); };
   window.WorkContent.builderHtml = builderHtml;
   window.WorkContent.mount = mount;
   window.WorkContent.pickPart = function (p) { _selP = (_selP === p) ? '' : p; if (_selP && !symsFor(_selP).some(function (s) { return s.name === _selS; })) { _selS = ''; _selSub = ''; } renderTpl(); };

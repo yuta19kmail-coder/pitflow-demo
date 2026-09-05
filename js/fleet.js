@@ -616,9 +616,11 @@ window.fleetOpenDetail = function (id) {
             var lk = window.pitFleetLinkTarget ? pitFleetLinkTarget(v) : null;
             if (!lk) return '<span class="fd-nolink" title="編集 ▸「顧客車両との紐づけ」から結べます">未紐づけ</span>';
             var kt = String(lk.veh.karteNo || '').trim();
+            /* 🔗 v2.66.0（ゆうた指定）**カルテNo を押すと、そのお客様の車両一覧（顧客詳細）へ飛ぶ。** */
             return '<span class="fd-linked" title="' + e((lk.cust.name || lk.cust.kana || '(無名)') + ' 様') + '">'
                  + '<i data-ic=link data-ics=13></i>済み</span>'
-                 + (kt ? '<span class="fd-linkkarte">' + e(kt) + '</span>' : '');
+                 + (kt ? '<button type="button" class="fd-linkkarte" onclick="fleetGoCustomer(\'' + e(v.id) + '\')"'
+                       + ' title="押すと、このお客様の車両一覧へ飛びます">' + e(kt) + '</button>' : '');
           })())
         /* v1.14.5：代車／社用車のどちらでも同じ項目を出す */
         + row('区分', e(cat))
@@ -628,7 +630,15 @@ window.fleetOpenDetail = function (id) {
         + row('12ヶ月点検', tk ? (e(window.pitWareki ? pitWareki(tk, 'ym') : tk) + '<span class="fd-auto">（車検の1年前／1年後・自動）</span>') : '')
         + '</table>'
         + '<div class="fd-opts">' + opt(v.etc, 'ETC') + opt(v.navi, 'ナビ') + opt(v.iso, 'ISO') + opt(v.camera, 'Bカメ') + '</div>'
+        /* 🔴 v2.66.0（ゆうた指定 2026-09-05）**一番下の列に「履歴」「作業予定」を足した。**
+           ・履歴 …… 顧客ビューの履歴を、**この車で絞った状態**で開く（紐づけていないと相手が分からないので押せない）
+           ・作業予定 … **この車でワンタイムの作業予定**を足す窓（作業予定ボードの「＋ 予定を足す」と同じ窓）
+           🔴 飛び先はどちらも既存の1本を呼ぶだけ（`custHistory` ／ `flMaintAdd`）。ここで組み立てない。 */
         + '<div class="fd-btns"><button class="vh-btn" onclick="fleetCloseDetail()">閉じる</button>'
+        + '<button class="vh-btn" onclick="fleetGoHistory(\'' + v.id + '\')"'
+          + (window.pitFleetLinked && pitFleetLinked(v) ? '' : ' disabled title="先に「顧客車両との紐づけ」で結んでください"')
+          + '><i data-ic=clock data-ics=16></i> 履歴</button>'
+        + '<button class="vh-btn" onclick="fleetCloseDetail();flMaintAdd(\'' + v.id + '\')"><i data-ic=wrench data-ics=16></i> 作業予定</button>'
         + '<button class="vh-btn primary" onclick="fleetCloseDetail();fleetOpenModal(\'' + v.id + '\')"><i data-ic=pencil data-ics=16></i> 編集</button></div>';
   let ov = document.getElementById('fleet-detail');
   if (!ov) {
@@ -642,6 +652,34 @@ window.fleetOpenDetail = function (id) {
   ov.classList.add('show');
   if (window.icoBoot) icoBoot(ov);
 };
+/* 🔗 v2.66.0（ゆうた指定 2026-09-05）スペック表からお客様側へ渡る2本。
+   🔴 **飛び先は customers.js の1本を呼ぶだけ**（履歴の絞り込みも顧客詳細も、あちらの作りをそのまま使う）。
+   🔴 先に顧客ビューへ切り替える＝開いた窓を閉じた時に、**顧客一覧に戻る**（車両管理に取り残されない）。
+      ⚠ v2.63.1 と同じ形＝「中身を出す関数は、画面の切り替えを持っていない」。 */
+function _flToCustomer(id, then){
+  var f = _fleetFind(id); if (!f) return null;
+  var lk = window.pitFleetLinkTarget ? pitFleetLinkTarget(f.v) : null;
+  if (!lk){
+    pitAlert('この車は、お客様の車と紐づいていません', { code:'PF-3068',
+      detail:'編集 ▸「顧客車両との紐づけ」で結ぶと、お客様の履歴や車両一覧へ行けるようになります。' });
+    return null;
+  }
+  fleetCloseDetail();
+  if (window.showView) showView('customers');
+  then(lk);
+  return lk;
+}
+window.fleetGoHistory = function (id) {
+  _flToCustomer(id, function(lk){
+    if (window.custHistory) custHistory(lk.cust.id, lk.veh.id);   /* 🔴 この車で絞った履歴 */
+  });
+};
+window.fleetGoCustomer = function (id) {
+  _flToCustomer(id, function(lk){
+    if (window.custOpen) custOpen(lk.cust.id);                    /* 🔴 そのお客様の車両一覧 */
+  });
+};
+
 window.fleetCloseDetail = function () {
   const ov = document.getElementById('fleet-detail');
   if (ov && ov.parentNode) ov.parentNode.removeChild(ov);

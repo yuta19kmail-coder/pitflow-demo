@@ -808,7 +808,12 @@
 .fl-link-bdg.off{ background:var(--bg1); color:var(--text3); border-color:var(--border2); font-weight:700; }
 .fd-nolink{ color:var(--text3); }
 .fd-linked{ display:inline-flex; align-items:center; gap:4px; font-weight:800; color:#c4a3fb; }
-.fd-linkkarte{ margin-left:10px; font-weight:800; letter-spacing:.5px; color:var(--text2); }
+/* 🔗 v2.66.0 カルテNo＝押すとお客様の車両一覧へ。押せると分かる見た目にする */
+.fd-linkkarte{ margin-left:10px; font-weight:800; letter-spacing:.5px; font-size:13px;
+  color:var(--brand); background:none; border:0; border-bottom:1px dashed rgba(38,162,105,.55);
+  padding:0 1px 1px; cursor:pointer; font-family:inherit; }
+.fd-linkkarte:hover{ color:var(--text1); border-bottom-color:var(--text1); }
+.fd-btns .vh-btn[disabled]{ opacity:.45; cursor:not-allowed; }
 .fl-bdg.shaken{ background:var(--red); }
 .fl-bdg.tenken{ background:#f59e0b; }
 

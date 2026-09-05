@@ -375,11 +375,17 @@
   /* ==================================================================
      修理などを手で足す（月の目標。**日はここでは決めない**）
      ================================================================== */
-  w.flMaintAdd = function(){
+  /* 🔴 v2.66.0（ゆうた指定 2026-09-05）**車を決めた状態でも開けるようにした。**
+     車両管理の一覧を押して出るスペック表の「作業予定」から呼ぶ＝**その車が選ばれた状態**で開く。
+     ⚠ 選び直せるようにはしておく（押し間違いの逃げ道）。
+     ⚠ 引退した車は一覧に出ないが、**その車から呼ばれた時だけは出す**（でないと選ばれた状態にできない）。 */
+  w.flMaintAdd = function(vehId){
     var td = today();
-    var vs = vehicles().filter(function(v){ return !v.retired; });
+    var pick = String(vehId || '');
+    var vs = vehicles().filter(function(v){ return !v.retired || v.id === pick; });
     var opts = vs.map(function(v){
-      return '<option value="' + v.id + '">' + esc(vehName(v)) + (vehNo(v) ? ('（' + esc(vehNo(v)) + '）') : '') + '</option>';
+      return '<option value="' + v.id + '"' + (v.id === pick ? ' selected' : '') + '>'
+           + esc(vehName(v)) + (vehNo(v) ? ('（' + esc(vehNo(v)) + '）') : '') + '</option>';
     }).join('');
     var yms = []; for (var i = 0; i < 7; i++){ var y = ymAdd(ymOf(td), i); yms.push('<option value="' + y + '">' + y.replace('-', '年') + '月</option>'); }
     _modal(

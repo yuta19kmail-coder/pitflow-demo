@@ -359,10 +359,22 @@
       if (r.fixed){
         h += '<span class="mb-chip fixed">' + md(r.fixed.fromDate) + '〜' + md(r.fixed.toDate) + ' で確定</span>';
       }
+      /* 🔴 v2.68.0（ゆうた指定 2026-09-05）**候補の横に小さい × を付けた。**
+         🗣「一度決めた候補を横にちっちゃい×つけて、飛び地の予定でも例えば真ん中だけ消すとかできるように」
+         ◎前まで
+           候補を1本だけ取り消す道は**車両管理の日ビューでチップを押す**しか無かった。
+           飛び地（4〜6／12〜16／24〜26 のような3本）の**真ん中だけ**消したい時、
+           ボードからは何もできず、日ビューへ行って月を送って探すことになっていた。
+         🔴 消すのは**その1本だけ**。中身は `flMaintDelRec`（前からある1本）を呼ぶだけ。
+         ⚠ 候補は置き直すのが軽いので、押す前に聞かない（代わりに消したことを知らせる）。
+            **カードごと無くす「取り下げ」は今までどおり聞く**＝消える重さで分けている。 */
       r.candidates.forEach(function(c){
         var gone = c.toDate < td;
         h += '<span class="mb-chip' + (gone ? ' gone' : '') + '" title="' + esc(c.fromDate + '〜' + c.toDate) + '">'
-           + md(c.fromDate) + (c.fromDate === c.toDate ? '' : ('〜' + md(c.toDate))) + '</span>';
+           + md(c.fromDate) + (c.fromDate === c.toDate ? '' : ('〜' + md(c.toDate)))
+           + '<button type="button" class="mb-x" title="この候補だけ取り消す" aria-label="この候補だけ取り消す"'
+           + ' onclick="event.stopPropagation();flMaintDelRec(\'' + c.id + '\')">×</button>'
+           + '</span>';
       });
       if (!r.fixed) h += '<span class="mb-chip add" onclick="flMaintGoto(\'' + r.vehicleId + '\',\'' + p.ym + '\')">＋ 候補を置く</span>';
       h += '</span></div>';
@@ -693,6 +705,10 @@
     saveCards();
     try { if (w.pitLog) w.pitLog('整備の枠を取り消した', { cardId:c.id, kind:'loaner',
       label:(WORK_LB[c.workType]||'') + ' ' + md(sp.from) + '〜' + md(sp.to) }); } catch(e){}
+    /* 🔴 v2.68.0 ボードの小さい × は押す前に聞かないので、**消したことを必ず知らせる。**
+       ⚠ 残りの候補の本数も出す＝飛び地の真ん中を消した時に、狙ったものが消えたか目で分かる。 */
+    if (w.pitToast) w.pitToast('候補 ' + md(sp.from) + '〜' + md(sp.to) + ' を取り消しました'
+      + '（残り ' + arr(c.maintSpans).length + '本）');
     if (w.renderFleet) w.renderFleet();
     if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
   };

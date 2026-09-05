@@ -21,6 +21,8 @@ const FL_EVT_TYPES = {
 
 function _fleetEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _flPd(s){ const p = String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
+/* 「2026-10-20」→「10/20」。カレンダーの狭いマスに入れる短い書き方。 */
+function _flMd(s){ const p = String(s||'').split('-'); return p.length===3 ? (+p[1])+'/'+(+p[2]) : String(s||''); }
 function _flAllVehicles(){ return (state.loaners || []).concat(state.companyCars || []); }
 /* v1.14.6：カレンダーの行を「代車」「社用車」に分けて、間に細い区切りを入れる */
 function _flVehSections(){
@@ -59,8 +61,7 @@ function renderFleet(){
   /* ===== ① カレンダー（最上部） ===== */
   h += '<div class="fl-card">';
   if (_flMode === 'month'){
-    h += '<div class="fl-h"><i data-ic=calendar data-ics=16></i> 車両カレンダー（月をクリック＝日別表示／右へ無限）<span class="fl-note">🔧 整備の枠（押すと日ビューへ）＋ イベント（セルをクリックで追加）</span></div>';
-    h += flMonthCalHtml();
+    h += '<div class="fl-h"><i data-ic=calendar data-ics=16></i> 車両カレンダー（月をクリック＝日別表示／右へ無限）<span class="fl-note">🔧 やること・内容だけ。日と貸出は日別で見る</span></div>';
   } else {
     const y = _flDay.getFullYear(), m = _flDay.getMonth();
     /* 🔴 v2.52.0（ゆうた 2026-09-01）**日ビューから月をまたげるようにした。**
@@ -75,8 +76,11 @@ function renderFleet(){
        + '<button class="vh-btn" onclick="flDayShift(1)" title="来月へ">来月 ›</button>　'
        + '<i data-ic=calendar data-ics=16></i> ' + y + '年' + (m+1) + '月（日別）</span>'
        + '<span class="fl-note">セルをクリック＝イベント追加／チップ＝編集／月をまたぐ時は先月・来月で移動</span></div>';
-    h += flDayCalHtml(y, m);
   }
+  /* 🔴 v2.70.0 凡例（ゆうた指定 2026-09-05）
+     🗣「凡例に無い見た目は画面に出さない」＝ 色と形の意味を、必ずカレンダーの真上に置く。 */
+  h += flCalLegendHtml();
+  h += (_flMode === 'month') ? flMonthCalHtml() : flDayCalHtml(_flDay.getFullYear(), _flDay.getMonth());
   h += '</div>';
 
   /* ===== ①-2 🔧 代車作業予定ボード（v2.44.0・ゆうた指定 2026-08-31） =====
@@ -192,7 +196,9 @@ function _flBindDayDrag(){
   wrap.addEventListener('mousedown', function(e){
     const el = cellOf(e.target);
     if (!el || !el.dataset.fv) return;
-    if (e.target.closest('.fl-mn') || e.target.closest('.fl-evt')) return;   /* チップの上は掴まない */
+    /* 🔴 v2.70.0 掴まない所＝整備のバー（.fl-bar3）・自由イベント（.fl-ev）・満了日の字（.fl-big）。
+       ⚠ バーは上の 22px だけに置いてある＝その下はふつうになぞれる（候補のドラッグ選択）。 */
+    if (e.target.closest('.fl-bar3') || e.target.closest('.fl-ev') || e.target.closest('.fl-big')) return;
     e.preventDefault();
     _flDrag = { v: el.dataset.fv, a: el.dataset.fd, b: el.dataset.fd };
     _flPaintDrag();
@@ -227,13 +233,75 @@ function _flClearDrag(){
   document.querySelectorAll('.fl-cal-cell.fl-pick').forEach(function(el){ el.classList.remove('fl-pick'); });
 }
 
+/* ==================================================================
+   🔴🔴 v2.70.0 車両カレンダー 作り直し（ゆうた承認 2026-09-05・モックのとおり）
+   ------------------------------------------------------------------
+   ◎なぜ作り直したか（2026-09-05 に画面と CSS を突き合わせて分かったこと）
+     マスは **横に並べて中央寄せ・折り返し**の入れ物なのに、中の札は
+     「下に3px空ける＝縦に積むつもり」で書かれていた。だから札が2つ以上あると
+     **横に並んで両方潰れる**。「たまに変」の正体はこれ。
+   ◎決めごと（ゆうた指定・凡例と1対1）
+     ① マスは縦積み ② 網掛けは1か所も使わない ③ 字は 11px 以上
+     ④ 月ビューは**やること・内容だけ**（候補の日付・貸出・仮押さえは日ビューの仕事）
+     ⑤ 色＝**状態**（未割当＝赤／予定＝黄／確定＝緑）。作業の種類は**前の小さい四角**
+     ⑥ ベタ塗りは「手遅れになると困る日」だけ＝**超過と満了日**
+     ⑦ 車検は**満了月＋その前2ヶ月を1本のバー**でぶち抜く（3つ並べない）
+     ⑧ 期限（満了・12点）は札にしない＝**左に色の縦線の1行**（やることと形で分ける）
+     ⑨ 凡例に無い見た目は画面に出さない
+   🔴 何を出すかは **maint-pit.js の pitMaintCalItems / pitMaintDayBars 1本**に聞く。
+      ここで state.cards を読んで自分で数えない（＝画面ごとに古くなる元）。
+   ⚠ 列は**固定幅**にした（月=86px・日=56px）。バーが何マスぶんか計算するため。
+   ================================================================== */
+const FL_COL_M = 86;    /* 月ビューの1列（ゆうた確定 2026-09-05「列幅は86PXでいいや」） */
+const FL_COL_D = 56;    /* 日ビューの1列 */
+const FL_COL_NAME = 150;
+
+/* 凡例。**画面に出る見た目は全部ここに載っている**（載っていない見た目は出さない） */
+function flCalLegendHtml(){
+  const dot = function(w, lb){
+    return '<span class="fl-lg-w"><i class="fl-dot ' + (window.pitMaintWorkDot ? pitMaintWorkDot(w) : 'wk-general') + '"></i>' + lb + '</span>';
+  };
+  let h = '<div class="fl-lg">';
+  h += '<div class="fl-lg-g"><span class="fl-lg-t">状態</span>'
+     + '<span class="fl-mb tbd"><b>未割当</b></span>'
+     + '<span class="fl-mb cand"><b>予定</b></span>'
+     + '<span class="fl-mb fixed"><b>確定</b></span>'
+     + '<span class="fl-mb over"><b>超過</b></span></div>';
+  h += '<div class="fl-lg-g"><span class="fl-lg-t">作業</span>'
+     + dot('shaken','車検') + dot('12pt','12点') + dot('general','一般') + dot('bp','B.P') + '</div>';
+  if (_flMode === 'month'){
+    h += '<div class="fl-lg-g"><span class="fl-lg-t">期限</span>'
+       + '<span class="fl-due">満了</span><span class="fl-due tk">12点</span>'
+       + '<span class="fl-lg-n">左に縦線の1行＝やることではなく期限</span></div>';
+    h += '<div class="fl-lg-g"><span class="fl-lg-t">車検</span>'
+       + '<span class="fl-lg-n">満了月＋その前2ヶ月を<b>1本のバー</b>でぶち抜き</span></div>';
+    h += '<div class="fl-lg-g"><span class="fl-lg-n">※ 月表示は<b>やること・内容だけ</b>。日・貸出・仮押さえは日別で見る</span></div>';
+  } else {
+    h += '<div class="fl-lg-g"><span class="fl-lg-t">その日</span>'
+       + '<span class="fl-lg-sq exp">満了</span><span class="fl-lg-sq tkc">12点</span>'
+       + '<span class="fl-lg-n">この日を過ぎると切れる＝<b>画面でいちばん強い</b></span></div>';
+    h += '<div class="fl-lg-g"><span class="fl-lg-t">代車</span>'
+       + '<span class="fl-lg-sw lend"></span><span class="fl-lg-n">貸出中</span>'
+       + '<span class="fl-lg-sw hold"></span><span class="fl-lg-n">仮押さえ（名前の頭に「仮」）</span></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+/* 作業の種類の四角＋名前＋状態 の1枚。月ビューの札とバーで同じ見た目を使う。 */
+function _flMbInner(it){
+  return '<i class="fl-dot ' + it.workDot + '"></i><b>' + _fleetEsc(it.workShort) + '</b>'
+       + '<span class="st">' + _fleetEsc(it.stateLabel) + '</span>';
+}
+
 /* 月モードのカレンダー */
 function flMonthCalHtml(){
   const months = [];
   const base = new Date(); base.setDate(1); base.setHours(0,0,0,0);
   for (let i = 0; i < _flMonths; i++){ months.push(new Date(base.getFullYear(), base.getMonth() + i, 1)); }
-  const vehicles = _flAllVehicles();
-  let h = '<div class="fl-cal-wrap" id="fl-cal-scroll"><div class="fl-cal" style="grid-template-columns:120px repeat(' + months.length + ', minmax(86px,1fr))">';
+  const keys = months.map(function(m){ return m.getFullYear() + '-' + String(m.getMonth()+1).padStart(2,'0'); });
+  let h = '<div class="fl-cal-wrap" id="fl-cal-scroll"><div class="fl-cal fl-cal-new" style="grid-template-columns:'
+        + FL_COL_NAME + 'px repeat(' + months.length + ', ' + FL_COL_M + 'px)">';
   h += '<div class="fl-cal-h fl-cal-corner">車両</div>';
   months.forEach(function(m){
     h += '<div class="fl-cal-h fl-cal-m" onclick="flZoom(' + m.getFullYear() + ',' + m.getMonth() + ')" title="クリックで日別表示">'
@@ -243,33 +311,54 @@ function flMonthCalHtml(){
    h += _flSecRow(sec.label);
    sec.arr.forEach(function(v){
     h += '<div class="fl-cal-name" title="' + _fleetEsc(v.model || '') + '">' + _fleetEsc(_flVehName(v)) + '</div>';
-    months.forEach(function(m){
-      const y = m.getFullYear(), mo = m.getMonth();
-      const ym = y + '-' + String(mo+1).padStart(2, '0');
+    const items = (window.pitMaintCalItems ? pitMaintCalItems(v) : []);
+    /* 🔴 月をまたぐもの（＝車検）は「始まりの月のマス」に入れて、右へ何マスぶんか伸ばす。
+       ⚠ バーが乗っているマスは上に場所を空ける（barpad）。空けないと中身と重なる。 */
+    const barAt = {}, padAt = {};
+    items.filter(function(it){ return it.bar; }).forEach(function(it){
+      const idx = it.months.map(function(k){ return keys.indexOf(k); })
+                    .filter(function(i){ return i >= 0; }).sort(function(a,b){ return a-b; });
+      if (!idx.length) return;
+      const span = idx[idx.length-1] - idx[0] + 1;
+      barAt[idx[0]] = { it: it, span: span };
+      for (let i = 0; i < span; i++) padAt[idx[0]+i] = 1;
+    });
+    const tk = (window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '');
+    months.forEach(function(m, mi){
+      const ym = keys[mi];
       const first = ym + '-01';
-      const last = ym + '-' + String(new Date(y, mo+1, 0).getDate()).padStart(2, '0');
-      /* 🔧 v2.46.0（ゆうた報告 2026-08-31「今元のバッチとダブっちゃってる」）
-         **月カレンダーの元の「車検」「12ヶ月」バッジは消した。**
-         v2.44.0 で足した整備の枠のバッジが、満了月・点検月・満了日まで全部出すので二重になっていた。
-         🔴 消したのは**月ビューだけ**。日ビュー側の「車検」「12ヶ月」は
-            「**その日が満了日・点検日**」という別の意味なので残してある。 */
-      /* v1.13.2：車検・点検は下の赤/橙バッジで出しているので、自動で作った同じ予定は重ねて出さない
-         （＝「車検」と「車検入庫」が二重に見えていた）。手で足した予定はそのまま出す。 */
-      /* 🧩 v2.42.0 その期間に何がかかっているかは **loaner-free.js の部品1本**に聞く。
-         ⚠ ここで state.fleetEvents / loanerAssigns を自前で読まないこと
-            （種類が増えた時に、この画面だけ古くなる＝🅿仮押さえで実際に踏んだ）。 */
-      const evs = pitLoanerSpan(v.id, first, last, { kinds:['event'] }).filter(function(x){ return !x.auto; });
-      h += '<div class="fl-cal-cell" onclick="flOpenEventModal(\'' + v.id + '\',\'' + first + '\')">';
-      /* 🔧 v2.44.0 整備の枠のバッジ（車検は満了月＋その前2ヶ月の3ヶ月）。中身は maint-pit.js。
-         押すと**日ビューに切り替わって、その車の行がアクティブになる**（ゆうた指定）。 */
-      (window.pitMaintBadges ? pitMaintBadges(v, ym) : []).forEach(function(b){
-        h += '<span class="fl-mbdg ' + b.cls + '" title="' + _fleetEsc(b.title || '') + '"'
-           + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">' + _fleetEsc(b.text) + '</span>';
+      const last  = ym + '-' + String(new Date(m.getFullYear(), m.getMonth()+1, 0).getDate()).padStart(2, '0');
+      let inner = '';
+      /* ① 3ヶ月ぶち抜きのバー（車検） */
+      const b = barAt[mi];
+      if (b){
+        inner += '<div class="fl-bar3 ' + b.it.state + '" style="width:calc(' + FL_COL_M + 'px * ' + b.span + ' - 12px)"'
+               + ' title="' + _fleetEsc(b.it.title) + '"'
+               + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
+               + _flMbInner(b.it) + '</div>';
+      }
+      /* ② 1ヶ月ぶんの札（12点・一般・B.P、超過） */
+      items.forEach(function(it){
+        if (it.bar) return;
+        if (it.months.indexOf(ym) < 0) return;
+        inner += '<div class="fl-mb ' + it.state + '" title="' + _fleetEsc(it.title) + '"'
+               + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
+               + _flMbInner(it) + '</div>';
       });
-      evs.forEach(function(x){
-        h += '<span class="fl-evt" style="background:' + x.color + '" title="' + _fleetEsc(x.from + '〜' + x.to) + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">' + _fleetEsc(x.label) + '</span>';
-      });
-      h += '</div>';
+      /* ③ 期限＝札にしない。左に色の縦線の1行（やること／期限を形で分ける） */
+      if (v.shakenDate && String(v.shakenDate).slice(0,7) === ym)
+        inner += '<div class="fl-due" title="車検の満了日">満了 ' + _flMd(v.shakenDate) + '</div>';
+      if (tk && tk.slice(0,7) === ym)
+        inner += '<div class="fl-due tk" title="12ヶ月点検の目安">12点 ' + _flMd(tk) + '</div>';
+      /* ④ 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） */
+      pitLoanerSpan(v.id, first, last, { kinds:['event'] }).filter(function(x){ return !x.auto; })
+        .forEach(function(x){
+          inner += '<div class="fl-ev" title="' + _fleetEsc(x.from + '〜' + x.to) + '"'
+                 + ' onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
+                 + '<i style="background:' + x.color + '"></i>' + _fleetEsc(x.label) + '</div>';
+        });
+      h += '<div class="fl-cal-cell' + (padAt[mi] ? ' barpad' : '') + '"'
+         + ' onclick="flOpenEventModal(\'' + v.id + '\',\'' + first + '\')">' + inner + '</div>';
     });
    });
   });
@@ -280,18 +369,18 @@ function flMonthCalHtml(){
 /* 日モードのカレンダー（1列＝1日・代車の利用状況を透かし表示） */
 function flDayCalHtml(y, mo){
   const last = new Date(y, mo+1, 0).getDate();
-  const vehicles = _flAllVehicles();
+  const ymP = y + '-' + String(mo+1).padStart(2, '0');
+  const first = ymP + '-01', lastDs = ymP + '-' + String(last).padStart(2, '0');
   const metas = [];
   for (let d = 1; d <= last; d++){
     const dt = new Date(y, mo, d);
-    const dow = dt.getDay();
-    const ds = y + '-' + String(mo+1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const ds = ymP + '-' + String(d).padStart(2, '0');
     /* 🚫 v1.50.0 休みは MHS の定休日カレンダー（PitCal）が基準 */
-    metas.push({ d: d, ds: ds, dow: dow, hol: (window.Holidays && Holidays.name(ds)) || null,
-                 closed: (window.PitCal ? PitCal.isClosed(ds) : false),
-                 note: (window.PitCal ? PitCal.label(ds) : '') });
+    metas.push({ d: d, ds: ds, dow: dt.getDay(), hol: (window.Holidays && Holidays.name(ds)) || null,
+                 closed: (window.PitCal ? PitCal.isClosed(ds) : false) });
   }
-  let h = '<div class="fl-cal-wrap" id="fl-cal-scroll"><div class="fl-cal" style="grid-template-columns:120px repeat(' + last + ', minmax(56px,1fr))">';
+  let h = '<div class="fl-cal-wrap" id="fl-cal-scroll"><div class="fl-cal fl-cal-new" style="grid-template-columns:'
+        + FL_COL_NAME + 'px repeat(' + last + ', ' + FL_COL_D + 'px)">';
   h += '<div class="fl-cal-h fl-cal-corner">車両</div>';
   metas.forEach(function(m){
     h += '<div class="fl-cal-h' + (m.dow === 0 ? ' sun' : (m.dow === 6 ? ' sat' : '')) + (m.hol ? ' fl-holh' : '') + (m.closed ? ' fl-closedh' : '') + '"' + (m.hol ? ' title="' + _fleetEsc(m.hol) + '"' : '') + '>' + m.d + '<span>' + '日月火水木金土'[m.dow] + (m.closed ? '・休' : '') + (m.hol ? '・祝' : '') + '</span></div>';
@@ -300,44 +389,53 @@ function flDayCalHtml(y, mo){
    h += _flSecRow(sec.label);
    sec.arr.forEach(function(v){
     const isLoanerVeh = (state.loaners || []).some(function(l){ return l.id === v.id; });
-    const _hl = (_flHlVeh && _flHlVeh === v.id) ? ' fl-hl' : '';   /* 🔧 v2.44.0 ボードから飛んできた車 */
+    const _hl = (_flHlVeh && _flHlVeh === v.id) ? ' fl-hl' : '';   /* 🔧 ボードから飛んできた車 */
     h += '<div class="fl-cal-name' + _hl + '" title="' + _fleetEsc(v.model || '') + '">' + _fleetEsc(_flVehName(v)) + '</div>';
-    metas.forEach(function(m){
+    /* 🔴 整備の枠は「日ごとの細切れ」をやめて、**期間ぜんぶを1本のバー**で描く。
+       ⚠ 飛び地は本数ぶんバーが並ぶ＝何本あるか数えられる。
+       ⚠ バーは上の 22px だけ。その下はなぞり（候補のドラッグ選択）のために空けてある。 */
+    const bars = (window.pitMaintDayBars ? pitMaintDayBars(v.id, first, lastDs) : []);
+    const barAt = {}, padAt = {};
+    bars.forEach(function(b){
+      const s = +b.clipFrom.slice(8) - 1, e = +b.clipTo.slice(8) - 1;
+      barAt[s] = { b: b, span: e - s + 1 };
+      for (let i = s; i <= e; i++) padAt[i] = 1;
+    });
+    const tk = (window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '');
+    metas.forEach(function(m, di){
       const ds = m.ds;
-      const sh = v.shakenDate === ds;
-      const tk = (window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '') === ds;
-      /* 🧩 v2.42.0 その日に何が乗っているかは **loaner-free.js の部品1本**に聞く。
-         ⚠ ここで state.loanerAssigns を自前で読まないこと。🅿仮押さえを足した時、
-            ここを手で直さないと出なかった＝同じことを繰り返さないための1本化。 */
       const day = pitLoanerDay(v.id, ds);
-      const evs = day.events.filter(function(x){ return !x.auto; });
-      // 代車の貸出・仮押さえ（利用カレンダー）を透かして重ねる
-      let useCls = '', useTag = '';
+      let cls = 'fl-cal-cell fl-day' + _hl + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '');
+      let inner = '';
+      /* 代車の貸出・仮押さえ＝マスの薄い色（整備のバーと満了はこの上に乗る） */
       if (isLoanerVeh){
         const it = day.lends[0] || day.holds[0] || null;
-        /* 🅿 v2.40.0 仮押さえも「その日ふさがっている」ので出す。ただし**貸出とは名前を分ける。** */
-        if (it){ useCls = ' fl-use' + (it.kind === 'hold' ? ' fl-hold' : '');
-          if (it.isStart) useTag = '<span class="fl-use-tag">' + _fleetEsc(it.kind === 'hold' ? ('仮押さえ' + (it.memo ? '：' + it.memo : '')) : it.label) + '</span>'; }
+        if (it){
+          cls += ' fl-use' + (it.kind === 'hold' ? ' fl-hold' : '');
+          if (it.isStart) inner += '<div class="fl-use-tag">'
+            + _fleetEsc(it.kind === 'hold' ? ('仮 ' + (it.memo || '仮押さえ')) : it.label) + '</div>';
+        }
       }
-      /* 🔧 v2.45.0 セルを押したら**選択肢を出す**（整備の候補／ここで確定／いままでの予定追加）。
-         ⚠ いままでの「セル＝予定追加」は**消していない**。選択肢の3つ目に残してある。 */
-      h += '<div class="fl-cal-cell fl-day' + useCls + _hl + (m.closed ? ' fl-closedc' : '') + (m.hol ? ' fl-holc' : '') + '"'
-         + ' data-fv="' + v.id + '" data-fd="' + ds + '">';
-      h += useTag;
-      /* 🔧 整備の枠（候補＝網掛け／確定＝塗り）。押すと確定・期間直し・取り消し */
-      day.maints.forEach(function(x){
-        if (!x.isStart) { h += '<span class="fl-mn ' + (x.stage === 'fixed' ? 'fixed' : 'cand') + ' mid"></span>'; return; }
-        h += '<span class="fl-mn ' + (x.stage === 'fixed' ? 'fixed' : 'cand') + '"'
-           + ' title="' + _fleetEsc((x.label || '整備') + ' ' + x.from + '〜' + x.to) + '"'
-           + ' onclick="event.stopPropagation();flMaintChip(\'' + x.id + '\')">'
-           + _fleetEsc(String(x.label || '整備').slice(0, 4)) + '</span>';
+      /* 🔴🔴 満了日・12点の日は**マスごと塗る**（ゆうた指定「逆に最も目立つぐらいじゃないと」）
+         ＝ その日を過ぎたら車検が切れる日。細い線では気づけない。 */
+      if (v.shakenDate === ds){ cls += ' d-exp'; inner += '<div class="fl-big">満了<small>' + _flMd(ds) + '</small></div>'; }
+      else if (tk === ds){ cls += ' d-tkc'; inner += '<div class="fl-big tk">12点<small>' + _flMd(ds) + '</small></div>'; }
+      if (padAt[di]) cls += ' barpad';
+      const bb = barAt[di];
+      if (bb){
+        inner = '<div class="fl-bar3 ' + bb.b.state + (bb.b.cutL ? ' cutL' : '') + (bb.b.cutR ? ' cutR' : '') + '"'
+              + ' style="width:calc(' + FL_COL_D + 'px * ' + bb.span + ' - 12px)"'
+              + ' title="' + _fleetEsc(bb.b.title) + '"'
+              + ' onclick="event.stopPropagation();flMaintChip(\'' + bb.b.id + '\')">'
+              + '<i class="fl-dot ' + bb.b.workDot + '"></i><b>' + _fleetEsc(bb.b.workShort) + '</b>'
+              + '<span class="st">' + _fleetEsc(bb.b.stateLabel) + '</span></div>' + inner;
+      }
+      /* 自由イベント＝丸＋名前ぜんぶ */
+      day.events.filter(function(x){ return !x.auto; }).forEach(function(x){
+        inner += '<div class="fl-ev" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
+               + '<i style="background:' + x.color + '"></i>' + _fleetEsc(x.label) + '</div>';
       });
-      if (sh) h += '<span class="fl-bdg shaken">車検</span>';
-      if (tk) h += '<span class="fl-bdg tenken">12ヶ月</span>';
-      evs.forEach(function(x){
-        h += '<span class="fl-evt" style="background:' + x.color + '" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">' + _fleetEsc(String(x.label).slice(0, 4)) + '</span>';
-      });
-      h += '</div>';
+      h += '<div class="' + cls + '" data-fv="' + v.id + '" data-fd="' + ds + '">' + inner + '</div>';
     });
    });
   });

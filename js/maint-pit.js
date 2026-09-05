@@ -168,9 +168,13 @@
        plan（月の目標・計算） ＋ candidates（保存） ＋ fixed（保存） ＋ 状態 ＋ 警告
      ⚠ **直近半年ぶん**（ゆうた指定）。ただし**過ぎたもの・超過は必ず出す**（消えると事故る）。
      ================================================================== */
-  function rows(todayStr){
+  /* 🔴 v2.71.0 第2引数＝**どこまで先を出すか**（月数）。
+     ・ボード（代車作業予定）＝**直近半年**（ゆうた指定・変えない）
+     ・車両カレンダー＝**1年先まで**（🗣「車検は1年先ぐらいまで3か月の帯表示を出して欲しい」）
+     ⚠ 同じ物差しを、見る場所ごとに**期間だけ変えて**使う。判定そのものは1本のまま。 */
+  function rows(todayStr, horizonN){
     var td = todayStr || today();
-    var horizon = ymAdd(ymOf(td), 6);      /* 直近半年 */
+    var horizon = ymAdd(ymOf(td), (horizonN == null ? 6 : horizonN));
     var out = [];
     vehicles().forEach(function(v){
       if (v.retired) return;
@@ -256,7 +260,9 @@
       /* ⚠ 言い方は3通り。**満了があるもの／繰り越したもの／手で入れたもの**で噛み合う文が違う。
          「今月に入りましたが」を修理に出すと意味が通らない（満了が無いので）。 */
       if (p.slipped){
-        msg = '⚠ ' + ymText(p.months[0]) + 'にできませんでした。' + ymText(p.ym) + 'へスライドしています';
+        /* ⚠ 言うのは**本来いつまでだったか**。`months` は帯を出す月の並びなので、ここで使わない
+           （v2.71.0 で 12点の months を2ヶ月にした時、months[0] だと1ヶ月ずれた文が出るようになった）。 */
+        msg = '⚠ ' + ymText(p.dueDate ? ymOf(p.dueDate) : p.months[0]) + 'にできませんでした。' + ymText(p.ym) + 'へスライドしています';
       } else if (p.manualId){
         msg = p.urgent ? '🚨 急ぎです。まだ日が決まっていません。早めに枠を取ってください'
                        : '⚠ まだ日が決まっていません。早めに枠を取ってください';
@@ -302,7 +308,8 @@
     var td = todayStr || today();
     var out = [];
     if (!v || v.retired) return out;
-    rows(td).forEach(function(r){
+    /* 🔴 v2.71.0 カレンダーは**1年先まで**出す（ボードは半年のまま）。 */
+    rows(td, 12).forEach(function(r){
       if (r.vehicleId !== v.id) return;
       var p = r.plan;
       var st, lb;
@@ -311,9 +318,12 @@
       else if (r.candidates.length)  { st = 'cand';  lb = '予定' + (r.candidates.length > 1 ? r.candidates.length : ''); }
       else                           { st = 'tbd';   lb = '未割当'; }
       /* 🔴 超過は**今月の列**に出す（満了月はもう過ぎているので、そこに出しても目に入らない） */
-      var ms = p.overdue ? [ymOf(td)] : arr(p.months).slice();
-      /* 繰り越したもの（12点をできなかった等）は、繰り越し先の月にも出す */
-      if (!p.overdue && p.ym && ms.indexOf(p.ym) < 0) ms.push(p.ym);
+      /* 🔴 超過は**今月の列**に出す（満了月はもう過ぎているので、そこに出しても目に入らない）
+         🔴 繰り越したもの（12点をできなかった等）は**スライド先の月だけ**に出す
+            ⚠ 元の月と足して並べると、間が空いた帯（飛び地をまたぐ1本のバー）になってしまう。 */
+      var ms = p.overdue ? [ymOf(td)]
+             : p.slipped ? [p.ym]
+             : arr(p.months).slice();
       ms.sort();
       var days = r.candidates.map(function(c){ return md(c.fromDate) + '〜' + md(c.toDate); });
       out.push({

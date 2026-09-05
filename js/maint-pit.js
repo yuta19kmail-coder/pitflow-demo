@@ -775,27 +775,19 @@
      ------------------------------------------------------------------
      🔴 受け皿（社内区分「代車」＋相方・売上非カウント）は **v2.6.0 でもう出来ている。**
         ここでやるのは「その形のカードを作って、点検待ちに置く」だけ。
-     🔴 お客様は **自社（小林モータース）**。代車マスタに結び先が無いので、
-        **ナンバーで顧客控えを引いて当てる**（見つかった時だけ代車マスタに覚える＝人の操作の中で書く）。
+
+     🔴🔴 v2.62.0（ゆうた指定 2026-09-05）**ナンバーで引き当てるのをやめた。**
+        前は「入庫の瞬間に、ナンバーが一致するお客様の車を探して、代車マスタに黙って書く」だった。
+        ・人が設定していないのに結び目ができるので、**間違っていても誰も気づけない**
+        ・同じナンバーが2件に分かれている時（ダブり）に、**どちらに結ぶかは運**
+        ＝ いまは **車両管理で人が設定した紐づけ（custId / custVehId）だけ**を見る。
+        🔴 判定は `js/fleet-link.js` 1本。ここでナンバーを舐め直さない。
+        ⚠ 結ばれていない台数は、データチェックの日常チェック **L08** が数える
+          （黙って逃がさず、0にする対象として出す）。
      ================================================================== */
   function ownerOf(v){
     if (!v) return null;
-    /* すでに結んであればそれ */
-    if (v.custId){
-      var c0 = arr(w.state && w.state.customers).filter(function(c){ return c.id === v.custId; })[0];
-      if (c0) return { cust:c0, veh: arr(c0.vehicles).filter(function(x){ return x.id === v.custVehId; })[0] || null };
-    }
-    var key = String(v.plate || '').replace(/\s/g, '');
-    if (!key) return null;
-    var hit = null;
-    arr(w.state && w.state.customers).forEach(function(c){
-      if (hit) return;
-      arr(c.vehicles).forEach(function(x){
-        if (hit) return;
-        if (String(x.plate || '').replace(/\s/g, '') === key) hit = { cust:c, veh:x };
-      });
-    });
-    return hit;
+    return w.pitFleetLinkTarget ? w.pitFleetLinkTarget(v) : null;
   }
   w.pitMaintOwner = ownerOf;
 
@@ -818,7 +810,8 @@
     var td = today();
     var own = ownerOf(v);
     var det = 'お客様＝自社（社内区分「代車」）。売上・完TEL・洗車・伝票はありません。\n'
-            + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）')) : '⚠ ナンバーで顧客控えを引けませんでした（そのまま入庫できます）');
+            + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）'))
+                   : '⚠ この車は顧客控えと紐づいていません（そのまま入庫できます）。\n　 車両管理 ▸ この車を開く ▸「顧客車両との紐づけ」で結べます。');
     if (w.pitTodayActionClose) w.pitTodayActionClose();
     w.pitAsk('この代車を入庫させますか？', { title:(WORK_LB[c.workType] || '整備') + '　' + vehName(v), ok:'入庫する', detail:det })
       .then(function(yes){ if (yes) _intakeGo(c, sp, v, own, td); });
@@ -827,9 +820,9 @@
     /* ① その候補で確定させ、期間を実際に合わせる（④で完TELのときにもう一度縮む／伸びる） */
     c.maintFixSid = sp.sid;
     sp.from = td; if (sp.to < td) sp.to = td;
-    /* ② 見つかったら代車マスタに覚える（人が押した操作の中なので書いてよい） */
+    /* ② 🔴 v2.62.0 **代車マスタには何も書かない。**（結び目を作るのは車両管理の紐づけ欄だけ）
+       　 結ばれている時は、そのお客様をカードに写すだけ。 */
     if (own && own.cust){
-      v.custId = own.cust.id; if (own.veh) v.custVehId = own.veh.id;
       c.customer   = own.cust.name || c.customer;
       c.customerId = own.cust.id;
       if (own.veh && own.veh.karteNo) c.karteNo = own.veh.karteNo;

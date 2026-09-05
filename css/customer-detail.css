@@ -35,6 +35,9 @@
 .cd-pill.green{ background:rgba(29,185,122,.16); color:#37d39a; border-color:rgba(29,185,122,.4); }
 .cd-pill.pink{ background:rgba(236,72,153,.16); color:#f472b6; border-color:rgba(236,72,153,.4); }
 .cd-pill.mut{ background:var(--bg1); color:var(--text2); border-color:var(--border); }
+/* 🔗 v2.62.0 この車を代車・自社車両として使っている印（押せない・車両管理で紐づけた時だけ出る） */
+.cd-pill-fleet{ display:inline-flex; align-items:center; gap:5px; font-weight:800;
+  background:rgba(168,85,247,.16); color:#c4a3fb; border-color:rgba(168,85,247,.45); }
 .cd-stats{ display:flex; flex-direction:column; gap:10px; flex:0 0 auto; padding-left:18px; border-left:1px solid var(--border); }
 .cd-statrow{ display:flex; gap:24px; justify-content:center; }
 .cd-stat{ text-align:center; }

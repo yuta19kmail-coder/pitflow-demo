@@ -934,9 +934,12 @@
     /* 🔍 v2.59.0 来店属性は別ファイル（sales-visit.js）。
        ⚠ 上のタブと期間の帯（`head()`）は**ここで作って渡す**＝期間の出し方を2か所に書かない。 */
     if(tab==='visit'){
-      if(!window.pitVisitMonth){ wrap.innerHTML=head()+'<div class="sv-card"><div class="sv-empty">来店属性の部品を読み込み中です…</div></div>'; return; }
-      if(yr) pitVisitYear(wrap, head(), window._svYear);
-      else   pitVisitMonth(wrap, head(), window._svYM.y, window._svYM.m);
+      /* ⚠ 期間の帯は `header(mode, ctx)`。**`head()` ではない**（2026-09-04 ここを間違えて、
+         タブを押しても何も起きない状態で出してしまった。見張りが文字だけ見ていて拾えなかった）。 */
+      var vHead = yr ? header('year',{y:window._svYear}) : header('month', window._svYM);
+      if(!window.pitVisitMonth){ wrap.innerHTML=vHead+'<div class="sv-card"><div class="sv-empty">来店属性の部品を読み込み中です…</div></div>'; return; }
+      if(yr) pitVisitYear(wrap, vHead, window._svYear);
+      else   pitVisitMonth(wrap, vHead, window._svYM.y, window._svYM.m);
       return;
     }
     if(tab==='quarter') yr?renderQuarterYear(wrap):renderQuarterMonth(wrap);

@@ -323,18 +323,26 @@ function flMonthCalHtml(){
       if (!idx.length) return;
       const span = idx[idx.length-1] - idx[0] + 1;
       barAt[idx[0]] = { it: it, span: span };
-      for (let i = 0; i < span; i++) padAt[idx[0]+i] = 1;
+      /* ⚠ 上に場所を空けるのは**バーになる時だけ**（1マスなら札なので空けない＝無駄な空白になる） */
+      if (span > 1) for (let i = 0; i < span; i++) padAt[idx[0]+i] = 1;
     });
     months.forEach(function(m, mi){
       const ym = keys[mi];
       const first = ym + '-01';
       const last  = ym + '-' + String(new Date(m.getFullYear(), m.getMonth()+1, 0).getDate()).padStart(2, '0');
       let inner = '';
-      /* ① 3ヶ月ぶち抜きのバー（車検） */
+      /* ① ぶち抜きのバー（車検＝3ヶ月／12点＝2ヶ月）
+         ⚠ v2.71.1 **1マスぶんしか見えていない時はバーにしない。**
+            1マスの幅（74px）に「四角＋作業名＋状態」を1行で入れると必ずはみ出すので、
+            その時は下と同じ2行の札で出す（見た目は変わるが、読めなくなるより良い）。 */
       const b = barAt[mi];
-      if (b){
+      if (b && b.span > 1){
         inner += '<div class="fl-bar3 ' + b.it.state + '" style="width:calc(' + FL_COL_M + 'px * ' + b.span + ' - 12px)"'
                + ' title="' + _fleetEsc(b.it.title) + '"'
+               + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
+               + _flMbInner(b.it) + '</div>';
+      } else if (b){
+        inner += '<div class="fl-mb ' + b.it.state + '" title="' + _fleetEsc(b.it.title) + '"'
                + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
                + _flMbInner(b.it) + '</div>';
       }
@@ -362,7 +370,7 @@ function flMonthCalHtml(){
         .forEach(function(x){
           inner += '<div class="fl-ev" title="' + _fleetEsc(x.from + '〜' + x.to) + '"'
                  + ' onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
-                 + '<i style="background:' + x.color + '"></i>' + _fleetEsc(x.label) + '</div>';
+                 + '<i style="background:' + x.color + '"></i><span>' + _fleetEsc(x.label) + '</span></div>';
         });
       h += '<div class="fl-cal-cell' + (padAt[mi] ? ' barpad' : '') + '"'
          + ' onclick="flOpenEventModal(\'' + v.id + '\',\'' + first + '\')">' + inner + '</div>';
@@ -431,17 +439,29 @@ function flDayCalHtml(y, mo){
       if (padAt[di]) cls += ' barpad';
       const bb = barAt[di];
       if (bb){
-        inner = '<div class="fl-bar3 ' + bb.b.state + (bb.b.cutL ? ' cutL' : '') + (bb.b.cutR ? ' cutR' : '') + '"'
+        /* 🔴 v2.71.1（ゆうた報告「テキストが1せるだと入り切ってない」）**幅で出す字を変える。**
+           日ビューの列は 56px。1日だけの枠はバーの内側が **26px しか無い**ので、
+           作業名を入れると必ず切れる。
+             1日  … 四角だけ（何の作業かは色で分かる。名前と期間はカーソルを乗せると出る）
+             2日〜… 四角＋作業名
+             4日〜… 四角＋作業名＋状態
+           ⚠ 予定か確定かは**色**が言っている（凡例に出してある）ので、字が消えても意味は落ちない。
+           ⚠ 字を小さくして詰め込まない（11.5px は決めごと）。**入る物だけ出す。** */
+        const _w = bb.span;
+        inner = '<div class="fl-bar3 ' + bb.b.state + (_w < 2 ? ' tiny' : '')
+              + (bb.b.cutL ? ' cutL' : '') + (bb.b.cutR ? ' cutR' : '') + '"'
               + ' style="width:calc(' + FL_COL_D + 'px * ' + bb.span + ' - 12px)"'
               + ' title="' + _fleetEsc(bb.b.title) + '"'
               + ' onclick="event.stopPropagation();flMaintChip(\'' + bb.b.id + '\')">'
-              + '<i class="fl-dot ' + bb.b.workDot + '"></i><b>' + _fleetEsc(bb.b.workShort) + '</b>'
-              + '<span class="st">' + _fleetEsc(bb.b.stateLabel) + '</span></div>' + inner;
+              + '<i class="fl-dot ' + bb.b.workDot + '"></i>'
+              + (_w >= 2 ? '<b>' + _fleetEsc(bb.b.workShort) + '</b>' : '')
+              + (_w >= 4 ? '<span class="st">' + _fleetEsc(bb.b.stateLabel) + '</span>' : '')
+              + '</div>' + inner;
       }
       /* 自由イベント＝丸＋名前ぜんぶ */
       day.events.forEach(function(x){   /* ⚠ 自動のぶんは物差しが弾く（v2.70.1）。ここで数えない */
         inner += '<div class="fl-ev" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
-               + '<i style="background:' + x.color + '"></i>' + _fleetEsc(x.label) + '</div>';
+               + '<i style="background:' + x.color + '"></i><span>' + _fleetEsc(x.label) + '</span></div>';
       });
       h += '<div class="' + cls + '" data-fv="' + v.id + '" data-fd="' + ds + '">' + inner + '</div>';
     });

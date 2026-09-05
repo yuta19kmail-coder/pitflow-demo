@@ -16,11 +16,13 @@
       ＝ 実績カウント日（`completedAt`）がその月／作業完了 or 返車済み／売上なしは外す。
       ⚠ ここで条件を書き直さない（`pitCardNoSale` は物差し1本）。**総計＝伝票の数**になるのが狙い。
 
-   🔴 **リピーターかどうかは「その実績日より前に、同じお客様の来店があるか」で決める。**
-      ⚠ カードにも「初回／リピーター」の札（受付が手で選ぶ）があるが、**そちらは見ていない**。
-         ゆうた指定が「お客様単位の過去来店」だから。ただし**食い違った数は画面の下に出す**
-         （札の付け忘れ・付け間違いが、そこで見える）。
-      ⚠ 同じ日に同じお客様の車が2台あった時は、**どちらも一見**になる（前の日が無いため）。
+   🔴🔴 **リピーターかどうかは、予約の「初回／リピーター」の札（`c.repeat`）で決める。**
+      🗣 ゆうた（2026-09-04・あとから変更）「**一見・リピーターは予約の初回リピーターバッジで判断して**」
+      ⚠ **札が空の時だけ**、来店履歴（その実績日より前に同じお客様の来店があるか）で補う。
+         🔴 これは v1.88.0 の決めごと「**まだ選んでいないものを初回だと決めつけない**」を守るため。
+            空を全部「一見」に落とすと、**付け忘れの数がそのまま新規客の数になる**。
+      ⚠ 補った数と、札と来店履歴が食い違った数は、**画面の下に出す**（付け忘れ・付け間違いが見える）。
+      ⚠ 来店履歴で補う時、同じ日に同じお客様の車が2台あれば、どちらも一見になる（前の日が無いため）。
    ======================================== */
 (function(){
   'use strict';
@@ -81,25 +83,36 @@
     Object.keys(m).forEach(function(k){ m[k].sort(); });
     return m;
   }
-  function isRepeater(c, dates){
+  /* 来店履歴から見た「前に来ているか」。⚠ 札が空の時の補いと、食い違いを数える時だけ使う。 */
+  function seenBefore(c, dates){
     var a=dates[custKey(c)]||[];
     var d=String(c.completedAt);
     for (var i=0;i<a.length;i++){ if(a[i] < d) return true; }   /* その日より前に来ていれば */
     return false;
   }
+  /* 🔴 本番の判定。返すのは { rep:true/false, from:'tag'|'hist' } */
+  function judge(c, dates){
+    var tag=String(c.repeat||'').trim();
+    if (tag==='repeater') return { rep:true,  from:'tag' };
+    if (tag==='first')    return { rep:false, from:'tag' };
+    return { rep: seenBefore(c, dates), from:'hist' };          /* 札が空＝来店履歴で補う */
+  }
 
   /* 空の集計箱 */
   function box(){
-    return { insp:{rep:0,first:0}, gen:{rep:0,first:0}, dom:0, imp:0, all:0, mismatch:0, slide:0 };
+    return { insp:{rep:0,first:0}, gen:{rep:0,first:0}, dom:0, imp:0, all:0, mismatch:0, noTag:0, slide:0 };
   }
-  function put(b, c, rep){
+  function put(b, c, j, dates){
+    var rep = j.rep;
     var k = isInsp(c) ? 'insp' : 'gen';
     b[k][rep?'rep':'first']++;
     if (teamOf(c)==='import') b.imp++; else b.dom++;
     b.all++;
-    /* カードの札（受付が選んだ初回／リピーター）と食い違っていたら数えておく */
-    var tag = (c.repeat==='repeater');
-    if (tag !== rep) b.mismatch++;
+    /* 🔴 札が空で、来店履歴から補ったもの＝**付け忘れ**の数 */
+    if (j.from==='hist') b.noTag++;
+    /* 🔴 札は入っているが、来店履歴と食い違うもの＝**付け間違いの疑い**の数
+       ⚠ 数字そのものは札のとおりに数えている（ここは知らせるだけ）。 */
+    else if (seenBefore(c, dates) !== rep) b.mismatch++;
     /* 🔴 スライド＝今月の数字に乗っているが、今月作った仕事ではない */
     if (isSlide(c)) b.slide++;
   }
@@ -112,7 +125,7 @@
     all.forEach(function(c){
       var d=String(c.completedAt);
       if(d<fromStr || d>toStr) return;
-      put(b, c, isRepeater(c, dates));
+      put(b, c, judge(c, dates), dates);
     });
     return b;
   }
@@ -130,8 +143,8 @@
       var d=String(c.completedAt);
       for(var i2=0;i2<slots.length;i2++){
         if(d>=slots[i2].from && d<=slots[i2].to){
-          var rep=isRepeater(c, dates);
-          put(slots[i2].b, c, rep); put(tot, c, rep);
+          var j=judge(c, dates);
+          put(slots[i2].b, c, j, dates); put(tot, c, j, dates);
           break;
         }
       }
@@ -155,10 +168,10 @@
     all.forEach(function(c){
       var d=String(c.completedAt);
       if(d<moS || d>moE) return;
-      var rep=isRepeater(c, dates);
-      if(isSlide(c)){ put(qs[0].b, c, rep); return; }      /* 🔴 スライドは週に入れない */
+      var j=judge(c, dates);
+      if(isSlide(c)){ put(qs[0].b, c, j, dates); return; }  /* 🔴 スライドは週に入れない */
       for(var i=1;i<qs.length;i++){
-        if(d>=qs[i].from && d<=qs[i].to){ put(qs[i].b, c, rep); break; }
+        if(d>=qs[i].from && d<=qs[i].to){ put(qs[i].b, c, j, dates); break; }
       }
     });
     return qs;
@@ -238,11 +251,13 @@
   function footHtml(b){
     return '<div class="sv-foot">数えているのは<b>実績になった車</b>（実績カウント日＝返車ベース／売上なし・社内車両は外している）＝<b>伝票の数</b>と同じ集合です。'
       + '<br><b>車検・点検</b>＝車検か12点が入っているもの。<b>一般</b>＝それ以外ぜんぶ（オイル・B.P・車販依頼・物販なども含む）。'
-      + '<br><b>リピーター</b>＝その実績日より前に、同じお客様の来店があるもの（取り込んだ過去の伝票も含む）。同じ日に2台目が来た場合は、どちらも一見になります。'
+      + '<br><b>リピーター／一見</b>＝<b>予約の「初回／リピーター」の札</b>で数えています。'
+      + '札が空のものだけ、来店履歴（その実績日より前に同じお客様の来店があるか）で補っています。'
       + '<br><b>スライド</b>＝<b>売上日が前の月</b>なのに、返車（実績）がこの月になったもの＝<b>この月に作った仕事ではない</b>ぶん。'
       + 'クォーター結果では4つの枠に入れず、先頭に分けています（スライド＋1/4〜4/4＝その月の合計）。'
       + '<br>⚠ 売上日が分からない車はスライドに数えていません。見るのは<b>月</b>で、同じ月の中の日のズレはスライドではありません。'
-      + (b.mismatch ? '<br>⚠ カードの「初回／リピーター」の札と食い違うものが <b>'+b.mismatch+'件</b> あります（この表は札ではなく来店履歴で数えています）。' : '')
+      + (b.noTag ? '<br>⚠ 札が空で<b>来店履歴から補ったもの</b>が <b>'+b.noTag+'件</b>（予約の時に初回／リピーターを選ぶと、この数は減ります）。' : '')
+      + (b.mismatch ? '<br>⚠ 札は入っているが<b>来店履歴と食い違うもの</b>が <b>'+b.mismatch+'件</b>（数字は札のとおりに数えています。付け間違いの疑いだけ知らせています）。' : '')
       + '</div>';
   }
 

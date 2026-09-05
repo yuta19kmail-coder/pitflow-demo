@@ -456,7 +456,12 @@
         out.push({
           work: '12pt', label: '12ヶ月点検', vehicleId: v.id,
           dueDate: tk, openFrom: _ym(tk) + '-01', openTo: tk,
-          months: [_ym(tk)],
+          /* 🔴 v2.71.0（ゆうた指定 2026-09-05）**12ヶ月点検も帯にする＝目安の月＋その前1ヶ月の2ヶ月。**
+             🗣「12点も車検のように2ヵ月分でバーで表示してほしい」
+             ⚠ 車検は「満了月＋その前2ヶ月＝3ヶ月」。12点は**2ヶ月**（期限ではなく目安なので短い）。
+             ⚠ `months` は**カレンダーで帯を出す月**。「本来いつまでか」は `dueDate` の方を見ること
+                （`months[0]` を期限の月として読むと、ここを変えた時に必ずズレる）。 */
+          months: [_ymAdd(_ym(tk), -1), _ym(tk)],
           ym: slip ? _ym(today) : _ym(tk),       /* できなかったら今の月へスライド */
           overdue: false, slipped: slip,
           inWindow: (_ym(today) === _ym(tk)) || slip

@@ -270,16 +270,18 @@ function flCalLegendHtml(){
   h += '<div class="fl-lg-g"><span class="fl-lg-t">作業</span>'
      + dot('shaken','車検') + dot('12pt','12点') + dot('general','一般') + dot('bp','B.P') + '</div>';
   if (_flMode === 'month'){
+    /* 🔴 v2.71.0 期限として出すのは**車検の満了日だけ**。12点は目安なので日付を出さない。 */
     h += '<div class="fl-lg-g"><span class="fl-lg-t">期限</span>'
-       + '<span class="fl-due">満了</span><span class="fl-due tk">12点</span>'
-       + '<span class="fl-lg-n">左に縦線の1行＝やることではなく期限</span></div>';
-    h += '<div class="fl-lg-g"><span class="fl-lg-t">車検</span>'
-       + '<span class="fl-lg-n">満了月＋その前2ヶ月を<b>1本のバー</b>でぶち抜き</span></div>';
+       + '<span class="fl-due">満了</span>'
+       + '<span class="fl-lg-n">左に赤い縦線の1行＝やることではなく<b>車検の期限</b></span></div>';
+    h += '<div class="fl-lg-g"><span class="fl-lg-t">バー</span>'
+       + '<span class="fl-lg-n">車検＝満了月＋その前<b>2ヶ月</b>（3ヶ月ぶち抜き）／'
+       + '12点＝目安の月＋その前<b>1ヶ月</b>（2ヶ月）。<b>12点に期限日はありません</b></span></div>';
     h += '<div class="fl-lg-g"><span class="fl-lg-n">※ 月表示は<b>やること・内容だけ</b>。日・貸出・仮押さえは日別で見る</span></div>';
   } else {
     h += '<div class="fl-lg-g"><span class="fl-lg-t">その日</span>'
-       + '<span class="fl-lg-sq exp">満了</span><span class="fl-lg-sq tkc">12点</span>'
-       + '<span class="fl-lg-n">この日を過ぎると切れる＝<b>画面でいちばん強い</b></span></div>';
+       + '<span class="fl-lg-sq exp">満了</span>'
+       + '<span class="fl-lg-n">この日を過ぎると車検が切れる＝<b>画面でいちばん強い</b>（12点は目安なので塗りません）</span></div>';
     h += '<div class="fl-lg-g"><span class="fl-lg-t">代車</span>'
        + '<span class="fl-lg-sw lend"></span><span class="fl-lg-n">貸出中</span>'
        + '<span class="fl-lg-sw hold"></span><span class="fl-lg-n">仮押さえ（名前の頭に「仮」）</span></div>';
@@ -323,7 +325,6 @@ function flMonthCalHtml(){
       barAt[idx[0]] = { it: it, span: span };
       for (let i = 0; i < span; i++) padAt[idx[0]+i] = 1;
     });
-    const tk = (window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '');
     months.forEach(function(m, mi){
       const ym = keys[mi];
       const first = ym + '-01';
@@ -345,11 +346,15 @@ function flMonthCalHtml(){
                + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
                + _flMbInner(it) + '</div>';
       });
-      /* ③ 期限＝札にしない。左に色の縦線の1行（やること／期限を形で分ける） */
+      /* ③ 期限＝札にしない。左に赤い縦線の1行（やること／期限を形で分ける）
+         🔴 v2.71.0（ゆうた指定 2026-09-05）**12点の日付は出さない。**
+            🗣「12点は満了日の記載はいらない。あくまで位だから」
+            ＝ 12ヶ月点検に「満了日」は無い。満了日の1年前という**目安**でしかないので、
+              日付を書くと「その日までにやらないといけない」と読み違える。
+            ＝ 12点は**2ヶ月ぶんの帯**（やること）だけで出す。日付を主張しない。
+         ⚠ 車検の満了日は**本物の期限**なので、ここは残す。 */
       if (v.shakenDate && String(v.shakenDate).slice(0,7) === ym)
         inner += '<div class="fl-due" title="車検の満了日">満了 ' + _flMd(v.shakenDate) + '</div>';
-      if (tk && tk.slice(0,7) === ym)
-        inner += '<div class="fl-due tk" title="12ヶ月点検の目安">12点 ' + _flMd(tk) + '</div>';
       /* ④ 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） */
       /* 🔴 v2.70.1 ここで `!x.auto` を書かない。**物差し（loaner-free.js）が弾く。**
          ⚠ 画面側で隠していたせいで、隠していない代車カレンダーにだけ残って見えていた。同じことを繰り返さない。 */
@@ -403,7 +408,6 @@ function flDayCalHtml(y, mo){
       barAt[s] = { b: b, span: e - s + 1 };
       for (let i = s; i <= e; i++) padAt[i] = 1;
     });
-    const tk = (window.pitTenkenFromShaken ? pitTenkenFromShaken(v.shakenDate) : '');
     metas.forEach(function(m, di){
       const ds = m.ds;
       const day = pitLoanerDay(v.id, ds);
@@ -420,8 +424,10 @@ function flDayCalHtml(y, mo){
       }
       /* 🔴🔴 満了日・12点の日は**マスごと塗る**（ゆうた指定「逆に最も目立つぐらいじゃないと」）
          ＝ その日を過ぎたら車検が切れる日。細い線では気づけない。 */
+      /* 🔴 v2.71.0 **12点の日は塗らない**（ゆうた指定「あくまで位だから」）。
+         ＝ 目安の日をマスごと橙に塗ると「この日が期限」に見える。12点にその日は無い。
+         ⚠ 車検の満了日だけ残す。こちらは**その日を過ぎたら切れる**本物の期限。 */
       if (v.shakenDate === ds){ cls += ' d-exp'; inner += '<div class="fl-big">満了<small>' + _flMd(ds) + '</small></div>'; }
-      else if (tk === ds){ cls += ' d-tkc'; inner += '<div class="fl-big tk">12点<small>' + _flMd(ds) + '</small></div>'; }
       if (padAt[di]) cls += ' barpad';
       const bb = barAt[di];
       if (bb){

@@ -36,7 +36,6 @@
 .fl-lg-sq{ display:inline-flex; align-items:center; justify-content:center; width:50px; height:24px;
   border-radius:5px; font-size:11px; font-weight:900; }
 .fl-lg-sq.exp{ background:var(--red); color:#fff; box-shadow:inset 0 0 0 2px rgba(255,255,255,.42); }
-.fl-lg-sq.tkc{ background:rgba(245,158,11,.9); color:#3a2400; box-shadow:inset 0 0 0 2px rgba(255,255,255,.32); }
 .fl-lg-sw{ display:inline-block; width:28px; height:16px; border-radius:4px; border:1px solid var(--border); }
 .fl-lg-sw.lend{ background:rgba(38,162,105,.22); }
 .fl-lg-sw.hold{ background:rgba(38,162,105,.10); }
@@ -82,7 +81,6 @@
    ⚠ 赤が「未割当」と同じ色になるので、**形**（札か、縦線の行か）で分ける。 */
 .fl-due{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:#f9a8a8;
   border-left:3px solid var(--red); padding-left:7px; line-height:1.5; }
-.fl-due.tk{ color:#fbbf24; border-left-color:var(--orange); }
 
 /* ── 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） ── */
 .fl-ev{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text2);
@@ -99,18 +97,17 @@
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 .fl-cal-new .fl-cal-cell.fl-use.fl-hold .fl-use-tag{ color:#5fae8b; }
 
-/* ── 日ビュー：満了日・12点の日＝マスごと塗る ──
+/* ── 日ビュー：車検の満了日＝マスごと塗る ──
    🔴🔴 ゆうた指定 2026-09-05「日ビューの満了だけわかりにくい。逆に最も目立つぐらいじゃないと」
       ＝ その日を過ぎたら車検が切れる日。前は上端の細い3pxの線＋小さい字で、ほぼ気づけなかった。
-   ⚠ 「ベタ塗り＝超過だけ」の決めごとを、**「ベタ塗り＝手遅れになると困る日」**に広げた。 */
+   ⚠ 「ベタ塗り＝超過だけ」の決めごとを、**「ベタ塗り＝手遅れになると困る日」**に広げた。
+   🔴 v2.71.0 **12点の日は塗らない**（ゆうた「あくまで位だから」）＝12点に期限の日は無い。
+      塗ると「この日が期限」に見える。12点は2ヶ月ぶんの帯（やること）だけで出す。 */
 .fl-cal-new .fl-cal-cell.d-exp{ background:var(--red) !important; box-shadow:inset 0 0 0 2px rgba(255,255,255,.42); }
-.fl-cal-new .fl-cal-cell.d-tkc{ background:rgba(245,158,11,.9) !important; box-shadow:inset 0 0 0 2px rgba(255,255,255,.32); }
 .fl-big{ margin-top:auto; margin-bottom:auto; text-align:center; color:#fff; font-weight:900;
   font-size:13px; line-height:1.2; letter-spacing:.5px; text-shadow:0 1px 2px rgba(0,0,0,.4); }
 .fl-big small{ display:block; font-size:10.5px; font-weight:800; opacity:.92; letter-spacing:0; }
-.fl-big.tk{ color:#3a2400; text-shadow:none; }
-.fl-cal-new .fl-cal-cell.d-exp .fl-use-tag,
-.fl-cal-new .fl-cal-cell.d-tkc .fl-use-tag{ color:#fff; opacity:.9; }
+.fl-cal-new .fl-cal-cell.d-exp .fl-use-tag{ color:#fff; opacity:.9; }
 
 /* ==========================================================================
    代車カレンダー（代車ビュー）に出す整備予定

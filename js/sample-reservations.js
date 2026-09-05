@@ -112,6 +112,14 @@
             :                  (1 + Math.floor(Math.random() * 3));
     c.mechanics = [];
     for (var _mi = 0; _mi < _mn; _mi++) c.mechanics.push(rnd(_mpool));
+    /* ✅ v2.73.0 チェック担当のサンプル。**1人1回まで**なので同じ人を2回入れない。
+       たまに空（＝未入力＝データチェックに出る側）も作る＝見た目を確かめられるように。 */
+    (function(){
+      var pool = _mpool.slice(), out = [], n = Math.random() < 0.72 ? 1 : (Math.random() < 0.7 ? 2 : 0);
+      for (var i = 0; i < n && pool.length; i++) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+      c.checkers = out;
+      if (!out.length && Math.random() < 0.5) c.checkersNone = true;   /* 「なし」と決めた形も混ぜる */
+    })();
     // 併用：車検/12点/一般 の一部にコーティング（3M/1Y）を追加＝バッジ2個。
     // 実績＝コーティング付帯は全体の約3.7%。対象(車検/12点/一般≒87%)に 0.045 で ≒3.9%。
     if (['shaken','12pt','general'].indexOf(wt) >= 0 && Math.random() < 0.045){

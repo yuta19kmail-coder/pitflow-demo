@@ -1289,8 +1289,11 @@
   function mechPicker(c, role, title, icon){
     return window.PitMechPick ? PitMechPick.blockHtml(c, role, title, icon, 'cv') : '';
   }
+  /* ✅ v2.73.0（ゆうた指定 2026-09-05）**チェック担当をここに足した。**
+     ⚠ 足したのは mech-pick.js の中だけ。ここは見出しの言葉しか変わっていない
+     （3つ目の枠も、押した時の動きも、部品が持っている）。 */
   function mechSectionHtml(c){
-    let h = '<div class="cv-sec"><div class="cv-sect"><i data-ic=user data-ics=16></i> 作業担当（点検・整備）</div>';
+    let h = '<div class="cv-sec"><div class="cv-sect"><i data-ic=user data-ics=16></i> 作業担当（点検・整備・チェック）</div>';
     /* 🔴 チップ・説明・配分バー（ライブ）は部品1本（mech-pick.js）から。 */
     h += (window.PitMechPick ? PitMechPick.html(c, 'cv', { liveId: 'cv-mech-live' }) : '');
     h += '</div>';

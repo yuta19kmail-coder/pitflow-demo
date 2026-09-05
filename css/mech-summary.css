@@ -29,6 +29,10 @@
 .cf-mchip.on{ border-color:transparent; }
 .cf-mech-i .cf-mchip.on{ background:#38bdf8; color:#06283d; }
 .cf-mech-m .cf-mchip.on{ background:#f59e0b; color:#3a2503; }
+/* ✅ v2.73.0 チェック担当＝みどり。点検（水色）・整備（オレンジ）と**一目で別の役**に見せる。
+   🔴 ここは 1人1枠なので「×2」は付かない（js 側で出していない）。 */
+.cf-mech-c .cf-mchip.on{ background:#34d399; color:#04291c; }
+.cf-mech-note-c{ color:var(--text3,#79839a); }
 .cf-mchip-x{ font-style:normal; font-size:11px; font-weight:900; margin-left:5px; }
 /* 🔴 「×2」（枠の数）と「✕」（外す）を見間違えないように、✕ は仕切り線で別ボタンに見せる */
 .cf-mchip-off{
@@ -106,3 +110,30 @@
 [data-theme="light"] .cf-mech-no{ color:#475569; background:rgba(100,116,139,.16); }
 [data-theme="light"] .mech-alloc{ border-color:rgba(100,116,139,.25); background:rgba(100,116,139,.05); }
 [data-theme="light"] .mech-alloc-sub, [data-theme="light"] .mech-alloc-veh, [data-theme="light"] .cf-mech-note{ color:#64748b; }
+
+
+/* ================================================================
+   🧾 v2.73.0 顧客ビューの伝票：ヘッダーと明細のあいだの「担当の1行」
+   ----------------------------------------------------------------
+   ・作るのは js（mech-pick.js の `pitMechLine`）。ここは**色と並べ方だけ**持つ。
+   ・🔴 未入力は**オレンジ**（データチェックが数えている側）。「該当者なし」は静かに。
+   ・横に並べて折り返す。名前が長い時は札ごと次の行へ落ちる（字は小さくしない）。
+   ================================================================ */
+.cf-mech-line{
+  display:flex; flex-wrap:wrap; gap:8px;
+  margin:0 0 10px; padding:8px 10px;
+  border:1px solid var(--border,#333650); border-radius:9px;
+  background:rgba(148,163,184,.06);
+}
+.cf-ml{ display:flex; align-items:center; gap:7px; min-width:0; }
+.cf-ml-t{
+  flex:0 0 auto; font-size:10.5px; font-weight:800; letter-spacing:.3px;
+  padding:2px 8px; border-radius:999px; color:#06283d; background:#38bdf8;
+}
+.cf-ml-m .cf-ml-t{ background:#f59e0b; color:#3a2503; }
+.cf-ml-c .cf-ml-t{ background:#34d399; color:#04291c; }
+.cf-ml-v{ font-size:12.5px; font-weight:700; color:var(--text,#e8ecf3); word-break:break-all; }
+.cf-ml.is-none .cf-ml-v{ font-weight:600; color:var(--text3,#79839a); }
+.cf-ml.is-miss .cf-ml-v{ color:#f59e0b; font-weight:800; }
+.cf-ml.is-none .cf-ml-t,
+.cf-ml.is-miss .cf-ml-t{ opacity:.62; }

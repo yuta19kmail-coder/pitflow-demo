@@ -788,7 +788,7 @@ function _loRenderDays(start, n){
        + '</span></div>';
 
     ls.forEach(function(l){
-      const attrs = ' data-lo="' + l.id + '" data-ld="' + dStr + '"';
+      let attrs = ' data-lo="' + l.id + '" data-ld="' + dStr + '"';
       /* 🧩 v2.42.0 その日に何が乗っているかは **loaner-free.js の部品1本**に聞く。
          この画面が本流（マスター）だが、**読み方まで自前で持つ必要は無い。**
          🔴 **保険の写し（部品が無い時の自前の読み方）は置かない。**置いた瞬間それが古くなる側になる。
@@ -803,23 +803,36 @@ function _loRenderDays(start, n){
            🔴 縦バーは**期間ぜんぶの日**に引き、**最初と最後だけ丸める**（途中は地続き）。
            🔴 札は**最初の日に1枚だけ**。貸出の札が乗る日には出さない（重ねない）。
            ⚠ 候補は**代車をふさがない**＝今までどおり貸せる。見た目も薄い方にする。 */
-      let mtLine = '', mtTag = '';
+      let mtLine = '', mtTag = '', mtTitle = '';
       if (day.maints.length){
         const mt = day.maints[0];
+        /* ⚠ 札を押せなくしたぶん、**何が入っているかはマスの title**（カーソルを乗せた時）で言う。
+           ⚠ 候補は代車をふさがない＝そこも一緒に書く（押さなくても分かるように）。 */
+        mtTitle = mt.label + ' ' + mt.from + '〜' + mt.to
+          + '（' + (mt.done ? '済' : (mt.stage === 'fixed' ? '確定・この期間は貸せません' : '予定・まだ貸せます')) + '）'
+          + '／直すのは車両管理の作業予定ボードから';
         /* 🏁 v2.72.0 済んだもの＝グレー（ゆうた指定「グレーで終わった感じを出して」）。
            ⚠ 確定より先に見る＝済んだ確定は緑ではなくグレーになる。 */
         const mCls = mt.done ? 'done' : (mt.stage === 'fixed' ? 'fixed' : 'cand');
         mtLine = '<span class="lo-mtline ' + mCls + (mt.isStart ? ' st' : '') + (mt.isEnd ? ' en' : '') + '"></span>';
         if (mt.isStart){
           const _dot = (window.pitMaintWorkDot ? pitMaintWorkDot(mt.work) : 'wk-general');
-          mtTag = '<span class="lo-mt ' + mCls + '" title="'
-            + _loEsc(mt.label + ' ' + mt.from + '〜' + mt.to + '（' + (mt.done ? '済' : (mt.stage === 'fixed' ? '確定' : '予定')) + '）')
-            + '" onclick="event.stopPropagation();flMaintChip(\'' + mt.id + '\')">'
+          /* 🔴🔴 v2.72.1（ゆうた指定 2026-09-05）**ここは押せなくする。**
+             🗣「代車カレンダー本体側からは修理系のイベントはさわれなくていい。
+             　　あったとしても仮押さえみたいな通常のクリック挙動をするようにして」
+             ◎前まで（v2.70.0）… 押すと作業予定の窓が開いていた。
+               ＝ **貸出を入れようとして押した時に、整備の窓が開く**（この画面でやりたいことと違う）。
+             ◎いま … 札も縦バーも**クリックを受けない**（CSS の pointer-events:none）。
+               押した先はマスに素通しされて、**空きマス・仮押さえと同じ動き**になる。
+             ⚠ 直す・取り消すのは**車両管理の作業予定ボード**の仕事。ここは「入っている」を見せるだけ。
+             ⚠ 何の整備かは**マスの title**（カーソルを乗せた時）に回した。札には onclick を付けない。 */
+          mtTag = '<span class="lo-mt ' + mCls + '">'
             + '<i class="fl-dot ' + _dot + '"></i>'
             + _loEsc((window.PIT_MAINT_WORK_SHORT && PIT_MAINT_WORK_SHORT[mt.work]) || mt.label)
             + ' ' + (mt.done ? '済' : (mt.stage === 'fixed' ? '整備中' : '予定')) + '</span>';
         }
       }
+      if (mtTitle) attrs += ' title="' + _loEsc(mtTitle) + '"';
       // 車両イベント（車検・点検・修理等）の予定オーバーレイ＝日付枠で目立たせる（セル全体を色づけ＋ラベル）
       let ov = '', evCls = '';
       const evs = day.events;
@@ -827,13 +840,12 @@ function _loRenderDays(start, n){
         const e0 = evs[0], c0 = e0.color || '#3b82f6';
         evCls = ' lo-evday';
         ov += '<span class="lo-evbg" style="background:' + c0 + '22;box-shadow:inset 4px 0 0 ' + c0 + ',inset -4px 0 0 ' + c0 + '"></span>';
-        /* 🔴 v2.70.1 押したら**その予定の窓が開く**ようにした（ゆうた報告 2026-09-05）。
-           ◎前まで … 代車カレンダーの予定は**見るだけ**で、消すには車両管理まで行くしか無かった。
-             だから「前の仕組みの車検の予定が残っている」と気づいても、その場では消せなかった。
-           ⚠ 窓は車両管理のものをそのまま使う（`flOpenEventModal`）。中に「削除」がある。 */
-        if (e0.isStart) ov += '<span class="lo-evt-tag" style="background:' + c0 + ';cursor:pointer"'
-          + ' title="' + _loEsc(e0.label + ' ' + e0.from + '〜' + e0.to + '／押すと直す・消せます') + '"'
-          + ' onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + e0.id + '\')">'
+        /* 🔴🔴 v2.72.1（ゆうた指定 2026-09-05）**ここも押せなくした。**
+           ⚠ v2.70.1 で一度「押すと直す・消せる」にしたが、**取り消した。**
+              🗣「代車カレンダー本体側からは修理系のイベントはさわれなくていい」
+              ＝ 貸出を入れる画面なので、押した先は**マスの通常の動き**であってほしい。
+           ⚠ 直す・消すのは**車両管理の月カレンダー**（そこでは今までどおり押せる）。 */
+        if (e0.isStart) ov += '<span class="lo-evt-tag" style="background:' + c0 + '">'
           + '<i data-ic=wrench data-ics=16></i> ' + _loEsc(e0.label) + '</span>';
       }
       // 元位置ゴースト（下書きで動かした割当の、元の代車・日付）＝列の左端に点線で並べる
@@ -1690,7 +1702,9 @@ window.loHelp = function(){
     + '<li>緊急車両はいちばん左の列。返車が済むと列ごと消えます（記録は残ります）</li>'
     + '<li>引退した代車は列に出ません。過去の貸出・履歴は残っています</li>'
     + '<li>🔧 左の<b>太い縦バー</b>＝この代車自身の整備。<b>確定は貸せません／予定はまだ貸せます</b>。'
-    + '押すと車両管理の作業予定へ飛びます（<b>前は何も出ていないのに警告だけ出て</b>いた所です）</li>'
+    + 'カーソルを乗せると中身が出ます（<b>前は何も出ていないのに警告だけ出て</b>いた所です）</li>'
+    + '<li>🔧 整備の札や車検入庫の札は<b>この画面では押せません</b>。押した先はマスに通るので、'
+    + '<b>空きマス・仮押さえと同じ動き</b>になります。直すのは<b>車両管理の作業予定ボード</b>から</li>'
     + '</ul></div>';
   ov.addEventListener('click', function(e){ if (e.target === ov) loHelpClose(); });
   document.body.appendChild(ov);

@@ -913,7 +913,8 @@
   // ===== 共通ヘッダ（タブ＋当月/月間トグル＋期間ナビ） =====
   function header(mode, ctx){
     var tab=window._svTab||'sales';
-    var TABS=[['sales','売上'],['quarter','クォーター'],['work','作業内容'],['front','フロント']];
+    /* 🔍 v2.59.0（ゆうた指定 2026-09-04）来店属性＝手で作っていた Excel「来店属性集計」を実データから出す */
+    var TABS=[['sales','売上'],['quarter','クォーター'],['work','作業内容'],['front','フロント'],['visit','来店属性']];
     var h='<div class="sv-tabbar">'+TABS.map(function(t){ return '<button class="sv-topbtn'+(tab===t[0]?' on':'')+'" onclick="svSetTab(\''+t[0]+'\')">'+t[1]+'</button>'; }).join('')+'<div class="sv-tools"><button class="sv-toolbtn" onclick="svExportPdf()" title="A4のPDFで保存（ベクター）"><i data-ic=file data-ics=16></i> PDF出力</button></div></div>';
     h+='<div class="sv-head"><div class="sv-tabs"><button class="sv-tab'+(mode==='month'?' on':'')+'" onclick="svSetMode(\'month\')">当月</button><button class="sv-tab'+(mode==='year'?' on':'')+'" onclick="svSetMode(\'year\')">月間（年度）</button></div>';
     if (mode==='month'){ h+='<div class="sv-nav"><button onclick="svShiftMonth(-1)" title="前の月"><i data-ic=chevLeft data-ics=16></i></button><b>'+ctx.y+'年'+(ctx.m+1)+'月</b><button onclick="svShiftMonth(1)" title="次の月"><i data-ic=chevRight data-ics=16></i></button><button class="sv-now" onclick="svShiftMonth(0)">今月</button></div>'; }
@@ -930,6 +931,14 @@
     if(!window._svYM) window._svYM={y:now.getFullYear(),m:now.getMonth()};
     if(!window._svYear) window._svYear=(now.getMonth()===11)?now.getFullYear()+1:now.getFullYear();
     var tab=window._svTab, yr=(window._svMode==='year');
+    /* 🔍 v2.59.0 来店属性は別ファイル（sales-visit.js）。
+       ⚠ 上のタブと期間の帯（`head()`）は**ここで作って渡す**＝期間の出し方を2か所に書かない。 */
+    if(tab==='visit'){
+      if(!window.pitVisitMonth){ wrap.innerHTML=head()+'<div class="sv-card"><div class="sv-empty">来店属性の部品を読み込み中です…</div></div>'; return; }
+      if(yr) pitVisitYear(wrap, head(), window._svYear);
+      else   pitVisitMonth(wrap, head(), window._svYM.y, window._svYM.m);
+      return;
+    }
     if(tab==='quarter') yr?renderQuarterYear(wrap):renderQuarterMonth(wrap);
     else if(tab==='work') yr?renderWorkYear(wrap):renderWorkMonth(wrap);
     else if(tab==='front') yr?renderFrontYear(wrap):renderFrontMonth(wrap);
@@ -943,6 +952,43 @@
   function svReportModel(){
     var tab=window._svTab||'sales', yr=(window._svMode==='year'); var tg=target();
     var SLOT=[12,1,2,3,4,5,6,7,8,9,10,11];
+    /* 🔍 v2.59.0 来店属性の紙。⚠ ここを足さないと、画面は来店属性なのに**売上の紙が出る**
+       （知らない tab は一番下の売上へ落ちる作りのため）。数字は画面と同じ物差しから取る。 */
+    if(tab==='visit' && window.pitVisitCollect){
+      var vRow=function(lb,f,cols,tt){ return [lb].concat(cols.map(function(c){return String(f(c.b));})).concat([String(f(tt))]); };
+      var vPct=function(n,d){ return d>0 ? Math.round(n/d*100)+'%' : '—'; };
+      var vRep=function(b){ return b.insp.rep+b.gen.rep; }, vFst=function(b){ return b.insp.first+b.gen.first; };
+      var cols, tt, period;
+      if(yr){ var dY=pitVisitCollectYear(window._svYear); cols=dY.slots; tt=dY.total; period=(window._svYear-1)+'年12月〜'+window._svYear+'年11月'; }
+      else { var ym2=window._svYM; cols=pitVisitQuarters(ym2.y, ym2.m);
+             tt=pitVisitCollect(ymdL(new Date(ym2.y,ym2.m,1)), ymdL(new Date(ym2.y,ym2.m+1,0)));
+             period=ym2.y+'年'+(ym2.m+1)+'月'; }
+      var rows=[
+        vRow('車検・点検 リピーター',function(b){return b.insp.rep;},cols,tt),
+        vRow('車検・点検 一見',function(b){return b.insp.first;},cols,tt),
+        vRow('一般 リピーター',function(b){return b.gen.rep;},cols,tt),
+        vRow('一般 一見',function(b){return b.gen.first;},cols,tt),
+        vRow('合計 リピーター',vRep,cols,tt),
+        vRow('合計 一見',vFst,cols,tt),
+        vRow('IR率 リピーター',function(b){return vPct(vRep(b),b.all);},cols,tt),
+        vRow('IR率 一見',function(b){return vPct(vFst(b),b.all);},cols,tt),
+        vRow('KY率 国産',function(b){return b.dom;},cols,tt),
+        vRow('KY率 輸入',function(b){return b.imp;},cols,tt),
+        vRow('KY率 国産率',function(b){return vPct(b.dom,b.all);},cols,tt),
+        vRow('KY率 輸入率',function(b){return vPct(b.imp,b.all);},cols,tt),
+        vRow('合計',function(b){return b.all;},cols,tt),
+        vRow('うちスライド（先月売上・今月返車）',function(b){return b.slide;},cols,tt)
+      ];
+      return { title:'来店属性集計', period:period,
+        kpis:[{label:'入庫台数（実績）',value:tt.all+'台'},
+              {label:'IR率（リピーター）',value:vPct(vRep(tt),tt.all)},
+              {label:'IR率（一見）',value:vPct(vFst(tt),tt.all)},
+              {label:'KY率（国産／輸入）',value:vPct(tt.dom,tt.all)+' / '+vPct(tt.imp,tt.all)}],
+        sections:[{ type:'table', title:(yr?'月ごと':'クォーター結果（1〜7／8〜15／16〜23／24〜末）'),
+          head:[yr?'入庫台数':'内容'].concat(cols.map(function(c){return c.label;})).concat(['合計']),
+          rows:rows, align:['l'].concat(cols.map(function(){return 'r';})).concat(['r']) }],
+        note:'実績になった車（実績カウント日＝返車ベース／売上なし・社内車両は除く）。車検・点検＝車検か12点が入っているもの／一般＝それ以外ぜんぶ。リピーター＝その実績日より前に同じお客様の来店があるもの。' };
+    }
     if(tab==='sales' && !yr){
       var ym=window._svYM; var d=collectMonth(ymdL(new Date(ym.y,ym.m,1)),ymdL(new Date(ym.y,ym.m+1,0))); var t=d.tiers;
       var tierRows=[['目標',man(tg.min)+'〜'+man(tg.max),'']].concat(TIERS.map(function(x){return [x.label,man(t[x.id].sum),t[x.id].count+'台'];}));

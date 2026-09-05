@@ -18,11 +18,16 @@
 
    🔴🔴 **リピーターかどうかは、予約の「初回／リピーター」の札（`c.repeat`）で決める。**
       🗣 ゆうた（2026-09-04・あとから変更）「**一見・リピーターは予約の初回リピーターバッジで判断して**」
-      ⚠ **札が空の時だけ**、来店履歴（その実績日より前に同じお客様の来店があるか）で補う。
-         🔴 これは v1.88.0 の決めごと「**まだ選んでいないものを初回だと決めつけない**」を守るため。
-            空を全部「一見」に落とすと、**付け忘れの数がそのまま新規客の数になる**。
-      ⚠ 補った数と、札と来店履歴が食い違った数は、**画面の下に出す**（付け忘れ・付け間違いが見える）。
-      ⚠ 来店履歴で補う時、同じ日に同じお客様の車が2台あれば、どちらも一見になる（前の日が無いため）。
+
+   🔴🔴🔴 **札が空のものは、どちらにも入れない。「未チェック」として独立して数える。**（v2.61.0）
+      🗣 ゆうた（大前提）「**伝票＝PitFlow＝実台数 が永遠にイコールになり続ける運用を目指したい**」
+      🗣「各クォーターごと、月末ごとに…全部±0になるまで修正」「**漏れを許容するって考えは少なめで**」
+      ＝ **抜けは「許す」のではなく「0にする対象として数を出す」。**
+      ⚠ v2.60.0 では空を来店履歴で補っていた（総計は合うが**内訳が推測で埋まる**）。
+         それだと**埋める動機が消える**ので、独立した行に立てた。
+      ⚠ だから **リピーター％＋一見％は、未チェックがある間 100% にならない**。足りないぶんが抜けの量。
+      ⚠ 来店履歴からの推測は**参考として1行だけ**出す（埋める時の手がかり。数字には混ぜない）。
+      ⚠ v1.88.0 の決めごと「**まだ選んでいないものを初回だと決めつけない**」とも、この形の方が合っている。
    ======================================== */
 (function(){
   'use strict';
@@ -90,34 +95,41 @@
     for (var i=0;i<a.length;i++){ if(a[i] < d) return true; }   /* その日より前に来ていれば */
     return false;
   }
-  /* 🔴 本番の判定。返すのは { rep:true/false, from:'tag'|'hist' } */
+  /* 🔴 本番の判定。返すのは { kind:'rep'|'first'|'none', guess:true/false }
+     ⚠ 'none' ＝ 札が空＝**まだ分からない**。数字を作らない（guess は参考の推測だけ）。 */
   function judge(c, dates){
     var tag=String(c.repeat||'').trim();
-    if (tag==='repeater') return { rep:true,  from:'tag' };
-    if (tag==='first')    return { rep:false, from:'tag' };
-    return { rep: seenBefore(c, dates), from:'hist' };          /* 札が空＝来店履歴で補う */
+    if (tag==='repeater') return { kind:'rep',   guess:seenBefore(c, dates) };
+    if (tag==='first')    return { kind:'first', guess:seenBefore(c, dates) };
+    return { kind:'none',  guess:seenBefore(c, dates) };
   }
 
   /* 空の集計箱 */
   function box(){
-    return { insp:{rep:0,first:0}, gen:{rep:0,first:0}, dom:0, imp:0, all:0, mismatch:0, noTag:0, slide:0 };
+    return { insp:{rep:0,first:0,none:0}, gen:{rep:0,first:0,none:0}, dom:0, imp:0, all:0,
+             mismatch:0, none:0, guessRep:0, guessFirst:0, noSalesDate:0, slide:0 };
   }
   function put(b, c, j, dates){
-    var rep = j.rep;
     var k = isInsp(c) ? 'insp' : 'gen';
-    b[k][rep?'rep':'first']++;
+    b[k][j.kind]++;
     if (teamOf(c)==='import') b.imp++; else b.dom++;
     b.all++;
-    /* 🔴 札が空で、来店履歴から補ったもの＝**付け忘れ**の数 */
-    if (j.from==='hist') b.noTag++;
-    /* 🔴 札は入っているが、来店履歴と食い違うもの＝**付け間違いの疑い**の数
-       ⚠ 数字そのものは札のとおりに数えている（ここは知らせるだけ）。 */
-    else if (seenBefore(c, dates) !== rep) b.mismatch++;
+    if (j.kind==='none'){
+      /* 🔴 未チェック＝**0にする対象**。参考に「来店履歴だとどちらか」も数えておく（数字には混ぜない） */
+      b.none++;
+      if (j.guess) b.guessRep++; else b.guessFirst++;
+    } else if (j.guess !== (j.kind==='rep')){
+      /* 🔴 札は入っているが来店履歴と食い違うもの＝**付け間違いの疑い**（数字は札のとおり） */
+      b.mismatch++;
+    }
+    /* 🔴 v2.61.0 売上日が空＝**スライドかどうか判断できない**車。これも0にする対象 */
+    if (!(window.pitSalesDate ? String(pitSalesDate(c)||'') : '')) b.noSalesDate++;
     /* 🔴 スライド＝今月の数字に乗っているが、今月作った仕事ではない */
     if (isSlide(c)) b.slide++;
   }
   function totalRep(b){ return b.insp.rep + b.gen.rep; }
   function totalFirst(b){ return b.insp.first + b.gen.first; }
+  function totalNone(b){ return b.insp.none + b.gen.none; }
 
   /* 期間で集める */
   function collect(fromStr, toStr){
@@ -180,14 +192,18 @@
   /* ═══ 比率のバー（2つに割るだけ。表と同じ数字を絵にしているだけのもの） ═══
      ⚠ 色は css のクラスで持つ（js に色を直書きしない）。
      ⚠ 見分けと数字を必ず横に置く＝色だけで意味を運ばない。 */
-  function ratioBar(aN, bN, aLb, bLb, cls){
-    var t=aN+bN;
+  /* ⚠ 3つ目（未チェック）は**入っている時だけ**出す。0なら出さない＝0が正しい姿。 */
+  function ratioBar(aN, bN, aLb, bLb, cls, cN, cLb){
+    cN = cN || 0;
+    var t=aN+bN+cN;
     if(!t) return '<div class="vst-bar-empty">この期間の実績はまだありません</div>';
     return '<div class="vst-bar '+(cls||'')+'">'
       + '<i class="vst-a" style="width:'+pctN(aN,t).toFixed(1)+'%"></i>'
-      + '<i class="vst-b" style="width:'+pctN(bN,t).toFixed(1)+'%"></i></div>'
+      + '<i class="vst-b" style="width:'+pctN(bN,t).toFixed(1)+'%"></i>'
+      + (cN?'<i class="vst-c" style="width:'+pctN(cN,t).toFixed(1)+'%"></i>':'')+'</div>'
       + '<div class="vst-lg"><span><i class="vst-sw vst-sw-a"></i>'+aLb+' <b>'+aN+'</b>台 '+pct(aN,t)+'</span>'
-      + '<span><i class="vst-sw vst-sw-b"></i>'+bLb+' <b>'+bN+'</b>台 '+pct(bN,t)+'</span></div>';
+      + '<span><i class="vst-sw vst-sw-b"></i>'+bLb+' <b>'+bN+'</b>台 '+pct(bN,t)+'</span>'
+      + (cN?'<span><i class="vst-sw vst-sw-c"></i>'+(cLb||'未チェック')+' <b>'+cN+'</b>台 '+pct(cN,t)+'</span>':'')+'</div>';
   }
 
   /* ═══ 表（元の Excel と同じ行の並び） ═══ */
@@ -210,6 +226,8 @@
     h+=row('一般　一見','vst-first',function(b){return b.gen.first;});
     h+=row('合計　リピーター','vst-rep vst-sum',function(b){return totalRep(b);});
     h+=row('合計　一見','vst-first vst-sum',function(b){return totalFirst(b);});
+    /* 🔴 v2.61.0 未チェック＝札を選んでいないもの。**0にする対象**なので必ず表に立てる */
+    h+=row('未チェック（初回／リピーター 未選択）','vst-none-row',function(b){return totalNone(b);});
     h+=row('IR率　リピーター','vst-rep',function(b){return pct(totalRep(b), b.all);});
     h+=row('IR率　一見','vst-first',function(b){return pct(totalFirst(b), b.all);});
     h+=row('KY率　国産','vst-dom',function(b){return b.dom;});
@@ -231,7 +249,8 @@
       +     (b.slide?'　／　<b class="vst-slide-n">うちスライド '+b.slide+'</b>':'')+'</div></div>'
       + '<div class="sv-hero-main"><div class="sv-hero-lb">IR率（リピーター）</div>'
       +   '<div class="sv-hero-num vst-num-a">'+pct(totalRep(b), b.all)+'</div>'
-      +   '<div class="sv-hero-sub">一見 '+pct(totalFirst(b), b.all)+'</div></div>'
+      +   '<div class="sv-hero-sub">一見 '+pct(totalFirst(b), b.all)
+      +     (totalNone(b)?'　／　<b class="vst-none-n">未チェック '+totalNone(b)+'</b>':'')+'</div></div>'
       + '<div class="sv-hero-main"><div class="sv-hero-lb">KY率（国産）</div>'
       +   '<div class="sv-hero-num vst-num-dom">'+pct(b.dom, b.all)+'</div>'
       +   '<div class="sv-hero-sub">輸入 '+pct(b.imp, b.all)+'</div></div>'
@@ -242,7 +261,7 @@
     return '<div class="sv-card"><div class="sv-card-h"><span>'+title+'</span></div>'
       + '<div class="vst-bars">'
       +   '<div class="vst-bwrap"><div class="vst-btl">IR率　リピーター と 一見</div>'
-      +     ratioBar(totalRep(b), totalFirst(b), 'リピーター', '一見') + '</div>'
+      +     ratioBar(totalRep(b), totalFirst(b), 'リピーター', '一見', '', totalNone(b), '未チェック') + '</div>'
       +   '<div class="vst-bwrap"><div class="vst-btl">KY率　国産 と 輸入</div>'
       +     ratioBar(b.dom, b.imp, '国産', '輸入', 'ky') + '</div>'
       + '</div></div>';
@@ -256,9 +275,25 @@
       + '<br><b>スライド</b>＝<b>売上日が前の月</b>なのに、返車（実績）がこの月になったもの＝<b>この月に作った仕事ではない</b>ぶん。'
       + 'クォーター結果では4つの枠に入れず、先頭に分けています（スライド＋1/4〜4/4＝その月の合計）。'
       + '<br>⚠ 売上日が分からない車はスライドに数えていません。見るのは<b>月</b>で、同じ月の中の日のズレはスライドではありません。'
-      + (b.noTag ? '<br>⚠ 札が空で<b>来店履歴から補ったもの</b>が <b>'+b.noTag+'件</b>（予約の時に初回／リピーターを選ぶと、この数は減ります）。' : '')
-      + (b.mismatch ? '<br>⚠ 札は入っているが<b>来店履歴と食い違うもの</b>が <b>'+b.mismatch+'件</b>（数字は札のとおりに数えています。付け間違いの疑いだけ知らせています）。' : '')
+      + '<br><b>未チェック</b>＝予約の札を選んでいないもの。<b>どちらにも入れていません</b>（推測で埋めない）。'
+      + 'そのぶんリピーター％＋一見％は 100% になりません。<b>足りないぶんが、まだ埋まっていない量</b>です。'
+      + fixListHtml(b);
       + '</div>';
+  }
+
+  /* 🔴🔴 v2.61.0 **0にする対象の一覧**（ゆうたの大前提＝抜けは許容せず、0にする対象として数を出す）。
+     ⚠ 0の項目は**出さない**（0が正しい姿なので、並べると「まだ何かある」に見える）。 */
+  function fixListHtml(b){
+    var rows=[];
+    if(b.none) rows.push('<li><b>初回／リピーターの未選択</b>　<b class="vst-fix-n">'+b.none+'件</b>'
+      + '<span>予約詳細で選ぶと消えます。参考：来店履歴だと リピーター '+b.guessRep+'／一見 '+b.guessFirst
+      + '（データチェックの「終わった車で、必須の項目が空」にも出ています）</span></li>');
+    if(b.noSalesDate) rows.push('<li><b>売上日が空</b>　<b class="vst-fix-n">'+b.noSalesDate+'件</b>'
+      + '<span>売上日が無いと、その車が<b>スライドかどうか判断できません</b>。予約詳細の「売上日」で入れられます</span></li>');
+    if(b.mismatch) rows.push('<li><b>札と来店履歴が食い違う</b>　<b class="vst-fix-n">'+b.mismatch+'件</b>'
+      + '<span>数字は札のとおりに数えています。付け間違いの疑いだけ知らせています</span></li>');
+    if(!rows.length) return '<div class="vst-fix vst-fix-ok">✅ この期間の抜けは <b>0件</b>です。</div>';
+    return '<div class="vst-fix"><div class="vst-fix-h">0にする対象</div><ul>'+rows.join('')+'</ul></div>';
   }
 
   /* ═══ 当月 ═══ */

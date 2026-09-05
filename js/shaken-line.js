@@ -132,12 +132,18 @@
   function errorHtml(T){
     var ng=T.filter(function(t){return t.kind==='ng';});
     var W=words(T);
+    /* 🔴🔴 v2.61.0（ゆうたの大前提＝抜けは許容せず、0にする対象として数を出す）
+       **「落ちた所」が未記入の数を必ず立てる。** 書かれていないものは集計から静かに消えるので、
+       数を出さないと「理由が少ない月」に見えてしまう。 */
+    var ngNo = ng.filter(function(t){ return !t.note; }).length;
+    var rpNo = T.filter(function(t){ return t.kind==='repass' && !t.note; }).length;
     var h='<div class="sv-card"><div class="sv-card-h"><span><i data-ic=warn data-ics=16></i> エラー ── 落ちた中身</span>'
       + '<span class="sv-legend">不合格 '+ng.length+' 件／ひっかかった項目 '+W.total+' 個</span></div>';
     if(!W.list.length){
       h+='<div class="sv-empty">'+(ng.length
         ? 'この月の不合格 '+ng.length+' 件には「落ちた所」が書かれていません。記録する窓で1行入れると、ここに集計されます。'
-        : 'この月は落ちていません。')+'</div></div>';
+        : 'この月は落ちていません。')+'</div>'
+        + fixListHtml(ngNo, rpNo) + '</div>';
       return h;
     }
     var max=W.list[0].n;
@@ -151,8 +157,21 @@
     });
     h+='</div>';
     h+='<div class="sv-foot" style="margin:6px 2px 0">「戻し」＝そのまま不合格になって自社へ持ち帰った数。数字が無いものは、その回のうちに直して通っています（再検合格）。</div>';
+    h+=fixListHtml(ngNo, rpNo);
     h+='</div>';
     return h;
+  }
+
+  /* 🔴🔴 v2.61.0 **0にする対象**（落ちた所の未記入）。⚠ 0の時は「0件」と出す＝0が正しい姿だと分かるように。 */
+  function fixListHtml(ngNo, rpNo){
+    if(!ngNo && !rpNo) return '<div class="sln-fix sln-fix-ok">✅ 落ちた所は<b>全部書かれています</b>（未記入 0件）。</div>';
+    var li=[];
+    if(ngNo) li.push('<li><b>不合格で「落ちた所」が未記入</b>　<b class="sln-fix-n">'+ngNo+'件</b>'
+      + '<span>予約詳細の不合格の記録を押すと、あとから書き足せます</span></li>');
+    if(rpNo) li.push('<li><b>再検合格で「落ちた所」が未記入</b>　<b class="sln-fix-n">'+rpNo+'件</b>'
+      + '<span>その回で受かった車です。何でひっかかったかが残っていません</span></li>');
+    return '<div class="sln-fix"><div class="sln-fix-h">0にする対象</div><ul>'+li.join('')+'</ul>'
+      + '<div class="sln-fix-note">⚠ 未記入のぶんは上の集計に出てきません。ここが 0 でないと、理由の多い順は本当の順番ではありません。</div></div>';
   }
 
   /* 🔎 気をつけどころ＝**数字から出せることだけ**書く。

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.60.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.61.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -32,8 +32,8 @@
 <link rel="stylesheet" href="css/topbar.css?v=9">
 <link rel="stylesheet" href="css/help.css?v=1">
 <link rel="stylesheet" href="css/mech-summary.css?v=3">
-<link rel="stylesheet" href="css/sales-visit.css?v=2"><!-- 🔍 v2.59.0 売上ビューの「来店属性」タブ -->
-<link rel="stylesheet" href="css/shaken-line.css?v=1"><!-- 🔍 v2.58.0 作業サマリーの「車検ライン」タブ -->
+<link rel="stylesheet" href="css/sales-visit.css?v=3"><!-- 🔍 v2.59.0 売上ビューの「来店属性」タブ -->
+<link rel="stylesheet" href="css/shaken-line.css?v=2"><!-- 🔍 v2.58.0 作業サマリーの「車検ライン」タブ -->
 <link rel="stylesheet" href="css/inspect.css?v=11"><!-- 🩺 データチェック（日常チェック／クォーターチェック） -->
 <link rel="stylesheet" href="css/quarter.css?v=20"><!-- 🧾 クォーターチェック（②売上チェックリスト突合／③AIチェック） -->
 <link rel="stylesheet" href="css/members.css?v=7">
@@ -126,7 +126,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.60.0</div>
+    <div class="login-ver">v2.61.0</div>
   </div>
 </div>
 
@@ -140,7 +140,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.60.0</span>
+    <span class="ver">v2.61.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -907,10 +907,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/insurance-pit.js?v=1"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
 <script src="js/sales-count.js?v=7"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=5"></script>
-<script src="js/sales-visit.js?v=3"></script><!-- 🔍 v2.59.0 来店属性（売上ビューの5つ目のタブ）。**sales-date.js（売上日）と sales-count.js より後ろ／sales.js より前** -->
-<script src="js/sales.js?v=22"></script>
+<script src="js/sales-visit.js?v=4"></script><!-- 🔍 v2.59.0 来店属性（売上ビューの5つ目のタブ）。**sales-date.js（売上日）と sales-count.js より後ろ／sales.js より前** -->
+<script src="js/sales.js?v=23"></script>
 <script src="js/sales-print.js?v=5"></script>
-<script src="js/shaken-line.js?v=1"></script><!-- 🔍 v2.58.0 車検ライン（作業サマリーの2つ目のタブ）。mech-summary より前に読む -->
+<script src="js/shaken-line.js?v=2"></script><!-- 🔍 v2.58.0 車検ライン（作業サマリーの2つ目のタブ）。mech-summary より前に読む -->
 <script src="js/mech-summary.js?v=8"></script>
 <script src="js/inspect-rules.js?v=21"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=6"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->

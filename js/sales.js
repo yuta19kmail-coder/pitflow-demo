@@ -961,6 +961,7 @@
       var vRow=function(lb,f,cols,tt){ return [lb].concat(cols.map(function(c){return String(f(c.b));})).concat([String(f(tt))]); };
       var vPct=function(n,d){ return d>0 ? Math.round(n/d*100)+'%' : '—'; };
       var vRep=function(b){ return b.insp.rep+b.gen.rep; }, vFst=function(b){ return b.insp.first+b.gen.first; };
+      var vNone=function(b){ return b.insp.none+b.gen.none; };
       var cols, tt, period;
       if(yr){ var dY=pitVisitCollectYear(window._svYear); cols=dY.slots; tt=dY.total; period=(window._svYear-1)+'年12月〜'+window._svYear+'年11月'; }
       else { var ym2=window._svYM; cols=pitVisitQuarters(ym2.y, ym2.m);
@@ -973,6 +974,7 @@
         vRow('一般 一見',function(b){return b.gen.first;},cols,tt),
         vRow('合計 リピーター',vRep,cols,tt),
         vRow('合計 一見',vFst,cols,tt),
+        vRow('未チェック（初回／リピーター 未選択）',vNone,cols,tt),
         vRow('IR率 リピーター',function(b){return vPct(vRep(b),b.all);},cols,tt),
         vRow('IR率 一見',function(b){return vPct(vFst(b),b.all);},cols,tt),
         vRow('KY率 国産',function(b){return b.dom;},cols,tt),
@@ -987,10 +989,13 @@
               {label:'IR率（リピーター）',value:vPct(vRep(tt),tt.all)},
               {label:'IR率（一見）',value:vPct(vFst(tt),tt.all)},
               {label:'KY率（国産／輸入）',value:vPct(tt.dom,tt.all)+' / '+vPct(tt.imp,tt.all)}],
+        /* 🔴 v2.61.0 紙にも「0にする対象」を出す（月末に紙で潰せるように） */
         sections:[{ type:'table', title:(yr?'月ごと':'クォーター結果（1〜7／8〜15／16〜23／24〜末）'),
           head:[yr?'入庫台数':'内容'].concat(cols.map(function(c){return c.label;})).concat(['合計']),
           rows:rows, align:['l'].concat(cols.map(function(){return 'r';})).concat(['r']) }],
-        note:'実績になった車（実績カウント日＝返車ベース／売上なし・社内車両は除く）。車検・点検＝車検か12点が入っているもの／一般＝それ以外ぜんぶ。リピーター＝その実績日より前に同じお客様の来店があるもの。' };
+        note:'実績になった車（実績カウント日＝返車ベース／売上なし・社内車両は除く）。車検・点検＝車検か12点が入っているもの／一般＝それ以外ぜんぶ。'
+          + 'リピーター／一見＝予約の「初回／リピーター」の札。札が空のものは未チェックとして分けています（推測で埋めていません）。'
+          + '　0にする対象：未選択 '+vNone(tt)+'件／売上日が空 '+(tt.noSalesDate||0)+'件／札と来店履歴の食い違い '+(tt.mismatch||0)+'件。' };
     }
     if(tab==='sales' && !yr){
       var ym=window._svYM; var d=collectMonth(ymdL(new Date(ym.y,ym.m,1)),ymdL(new Date(ym.y,ym.m+1,0))); var t=d.tiers;

@@ -2710,6 +2710,14 @@ td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(11
   border:1px solid rgba(214,168,70,.5);
   background:repeating-linear-gradient(45deg,rgba(214,168,70,.16) 0 6px,rgba(214,168,70,.04) 6px 12px); }
 .mb-chip.gone{ opacity:.38; text-decoration:line-through; }
+/* 🔴 v2.68.0 候補の横の小さい×（この1本だけ取り消す）。
+   ⚠ 押せる的は小さすぎないようにする（見た目は小さく、当たり判定は広め）。 */
+.mb-chip{ display:inline-flex; align-items:center; gap:5px; }
+.mb-x{ display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; margin-right:-3px;
+  border:0; border-radius:50%; background:rgba(0,0,0,.22); color:inherit; opacity:.6;
+  font-size:12px; line-height:1; font-family:inherit; cursor:pointer; padding:0; }
+.mb-x:hover{ opacity:1; background:var(--red); color:#fff; }
+.mb-chip.gone .mb-x{ text-decoration:none; }
 .mb-chip.fixed{ background:rgb(214,168,70); color:#3a2a00; border-color:rgb(214,168,70); }
 .mb-chip.add{ color:var(--text3); border:1px dashed var(--border2); background:transparent; cursor:pointer; }
 .mb-chip.add:hover{ color:var(--text); border-color:var(--brand); }

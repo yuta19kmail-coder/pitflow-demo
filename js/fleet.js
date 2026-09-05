@@ -54,7 +54,7 @@ function renderFleet(){
   if (!Array.isArray(state.companyCars)) state.companyCars = [];
   if (typeof _loEnsureOpts === 'function') _loEnsureOpts();   // 代車の装備オプション初期化（未設定分）
   _flEvents();
-  try { pitRefreshAutoTenken(); } catch (e) { console.warn('[fleet] 点検の自動計算でエラー', e); }
+  try { pitCleanupAutoVehEvents(); } catch (e) { console.warn('[fleet] 古い予定の片付けでエラー', e); }
 
   let h = '';
 
@@ -351,7 +351,9 @@ function flMonthCalHtml(){
       if (tk && tk.slice(0,7) === ym)
         inner += '<div class="fl-due tk" title="12ヶ月点検の目安">12点 ' + _flMd(tk) + '</div>';
       /* ④ 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） */
-      pitLoanerSpan(v.id, first, last, { kinds:['event'] }).filter(function(x){ return !x.auto; })
+      /* 🔴 v2.70.1 ここで `!x.auto` を書かない。**物差し（loaner-free.js）が弾く。**
+         ⚠ 画面側で隠していたせいで、隠していない代車カレンダーにだけ残って見えていた。同じことを繰り返さない。 */
+      pitLoanerSpan(v.id, first, last, { kinds:['event'] })
         .forEach(function(x){
           inner += '<div class="fl-ev" title="' + _fleetEsc(x.from + '〜' + x.to) + '"'
                  + ' onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
@@ -431,7 +433,7 @@ function flDayCalHtml(y, mo){
               + '<span class="st">' + _fleetEsc(bb.b.stateLabel) + '</span></div>' + inner;
       }
       /* 自由イベント＝丸＋名前ぜんぶ */
-      day.events.filter(function(x){ return !x.auto; }).forEach(function(x){
+      day.events.forEach(function(x){   /* ⚠ 自動のぶんは物差しが弾く（v2.70.1）。ここで数えない */
         inner += '<div class="fl-ev" onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
                + '<i style="background:' + x.color + '"></i>' + _fleetEsc(x.label) + '</div>';
       });
@@ -521,6 +523,10 @@ function flEventSubmit(){
   if (window.PitDB) PitDB.save();
   flEventClose();
   renderFleet();
+  /* 🔴 v2.70.1 いま見ている画面も描き直す。
+     ⚠ この窓は**代車カレンダーからも開く**ようになった（前は車両管理からだけ）。
+        `renderFleet()` だけだと、代車カレンダーで消しても消えたように見えない。 */
+  if (window.state && state.currentView && state.currentView !== 'fleet' && window.showView) showView(state.currentView);
 }
 function flEventDelete(){
   if (!_flEvtEditId) return;
@@ -530,6 +536,7 @@ function flEventDelete(){
     if (window.PitDB) PitDB.save();
     flEventClose();
     renderFleet();
+    if (window.state && state.currentView && state.currentView !== 'fleet' && window.showView) showView(state.currentView);
   });
 }
 
@@ -674,15 +681,15 @@ document.addEventListener('mousedown', function(e){
   const box=document.getElementById('fl-plate');
   if(box && box.classList.contains('open') && !box.contains(e.target)) box.classList.remove('open');
 });
-/* 車検満了/12点 → カレンダーに自動でイベント（車両×種別で1件・上書き更新）。代車カレンダーにも出る。 */
-function _flSyncVehEvent(vehicleId, type, date){
-  const eid = 'auto_' + vehicleId + '_' + type;
-  const evs = _flEvents();
-  const i = evs.findIndex(function(e){ return e.id === eid; });
-  if (!date){ if (i>=0) evs.splice(i,1); return; }
-  const rec = { id:eid, vehicleId:vehicleId, type:type, label:(FL_EVT_TYPES[type]?FL_EVT_TYPES[type].label:''), fromDate:date, toDate:date, auto:true };
-  if (i>=0) evs[i]=rec; else evs.push(rec);
-}
+/* 🔴🔴 v2.70.1 **車を保存した時に「車検入庫」「12ヶ月点検」を自動で作るのはやめた。**
+   ◎前まで … 保存のたびに `auto_<車id>_shakenIn` / `_tenken` を `fleetEvents` に作っていた。
+     v1.12 の、まだ整備の仕組みが無かったころの作り。
+   ◎なぜやめたか … 同じことを**整備の枠（カード）が全部やっている**。二重に持つと必ず食い違う。
+     しかも車両カレンダーは画面側で「自動のぶんは隠す」としていただけなので、
+     **代車カレンダーにだけ古い車検の予定が残って見えていた**（ゆうた報告 2026-09-05）。
+     消しても、車を保存した瞬間に**また作られて**いた。
+   ⚠ 残っている古いぶんは、下の `pitCleanupAutoVehEvents` が画面を開いた時に片付ける。
+   ⚠ 手で入れた「車検入庫」には自動の印が付かない＝**そのまま残る**（人が入れたものは勝手に消さない）。 */
 
 /* ===== v1.12.0 車両の詳細（閲覧のみ）=====
    カードをクリック → ここで中身を見る → 「編集」で入力画面へ（削除はその入力画面の中）。
@@ -812,25 +819,31 @@ window.flWarekiSync = function () {
 
 /* v1.14.7：12ヶ月点検は「今日」から見て前後どちらに来るかが変わるので、
    画面を開くたびに自動イベントを貼り直す。変わったときだけ保存する（無駄な通信をしない）。 */
-window.pitRefreshAutoTenken = function () {
+/* 🔴🔴 v2.70.1（ゆうた報告 2026-09-05）
+   **アプリが勝手に作った古い予定を、画面を開いた時に片付ける。**
+   🗣「この代車に整備の仕組みになる以前の車検の予定みたいのが代車カレンダーに何個か残ってるんだよね」
+   ◎正体 … v1.12 のころ、車を保存するたびに作っていた `auto_<車id>_shakenIn` / `_tenken`。
+     ・車両カレンダーは画面側で隠していた（v2.46.0「今元のバッチとダブっちゃってる」の時）
+     ・**代車カレンダーは隠していなかった**＝そこにだけ残って見えていた
+     ・しかも車を保存するたびに作り直されていたので、消しても戻ってきた
+   ◎いま … 作るのをやめた（上の注記）＋**残っているぶんはここで消す**。
+   ⚠ 消すのは**自動の印（auto）が付いているものだけ**。
+      手で入れた「車検入庫」「12ヶ月点検」は**そのまま残る**（人が入れたものは勝手に消さない）。
+   ⚠ 前の名前は「点検を貼り直す」だった。**やることが逆になったので名前も変えた。**
+      呼ぶ側＝車両管理（renderFleet）と代車カレンダー（renderLoaner）の2ヶ所。 */
+window.pitCleanupAutoVehEvents = function () {
   if (typeof state === 'undefined' || !state) return false;
   const evs = _flEvents();
-  let changed = false;
-  _flAllVehicles().forEach(function (v) {
-    const eid = 'auto_' + v.id + '_tenken';
-    const want = (v.shakenDate && window.pitTenkenFromShaken) ? pitTenkenFromShaken(v.shakenDate) : '';
-    const i = evs.findIndex(function (e) { return e.id === eid; });
-    if (!want) { if (i >= 0) { evs.splice(i, 1); changed = true; } return; }
-    if (i < 0) {
-      evs.push({ id: eid, vehicleId: v.id, type: 'tenken', label: FL_EVT_TYPES.tenken.label,
-                 fromDate: want, toDate: want, auto: true });
-      changed = true;
-    } else if (evs[i].fromDate !== want || evs[i].toDate !== want) {
-      evs[i].fromDate = want; evs[i].toDate = want; changed = true;
-    }
-  });
-  if (changed && window.PitDB && PitDB.save) { try { PitDB.save(); } catch (e) { console.warn('[fleet] 点検の貼り直しで保存できず', e); } }
-  return changed;
+  const before = evs.length;
+  const keep = evs.filter(function (e) { return !(e && e.auto); });
+  if (keep.length === before) return false;
+  state.fleetEvents = keep;
+  try {
+    if (window.pitLog) pitLog('前の仕組みの車検・点検の予定を片付けた（' + (before - keep.length) + '件）',
+      { auto: true, kind: 'auto' });
+  } catch (e) {}
+  if (window.PitDB && PitDB.save) { try { PitDB.save(); } catch (e) { console.warn('[fleet] 古い予定の片付けで保存できず', e); } }
+  return true;
 };
 
 function fleetOpenModal(id){
@@ -977,8 +990,6 @@ function _fleetSubmitInner(){
       /* 🔗 v2.62.0 紐づけ。外した時は欄ごと消す（空文字を残すと「結んである」と読み違える元） */
       if (_flLink.custId && _flLink.custVehId){ f.v.custId=_flLink.custId; f.v.custVehId=_flLink.custVehId; }
       else { delete f.v.custId; delete f.v.custVehId; }
-      _flSyncVehEvent(f.v.id, 'shakenIn', shaken);
-      _flSyncVehEvent(f.v.id, 'tenken', tenken);
     }
   } else {
     const id = (kind === 'loaner' ? 'L' : 'C') + Date.now().toString(36);
@@ -989,8 +1000,6 @@ function _fleetSubmitInner(){
     if (_flLink.custId && _flLink.custVehId){ rec.custId=_flLink.custId; rec.custVehId=_flLink.custVehId; }
     (kind === 'loaner' ? state.loaners : state.companyCars).push(rec);
     _fleetEditId = id;   /* v1.14.2：万一もう一度押されても、増やさずに同じ車両を直す */
-    _flSyncVehEvent(id, 'shakenIn', shaken);
-    _flSyncVehEvent(id, 'tenken', tenken);
     // 入替予定＝旧車のカレンダーに「代車入替」イベント（〜入替日）＋新車にも開始予定
     if (dupLoaner && repDate){
       _flEvents().push({ id:'rep_'+id, vehicleId:dupLoaner.id, type:'lease', label:'代車'+number+'入替→新車へ', fromDate:ymd(new Date()), toDate:repDate });

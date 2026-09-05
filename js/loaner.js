@@ -793,6 +793,29 @@ function _loRenderDays(start, n){
          　 `loaner-free.js` は index.html で**必ずこのファイルより前**に読む（そういう決めごと）。
          ⚠ 種類（貸出／仮押さえ／代車自身の予定／これから足す整備の枠）を増やすのは部品の側。 */
       const day = pitLoanerDay(l.id, dStr);
+      /* 🔧🔴 v2.70.0（ゆうた確定 2026-09-05）**代車カレンダーに整備予定を出す。**
+         ◎前まで … このカレンダーは貸出・仮押さえ・代車自身の予定しか読んでいなかった。
+           なのに「空いているか」の物差し（pitLoanerDay().busy）は**確定の整備をふさがりに数える**。
+           ＝ **マスは空いて見えるのに、貸そうとすると警告だけ出る**（理由が画面に無い）。
+         ◎いま … 太い縦バー＋作業名の札で出す（ゆうた指定「太い縦バーで外わくなし」）。
+           🔴 縦バーは**期間ぜんぶの日**に引き、**最初と最後だけ丸める**（途中は地続き）。
+           🔴 札は**最初の日に1枚だけ**。貸出の札が乗る日には出さない（重ねない）。
+           ⚠ 候補は**代車をふさがない**＝今までどおり貸せる。見た目も薄い方にする。 */
+      let mtLine = '', mtTag = '';
+      if (day.maints.length){
+        const mt = day.maints[0];
+        const mCls = (mt.stage === 'fixed' ? 'fixed' : 'cand');
+        mtLine = '<span class="lo-mtline ' + mCls + (mt.isStart ? ' st' : '') + (mt.isEnd ? ' en' : '') + '"></span>';
+        if (mt.isStart){
+          const _dot = (window.pitMaintWorkDot ? pitMaintWorkDot(mt.work) : 'wk-general');
+          mtTag = '<span class="lo-mt ' + mCls + '" title="'
+            + _loEsc(mt.label + ' ' + mt.from + '〜' + mt.to + '（' + (mt.stage === 'fixed' ? '確定' : '予定') + '）')
+            + '" onclick="event.stopPropagation();flMaintChip(\'' + mt.id + '\')">'
+            + '<i class="fl-dot ' + _dot + '"></i>'
+            + _loEsc((window.PIT_MAINT_WORK_SHORT && PIT_MAINT_WORK_SHORT[mt.work]) || mt.label)
+            + ' ' + (mt.stage === 'fixed' ? '整備中' : '予定') + '</span>';
+        }
+      }
       // 車両イベント（車検・点検・修理等）の予定オーバーレイ＝日付枠で目立たせる（セル全体を色づけ＋ラベル）
       let ov = '', evCls = '';
       const evs = day.events;
@@ -887,12 +910,14 @@ function _loRenderDays(start, n){
              ⚠ 中にアイコンを入れない。入れると線のV字が戻って、また先が浮いて見える。 */
           h += '<span class="lo-end"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '" title="下へドラッグで返却日を伸ばせます"></span>';
         }
-        h += ov + hv + '</div>';
+        /* 🔧 整備の縦バーは貸出の日にも引く（＝重なっていることが目で分かる）。
+           ⚠ 札は貸出の札が出る日には出さない（重ねない）。 */
+        h += ov + hv + mtLine + (isStart ? '' : mtTag) + '</div>';
       } else {
         /* 🅿 v2.40.0 仮押さえの日は `.lo-free` を付けない
            ＝ドラッグの範囲選択に入らない（押したら「解除」の窓が開く）。 */
         h += '<div class="lo-cell ' + (hold ? 'lo-hold' : 'lo-free') + (isToday ? ' lo-today' : '') + evCls + hCls + dayMods + '"' + attrs
-           + (hold ? ' onclick="loHoldMenu(event,\'' + hold.id + '\')"' : '') + '>' + dayBg + gh + ov + hv + '</div>';
+           + (hold ? ' onclick="loHoldMenu(event,\'' + hold.id + '\')"' : '') + '>' + dayBg + gh + ov + hv + mtLine + mtTag + '</div>';
       }
     });
   }
@@ -1631,6 +1656,9 @@ window.loHelp = function(){
     + '<div>' + sw(hatch('116,152,200')) + '🅿 仮押さえ</div>'
     + '<div>' + sw('background:#5b6675') + '返却済み</div>'
     + '<div>' + sw('background:#ef4444') + '緊急車両</div>'
+    /* 🔧 v2.70.0 この代車自身の整備予定。**縦バーだけは色の意味が別**（貸出ではない）ので、必ずここに書く。 */
+    + '<div>' + sw('background:var(--pit-maint,#d6a846);width:8px') + '🔧 整備（確定）＝この期間は押さえています</div>'
+    + '<div>' + sw('background:color-mix(in srgb,var(--pit-maint,#d6a846) 45%,transparent);width:8px') + '🔧 整備（予定）＝<b>まだ貸せます</b></div>'
     + '</div>'
     + '<h5>さわり方</h5><div class="lo-help-kv">'
     + '<b>空きを押す／なぞる</b><span>「仮押さえ」か「予約以外で貸出」を選ぶ</span>'
@@ -1649,6 +1677,8 @@ window.loHelp = function(){
     + '<li>灰色＝返却済み。<b>消せません</b>（貸した記録として残す決まり）</li>'
     + '<li>緊急車両はいちばん左の列。返車が済むと列ごと消えます（記録は残ります）</li>'
     + '<li>引退した代車は列に出ません。過去の貸出・履歴は残っています</li>'
+    + '<li>🔧 左の<b>太い縦バー</b>＝この代車自身の整備。<b>確定は貸せません／予定はまだ貸せます</b>。'
+    + '押すと車両管理の作業予定へ飛びます（<b>前は何も出ていないのに警告だけ出て</b>いた所です）</li>'
     + '</ul></div>';
   ov.addEventListener('click', function(e){ if (e.target === ov) loHelpClose(); });
   document.body.appendChild(ov);

@@ -1,0 +1,142 @@
+/* ==========================================================================
+   fleet-cal.css ── 車両カレンダー／代車カレンダーの整備予定（PitFlow v2.70.0）
+   --------------------------------------------------------------------------
+   🔴🔴 ゆうた承認 2026-09-05（モック「車両カレンダー」「代車カレンダーの整備予定」のとおり）
+
+   ◎決めごと（凡例と1対1。**ここに無い見た目は画面に出さない**）
+     ① マスは縦積み ② 網掛けは1か所も使わない ③ 字は 11px 以上
+     ④ 色＝**状態**（未割当＝赤／予定＝黄／確定＝緑／超過＝ベタ赤）
+     ⑤ 作業の種類は**前の小さい四角**（車検＝赤・12点＝橙・一般＝黄緑・B.P＝紫）
+     ⑥ ベタ塗りは「手遅れになると困る日」だけ＝**超過と満了日**
+     ⑦ 期限（満了・12点）は札にしない＝**左に色の縦線の1行**
+
+   ⚠ 読み込みは polish.css の**後ろ**（ここが上書きする側）。
+   ⚠ 色は全部この1枚に集めた。JS 側では綴らない（綴ると必ず2ヶ所がズレる）。
+   ========================================================================== */
+
+/* ── 作業の種類の四角（車検・12点・一般・B.P）＝カレンダーもボードもこの色 ── */
+.fl-dot{ display:inline-block; width:9px; height:9px; border-radius:2px; flex:0 0 auto;
+  box-shadow:0 0 0 1px var(--bg2); }
+.wk-shaken { background:#ef4444; }
+.wk-12pt   { background:#f97316; }
+.wk-general{ background:#84cc16; }
+.wk-bp     { background:#a855f7; }
+/* 🔴 ボードの作業タグも同じ意味の色にそろえた（前は 一般＝紫・B.P＝あお＝画面ごとに違った） */
+.mb-k-general{ background:rgba(132,204,22,.16); color:#bef264; border:1px solid rgba(132,204,22,.4); }
+.mb-k-bp     { background:rgba(168,85,247,.16); color:#d8b4fe; border:1px solid rgba(168,85,247,.4); }
+
+/* ── 凡例 ── */
+.fl-lg{ display:flex; flex-wrap:wrap; gap:14px; padding:9px 14px;
+  background:var(--bg1); border-bottom:1px solid var(--border); }
+.fl-lg-g{ display:flex; align-items:center; gap:7px; font-size:11px; font-weight:700; color:var(--text2); }
+.fl-lg-t{ color:var(--text3); font-weight:800; }
+.fl-lg-n{ font-size:10.5px; color:var(--text3); font-weight:700; }
+.fl-lg-n b{ color:var(--text2); }
+.fl-lg-w{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800; color:var(--text2); }
+.fl-lg-sq{ display:inline-flex; align-items:center; justify-content:center; width:50px; height:24px;
+  border-radius:5px; font-size:11px; font-weight:900; }
+.fl-lg-sq.exp{ background:var(--red); color:#fff; box-shadow:inset 0 0 0 2px rgba(255,255,255,.42); }
+.fl-lg-sq.tkc{ background:rgba(245,158,11,.9); color:#3a2400; box-shadow:inset 0 0 0 2px rgba(255,255,255,.32); }
+.fl-lg-sw{ display:inline-block; width:28px; height:16px; border-radius:4px; border:1px solid var(--border); }
+.fl-lg-sw.lend{ background:rgba(38,162,105,.22); }
+.fl-lg-sw.hold{ background:rgba(38,162,105,.10); }
+
+/* ── マス（縦積み・大きめ） ─────────────────────────────
+   🔴 いちばん効いた直し。前は「横に並べて中央寄せ・折り返し」だったので、
+      札が2つ以上あると横に並んで両方潰れていた。 */
+.fl-cal-new .fl-cal-cell{ display:flex; flex-direction:column; align-items:stretch; justify-content:flex-start;
+  gap:4px; min-height:58px; padding:6px; position:relative; flex-wrap:nowrap; }
+.fl-cal-new .fl-cal-name{ font-size:13px; font-weight:700; padding:10px 12px; }
+.fl-cal-new .fl-cal-h{ font-size:12.5px; padding:9px 4px; }
+
+/* ── 1ヶ月ぶんの札（12点・一般・B.P・超過） ── */
+.fl-mb{ display:flex; align-items:center; gap:6px; border-radius:8px; padding:5px 8px;
+  font-size:11.5px; font-weight:800; line-height:1.3; cursor:pointer; min-width:0; }
+.fl-mb b{ flex:0 0 auto; }
+.fl-mb .st{ flex:0 0 auto; margin-left:auto; font-weight:800; }
+.fl-mb.tbd  { background:rgba(239,68,68,.16);  color:#f9a8a8; border:1px solid rgba(239,68,68,.50); }
+.fl-mb.cand { background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.50); }
+.fl-mb.fixed{ background:rgba(29,185,122,.18); color:#4ade80; border:1px solid rgba(29,185,122,.55); }
+.fl-mb.over { background:var(--red); color:#fff; border:1px solid var(--red); }
+
+/* ── ぶち抜きのバー（月ビュー＝車検の3ヶ月／日ビュー＝整備の枠の期間ぜんぶ） ──
+   🔴 3ヶ月ぶん同じ札が3つ並ぶのをやめた。「これで1本の車検」だと**形**で分かる。
+   ⚠ バーが乗るマスは上に場所を空ける（.barpad）。空けないと下の中身と重なる。
+   ⚠ バーは上の 22px だけ＝その下はふつうになぞれる（日ビューの候補ドラッグ）。 */
+.fl-cal-new .fl-bar3{ position:absolute; left:6px; top:6px; height:23px; z-index:2;
+  display:flex; align-items:center; gap:6px; padding:0 9px; border-radius:8px;
+  font-size:11.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  cursor:pointer; box-sizing:border-box; }
+.fl-cal-new .fl-bar3 b{ overflow:hidden; text-overflow:ellipsis; }
+.fl-cal-new .fl-bar3 .st{ margin-left:auto; }
+.fl-cal-new .fl-bar3.tbd  { background:rgba(239,68,68,.16);  color:#f9a8a8; border:1px solid rgba(239,68,68,.50); }
+.fl-cal-new .fl-bar3.cand { background:rgba(245,158,11,.16); color:#fbbf24; border:1px solid rgba(245,158,11,.50); }
+.fl-cal-new .fl-bar3.fixed{ background:rgba(29,185,122,.18); color:#4ade80; border:1px solid rgba(29,185,122,.55); }
+.fl-cal-new .fl-bar3.over { background:var(--red); color:#fff; border:1px solid var(--red); }
+/* 画面の外へ続いている側＝角を落として点線（まだ続く、が読める） */
+.fl-cal-new .fl-bar3.cutL{ border-top-left-radius:0; border-bottom-left-radius:0; border-left-style:dashed; }
+.fl-cal-new .fl-bar3.cutR{ border-top-right-radius:0; border-bottom-right-radius:0; border-right-style:dashed; }
+.fl-cal-new .fl-cal-cell.barpad{ padding-top:35px; }
+
+/* ── 期限＝札にしない。左に色の縦線の1行 ──
+   ⚠ 赤が「未割当」と同じ色になるので、**形**（札か、縦線の行か）で分ける。 */
+.fl-due{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:800; color:#f9a8a8;
+  border-left:3px solid var(--red); padding-left:7px; line-height:1.5; }
+.fl-due.tk{ color:#fbbf24; border-left-color:var(--orange); }
+
+/* ── 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） ── */
+.fl-ev{ display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--text2);
+  min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.fl-ev i{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+
+/* ── 日ビュー：貸出・仮押さえ ──
+   🔴 ゆうた 2026-09-05「いまの緑・やや透過の方が見やすい。もうほんとちょっと鮮やかで透過で」
+      ＝ 緑のまま、.14 → .22 へ。仮押さえは同じ緑の薄い方（.10）＋名前の頭に「仮」。
+   ⚠ 透過のまま＝**背景**。整備のバーと満了はこの上に乗る。 */
+.fl-cal-new .fl-cal-cell.fl-use{ background:rgba(38,162,105,.22); }
+.fl-cal-new .fl-cal-cell.fl-use.fl-hold{ background:rgba(38,162,105,.10) !important; }
+.fl-cal-new .fl-use-tag{ font-size:10.5px; font-weight:800; color:#7ee0b0; opacity:1;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+.fl-cal-new .fl-cal-cell.fl-use.fl-hold .fl-use-tag{ color:#5fae8b; }
+
+/* ── 日ビュー：満了日・12点の日＝マスごと塗る ──
+   🔴🔴 ゆうた指定 2026-09-05「日ビューの満了だけわかりにくい。逆に最も目立つぐらいじゃないと」
+      ＝ その日を過ぎたら車検が切れる日。前は上端の細い3pxの線＋小さい字で、ほぼ気づけなかった。
+   ⚠ 「ベタ塗り＝超過だけ」の決めごとを、**「ベタ塗り＝手遅れになると困る日」**に広げた。 */
+.fl-cal-new .fl-cal-cell.d-exp{ background:var(--red) !important; box-shadow:inset 0 0 0 2px rgba(255,255,255,.42); }
+.fl-cal-new .fl-cal-cell.d-tkc{ background:rgba(245,158,11,.9) !important; box-shadow:inset 0 0 0 2px rgba(255,255,255,.32); }
+.fl-big{ margin-top:auto; margin-bottom:auto; text-align:center; color:#fff; font-weight:900;
+  font-size:13px; line-height:1.2; letter-spacing:.5px; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+.fl-big small{ display:block; font-size:10.5px; font-weight:800; opacity:.92; letter-spacing:0; }
+.fl-big.tk{ color:#3a2400; text-shadow:none; }
+.fl-cal-new .fl-cal-cell.d-exp .fl-use-tag,
+.fl-cal-new .fl-cal-cell.d-tkc .fl-use-tag{ color:#fff; opacity:.9; }
+
+/* ==========================================================================
+   代車カレンダー（代車ビュー）に出す整備予定
+   --------------------------------------------------------------------------
+   🔴🔴 ゆうた確定 2026-09-05：**太い縦バー・マスの外わく無し**（D案）。
+     🗣「太い縦バーで外わくなしは」
+     🗣「連続の日は同士は丸めないで　最初と最後だけ丸める」
+   ◎なぜ必要だったか
+     代車カレンダーは `day.lends / holds / events` しか読んでいなかったので、
+     **整備の枠が1本も出ていなかった**。なのに「空いているか」の物差しは確定の整備を
+     ふさがりに数える＝**マスは空いて見えるのに警告だけ出る**、が起きていた。
+   ◎決めごと
+     ・縦バーは**期間ぜんぶの日**に引く。**最初と最後だけ丸める**（途中の日は角なしで地続き）
+     ・札（作業名）は**最初の日に1枚だけ**。貸出の札が乗っている日には出さない（重ねない）
+     ・確定＝濃い／候補＝薄い。**候補は代車をふさがない**（今までどおり貸せる）
+   ⚠ 色は車両管理と同じ「整備の色」（--pit-maint）。ここで別の色を作らない。
+   ========================================================================== */
+.lo-cell{ position:relative; }
+.lo-mtline{ position:absolute; left:3px; top:-1px; bottom:-1px; width:6px; border-radius:0; z-index:2;
+  background:var(--pit-maint,#d6a846); pointer-events:none; }
+.lo-mtline.st{ top:3px; border-top-left-radius:3px; border-top-right-radius:3px; }
+.lo-mtline.en{ bottom:3px; border-bottom-left-radius:3px; border-bottom-right-radius:3px; }
+.lo-mtline.cand{ background:color-mix(in srgb, var(--pit-maint,#d6a846) 45%, transparent); }
+.lo-mt{ position:absolute; left:0; top:0; width:100%; z-index:3;
+  display:flex; align-items:flex-start; gap:6px; padding:4px 6px 0 15px;
+  font-size:11px; font-weight:800; color:#e8cf9a; white-space:nowrap; overflow:hidden;
+  cursor:pointer; background:none; border:0; }
+.lo-mt.cand{ color:#b99a5f; font-weight:700; }
+.lo-mt i{ margin-top:2px; }

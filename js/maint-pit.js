@@ -12,7 +12,8 @@
    ◎このファイルが持つもの
      pitMaintRows(today)   … ボードに出す行（月の目標＋保存済みの候補/確定＋警告を1つにまとめたもの）
      flMaintBoardHtml()    … ボードのHTML（renderFleet が呼ぶ）
-     pitMaintBadges(v, ym) … 月カレンダーのバッジ（fleet.js が呼ぶ）
+     pitMaintCalItems(v)   … 車両カレンダー（月の軸）に出す「やること」（fleet.js が呼ぶ）
+     pitMaintDayBars(id,f,t) … 日の軸に出す整備の枠。車両カレンダーの日ビューと代車カレンダーが呼ぶ
      flMaintAdd/Save/Drop  … 修理の手入力・取り下げ
      flMaintGoto           … 「日を決める」＝代車カレンダーへ飛ぶ
 
@@ -149,7 +150,16 @@
   try { document.documentElement.style.setProperty('--pit-maint', MAINT_COLOR); } catch (e) {}
 
   var WORK_LB = { shaken:'車検', '12pt':'12ヶ月点検', general:'一般（修理）', bp:'B.P' };
-  var WORK_CLS = { shaken:'mb-k-shaken', '12pt':'mb-k-12', general:'mb-k-fix', bp:'mb-k-gen' };
+  /* 🔴 v2.70.0（ゆうた指定 2026-09-05）**作業の色は、どの画面でも同じ。**
+     ◎前まで … ボードは 一般＝紫・B.P＝あお、カレンダーは金一色。**画面ごとに意味が違った。**
+     ◎いま  … 車検＝赤／12点＝橙／一般＝黄緑／B.P＝紫 の1組だけ。
+     ⚠ 色そのものは CSS（css/fleet-cal.css の .wk-*）が持つ。ここは**クラス名だけ**を配る。
+        ＝ js に色を綴らない（綴ると CSS と2ヶ所になって必ずズレる）。 */
+  var WORK_CLS   = { shaken:'mb-k-shaken', '12pt':'mb-k-12', general:'mb-k-general', bp:'mb-k-bp' };
+  /* 作業の短い名前＝カレンダーのマスに入る長さ（ボードは WORK_LB の長い方を使う） */
+  var WORK_SHORT = { shaken:'車検', '12pt':'12点', general:'一般', bp:'B.P' };
+  /* 作業タイプ ⇔ 四角の色クラス。CSS 側の .wk-shaken / .wk-12pt / .wk-general / .wk-bp と対。 */
+  function workDot(work){ return 'wk-' + (WORK_SHORT[work] ? work : 'general'); }
 
   /* ==================================================================
      ボードに出す行を組み立てる
@@ -270,44 +280,86 @@
   }
 
   /* ==================================================================
-     月カレンダーのバッジ（fleet.js が1マスごとに呼ぶ）
-     🔴 車検は **満了月＋その前2ヶ月の3ヶ月**（ゆうた指定「満了日の前2月分にも」）。
+     🔴🔴 v2.70.0（ゆうた承認 2026-09-05・モックのとおり）
+     **車両カレンダーに出す「やること」＝ここが物差し1本。**
+     ------------------------------------------------------------------
+     ◎前まで（badges）… 1マスぶんの札を、文字列にして返していた。
+       ・車検は満了月＋前2ヶ月に**同じ札が3つ**並んで、別々の車検3本に見えた
+       ・色は「確定か候補か」しか表しておらず、**作業の種類が読めなかった**
+       ・満了日が整備の札と**同じ形**で出ていて、予定なのか期限なのか区別が付かなかった
+
+     ◎いま … **1つの整備＝1件**を返す。どのマスに置くかは月の配列で渡す。
+       state       … 'over'（超過）／'fixed'（確定）／'cand'（予定）／'tbd'（未割当）
+       months      … 出る月。**車検は満了月＋その前2ヶ月の3ヶ月**＝画面は1本のバーで描く
+       bar         … 月をまたぐ（＝ぶち抜きのバーにする）か
+       workDot     … 作業の種類を表す小さい四角のクラス（色は CSS が持つ）
+     🔴 色の意味は**状態**（未割当＝赤／予定＝黄／確定＝緑／超過＝ベタ赤）。
+        作業の種類では色を変えない＝「赤い所から手を打つ」が遠目で読める。
+     ⚠ 満了日そのものはここでは返さない。**期限は「やること」ではない**ので、
+        画面側が車の `shakenDate` から別の行（左に赤い縦線）で出す。
      ================================================================== */
-  function badges(v, ym, todayStr){
+  function calItems(v, todayStr){
     var td = todayStr || today();
     var out = [];
     if (!v || v.retired) return out;
     rows(td).forEach(function(r){
       if (r.vehicleId !== v.id) return;
       var p = r.plan;
-      /* 満了超過＝今月の列に赤で出す（消えないように） */
-      if (p.overdue && ym === ymOf(td)){
-        out.push({ cls:'bad', text:'🚨 ' + r.workLabel + '超過', title:'満了 ' + p.dueDate + '（貸出は止めていません）', gid:r.groupId, ym:ym });
-        return;
-      }
-      if (p.months.indexOf(ym) < 0 && p.ym !== ym) return;
-      /* 確定・候補がその月にあれば実体のバッジ */
-      var inMonth = r.candidates.filter(function(c){ return ymOf(c.fromDate) === ym; });
-      var hit = (r.fixed && ymOf(r.fixed.fromDate) === ym) ? r.fixed : inMonth[0];
-      if (hit){
-        /* ⚠ 1マスしかないので、同じ月に候補が2本以上ある時は**まとめて数で出す**
-           （1本目だけ出すと、残りが無いように見える） */
-        var txt = (hit.stage !== 'fixed' && inMonth.length > 1)
-                ? (r.workLabel + ' 候補' + inMonth.length + '本')
-                : (r.workLabel + ' ' + md(hit.fromDate) + (hit.fromDate === hit.toDate ? '' : ('〜' + md(hit.toDate))));
-        out.push({ cls: (hit.stage === 'fixed' ? 'fixed' : 'plan'), text: txt,
-                   title: (hit.stage === 'fixed' ? '確定' : ('候補 ' + inMonth.map(function(c){ return md(c.fromDate) + '〜' + md(c.toDate); }).join(' / '))),
-                   gid:r.groupId, ym:ym });
-      } else {
-        out.push({ cls:'plan' + (r.level === 'warn' ? ' warn' : ''), text:r.workLabel + (r.plan.slipped ? '（繰越）' : ''),
-                   title:'日を決めるにはクリック', gid:r.groupId, ym:ym });
-      }
-      /* 満了日そのものの月には、赤で満了日 */
-      if (p.dueDate && ymOf(p.dueDate) === ym){
-        out.push({ cls:'due', text:'満了 ' + md(p.dueDate), title:p.dueDate, gid:r.groupId, ym:ym });
-      }
+      var st, lb;
+      if (p.overdue)                 { st = 'over';  lb = '超過'; }
+      else if (r.fixed)              { st = 'fixed'; lb = '確定'; }
+      else if (r.candidates.length)  { st = 'cand';  lb = '予定' + (r.candidates.length > 1 ? r.candidates.length : ''); }
+      else                           { st = 'tbd';   lb = '未割当'; }
+      /* 🔴 超過は**今月の列**に出す（満了月はもう過ぎているので、そこに出しても目に入らない） */
+      var ms = p.overdue ? [ymOf(td)] : arr(p.months).slice();
+      /* 繰り越したもの（12点をできなかった等）は、繰り越し先の月にも出す */
+      if (!p.overdue && p.ym && ms.indexOf(p.ym) < 0) ms.push(p.ym);
+      ms.sort();
+      var days = r.candidates.map(function(c){ return md(c.fromDate) + '〜' + md(c.toDate); });
+      out.push({
+        gid: r.groupId, work: r.work, workLabel: r.workLabel,
+        workShort: WORK_SHORT[r.work] || r.workLabel, workDot: workDot(r.work),
+        state: st, stateLabel: lb, level: r.level,
+        months: ms, bar: ms.length > 1,
+        dueDate: p.dueDate || '', slipped: !!p.slipped,
+        title: (st === 'over' ? ('満了 ' + p.dueDate + ' を過ぎています（貸出は止めていません）')
+              : st === 'tbd'  ? 'まだ日が決まっていません。押すと日ビューへ'
+              : (lb + '　' + days.join(' / ')))
+      });
     });
     return out;
+  }
+
+  /* ==================================================================
+     🔧 日の軸に出す「整備の枠」＝ここも物差し1本（車両カレンダーの日ビューと代車カレンダーが使う）
+     ------------------------------------------------------------------
+     期間 from〜to にかかっている枠を、**期間ごと1本**で返す（日ごとに切らない）。
+     ⚠ 画面からはみ出す側は `cutL` / `cutR` を立てて返す。切り詰めた端は `clipFrom` / `clipTo`。
+     🔴 月の目標（候補が1本も無いカード）は日の軸に出さない＝ここでも出てこない。
+     ================================================================== */
+  function dayBars(vehId, from, to){
+    var out = [];
+    if (!vehId || !from || !to) return out;
+    recs().forEach(function(r){
+      if (r.vehicleId !== vehId) return;
+      if ((r.stage || '') === 'month') return;
+      if (!(r.fromDate <= to && r.toDate >= from)) return;
+      out.push({
+        id: r.id, gid: r.groupId, work: r.work,
+        workLabel: r.workLabel || WORK_LB[r.work] || '整備',
+        workShort: WORK_SHORT[r.work] || '整備', workDot: workDot(r.work),
+        stage: r.stage, fixed: (r.stage === 'fixed'),
+        state: (r.stage === 'fixed' ? 'fixed' : 'cand'),
+        stateLabel: (r.stage === 'fixed' ? '確定' : '予定'),
+        from: r.fromDate, to: r.toDate,
+        clipFrom: (r.fromDate < from ? from : r.fromDate),
+        clipTo:   (r.toDate   > to   ? to   : r.toDate),
+        cutL: (r.fromDate < from), cutR: (r.toDate > to),
+        title: (WORK_LB[r.work] || '整備') + ' ' + md(r.fromDate) + '〜' + md(r.toDate)
+               + '（' + (r.stage === 'fixed' ? '確定' : '予定') + '）'
+      });
+    });
+    return out.sort(function(a, b){ return a.clipFrom < b.clipFrom ? -1 : 1; });
   }
 
   /* ==================================================================
@@ -1289,7 +1341,13 @@
 
   w.pitMaintRows   = rows;
   w.pitMaintRecs   = recs;      /* ⚠ 見張り用。画面からは呼ばない（カードを直に見ればよい） */
-  w.pitMaintBadges = badges;
+  /* 🔴 v2.70.0 `pitMaintBadges` は **消した**（作り直したカレンダーが使わない）。
+     代わりが `pitMaintCalItems`（月の軸）と `pitMaintDayBars`（日の軸）。
+     ⚠ 使われなくなった物差しは残さない。残すと「どっちで見るんだっけ」が1つ増える。 */
+  w.pitMaintCalItems = calItems;
+  w.pitMaintDayBars  = dayBars;
   w.flMaintBoardHtml = boardHtml;
   w.PIT_MAINT_WORK_LB = WORK_LB;
+  w.PIT_MAINT_WORK_SHORT = WORK_SHORT;
+  w.pitMaintWorkDot = workDot;
 })(window);

@@ -1302,16 +1302,42 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitCancelText      = pitCancelText;
   w.pitCardStatusText  = pitCardStatusText;
 
-  /* 🔴 まだ生きているカードか＝盤面に残るもの。**廃車・予約キャンセル・売上なしは出さない。**
-     ⚠ 車検予定だけキャンセルを素通りさせていた（ほかの一覧は前から除外していた）。 */
+  /* 🔴 まだ生きているカードか＝盤面に残るもの。**廃車・予約キャンセル・「売上なし」の印は出さない。**
+     ⚠ 車検予定だけキャンセルを素通りさせていた（ほかの一覧は前から除外していた）。
+
+     🚙🔴🔴 v2.81.0（ゆうた報告 2026-09-07「代車と自社車両の車検が、車検予定に拾ってない？」）
+     -------------------------------------------------------------------
+     ◎正体＝**ここが `pitCardNoSale` を見ていた。**
+       `pitCardNoSale` は v2.6.0 から**社内車両（中古・代車・内部）も合流している**物差しで、
+       合流させたのは**集計から外すため**。「もう終わった」「盤面に居ない」という意味は1ミリも無い。
+       それをこの「生きているか」で見ていたので、**代車・自社車両のカードが
+       車検予定・MHSの当日ビュー・前日LINEの画像・顧客詳細の「いま動いているもの」から丸ごと消えていた。**
+     🔴🔴 **同じ根っこで3回目。**（v1.108.0 で混ぜ、v2.47.0 に `archive-pit.js` で1回捕まえて
+       「使い分けを間違えないこと」と書いたのに、**物差し自身がまだ間違えたままだった**）
+     🔴 **決めごと＝「集計から外すか」と「盤面に居るか」は、二度と混ぜない。**
+       ・数えるか   … `pitCardNoSale`（社内車両ぜんぶ＋手で売上なしにした車）
+       ・盤面に居るか … **ここ**（`pitCardNoSaleMarked`＝**人が手で付けた印だけ**を見る）
+       ・お客様の車だけ見たい所 … 下の `pitCardActiveCust`
+     ⚠ 社内車両を出したくない画面は `pitCardActive` ではなく **`pitCardActiveCust`** を呼ぶこと。 */
   function pitCardActive(c){
     if (!c) return false;
     if (c.status === 'scrap') return false;
     if (c.status === 'cancelled' || c.cancelled === true) return false;
-    if (pitCardNoSale(c)) return false;
+    if (pitCardNoSaleMarked(c)) return false;
     return true;
   }
   w.pitCardActive = pitCardActive;
+
+  /* 🚙 v2.81.0 **生きているカードのうち、お客様の車だけ**（社内車両を外す）。
+     ◎ここを使う所（ゆうた確定 2026-09-07・**代車を出さないと決めた画面**）
+       ・その日の入庫一覧（avail.js）　・新規予約画面の右カラムの「その日の予定」（card-detail.js）
+       ・データチェックの規則（inspect-rules.js）… ⏭ 規則1本ずつの判断がまだなので、いまはここ
+     ⚠ ここに条件を書き足さない。**外すものが増えたら `pitCardActive` の側に書く。** */
+  function pitCardActiveCust(c){
+    if (!pitCardActive(c)) return false;
+    return !(w.pitCardIntern && w.pitCardIntern(c));
+  }
+  w.pitCardActiveCust = pitCardActiveCust;
 
   /* 🔴🔴 v2.56.0（ゆうた確定 2026-09-04）**車検の言葉を3つに分けた。**
      🗣「まず実際に再検のパターンが2つある。なのでそもそもの言葉を2つにしよう」

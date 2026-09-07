@@ -239,10 +239,16 @@
   function shopClosed(iso){ try { return !!(w.PitCal && w.PitCal.isClosed && w.PitCal.isClosed(iso)); } catch(e){ return false; } }
 
   /* 「いま盤面にいる車」＝廃車・キャンセル・売上なし・アーカイブ・返車済みを除いたもの。
-     ⚠ 生き死には pit-share.js の `pitCardActive` に聞く（ここで status を並べない）。 */
+     ⚠ 生き死には pit-share.js の物差しに聞く（ここで status を並べない）。
+     🚙⏭ v2.81.0 **いまは今までどおり「お客様の車だけ」**（`pitCardActiveCust`）。
+        ゆうたは「データチェックにも代車・自社車両を出す」と決めているが、
+        **規則1本ずつの判断がまだ**＝金額・伝票・完TEL・洗車・電話番号を見る規則は
+        代車に当てると**無いものを『抜け』と言い出す**（今日ほんとうに直すべき数件が埋もれる）。
+        🔴 ここを `pitCardActive` に戻すのは、**規則ごとに当てる／当てないを決めたあと。**
+        　 それまでは付け替えないこと（v2.81.0 でこの1行だけ名前が変わっている＝見え方は前と同じ）。 */
   function isLive(c){
     if (!c || c._draft || c.archived) return false;
-    if (!(w.pitCardActive ? w.pitCardActive(c) : true)) return false;
+    if (!(w.pitCardActiveCust ? w.pitCardActiveCust(c) : true)) return false;
     return c.status !== 'returned';
   }
   /* 実績になった車（売上なしは別扱い） */

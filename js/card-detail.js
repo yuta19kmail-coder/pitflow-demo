@@ -975,7 +975,13 @@ function _cfsDayListHtml(c){
         **この行は1件も外していなかった**＝キャンセルした車がずっと予定に並び続けていた。
         JSエラーは1つも出ないので、綴りの間違いに誰も気づけない。
         ⚠ **状態の名前を自分で綴らない。1本に聞く。** */
-  const _alive = window.pitCardActive || function (x){ return !!x && x.status !== 'scrap' && x.status !== 'cancelled'; };
+  /*
+     🚙 v2.81.0 **社内車両（代車・自社車両）はここには出さない**（ゆうた確定 2026-09-07）＝
+        物差しを `pitCardActive` → `pitCardActiveCust`（お客様の車だけ）に付け替えた。
+        ⚠ 付け替えただけで、**この画面の見え方は今までと1ミリも変わっていない。**
+        　 v2.81.0 で `pitCardActive` の意味が「社内車両も生きている」に変わったので、
+        　 今までどおりにするには、こちらを名指しする必要がある。 */
+  const _alive = window.pitCardActiveCust || function (x){ return !!x && x.status !== 'scrap' && x.status !== 'cancelled'; };
   const live = function (x){ return x.status !== 'returned' && _alive(x); };
   /* v1.17.0：他の人が書きかけの下書き（_draft）は、この一覧にも出さない */
   const intake = (state.cards||[]).filter(function(x){ return x && !x._draft && x.id!==me && x.reserveDate===ds && live(x); });

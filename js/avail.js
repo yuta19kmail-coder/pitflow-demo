@@ -64,7 +64,13 @@ function _availList(team, ds){
            しかも下の `done` は「`reserved` 以外＝入庫済」なので、
            **キャンセルした車に「入庫済」の札が付く**という見え方になっていた。
         ⚠ 条件をここに書き戻さないこと。何を外すかは全部あちらで決める。 */
-  const _alive = window.pitCardActive || function (c) { return !!c && c.status !== 'scrap' && c.status !== 'cancelled'; };
+  /*
+     🚙 v2.81.0 **社内車両（代車・自社車両）はここには出さない**（ゆうた確定 2026-09-07）＝
+        物差しを `pitCardActive` → `pitCardActiveCust`（お客様の車だけ）に付け替えた。
+        ⚠ 付け替えただけで、**この画面の見え方は今までと1ミリも変わっていない。**
+        　 v2.81.0 で `pitCardActive` の意味が「社内車両も生きている」に変わったので、
+        　 今までどおりにするには、こちらを名指しする必要がある。 */
+  const _alive = window.pitCardActiveCust || function (c) { return !!c && c.status !== 'scrap' && c.status !== 'cancelled'; };
   const cards = (state.cards || []).filter(function (c) {
     return c.boardId === team && c.reserveDate === ds && _alive(c) && c.status !== 'returned';
   }).sort(function (a, b) {

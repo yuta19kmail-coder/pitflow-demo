@@ -23,8 +23,10 @@
           ＝ チェックは「見た／見ていない」の1回きりで、取り分の重みではないため。
        ② **作業サマリーの配分には1ミリも影響しない**（ゆうた確定）。金額も台数も動かさない。
           ＝ ここは「誰が確かめたか」の記録。だから mech-summary.js は1文字も触っていない。
-       ③ 候補は**全員**（フロント・受付も含む）。点検・整備は「メカ」に付けた人だけだが、
-          チェックは工場長・フロントも押すので、名簿で絞らない。
+       ③ 🔴 **候補は3つとも同じ＝メンバー画面で「メカ」に印を付けた人だけ**（v2.76.0 でゆうた変更）。
+          ⚠ v2.73.0 は「工場長・フロントも押すから」と**チェックだけ全員**にしていたが、
+          　 それをやめて点検・整備とそろえた。押す人を増やしたい時は**名簿の「メカ」を付ける**。
+          ⚠ すでに入っている人は、名簿から外れても**チップに残る**（blockHtml が足す）＝勝手に消えない。
        ④ **導入日（下の CHECKER_FROM）より前のカードでは、この枠を「入っていない」と言わない。**
           🔴 昔のカードには入りようが無いのに要対応が数千件出る＝**数えるべき抜けが埋もれる**。
           ⚠ 枠そのものは昔のカードにも出す（あとから入れられる）。**言わないだけ。**
@@ -44,12 +46,13 @@
   var HOOK = {};                    /* 名札 → 押された時に呼ぶ関数 */
 
   /* ✅ v2.73.0 3つの役を1か所にまとめた。**足す時はここだけ。**
-     once … 1人1枠まで（×2 を作らない）／all … 候補を名簿で絞らない（全員出す） */
+     once … 1人1枠まで（×2 を作らない）
+     🔴 v2.76.0 `all`（候補を名簿で絞らない）は**廃止した**。3つとも「メカ」の人だけを出す。 */
   var ROLES = [
     { role:'inspectors', title:'点検担当者', icon:'search', kind:'i', label:'点検担当' },
     { role:'mechanics',  title:'整備担当者', icon:'wrench', kind:'m', label:'整備担当' },
     { role:'checkers',   title:'チェック担当者', icon:'check', kind:'c', label:'チェック担当',
-      once:true, all:true }
+      once:true }
   ];
   function roleDef(role){
     for (var i = 0; i < ROLES.length; i++) if (ROLES[i].role === role) return ROLES[i];
@@ -75,10 +78,11 @@
   function cardOf(id){ return (window.state && state.cards || []).find(function(x){ return x && x.id === id; }) || null; }
 
   /* 候補＝メンバー画面で「メカ」にチェックした人。まだ誰も付いていなければ全員（空にして困らないように）
-     ✅ v2.73.0 チェック担当だけは**全員**（ゆうた確定＝工場長・フロントも押すため）。 */
+     🔴 v2.76.0（ゆうた指定 2026-09-07）**チェック担当も同じにした。**
+     🗣「作業のチェック欄の該当メンバーを全員じゃなくて、メンバーのメカにチェックが入ってる人間だけにして」
+     ＝ 3つの役でここ1本を見る。役ごとの例外は**もう無い**。 */
   function options(role){
     var all = (window.state && state.staff) || [];
-    if (roleDef(role).all) return all.map(function (s){ return s && s.name; }).filter(Boolean);
     var mech = all.filter(function (s){ return s && s.mech; });
     return (mech.length ? mech : all).map(function (s){ return s && s.name; }).filter(Boolean);
   }

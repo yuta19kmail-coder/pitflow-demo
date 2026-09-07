@@ -111,9 +111,14 @@
     if (t(c.loanerFrom) && t(c.loanerTo) && t(c.loanerTo) < t(c.loanerFrom))
       stop.push('代車の「貸出まで」が「貸出から」より前です');
 
-    if (返車済み && !dt) stop.push('返車済みなのに、実績カウント日が空です');
+    /* ⚠ 「売上なしアーカイブ」は**わざと実績カウント日を空にする**（実績・売上に乗る道を無くすため）。
+       ＝ そこは止めない。ふつうの返車済みだけ見る。 */
+    if (返車済み && !dt && !c.noSale) stop.push('返車済みなのに、実績カウント日が空です');
     if (返車済み && !c.noSale && !amt)
       stop.push('返車済みなのに、確定金額が空です（売上に数えないなら「売上なし」を押してください）');
+    /* 🔴 見るのは**確定金額（請求額）だけ**。
+       ⚠ 見積・受注の額が残っているのは**正しい姿**（v2.9.5＝本当に見積もった額なので消さない）。
+       　 ここで見積・受注まで止めると、あの決めごとと正面衝突する。 */
     if (c.noSale && amt) stop.push('「売上なし」なのに、確定金額（' + yen(amt) + ' 円）が入っています');
     if (未入庫 && ain)  stop.push('まだ入庫していない状態なのに、実際に入庫した日が入っています');
     if (未入庫 && dt)   stop.push('まだ入庫していない状態なのに、実績カウント日が入っています');
@@ -148,7 +153,7 @@
      保存＝ふつうの道と同じ連動を起こす（ゆうた確定）
      🔴 ここで「何を連動させるか」を増やさない。**ふつうのカードと同じ道**を通すだけ。
      ================================================================ */
-  w.pitMasterSave = function(){
+  w.pitMasterSave = function(print){
     if (!M || !admin()) return;
     var r = checks(M);
     if (r.stop.length){ if (w.pitToast) w.pitToast('まだ保存できません（下の赤い所を直してください）'); return; }
@@ -157,9 +162,37 @@
       detail: (MODE === 'fix' ? '・いまあるカードを、この内容で上書きします' : '・新しいカードを作ります')
             + (r.warn.length ? ('\n' + r.warn.map(function(x){ return '・' + x; }).join('\n')) : '')
     }) : Promise.resolve(true);
-    go.then(function(yes){ if (yes) _save(); });
+    go.then(function(yes){ if (yes) _save(!!print); });
   };
-  function _save(){
+
+  /* 🗑 v2.86.0（ゆうた指定 2026-09-07）**売上なしアーカイブで保存する。**
+     🗣「売上なしとアーカイブのバッチはなしで、**売上なしアーカイブで保存する**」
+     🔴 中身は予約詳細の「売上なしでアーカイブ」と**まったく同じ手順**（写しを作らない）。
+        ＝ 印を付ける／返車済みにする／**実績カウント日は空にする**（実績・売上に乗る道を無くす）／
+          確定返車日を埋める／置き場所を空ける。
+     ⚠ 確定金額（請求額）が入ったままだと、上の関門で止まる。**先に消してから押すこと。**
+        （見積・受注の額はそのままでよい＝v2.9.5 の決めごと） */
+  w.pitMasterNoSale = function(){
+    if (!M || !admin()) return;
+    (w.pitAsk ? w.pitAsk('売上なしアーカイブで保存しますか？', { ok:'売上なしで保存', danger:true,
+      detail:'・実績にも売上にも入りません\n・返車済みにして片付けます\n・実績カウント日は空にします' })
+      : Promise.resolve(true)).then(function(yes){
+      if (!yes) return;
+      var td = today();
+      M.noSale = true; M.noSaleAt = td;
+      M.noSaleBy = (w.pitFlowMe ? w.pitFlowMe() : '');
+      M.status = 'returned';
+      M.completedAt = '';                       /* 🔴 実績カウント日は入れない */
+      M.returnDateFinal = t(M.returnDateFinal) || t(M.returnDate) || td;
+      if (!t(M.returnDate)) M.returnDate = M.returnDateFinal;
+      M.returnTbd = false; M.bayId = null; M.baySlot = null; M.testDrive = false;
+      var r = checks(M);
+      if (r.stop.length){ render(); if (w.pitToast) w.pitToast('まだ保存できません（下の赤い所を直してください）'); return; }
+      _save(false, true);
+    });
+  };
+
+  function _save(print, noSale){
     if (!Array.isArray(st().cards)) st().cards = [];
     var live = null;
     if (MODE === 'fix'){
@@ -179,8 +212,21 @@
         { cardId: live.id, kind:'edit',
           label: (t(live.customer) || '（無名）') + ' / ' + (t(live.car) || t(live.plate) || '') });
     } catch(e){}
+    if (noSale){
+      try { if (w.logFlow) w.logFlow(live, '売上なしでアーカイブした'); } catch(e){}
+      try { if (w.pitLog) w.pitLog('売上なしでアーカイブした', { cardId: live.id, kind:'out',
+        label: (t(live.customer) || '（無名）') + ' / ' + (t(live.car) || t(live.plate) || '') }); } catch(e){}
+    }
     if (w.PitDB) w.PitDB.save();
-    if (w.pitToast) w.pitToast(MODE === 'fix' ? '直しました' : 'カードにしました');
+    /* 🖨 表紙は cover-print.js の `pitPrintCover` 1本（別の窓で刷るので、画面の切り替えとは関係なく動く）。
+       🔴 **保存が通った時だけ刷る**＝紙が出たのにカードが無い、が起きない（v1.78.0 の決めごとと同じ）。 */
+    if (print){
+      try { if (w.logFlow) w.logFlow(live, '表紙を印刷して保存'); } catch(e){}
+      if (w.pitToast) w.pitToast('表紙を印刷しています…');
+      try { if (w.pitPrintCover) w.pitPrintCover(live.id); } catch(e){}
+    }
+    if (w.pitToast && !print) w.pitToast(noSale ? '売上なしでアーカイブしました（実績・売上には入りません）'
+                                                : (MODE === 'fix' ? '直しました' : 'カードにしました'));
     MODE = 'fix'; M = JSON.parse(JSON.stringify(live)); BEFORE = JSON.parse(JSON.stringify(live));
     render();
     if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
@@ -567,12 +613,27 @@
       h += fld('諸費用（車検）', txt('feeAmount'), { req: !!(w.pitIsShaken && w.pitIsShaken(M)) });
       h += '</div>';
     }
-    h += '<div class="ms-chips" style="margin-top:11px">';
-    h += chip(!!M.noSale, '売上なし', "pitMasterToggle('noSale')");
-    h += chip(!!M.archived, 'アーカイブ', "pitMasterToggle('archived')");
-    if (w.pitIsShaken && w.pitIsShaken(M)) h += chip(!!M.earlyDiscount, '早期割', "pitMasterToggle('earlyDiscount')");
-    return h + '</div><div class="ms-hint" style="margin-top:7px">'
-      + '※ 金額は税抜。諸費用（法定費用）は台単価・概算から外して扱う決まりのままです。</div></div></div>';
+    /* 🗑 v2.86.0（ゆうた指定 2026-09-07）**「売上なし」と「アーカイブ」の札は置かない。**
+       🗣「売上なしとアーカイブのバッチはなしで、売上なしアーカイブで保存する」
+       🗣「アーカイブは状態が実績なら勝手にそうなるでしょ？」＝**そのとおり。**
+       ◎理由（2つとも「押して立てる印」ではない）
+         ・アーカイブ … **返車済みになった時点で自動でそうなる**（archive-pit.js の物差し）。
+         　 手で立てる欄を置くと、物差しと食い違う印を自分で作れてしまう。
+         ・売上なし … **1つの操作**（印を付ける＋返車済みにする＋実績カウント日を空にする＋
+         　 確定返車日を埋める）なので、札を1つ押すだけでは半端な形になる。
+         　 ＝ 下の**「売上なしアーカイブで保存」**のボタン1本に寄せた。 */
+    if (w.pitIsShaken && w.pitIsShaken(M)){
+      h += '<div class="ms-chips" style="margin-top:11px">'
+        +  chip(!!M.earlyDiscount, '早期割', "pitMasterToggle('earlyDiscount')") + '</div>';
+    }
+    h += '<div class="ms-hint" style="margin-top:9px">'
+      + '※ 金額は税抜。諸費用（法定費用）は台単価・概算から外して扱う決まりのままです。<br>'
+      + '※ <b>アーカイブは「いまどの列にいるか」を返車済みにすれば自動で付きます</b>（手で立てる欄はありません）。<br>'
+      + '※ 売上に数えないで片付けるなら、下の <b>「売上なしアーカイブで保存」</b> を押してください。'
+      + (M.noSale ? '<br><b style="color:var(--ins-c,#f59e0b)">いまこのカードは「売上なし」の印が付いています'
+                    + (t(M.noSaleAt) ? '（' + esc(t(M.noSaleAt)) + ' ' + esc(t(M.noSaleBy)) + '）' : '') + '</b>' : '')
+      + '</div>';
+    return h + '</div></div>';
   }
 
   /* ===== 下＝このまま保存するとどうなるか（この画面のいちばん大事な所） =====
@@ -607,6 +668,12 @@
     h += '</div><div class="ms-resf"><span class="ms-hint">操作ログに「マスターで作った／直した」と、変えた欄が全部残ります。</span>'
       + '<div class="ms-sp"></div>'
       + (MODE === 'fix' && BEFORE ? '<button class="ms-btn" onclick="pitMasterUndo()">開いた時に戻す</button>' : '')
+      /* 🗑 売上なしアーカイブ＝予約詳細と同じ手順を1本のボタンで（ゆうた指定 2026-09-07） */
+      + '<button class="ms-btn danger"' + (r.stop.length ? ' disabled' : '')
+      + ' onclick="pitMasterNoSale()" title="実績にも売上にも入れずに片付けます">売上なしアーカイブで保存</button>'
+      /* 🖨 表紙＝新規予約の「印刷して保存」と同じ道（保存が通った時だけ刷る） */
+      + '<button class="ms-btn"' + (r.stop.length ? ' disabled' : '')
+      + ' onclick="pitMasterSave(true)">表紙を印刷して保存</button>'
       + '<button class="ms-btn primary"' + (r.stop.length ? ' disabled' : '')
       + ' onclick="pitMasterSave()">保存してカードにする</button></div></div>';
     return h;

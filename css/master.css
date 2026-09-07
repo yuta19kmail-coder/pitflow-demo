@@ -111,3 +111,6 @@
 .ms-chk ul{margin:2px 0 0;padding-left:18px}
 .ms-chk li{margin:1px 0}
 .ms-resf{display:flex;gap:9px;align-items:center;padding:11px 14px;border-top:1px solid var(--border);background:var(--bg3)}
+.ms-btn.danger{border-color:rgba(239,68,68,.55);color:var(--red,#ef4444)}
+.ms-btn.danger:hover{background:var(--red,#ef4444);border-color:var(--red,#ef4444);color:#fff}
+.ms-resf{flex-wrap:wrap}

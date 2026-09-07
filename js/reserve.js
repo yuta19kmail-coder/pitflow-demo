@@ -229,7 +229,17 @@ function renderReserveMonth(){
 
   const base = new Date(state.reserveDate.getFullYear(), state.reserveDate.getMonth(), 1);
   window._rmlStart = base;
-  window._rmlN = 42;   // 初期6週間ぶん
+  /* 📜🔴 v2.84.0（ゆうた報告 2026-09-07）**描き直しでは、行数も見ている場所も戻さない。**
+     🗣「リアルタイム同期で受信したタイミングで常に当日とか初期に戻される。
+     　　そうすると**探してるのに探せない**とかが発生する」
+     ◎前まで … 描くたびに **6週間ぶんに戻して、今日の行まで飛ばして**いた。
+       ＝ 先月・来月を探している最中でも、誰かが何かを保存した瞬間に今日へ戻る。
+     🔴 いま＝**新しく開いた時だけ**6週間ぶんにして今日へ飛ぶ。描き直しでは触らない。
+     ⚠ 月を送った時・日/週/月を切り替えた時は `showView` を通らないので `_pitRedraw` は false
+       ＝ **今までどおり今日へ飛ぶ**（ゆうた確定）。
+     ⚠ スクロール位置そのものを戻すのは views.js の1か所（画面ごとに書かない）。 */
+  const _redraw = !!window._pitRedraw;
+  if (!_redraw || !window._rmlN) window._rmlN = 42;   // 初期6週間ぶん（描き直しでは減らさない）
   wrap.innerHTML = '<div class="rml-scroll" id="rml-scroll"><div id="rml-list">' + _rmlRows(0, window._rmlN) + '</div></div>';
 
   const sc = document.getElementById('rml-scroll');
@@ -242,9 +252,11 @@ function renderReserveMonth(){
         if (list) list.insertAdjacentHTML('beforeend', _rmlRows(from, window._rmlN));
       }
     });
-    // 今月を開いた時は今日の行まで自動スクロール
-    const t = sc.querySelector('.rml-date.today');
-    if (t) sc.scrollTop = Math.max(0, t.closest('.rml-row').offsetTop - 8);
+    /* 📜 v2.84.0 今日へ飛ぶのは**新しく開いた時だけ**（描き直しでは動かさない） */
+    if (!_redraw){
+      const t = sc.querySelector('.rml-date.today');
+      if (t) sc.scrollTop = Math.max(0, t.closest('.rml-row').offsetTop - 8);
+    }
   }
 }
 

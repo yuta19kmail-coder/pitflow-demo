@@ -143,6 +143,38 @@
     return all().filter(function(x){ return !x.v.retired && !isLinked(x.v); });
   }
 
+  /* ===== ⑦ 🚙🔴 v2.79.0 **顧客控えの車種名に、代車の呼び名が入り込んでいないか**（ゆうた指定 2026-09-07）
+     -----------------------------------------------------------------
+     🗣「顧客ビューの車種名は車種名なんだから **アクア** とか **タント** が出なきゃいけない。
+     　　だが顧客ビューの車種名に**代車名が挿入されちゃってる**（アクア1号・タント茶みたいな）」
+     ◎いつ入り込んだか（v2.78.0 で塞いだ道）
+       代車の整備カードは車名の欄に**代車の呼び名**を持っていて、
+       カードを閉じる／保存すると、それが**お客様の車の「車種」に書き戻されていた。**
+       ＝ 塞いだのはこれから先だけ。**すでに書き換わったぶんは、ここで数えて人が直す。**
+     ◎見つけ方＝**紐づけた相手の車種名が、その代車の呼び名と同じなら怪しい。**
+       ⚠ 上書きされる前の字はどこにも残っていないので、**機械には「直す」ことができない。**
+       ⚠ もともと代車の呼び名が車種名そのまま（例＝呼び名も「タント」）のことはある。
+          だから規則の側は**要判断**（見て「合っている」と言えば数から外れる）にしてある。
+     🔴 ならしは normPlate と同じ考え方＝**空白だけ落として比べる。**ここを緩めると別物を同じと言う。
+     ===================================================================== */
+  function nameKey(v){ return t(v).replace(/[\s　]/g, ''); }
+  function nameBled(){
+    var out = [];
+    all().forEach(function(x){
+      if (x.v.retired) return;
+      var tg = targetOf(x.v);
+      if (!tg) return;                                   /* 結ばれていないものは L08 の担当 */
+      var car = nameKey(tg.veh && tg.veh.car);
+      if (!car) return;
+      var model = nameKey(x.v.model), nm = nameKey(x.v.name);
+      var hit = (model && car === model) ? t(x.v.model)
+              : ((nm && car === nm) ? t(x.v.name) : '');
+      if (!hit) return;
+      out.push({ kind:x.kind, v:x.v, cust:tg.cust, veh:tg.veh, 呼び名:hit });
+    });
+    return out;
+  }
+
   w.pitFleetAll        = all;
   w.pitFleetById       = byId;
   w.pitFleetKindLabel  = kindLabel;
@@ -155,6 +187,7 @@
   w.pitFleetSearch     = search;
   w.pitFleetHeldBy     = heldBy;
   w.pitFleetUnlinked   = unlinked;
+  w.pitFleetNameBled   = nameBled;   /* 🚙 v2.79.0 顧客控えの車種名に代車の呼び名が入り込んでいるもの */
 
   console.log('[fleet-link] ready（代車・自社車両とお客様の車の紐づけの物差し）');
 })(window);

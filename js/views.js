@@ -4,6 +4,73 @@
    ※ openDetail/closeDetail は card-detail.js に分離
    ======================================== */
 
+/* ══════════════════════════════════════════════════════════════════════════
+   📜🔴🔴 v2.84.0（ゆうた報告 2026-09-07）**同じ画面の描き直しで、見ていた場所を動かさない。**
+   --------------------------------------------------------------------------
+   🗣「代車カレンダーとか、月の予約ビューとか、PitFlow には結構長いスクロール画面がある。
+   　　ただ、**リアルタイム同期で受信したタイミングで常に当日とか初期に戻されるんだよね。**
+   　　そうすると**探してるのに探せない**とかが発生する」
+
+   ◎正体（1本）
+     クラウドから何か届くたびに `showView(state.currentView)` が呼ばれ、
+     **いま開いている画面をまるごと描き直している。**
+     中身を入れ替えると、その一瞬だけ中身が短くなり、**ブラウザがスクロール位置を巻き戻す。**
+     見張っているのは7種類（カード・顧客・代車・貸出・社用車・車両予定・付箋）なので、
+     誰かが何かを触るたびに起きる＝「常に戻される」。
+
+   ◎なぜ画面によって差が出ていたか
+     代車カレンダーだけ、2026-08-15 の同じ報告（v1.95.0）で
+     **その画面の中だけで位置を覚える仕組み**を入れてあった。ほかの画面には入っていない。
+     🔴 だから今回は**画面ごとに足さない。ここ1か所で、全部の画面のぶんを覚える。**
+
+   ◎やっていること
+     ・描く前 … その画面の中で**いま動いている（0 でない）スクロール位置を全部控える**
+     ・描いた後 … 同じ所へ黙って戻す（アニメーションさせない＝また動いたように見えるため）
+     ⚠ 控えるのは**同じ画面を描き直す時だけ**。画面を移った時は今までどおり先頭から。
+     ⚠ 戻すのは2回（すぐ／次の描画のあと）。中身の高さが決まる前に当てると効かないため。
+     ⚠ 目印は **id を最優先**。id が無いものは「同じ見た目のクラスの何番目か」で当てる。
+   ══════════════════════════════════════════════════════════════════════════ */
+function _pitScrollKeep(root){
+  if (!root) return null;
+  var out = [], seen = {};
+  var all = [root].concat(Array.prototype.slice.call(root.querySelectorAll('*')));
+  for (var i = 0; i < all.length; i++){
+    var el = all[i];
+    var top = el.scrollTop | 0, left = el.scrollLeft | 0;
+    if (!top && !left) continue;                       /* 動いていないものは覚えない */
+    var cls = (typeof el.className === 'string') ? el.className : '';
+    var k = 'c:' + cls;
+    seen[k] = (seen[k] || 0) + 1;
+    out.push({ root: (el === root), id: el.id || '', cls: cls, nth: seen[k], top: top, left: left });
+  }
+  return out.length ? out : null;
+}
+function _pitScrollRestore(root, keep){
+  if (!root || !keep || !keep.length) return;
+  var used = {};
+  keep.forEach(function(k){
+    var el = null;
+    if (k.root) el = root;
+    else if (k.id) el = document.getElementById(k.id);
+    if (!el && k.cls){
+      /* id が無いもの＝同じクラスの並びの中で、まだ使っていない n 番目に当てる */
+      var sel = '.' + String(k.cls).trim().split(/\s+/).filter(Boolean).join('.');
+      var list;
+      try { list = root.querySelectorAll(sel); } catch(e){ list = []; }
+      var n = 0;
+      for (var i = 0; i < list.length; i++){
+        n++;
+        if (n !== k.nth) continue;
+        if (used[sel + '#' + n]) break;
+        used[sel + '#' + n] = 1; el = list[i]; break;
+      }
+    }
+    if (!el) return;
+    if (k.top)  el.scrollTop  = k.top;
+    if (k.left) el.scrollLeft = k.left;
+  });
+}
+
 function showView(viewId){
   /* 🔴 v1.80.0 代車カレンダーに**未確定の下書き**がある時は、黙って離れさせない。
      ⚠ 下書きは state に直接書かれていて、よその画面の保存に巻き込まれると
@@ -44,6 +111,13 @@ function showView(viewId){
     if (grp) grp.classList.add('has-active');
   }
 
+  /* 📜 v2.84.0 **同じ画面の描き直しか。** ここで決めて、描く側にも渡す（`_pitRedraw`）。
+     ⚠ `showView` を通さずに直接描き直す所（窓を閉じた時など）は `false` のまま
+        ＝「新しく開いた時」と同じ振る舞いになる。そこは今までどおりで正しい。 */
+  const _pitSame = (window._pitPrevView === viewId);
+  const _pitKeep = _pitSame ? _pitScrollKeep(target) : null;
+  window._pitRedraw = _pitSame;
+
   if (viewId === 'today')   renderToday();
   if (viewId === 'availcal' && window.renderAvail) renderAvail();
   if (viewId === 'reserve') renderReserve();
@@ -71,6 +145,16 @@ function showView(viewId){
   if (viewId === 'members' && window.renderMembers) renderMembers();
   if (viewId === 'oplog' && window.renderOplog) renderOplog();
   if (viewId === 'news' && window.renderNews) renderNews();
+
+  /* 📜 v2.84.0 描き終わったら、見ていた場所へ黙って戻す。
+     ⚠ 2回当てる＝中身の高さが決まる前に当てても効かないため（1回目で効けば2回目は同じ値）。
+     🔴 `_pitRedraw` は**ここで必ず false に戻す**。残すと、次に直接描き直した時に
+        「描き直し」と勘ちがいして、新しく開いたのに前の場所へ戻ろうとする。 */
+  if (_pitKeep){
+    _pitScrollRestore(target, _pitKeep);
+    requestAnimationFrame(function(){ _pitScrollRestore(target, _pitKeep); });
+  }
+  window._pitRedraw = false;
 }
 
 /* 📅 予約カレンダー（その日）へ飛ぶ（顧客履歴・検索結果から） */

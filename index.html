@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.84.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.85.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -36,7 +36,8 @@
 <link rel="stylesheet" href="css/sales-visit.css?v=3"><!-- 🔍 v2.59.0 売上ビューの「来店属性」タブ -->
 <link rel="stylesheet" href="css/shaken-line.css?v=2"><!-- 🔍 v2.58.0 作業サマリーの「車検ライン」タブ -->
 <link rel="stylesheet" href="css/inspect.css?v=11"><!-- 🩺 データチェック（日常チェック／クォーターチェック） -->
-<link rel="stylesheet" href="css/quarter.css?v=21"><!-- 🧾 クォーターチェック（②売上チェックリスト突合／③AIチェック） -->
+<link rel="stylesheet" href="css/quarter.css?v=21">
+<link rel="stylesheet" href="css/master.css?v=1"><!-- 🗂 v2.85.0 マスター入力 --><!-- 🧾 クォーターチェック（②売上チェックリスト突合／③AIチェック） -->
 <link rel="stylesheet" href="css/members.css?v=7">
 <link rel="stylesheet" href="css/news-oplog.css?v=5">
 <style id="pit-dev-style">
@@ -131,7 +132,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.84.0</div>
+    <div class="login-ver">v2.85.0</div>
   </div>
 </div>
 
@@ -145,7 +146,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.84.0</span>
+    <span class="ver">v2.85.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -203,6 +204,7 @@
 
     <div class="si-section-title">管理</div>
     <div class="si-item" data-view="members" onclick="showView('members')"><span class="icon"><i data-ic=users data-ics=16></i></span><span>メンバー</span></div>
+    <div class="si-item" data-view="master" onclick="showView('master')"><span class="icon"><i data-ic=clipboard data-ics=16></i></span><span>マスター入力</span></div>
     <div class="si-item" data-view="oplog" onclick="showView('oplog')"><span class="icon"><i data-ic=history data-ics=16></i></span><span>操作ログ</span></div>
     <div class="si-item" data-view="settings" onclick="showView('settings')"><span class="icon"><i data-ic=settings data-ics=16></i></span><span>設定</span></div>
     <div class="si-item" data-view="news" onclick="showView('news')"><span class="icon"><i data-ic=megaphone data-ics=16></i></span><span>お知らせ</span></div>
@@ -551,6 +553,11 @@
       <div id="members-body"></div>
     </section>
 
+    <section id="view-master" class="view">
+      <div class="view-header"><div class="view-title"><span class="icon"><i data-ic=clipboard data-ics=16></i></span>マスター入力 <span style="font-size:11px;color:var(--text3);font-weight:400">予約〜返車を1枚で作る・直す（管理者以上）</span></div></div>
+      <div id="master-body"></div>
+    </section>
+
     <section id="view-oplog" class="view">
       <div class="view-header"><div class="view-title"><span class="icon"><i data-ic=history data-ics=16></i></span>操作ログ</div></div>
       <div id="oplog-body"></div>
@@ -892,7 +899,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/return-slot.js?v=15"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
 <script src="js/overdue-pit.js?v=7"></script><!-- 🔴 v1.101.0 当日を過ぎた予約・返車を自動で正しい箱へ移す。return-slot.js より後ろ、views.js（showView から呼ぶ）より前 -->
 <script src="js/approval-pit.js?v=2"></script><!-- 🔵 v1.74.0 新規予約の「承認」制度（承認待ちの印・承認する・入庫前に1回聞く）。印を出す側（reserve / card-hover / loaner / card-view / undetermined）より前に読む -->
-<script src="js/views.js?v=57"></script>
+<script src="js/views.js?v=58"></script>
 <script src="js/work-content.js?v=15"></script>
 <script src="js/card-miss.js?v=3"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
 <script src="js/card-detail.js?v=148"></script>
@@ -924,7 +931,8 @@ window.PIT_DEMO = true;</script>
 <script src="js/sales-print.js?v=5"></script>
 <script src="js/shaken-line.js?v=2"></script><!-- 🔍 v2.58.0 車検ライン（作業サマリーの2つ目のタブ）。mech-summary より前に読む -->
 <script src="js/mech-summary.js?v=8"></script>
-<script src="js/inspect-rules.js?v=27"></script><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
+<script src="js/inspect-rules.js?v=27"></script>
+<script src="js/master-pit.js?v=1"></script><!-- 🗂 v2.85.0 マスター入力。card-miss / intern-pit / pit-share / customers より後ろ --><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
 <script src="js/inspect-fix.js?v=6"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
 <script src="js/quarter-match.js?v=9"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
 <script src="js/quarter-store.js?v=11"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->

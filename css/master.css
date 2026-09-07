@@ -1,0 +1,113 @@
+/* ================================================================================
+   master.css ─ 🗂 マスター入力（master-pit.js）  PitFlow v2.85.0
+   🔴 色は変数から取る（ここで #色 を直書きしない）。ほかの画面と同じ見た目にそろえる。
+   ================================================================================ */
+.ms-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--bg2);
+  border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:14px;
+  position:sticky;top:0;z-index:12}
+.ms-sp{flex:1}
+.ms-adm{font-size:11px;font-weight:800;color:var(--ins-c,#f59e0b);
+  border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.10);border-radius:999px;padding:3px 10px}
+.ms-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;
+  padding:6px 13px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.ms-btn:hover{border-color:var(--brand)}
+.ms-btn.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ms-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.ms-btn[disabled]{opacity:.45;cursor:not-allowed}
+.ms-btn.ms-sm{padding:3px 10px;font-size:11px}
+.ms-seg{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.ms-seg .ms-btn{border:0;border-radius:0}
+.ms-seg .ms-btn+.ms-btn{border-left:1px solid var(--border)}
+
+.ms-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;margin-bottom:14px;overflow:hidden}
+.ms-ch{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg3);
+  border-bottom:1px solid var(--border);font-size:13px;font-weight:800}
+.ms-n{width:20px;height:20px;border-radius:6px;background:var(--brand);color:#fff;
+  display:grid;place-items:center;font-size:11px}
+.ms-note{margin-left:auto;font-size:11px;color:var(--text3);font-weight:600}
+.ms-pad{padding:13px 14px}
+.ms-sep{border:0;border-top:1px dashed var(--border);margin:13px 0}
+.ms-lb{font-size:11px;font-weight:800;color:var(--text3);margin:2px 0 7px}
+.ms-lb span{font-weight:600;margin-left:7px;color:var(--text3)}
+.ms-hint{font-size:10.5px;color:var(--text3);line-height:1.7}
+
+.ms-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(216px,1fr));gap:11px}
+.ms-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ms-f>label{font-size:11px;color:var(--text3);font-weight:700;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.ms-f.wide{grid-column:1/-1}
+.ms-f input,.ms-f select,.ms-f textarea{background:var(--bg1);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit;width:100%}
+.ms-f textarea{resize:vertical;min-height:56px}
+.ms-f input:focus,.ms-f select:focus,.ms-f textarea:focus{outline:none;border-color:var(--brand)}
+.ms-f.lock input,.ms-f.lock select{background:var(--bg3);color:var(--text2);cursor:not-allowed}
+.ms-row2{display:flex;gap:6px}
+.ms-row2 .ms-btn{white-space:nowrap}
+.ms-req{color:var(--red,#ef4444);font-size:10px;font-weight:800;
+  border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.10);border-radius:4px;padding:0 4px}
+.ms-mon{color:var(--ins-c,#f59e0b);font-size:10px;font-weight:800;
+  border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.10);border-radius:4px;padding:0 4px}
+.ms-lockb{font-size:10px;font-weight:800;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:0 5px}
+.ms-go{color:var(--blue,#378ADD);text-decoration:underline;cursor:pointer;font-size:11px}
+
+.ms-chips{display:flex;gap:6px;flex-wrap:wrap}
+.ms-chip{border:1px solid var(--border);background:var(--bg1);color:var(--text);border-radius:999px;
+  padding:4px 11px;font-size:12px;cursor:pointer;font-family:inherit}
+.ms-chip:hover{border-color:var(--brand)}
+.ms-chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ms-chip.grey{color:var(--text2)}
+.ms-chip.grey.on{background:var(--text3);border-color:var(--text3);color:#fff}
+.ms-chip.off{opacity:.35;cursor:not-allowed}
+
+.ms-find{display:flex;gap:6px;align-items:center;margin-bottom:9px}
+.ms-find input{flex:1;background:var(--bg1);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:7px 9px;font-size:13px;font-family:inherit}
+.ms-cand{display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--bg1);
+  border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer}
+.ms-cand:hover{border-color:var(--brand)}
+.ms-cand.on{border-color:var(--brand);background:var(--brand-soft,rgba(38,162,105,.15))}
+.ms-cl{display:flex;flex-direction:column;min-width:0}
+.ms-cl b{font-size:13.5px}
+.ms-cl span{font-size:11px;color:var(--text3)}
+.ms-cr{margin-left:auto;font-size:11px;color:var(--text2);text-align:right;white-space:nowrap}
+
+/* 🕐 入庫時刻＝新規予約と同じ形（打ち込み＋ショートカット） */
+.ms-time{display:flex;flex-direction:column;gap:6px}
+.ms-tq{display:flex;gap:5px;flex-wrap:wrap}
+.ms-tqb{border:1px solid var(--border);background:var(--bg1);color:var(--text2);border-radius:7px;
+  padding:3px 9px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.ms-tqb:hover{border-color:var(--brand)}
+.ms-tqb.on{background:var(--brand);border-color:var(--brand);color:#fff}
+
+/* 車検の記録（何回でも足せる） */
+.ms-shkrow{display:grid;grid-template-columns:26px 132px 84px 74px 108px 118px 1fr 30px;gap:7px;align-items:center;
+  border:1px solid var(--border);background:var(--bg1);border-radius:10px;padding:8px 10px;margin-bottom:7px}
+.ms-shkrow input,.ms-shkrow select{background:var(--bg2);border:1px solid var(--border);color:var(--text);
+  border-radius:7px;padding:5px 7px;font-size:12px;font-family:inherit;width:100%}
+.ms-shkrow.ng{border-color:rgba(239,68,68,.5);background:rgba(239,68,68,.06)}
+.ms-shkrow.ok{border-color:rgba(29,185,122,.45);background:rgba(29,185,122,.06)}
+.ms-no{font-size:11px;font-weight:800;color:var(--text3);text-align:center}
+.ms-x{background:transparent;border:1px solid var(--border);color:var(--text3);border-radius:7px;
+  width:26px;height:26px;cursor:pointer;font-size:12px;font-family:inherit}
+.ms-x:hover{color:#fff;background:var(--red,#ef4444);border-color:var(--red,#ef4444)}
+@media(max-width:1000px){.ms-shkrow{grid-template-columns:1fr 1fr}}
+
+/* 下＝このまま保存するとどうなるか */
+.ms-res{position:sticky;bottom:0;z-index:11;background:var(--bg2);border:1px solid var(--border2);
+  border-radius:14px;overflow:hidden;box-shadow:0 -6px 22px rgba(0,0,0,.25);margin-bottom:6px}
+.ms-resh{display:flex;align-items:center;gap:9px;padding:10px 14px;background:var(--bg4,var(--bg3));
+  font-size:13px;font-weight:800;border-bottom:1px solid var(--border)}
+.ms-resb{padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.ms-rr{border:1px solid var(--border);border-radius:10px;background:var(--bg1);padding:9px 11px}
+.ms-rr .k{font-size:10.5px;color:var(--text3);font-weight:700;margin-bottom:2px}
+.ms-rr .v{font-size:13px;font-weight:800}
+.ms-rr .v.o{color:var(--ins-c,#f59e0b)}
+.ms-rr .s{font-size:11px;color:var(--text2);margin-top:2px}
+.ms-chkbox{padding:0 14px}
+.ms-chk{border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.85;margin-bottom:8px}
+.ms-chk.ng{border:1px solid rgba(239,68,68,.55);background:rgba(239,68,68,.10)}
+.ms-chk.wa{border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.10)}
+.ms-chk.ok{border:1px solid rgba(29,185,122,.45);background:rgba(29,185,122,.08)}
+.ms-chk b{display:block;margin-bottom:3px}
+.ms-chk ul{margin:2px 0 0;padding-left:18px}
+.ms-chk li{margin:1px 0}
+.ms-resf{display:flex;gap:9px;align-items:center;padding:11px 14px;border-top:1px solid var(--border);background:var(--bg3)}

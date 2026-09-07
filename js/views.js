@@ -143,6 +143,7 @@ function showView(viewId){
   if (viewId === 'settings' && window.renderSettings) renderSettings();
   if (viewId === 'rules' && window.renderRules) renderRules();
   if (viewId === 'members' && window.renderMembers) renderMembers();
+  if (viewId === 'master' && window.renderMaster) renderMaster();   /* 🗂 v2.85.0 マスター入力 */
   if (viewId === 'oplog' && window.renderOplog) renderOplog();
   if (viewId === 'news' && window.renderNews) renderNews();
 

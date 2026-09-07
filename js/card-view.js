@@ -434,6 +434,22 @@
           + '</div>';
       hi += '<div class="cv-rsvnote">' + esc(pitInternLabel(c)) + '（社内車両）です。'
           + '金額・完TEL・洗車・伝票はありません。実績にはなりますが、売上には数えません。</div>';
+      /* 🏢 v2.80.0（ゆうた指定 2026-09-07）**紐づけた相手は、ここに小さく出す。**
+         ◎なぜ要るか … v2.80.0 で**お客様欄の名前を「自社代車／自社車両」で固定した**ので、
+           そのままだと「どのお客様の車と結んであるか」がカードのどこにも出なくなる。
+         🔴 判定は `pitFleetLinkTarget`（js/fleet-link.js）1本。ここで custId を見に行かない。
+         ⚠ 結ばれていない時も**黙らない**（気づけないと L08 が数えるだけになる）。 */
+      if (c.maintVehId && window.pitFleetById){
+        const _fx = pitFleetById(c.maintVehId);
+        const _tg = (_fx && window.pitFleetLinkTarget) ? pitFleetLinkTarget(_fx.v) : null;
+        hi += '<div class="cv-rsvnote">'
+            + (_tg
+               ? ('紐づけ：<b>' + esc(_tg.cust.name || _tg.cust.kana || '(無名)') + ' 様</b>'
+                  + (_tg.veh && _tg.veh.plate ? '　' + esc(_tg.veh.plate) : '')
+                  + '　この車の履歴は顧客ビューでも見られます。')
+               : 'この車は、お客様の車と紐づいていません（車両管理 ▸ この車を開く ▸「顧客車両との紐づけ」）。')
+            + '</div>';
+      }
       hi += '</div>';
       return hi + flowTab(c);
     }

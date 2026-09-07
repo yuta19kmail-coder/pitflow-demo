@@ -639,9 +639,16 @@
       resNo: (w.pitGenResNo ? w.pitGenResNo() : ''),
       status: 'reserved',
       intakeTbd: true,                    /* 🔴 日はまだ決まっていない＝予約カレンダーには乗らない */
-      boardId: 'default', bayId: null, division: null,
+      /* 🏢 v2.80.0（ゆうた報告 2026-09-07）**課は決め打ちをやめた。**
+         前は `boardId:'default'`（国産・1課）で固定していたので、輸入車でも必ず1課に行っていた。
+         🔴 決め方は `pitFleetBoardOf`（js/fleet-link.js）1本＝**紐づけた相手の設定 → 無ければ車両管理の区分。**
+         ⚠ ここで「輸入かどうか」を書かない。書き写すと、入庫の時の判断と食い違う日が来る。
+         ⚠ 作業予定を立てた**あと**に紐づけることがあるので、入庫の時にもう一度そろえる（`_intakeGo`）。 */
+      boardId: (w.pitFleetBoardOf ? w.pitFleetBoardOf(vehId) : 'default'), bayId: null, division: null,
       internKind: 'loanercar',            /* 🔴 売上・台数・突合から外れる受け皿（v2.6.0） */
-      customer: '自社代車', customerId: '', kana: '', tel: '',
+      /* 🏢 v2.80.0 お客様欄は**種別で分ける**（代車＝自社代車／社用車＝自社車両）。
+         🔴 入庫しても**上書きしない**（前は紐づけた本物のお客様の名前で塗り替えていた）。 */
+      customer: (w.pitFleetCardName ? w.pitFleetCardName(vehId) : '自社代車'), customerId: '', kana: '', tel: '',
       maker: (v && v.maker) || '', car: vehName(v), plate: (v && v.plate) || '', karteNo: '',
       workType: work, workTypes: [work],
       reserveDate: '', reserveTime: '', returnDate: '',
@@ -1094,11 +1101,26 @@
     c.maintFixSid = sp.sid;
     sp.from = td; if (sp.to < td) sp.to = td;
     /* ② 🔴 v2.62.0 **代車マスタには何も書かない。**（結び目を作るのは車両管理の紐づけ欄だけ）
-       　 結ばれている時は、そのお客様をカードに写すだけ。 */
+       　 結ばれている時は、そのお客様を**カードに控えるだけ**。
+       🏢🔴 v2.80.0（ゆうた報告 2026-09-07）**お客様欄の名前は上書きしない。**
+       🗣「社用車の方、予約カードの顧客名が自社車両になってない。本当の顧客名が出ちゃってる」
+         ＝ ここで `c.customer` を本物のお客様の名前に塗り替えていたのが正体。
+         いまは **`c.customerId` だけ**を持つ＝顧客ビューにも履歴にも今までどおり行けて、
+         **ボードの名札は「自社代車／自社車両」のまま。** */
     if (own && own.cust){
-      c.customer   = own.cust.name || c.customer;
       c.customerId = own.cust.id;
       if (own.veh && own.veh.karteNo) c.karteNo = own.veh.karteNo;
+    }
+    /* 🏢 v2.80.0 **課をここでもう一度そろえる。**
+       ＝ 作業予定を立てたあとに紐づけることがあるので、作った時の判断が古いことがある。
+       🔴🔴 ただし**そろえ直すのは「紐づけた相手が国産／輸入を持っている時」だけ。**
+       　 紐づけていない車まで毎回そろえ直すと、**人がカードで課を選び直したぶんを黙って巻き戻す**。
+       　 ＝「人が動かしたと言えるのは、人が動かしたのを見た時だけ」（2026-09-06 の全アプリ共通の決めごと）。
+       　 紐づけた相手の設定は**あとから分かった本当のこと**なので、こちらは上書きしてよい（ゆうた確定）。
+       ⚠ 紐づけていない時の既定は、カードを作った時に**車両管理の区分**から入れてある。 */
+    if (w.pitFleetLinkBoard){
+      var _b = w.pitFleetLinkBoard(c.maintVehId);
+      if (_b) c.boardId = _b;
     }
     /* ③ 🔴 カードを作らない。**status を進めるだけ**（ふつうの車と同じ階段） */
     c.status      = 'check';

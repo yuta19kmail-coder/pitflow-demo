@@ -37,8 +37,7 @@
 .q-pq-t{ font-size:12.5px; font-weight:800; color:var(--text2); }
 .q-pq-t i{ font-style:normal; font-size:10.5px; font-weight:600; color:var(--text3); margin-left:6px; }
 .q-pq-d{ font-size:10.5px; color:var(--text3); }
-.q-pq-v{ font-size:12px; font-weight:800; color:var(--ins-c,#f59e0b); font-variant-numeric:tabular-nums; }
-.q-pq.ok .q-pq-v{ color:var(--green); }
+/* 🔢 v2.77.0 Qの箱の「+◯円」を消したので、その色づけも外した（ゆうた指定・全体は件数だけ） */
 .q-pq-r{ flex:0 0 auto; font-size:13px; font-weight:800; color:var(--ins-c,#f59e0b); white-space:nowrap; }
 .q-pq-r b{ font-size:26px; font-weight:800; margin:0 2px; font-variant-numeric:tabular-nums; }
 .q-pq-r em{ font-style:normal; font-size:13px; font-weight:700; color:var(--text3); }
@@ -402,7 +401,7 @@
 .q-grb-l{ font-size:12.5px; font-weight:800; color:var(--text2); }
 .q-grb.on .q-grb-l{ color:var(--text); }
 .q-grb-n{ font-size:26px; font-weight:800; line-height:1.15; color:var(--text); font-variant-numeric:tabular-nums; }
-.q-grb-v{ font-size:11.5px; font-weight:700; color:var(--ins-c,#f59e0b); font-variant-numeric:tabular-nums; min-height:17px; }
+/* 🔢 v2.77.0 グループの箱の「+◯円」を消したので、その行も外した */
 .q-grb-t{ font-size:10.5px; color:var(--text3); line-height:1.5; margin-top:3px; }
 .q-grb.is-ok .q-grb-n{ color:var(--green); }
 .q-grb.is-ok.on{ border-color:var(--green); box-shadow:0 0 0 1px var(--green) inset; }
@@ -597,7 +596,7 @@
 .q-done > summary:hover{ background:var(--bg3); }
 .q-done-h{ font-weight:700; }
 .q-done-n{ font-size:11px; color:var(--text3); background:var(--bg3); border-radius:10px; padding:1px 9px; }
-.q-done-v{ font-size:11px; color:var(--text3); font-variant-numeric:tabular-nums; }
+/* 🔢 v2.77.0 「✅チェック済み」の見出しの「+◯円」を消したので、その行も外した */
 .q-done-t{ font-size:10.5px; color:var(--text3); }
 .q-done-list{ border-top:1px solid var(--border); padding:10px; display:flex; flex-direction:column; gap:10px;
   max-height:520px; overflow-y:auto; }

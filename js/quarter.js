@@ -25,6 +25,23 @@
 (function (w) {
   'use strict';
 
+  /* ================================================================
+     🔢 v2.77.0（ゆうた指定 2026-09-07）**全体の数字は「件数」だけにした。**
+     ----------------------------------------------------------------
+     🗣「Q1 +〇万円とか、その下データ違うとかも +〇万円とか、あんまりQを正確な金額で
+     　　管理してないから、金額出されるとかえって混乱するかも。金額は各詳細でいくら違うよ
+     　　ってのは出ていいけど、**全体として件数のみで対応したい**」
+     🔴 消したのは**まとめて出していた金額4か所だけ**（下の 🔢 の印を付けた所）。
+        ① Q1〜Q4 の箱の「+◯円」　② データ／金額／日付の箱の「+◯円」
+        ③ 上の3枚の「まだ合っていない」の「+◯円」　④「✅チェック済み」の見出しの「+◯円」
+     🟢 **残したもの**（ゆうた確定）
+        ・上の3枚の「フロントマン ◯枚 ◯円」「PitFlow ◯台 ◯円」＝元の規模なので残す
+        ・**検算の帯と、差額の内訳・お知らせ・まとめ返車は既存のまま**（金額も含めて1文字も触っていない）
+        ・**各カードの中の金額**（伝票いくら／PitFlow いくら／◯円ちがい）＝「詳細ではいくら違うか」は要る
+     ⚠ **数え方・検算・保存する中身は1つも変えていない。消したのは画面に出す所だけ。**
+        ＝ 金額は今までどおり計算も保存もされているので、あとで戻したくなったら出し直せる。
+     ================================================================ */
+
   function esc(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
   function s(v){ return String(v == null ? '' : v); }
   function t(v){ return s(v).trim(); }
@@ -160,12 +177,14 @@
        +       '<b>' + R.整備ソフト.枚数 + '</b>枚<span class="q-y">' + yen(R.整備ソフト.金額) + '円</span></div>'
        +     '<div class="q-card"><span class="q-k">PitFlow</span>'
        +       '<b>' + R.PitFlow.台数 + '</b>台<span class="q-y">' + yen(R.PitFlow.金額) + '円</span></div>'
+       /* 🔢 v2.77.0 ここに出していた「+◯円」を消した（件数だけ）。上の 🔢 の説明を見ること。 */
        +     '<div class="q-card q-diff"><span class="q-k">まだ合っていない</span>'
-       +       '<b>' + nokori + '</b>件'
-       +       '<span class="q-y">' + (R.差.金額 > 0 ? '+' : '') + yen(R.差.金額) + '円</span></div>'
+       +       '<b>' + nokori + '</b>件</div>'
        +   '</div>';
     h +=   '<div class="q-chk ' + (ok ? 'ok' : 'ng') + '">'
-       +     (ok ? ('✓ 下の3つ' + (D.済み.length ? '＋チェック済み' : '') + 'を足すと、この差とぴったり同じです')
+       /* 🔢 v2.77.0 「この差」＝上に出していた「+◯円」のことだった。**その数字を消したので指す先が無い。**
+          ＝ 言い方だけ「フロントマンと PitFlow の金額の差」に直した。**検算そのものは1つも変えていない。** */
+       +     (ok ? ('✓ 下の3つ' + (D.済み.length ? '＋チェック済み' : '') + 'を足すと、フロントマンと PitFlow の金額の差とぴったり同じです')
                  : '⚠ 内訳を足しても実際の差に届きません（' + yen(R.検算.ずれ) + '円ぶん）。'
                    + 'この画面の数字は当てにしないでください')
        +     '<button class="q-print" onclick="window.print()">印刷</button>'
@@ -267,7 +286,7 @@
     if (!D || !D.済み.length) return '';
     var h = '<details class="q-done"><summary><span class="q-done-h">✅ チェック済み</span>'
           + '<span class="q-done-n">' + D.済み.length + '件</span>'
-          + (D.効き ? '<span class="q-done-v">' + (D.効き > 0 ? '+' : '') + yen(D.効き) + '円</span>' : '')
+          /* 🔢 v2.77.0 ここの「+◯円」を消した（件数だけ）。`D.効き` の計算はそのまま残してある。 */
           + '</summary>';
     h += '<div class="q-done-list">';
     D.済み.forEach(function (item) {
@@ -297,7 +316,8 @@
     });
     h += '</div>';
     /* 🔴 これは残す＝**消すと「数字が動いた」と誤解される**（2026-08-25 の決めごとの例外側） */
-    h += '<div class="q-done-note">⚠ 上の合計・差・検算は1円も動きません</div>';
+    /* 🔢 v2.77.0 「差」は画面から消したので、指す先のある言い方に直した（意味は同じ） */
+    h += '<div class="q-done-note">⚠ 上の合計と検算は1円も動きません</div>';
     return h + '</details>';
   }
 
@@ -382,7 +402,7 @@
          +   ' onclick="pitQTab(\'' + x.id + '\')">'
          +   '<span class="q-grb-l">' + esc(x.l) + '</span>'
          +   '<span class="q-grb-n">' + x.n + '</span>'
-         +   '<span class="q-grb-v">' + (x.id === 'ok' ? '' : (x.v > 0 ? '+' : '') + yen(x.v) + '円') + '</span>'
+         /* 🔢 v2.77.0 ここの「+◯円」を消した。⚠ 上の GS の `v`（金額）は計算も保存もそのまま。 */
          +   '<span class="q-grb-t">' + esc(x.note) + '</span>'
          + '</button>';
     });
@@ -456,8 +476,7 @@
          保存の要約（`x.run.直す件数`）も v2.10.0 から同じ式で作っている＝
          **押す前と押したあとで数字が変わらない**（ゆうた「クリックしたら⓪になったり」）。 */
       var nok = w.pitQNokori ? w.pitQNokori(g.res) : 0;
-      var d   = g.res ? g.res.差.金額 : 0;
-      var okQ = !!g.res && !nok;
+      var okQ = !!g.res && !nok;   /* 🔢 v2.77.0 金額（差）はここでは使わなくなった＝取り出すのもやめた */
       /* 🗓 v2.10.0 いま読んだPDFの組か、保存から借りてきた組かを**書き分ける**。
          ＝ 全部「このPDF」と書くと、読んでいない期間まで読んだように見える。 */
       var 保存 = (g.出どころ === '保存');
@@ -472,7 +491,7 @@
         +       (保存 ? (esc(s(g.保存 && g.保存.at).slice(0, 10)) + ' に実施（残してある伝票 ' + g.soft.length + '枚）')
                       : ('このPDF ' + g.soft.length + '枚'))
         +     '</span>'
-        +     '<span class="q-pq-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span>'
+        /* 🔢 v2.77.0 Qの箱の「+◯円」を消した（右の「残 ◯件」だけで見る） */
         +   '</span>'
         +   '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
         + '</button></div>';
@@ -485,8 +504,8 @@
       +   ' onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
       +   '<span class="q-pq-l"><span class="q-pq-t">' + hd + '</span>'
       +     (r
+             /* 🔢 v2.77.0 ここの「+◯円」も消した（いま読んだ組と同じ形にそろえる） */
              ? '<span class="q-pq-d">' + esc(s(r.走らせた日時).slice(0, 10)) + ' に実施</span>'
-               + '<span class="q-pq-v">' + ((r.差金額 > 0) ? '+' : '') + yen(r.差金額) + '円</span>'
              : '<span class="q-pq-d">まだ実施していません</span>')
       +   '</span>'
       +   '<span class="q-pq-r">' + (r ? (ok2 ? 'OK' : '残 <b>' + nok2 + '</b>件') : '<em>まだ</em>') + '</span>'
@@ -523,16 +542,15 @@
       var inPlan = plan.some(function (x) { return g.from <= x.to && g.to >= x.from; });
       if (inPlan) return;
       var nok = w.pitQNokori ? w.pitQNokori(g.res) : 0;
-      var d = g.res ? g.res.差.金額 : 0;
-      var okQ = !!g.res && !nok;
+      var okQ = !!g.res && !nok;   /* 🔢 v2.77.0 同上 */
       extra += '<div class="q-pqwrap"><button class="q-pq now'
         + (U.gi === i ? ' on' : '') + (okQ ? ' ok' : ' done') + (g.全部 ? '' : ' part')
         + '" onclick="pitQPickGroup(' + i + ')">'
         + '<span class="q-pq-l"><span class="q-pq-t">' + esc(g.label)
         +   (g.全部 ? '' : '<em class="q-pq-part">' + esc(dd(g.from)) + '〜' + esc(dd(g.to)) + '日だけ</em>')
         + '</span>'
-        + '<span class="q-pq-d">このPDF ' + g.soft.length + '枚</span>'
-        + '<span class="q-pq-v">' + (d > 0 ? '+' : '') + yen(d) + '円</span></span>'
+        /* 🔢 v2.77.0 ここの「+◯円」も消した（Qの箱は3か所とも同じ形） */
+        + '<span class="q-pq-d">このPDF ' + g.soft.length + '枚</span></span>'
         + '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
         + '</button></div>';
     });
@@ -605,12 +623,13 @@
        +     '<div class="q-card"><span class="q-k">PitFlow</span><b>' + (R.PitFlow ? R.PitFlow.台数 : 0)
        +       '</b>台<span class="q-y">' + yen(R.PitFlow ? R.PitFlow.金額 : 0) + '円</span></div>'
        +     '<div class="q-card q-diff' + (nokori4 === 0 ? ' zero' : '') + '">'
-       +       '<span class="q-k">まだ合っていない</span><b>' + (nokori4 == null ? '—' : nokori4) + '</b>件'
-       +       '<span class="q-y">' + ((R.差 && R.差.金額 > 0) ? '+' : '') + yen(R.差 ? R.差.金額 : 0) + '円</span></div>'
+       /* 🔢 v2.77.0 走らせた直後と同じく「+◯円」を消した（顔を2つにしない） */
+       +       '<span class="q-k">まだ合っていない</span><b>' + (nokori4 == null ? '—' : nokori4) + '</b>件</div>'
        +   '</div>';
     h +=   '<div class="q-chk ' + (ok ? 'ok' : 'ng') + '">'
+       /* 🔢 v2.77.0 走らせた直後と同じ理由で、「この差」の言い方だけ直した */
        +     (ok ? (nokori4 === 0 ? '🎉 オールグリーン。直すところはありません'
-                                  : '✓ 下の3つを足すと、この差とぴったり同じです')
+                                  : '✓ 下の3つを足すと、フロントマンと PitFlow の金額の差とぴったり同じです')
                  : '⚠ 内訳を足しても実際の差に届きません。この画面の数字は当てにしないでください')
        +     '<button class="q-print" onclick="window.print()">印刷</button>'
        +   '</div>';

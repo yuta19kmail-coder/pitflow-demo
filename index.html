@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.74.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.76.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -104,6 +104,10 @@
 :root[data-theme="light"] #topbar .logo .logo-light,
 :root[data-theme="light-liquid"] #topbar .logo .logo-light{display:block}
 </style>
+<!-- 🔴 ログイン画面の「待つ」（全アプリ共通・本体は _shared）。戻りを受け取るまで Google ボタンを出さない。⚠ 画面より先（head の中）に置くこと -->
+<script src="js/coreflow-auth-gate.js?v=a5cec0e0"></script>
+<!-- 🔴 「Google でログイン」ボタンの見た目（全アプリ共通・本体は _shared）。色はボタンの data-cf-login で決まる -->
+<script src="js/coreflow-login-btn.js?v=1ee736d7"></script>
 </head>
 <body>
 
@@ -121,13 +125,13 @@
       <b>このブラウザではログインできません</b><br>
       LINE・Instagram などのアプリ内ブラウザからは Google ログインが使えません。右上のメニューから <b>Safari / Chrome で開く</b> を選んでください。
     </div>
-    <button class="btn-login" id="pl-google" style="display:none" onclick="pitSampleLogin()">
+    <button class="btn-login" id="pl-google" data-cf-login="pitflow" style="display:none" onclick="pitSampleLogin()">
       <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="background:#fff;border-radius:2px;padding:2px;box-sizing:content-box;flex:0 0 auto"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"/></svg>
       <span class="pl-label">Google でログイン</span>
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.74.0</div>
+    <div class="login-ver">v2.76.0</div>
   </div>
 </div>
 
@@ -141,7 +145,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.74.0</span>
+    <span class="ver">v2.76.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -859,7 +863,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-functions-compat.js"></script><!-- 🤖 AIに聞く窓口（鍵はサーバー側。functions/index.js の pfAsk） -->
 
 <!-- ===== JS ===== -->
-<script src="js/coreflow-icons.js?v=4ad44b4e"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
+<script src="js/coreflow-icons.js?v=828f3c5c"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
 <script src="js/pit-share.js?v=29"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=f85dcc35"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
@@ -893,7 +897,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-miss.js?v=3"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
 <script src="js/card-detail.js?v=147"></script>
 <script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
-<script src="js/mech-pick.js?v=3"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
+<script src="js/mech-pick.js?v=4"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
 <script src="js/card-view.js?v=75"></script>
 <script src="js/cover-print.js?v=16"></script>
 <script src="js/avail.js?v=7"></script>

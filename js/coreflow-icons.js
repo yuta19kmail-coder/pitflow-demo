@@ -141,6 +141,16 @@
     eraser:     'M8.6 19.5h11M4.6 15.6l4.8 4.8 9.6-9.6a1.7 1.7 0 0 0 0-2.4l-2.4-2.4a1.7 1.7 0 0 0-2.4 0l-9.6 9.6a1.7 1.7 0 0 0 0 2z M9.5 8.5l6 6',
     highlight:  'M4 20.5h6M6 17.5l-1 3 3-1 10-10a2.1 2.1 0 0 0 0-3l-.5-.5a2.1 2.1 0 0 0-3 0l-10 10z M13.5 6.5l4 4',
     frame:      'M7.5 3.5v17M16.5 3.5v17M3.5 7.5h17M3.5 16.5h17',
+    /* ⏭ 飛ばす（この人を回覧から外して次へ）。2026-09-05 CoreTools「ラフ赤入れ」で追加。
+       三角＋右の縦棒＝音楽プレーヤーの「次へ」と同じ形。誰でも一目で分かる。 */
+    skip:       'M6.5 6.2v11.6l9.2-5.8zM18.2 5.6v12.8',
+    /* ⏮ その前へ（skip の左右反転）。対で無いと使いにくいので一緒に入れる。 */
+    skipBack:   'M17.5 6.2v11.6L8.3 12zM5.8 5.6v12.8',
+    /* ✍ 指で描く。手のひら（hand）と混ざらないよう、**指先＋短い線**で描く。
+       2026-09-05 追加。「指で描く／指で送る」を並べて出す時の相方。 */
+    handDraw:   'M8.5 10.6V5.4a1.5 1.5 0 0 1 3 0v5.2V4.9a1.5 1.5 0 0 1 3 0v5.7V6.9a1.5 1.5 0 0 1 3 0v6.1a7 7 0 0 1-7 7 5.4 5.4 0 0 1-4.3-2.1L4 14.7a1.5 1.5 0 0 1 2.4-1.8z M3.2 8.2l3.4-3.4',
+    /* 📚 ページを縦に続けて出す（Acrobat のスクロール表示）。2026-09-05 追加。 */
+    pages:      'M6 3.5h12v7H6zM6 13.5h12v7H6z',
     comment:    'M20 12.8a6.9 6.9 0 0 1-7.4 6.9L7 21l1.3-4A6.9 6.9 0 1 1 20 12.8z',
     stamp:      'M12 3.8l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 10l5.9-.9z',
     scissors:   'M6.5 4.5a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z M6.5 14.3a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2z M8.7 8.8L20 20M20 4L8.7 15.2',
@@ -236,7 +246,11 @@
     invoice: 'receipt', morning: 'sunrise', good: 'thumbUp', status: 'dot',
     /* MHS の言い方（2026-08-01） */
     shift: 'bed', rest: 'bed', logout: 'power', evening: 'sunset', closed: 'cone',
-    parts: 'box', done: 'check', inspect: 'search', cash: 'money'
+    parts: 'box', done: 'check', inspect: 'search', cash: 'money',
+    /* ラフ赤入れの言い方（CoreTools・2026-09-05） */
+    pass: 'skip', forward: 'skip', rewind: 'skipBack',
+    fingerDraw: 'handDraw', fingerScroll: 'hand', redpen: 'pen', proof: 'pen',
+    scroll: 'pages', continuous: 'pages', fit: 'expand', actual: 'frame'
   };
 
   var DEF = { s: 18, sw: 1.6 };

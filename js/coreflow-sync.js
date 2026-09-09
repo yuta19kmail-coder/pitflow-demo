@@ -363,11 +363,40 @@
       return cb.apply(this, arguments);
     };
   }
+  /* ============================================================
+     🔴🔴🔴 2026-09-08（v1.3.0）**購読が落ちたら、ここで自動につなぎ直す**
+     ------------------------------------------------------------
+     ◎なぜここでやるか（2026-09-08 の全アプリ棚卸し）
+       10本のアプリを1つずつ見たら、**購読が落ちた時に張り直しているのは
+       PitFlow・CoreBoard・CoreNote の3本だけ**だった。
+       残り（MHS 25本／CoreMembers 4本／CoreTemplate 2本 …）は
+       `console.warn` を出すだけ＝**その画面はリロードするまで一生更新が来ない**。
+       しかも画面は普通に動くので、**本人は絶対に気づけない**。
+       🔴 2026-08-28 の事故（古い画面が他人の作業を6件消した）と同じ形。
+     ◎ここで直す理由
+       この部品の onSnapshot ラッパーは**すでに全アプリの全購読を通っている**（成功だけ見ていた）。
+       ここでエラーも受ければ、**各アプリを1本ずつ直さなくても全部に効く**。
+     ◎やっていること
+       ・エラーが来たら **3秒→6秒→12秒…最大60秒** と伸ばしながら、**同じ購読を張り直す**
+       ・成功したら待ち時間を戻す
+       ・アプリが unsubscribe を呼んだら、**張り直しも止める**（二重購読にしない）
+     ⚠ 🔴 **直らないエラーでは張り直さない。**
+        `permission-denied` / `unauthenticated`（ルールで弾かれている・ログアウトした）は
+        何度やっても同じ。無限に叩き続けると請求と負荷だけが増える。ここは1回で諦めて赤にする。
+     ⚠ 自前で張り直しを持っているアプリ（PitFlow・CoreBoard・CoreNote・CarFlow）とは競合しない。
+        あちらは張り直す前に必ず unsubscribe を呼ぶので、こちらの予約はその時点で消える。
+     ============================================================ */
+  var NO_RETRY = { 'permission-denied': 1, 'unauthenticated': 1, 'invalid-argument': 1,
+                   'failed-precondition': 1, 'unimplemented': 1 };
+
   function wrapSnap(proto, name) {
     if (!proto || typeof proto[name] !== 'function' || proto[name].__cf) return;
     var orig = proto[name];
     var f = function () {
+      var self = this;
       var args = Array.prototype.slice.call(arguments);
+
+      /* 成功のコールバックを包む（ランプを緑にする。前からあった処理） */
       var done = false;
       for (var i = 0; i < args.length && !done; i++) {
         if (typeof args[i] === 'function') { args[i] = wrapCb(args[i]); done = true; }
@@ -378,7 +407,66 @@
           args[i] = copy; done = true;
         }
       }
-      return orig.apply(this, args);
+
+      /* エラーのコールバックの場所を探す（関数の2つめ、または observer の error） */
+      var errIdx = -1, obsIdx = -1;
+      var fnSeen = 0;
+      for (var j = 0; j < args.length; j++) {
+        if (typeof args[j] === 'function') { fnSeen++; if (fnSeen === 2) { errIdx = j; break; } }
+        else if (args[j] && (typeof args[j].next === 'function' || typeof args[j].error === 'function')) { obsIdx = j; }
+      }
+
+      var stopped = false, timer = null, waitMs = 3000, inner = null;
+      var appErr = (errIdx >= 0) ? args[errIdx]
+                 : (obsIdx >= 0 && typeof args[obsIdx].error === 'function') ? args[obsIdx].error.bind(args[obsIdx])
+                 : null;
+
+      function onErr(err) {
+        try { API.set('error'); } catch (e) {}
+        var code = (err && err.code) || '';
+        if (appErr) { try { appErr(err); } catch (e) {} }     /* アプリ側の処理は必ず先に通す */
+        if (stopped) return;
+        if (NO_RETRY[code]) {                                  /* 直らないエラー＝あきらめる */
+          try { if (w.console) w.console.error('[CFSync] 購読が拒否されました（張り直しません）', code); } catch (e) {}
+          return;
+        }
+        if (timer) return;
+        try { if (w.console) w.console.warn('[CFSync] 購読が落ちました。' + waitMs + 'ms 後につなぎ直します', code || err); } catch (e) {}
+        timer = setTimeout(function () {
+          timer = null;
+          if (stopped) return;
+          try { if (inner) inner(); } catch (e) {}
+          inner = link();
+        }, waitMs);
+        waitMs = Math.min(waitMs * 2, 60000);
+      }
+
+      /* エラーの受け口を差し込む */
+      var callArgs = args.slice();
+      if (errIdx >= 0) callArgs[errIdx] = onErr;
+      else if (obsIdx >= 0) {
+        var o2 = {}; for (var k2 in callArgs[obsIdx]) o2[k2] = callArgs[obsIdx][k2];
+        o2.error = onErr; callArgs[obsIdx] = o2;
+      } else callArgs.push(onErr);      /* アプリがエラーを見ていない購読にも受け口を付ける */
+
+      /* 成功したら待ち時間を戻す */
+      var okIdx = -1;
+      for (var m = 0; m < callArgs.length; m++) { if (typeof callArgs[m] === 'function') { okIdx = m; break; } }
+      if (okIdx >= 0 && okIdx !== errIdx) {
+        var okFn = callArgs[okIdx];
+        callArgs[okIdx] = function () { waitMs = 3000; return okFn.apply(this, arguments); };
+      }
+
+      function link() { return orig.apply(self, callArgs); }
+      inner = link();
+
+      /* アプリに返すのは「止める」関数。中身を差し替えても、これ1つで止まる。 */
+      return function () {
+        stopped = true;
+        if (timer) { clearTimeout(timer); timer = null; }
+        try { if (inner) inner(); } catch (e) {}
+        inner = null;
+      };
     };
     f.__cf = 1;
     proto[name] = f;

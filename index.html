@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.86.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.87.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -132,7 +132,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.86.0</div>
+    <div class="login-ver">v2.87.0</div>
   </div>
 </div>
 
@@ -146,7 +146,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.86.0</span>
+    <span class="ver">v2.87.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -591,6 +591,12 @@
               <b><i data-ic=check data-ics=16></i> 承認に回して保存</b>
               <span>枠は埋めたまま、承認待ちとして登録。未定タブの「承認待ち」に並ぶ</span></button>
             <div class="vh-msep"></div>
+            <!-- 🔁 v2.87.0（ゆうた指定 2026-09-09）電話1本で相談来店と本来店を続けて取るため。
+                 お客様と車を2回打たなくて済むようにする。2枚はつながっていない別々の予約。 -->
+            <button class="vh-mi" role="menuitem" onclick="pitSaveAndPrintNext()">
+              <b><i data-ic=copy data-ics=16></i> 印刷して保存して、この車でもう1件</b>
+              <span>表紙を刷って保存し、同じお客様・同じ車で次の予約をつづけて入力する</span></button>
+            <div class="vh-msep"></div>
             <button class="vh-mi" role="menuitem" onclick="pitSaveTentative()">
               <b><i data-ic=pencil data-ics=16></i> 仮予約で保存</b>
               <span>まだ確定していない予約。カレンダーに「仮」付きで載る</span></button>
@@ -899,10 +905,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/return-slot.js?v=15"></script><!-- v1.60.0 返車の行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）を決める物差し＋時間の入力ガイド共通部品。state.js より後ろ、使う側（card-detail / card-hover / return-popup / undetermined）より前 -->
 <script src="js/overdue-pit.js?v=7"></script><!-- 🔴 v1.101.0 当日を過ぎた予約・返車を自動で正しい箱へ移す。return-slot.js より後ろ、views.js（showView から呼ぶ）より前 -->
 <script src="js/approval-pit.js?v=2"></script><!-- 🔵 v1.74.0 新規予約の「承認」制度（承認待ちの印・承認する・入庫前に1回聞く）。印を出す側（reserve / card-hover / loaner / card-view / undetermined）より前に読む -->
-<script src="js/views.js?v=58"></script>
+<script src="js/views.js?v=59"></script>
 <script src="js/work-content.js?v=15"></script>
 <script src="js/card-miss.js?v=3"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
-<script src="js/card-detail.js?v=148"></script>
+<script src="js/card-detail.js?v=149"></script>
 <script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=4"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
 <script src="js/card-view.js?v=76"></script>
@@ -968,7 +974,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/auth-pit.js?v=17"></script>
 <script src="js/members-pit.js?v=18"></script>
 <script src="js/oplog-pit.js?v=6"></script>
-<script src="js/news-pit.js?v=44"></script>
+<script src="js/news-pit.js?v=45"></script>
 <script src="js/launcher.js?v=e62024b3"></script>
 <script src="js/holidays.js?v=1c79064f"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>
@@ -996,7 +1002,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/blank-cards.js?v=8"></script><!-- 空の予約カードを残さない（settings.js / views.js / card-detail.js より後ろ） -->
 <script src="js/reset-pit.js?v=4"></script><!-- 本番データの初期化／デモ版の「まっさらにする」（settings.js より後ろ） -->
 <!-- 🗑 v2.50.0 import-cloud.js（顧客データの取込・本番）を外した＝1回きりの道具で、もう済んでいる。_to_delete に置いてある -->
-<script src="js/coreflow-sync.js?v=65757af5"></script><!-- 同期ランプ共通部品（PitFlowではふきだしだけ借りる。sync-pit.js より後ろ） -->
+<script src="js/coreflow-sync.js?v=6af2a532"></script><!-- 同期ランプ共通部品（PitFlowではふきだしだけ借りる。sync-pit.js より後ろ） -->
 <script src="js/deeplink-pit.js?v=2"></script><!-- ?card= でカードを直接開く（MHS Todayボードの「詳細を見る」の受け口）。card-detail.js / views.js より後ろ -->
 <script src="js/ctxmenu-pit.js?v=4"></script><!-- 🖱 右クリックメニュー（全ビュー共通）。対象を探すだけなので、どのビューのJSより後ろに置く -->
 <script src="js/mhs-pit.js?v=2"></script><!-- 📡 MHSの予定を読む（新規予約の「担当の予定」）。card-detail.js より後ろ -->

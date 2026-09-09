@@ -448,21 +448,14 @@ function holdDaysLabel(c, workLabel){                 // 預かり：6/10〜（5
 }
 function escAttr(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
 
-function openNewReserve(){
-  /* 🔴 v1.56.1（2026-08-06 の事故）**保存した直後（0.7秒以内）の「＋ 新規予約」は受け流す。**
-     「＋ 新規予約」は上のバーにずっと出ているので、保存で画面が戻った**直後の2度目のクリック**が
-     そのまま新しい予約を開いてしまう。ゆうたが「反応しないから6回押した」と言っていた日に、
-     **空の予約が7〜8秒おきに6枚できた**のはこれ（押す → 保存されて戻る → 空の新規が開く →
-     また押す → その空が保存される…の繰り返し）。
-     ⚠ 黙って無視しない＝**必ず知らせる**（本当に壊れたと思われないため）。
-     ⚠ 見張るのは「保存の直後」だけ。ふだんの「＋ 新規予約」は今までどおり効く。 */
-  if (window.pitJustSaved && pitJustSaved()){
-    if (window.pitToast) pitToast('保存しました。新しく予約を作るときは、もう一度押してください');
-    return;
-  }
-  if (window.pitLog) pitLog('新規予約を開いた', { kind:'new' });
-  const id = 'c' + Date.now();
-  const card = {
+/* 🆕 v2.87.0 まっさらな予約カードを1枚こしらえる。
+   🔴 「＋ 新規予約」と「この車でもう1件」の**両方がここを通る**＝写しを作らない。
+      ここに欄を足したら、両方に自動で乗る。 */
+function _pitBlankReserveCard(){
+  let id = 'c' + Date.now();
+  /* 同じミリ秒で2枚できると、あとから開く方が前の1枚を上書きしてしまう＝必ず別の名前にする */
+  while (Array.isArray(state.cards) && state.cards.some(x => x.id === id)) id = 'c' + Date.now() + Math.floor(Math.random() * 1000);
+  return {
     id, resNo: (window.pitGenResNo ? pitGenResNo() : ''),   // <i data-ic=numbers data-ics=16></i> 予約番号（ローマ字1＋5桁・例 K48201）
     status: 'reserved', boardId: null, bayId: null,   // 国産/輸入は未選択スタート（選ぶと片方のカレンダーが消える）
     division: null,   // 課は国産/輸入を選んだ瞬間に自動で入る
@@ -480,6 +473,22 @@ function openNewReserve(){
     workSpecials: [],  // その他・付加（保証/保険/社員）＝作業タイプとセットの時だけ付く。予約詳細/ホバー/印刷にのみ表示 v0.116.0
     internKind: ''     // その他・社内区分（''/used=中古/loanercar=代車/inhouse=内部）＝売上が立たないカード v2.6.0
   };
+}
+
+function openNewReserve(){
+  /* 🔴 v1.56.1（2026-08-06 の事故）**保存した直後（0.7秒以内）の「＋ 新規予約」は受け流す。**
+     「＋ 新規予約」は上のバーにずっと出ているので、保存で画面が戻った**直後の2度目のクリック**が
+     そのまま新しい予約を開いてしまう。ゆうたが「反応しないから6回押した」と言っていた日に、
+     **空の予約が7〜8秒おきに6枚できた**のはこれ（押す → 保存されて戻る → 空の新規が開く →
+     また押す → その空が保存される…の繰り返し）。
+     ⚠ 黙って無視しない＝**必ず知らせる**（本当に壊れたと思われないため）。
+     ⚠ 見張るのは「保存の直後」だけ。ふだんの「＋ 新規予約」は今までどおり効く。 */
+  if (window.pitJustSaved && pitJustSaved()){
+    if (window.pitToast) pitToast('保存しました。新しく予約を作るときは、もう一度押してください');
+    return;
+  }
+  if (window.pitLog) pitLog('新規予約を開いた', { kind:'new' });
+  const card = _pitBlankReserveCard();
   /* v1.17.0：ここで作るカードは「下書き（_draft）」。
      ⚠ _draft が付いている間は **クラウドにも端末の本保存にも書かない**（db-pit.js が外す）＝
         「保存する／仮予約で登録／印刷して保存」を押すまで、どこにも数えられないし他の端末にも出ない。
@@ -488,8 +497,53 @@ function openNewReserve(){
   card._draft = true;
   state.cards.push(card);
   if (window.PitDB) PitDB.save(true);   // 下書き以外の変化を反映（下書き自体は書かれない）
-  openCard(id, 'page');   // 新規入庫予約＝全画面
+  openCard(card.id, 'page');   // 新規入庫予約＝全画面
 }
+
+/* ===================================================================
+   🔁 v2.87.0（ゆうた指定 2026-09-09）**同じお客様・同じ車で、もう1件つづけて予約を取る**
+   -------------------------------------------------------------------
+   🗣「相談来店 → 本来店を一回の電話で先に予約取っちゃうことが多い。
+   　　なので電話口で計2本、同じ予約を取ってる」
+   ＝ お客様と車を2回打っていたのをやめる。1枚目を保存したら、そのまま2枚目の入力に入る。
+
+   🔴 **2枚はまったく別の予約**。つながりの印は持たせない
+      ＝片方を消しても、もう片方には何も起きない（ゆうた確定 2026-09-09）。
+   🔴 **引き継ぐのはこの3組だけ。** 増やす時はゆうたに聞くこと。
+   🔴 日にち・時刻・受付タイプ・相談の印・代車・概算・メモ・持ち物は**引き継がない**
+      ＝2枚目は別の日の別の来店。前の内容が残っていると、直し忘れがそのまま予約になる。
+   ⚠ ここは openNewReserve と**わざと分けてある**＝上の「保存の直後は受け流す」を通さないため。
+      あれは「戻った直後の流れ弾」を止めるもので、こちらは**わざと続けて開いている**。
+   =================================================================== */
+const PIT_NEXT_KEEP = [
+  /* お客様 */ 'customerId', 'repeat', 'customer', 'sei', 'mei', 'kana', 'seiKana', 'meiKana',
+               'tel', 'contacts', 'lstepId', 'lineStatus',
+  /* 車 */     'karteNo', 'maker', 'plate', 'car', 'drive', 'perVisit',
+  /* 予約内容 */ 'boardId', 'division', 'workType', 'workAddons', 'frontStaff', 'reserveStaff'
+];
+window.PIT_NEXT_KEEP = PIT_NEXT_KEEP;
+
+function pitOpenNextReserveFrom(srcId){
+  const src = (Array.isArray(state.cards) ? state.cards : []).find(x => x.id === srcId);
+  const card = _pitBlankReserveCard();
+  if (src){
+    PIT_NEXT_KEEP.forEach(function (k){
+      const v = src[k];
+      if (v === undefined || v === null || v === '') return;
+      /* 🔴 中身のあるもの（連絡先・車両注意・併用可）は**写しを取ってから**入れる。
+         そのまま渡すと1枚目と2枚目が同じものを共有して、片方を直すともう片方も変わる。 */
+      card[k] = (typeof v === 'object') ? JSON.parse(JSON.stringify(v)) : v;
+    });
+  }
+  card._draft = true;
+  state.cards.push(card);
+  if (window.PitDB) PitDB.save(true);
+  if (window.pitLog) pitLog('新規予約を開いた', { kind:'again', from: srcId || '' });
+  openCard(card.id, 'page');
+  if (window.pitToast) pitToast('同じお客様・同じ車で、次の予約を入力してください');
+  return card.id;
+}
+window.pitOpenNextReserveFrom = pitOpenNextReserveFrom;
 function goToday(){
   state.reserveDate = new Date();
   if (state.currentView === 'reserve') renderReserve();

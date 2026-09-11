@@ -16,7 +16,7 @@
         画面のボタンを消すだけにしない＝**ここでも止める**（全アプリ共通の決めごと）。
 
    ◎出しかた（ゆうた・1回だけ）
-     cd D:\Claude\アプリ開発\PitFlow\pitflow\functions
+     cd D:\Claude\CoreFlowアプリ\PitFlow\pitflow\functions
      npm install
      cd ..
      firebase deploy --only functions:pitflow

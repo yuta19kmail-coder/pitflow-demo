@@ -206,7 +206,7 @@
      ⚠ 「管理（admin）」とは別物。広げないこと。
         Firestore のルールが `pitAuditLogs` の delete を `_isMaster()` に締めてあるので、
         ここを admin まで広げると**押せるのに消えないボタン**（サーバー側で拒否）になる。
-        ルールは `CarFlow\carflow\firestore.rules`（全アプリ共通の1枚）にある。 */
+        ルールは `_ルール\firestore.rules`（全アプリ共通の1枚）にある。 */
   window.pitIsMaster = function () {
     var m = window.fb && window.fb.currentMember;
     return !!(m && m.master === true);

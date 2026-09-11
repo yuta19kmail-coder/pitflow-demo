@@ -71,7 +71,7 @@
   'use strict';
 
   /* 🔴 マスター（ゆうた本人）の uid。Firestore のルールの `_isMaster()` と同じ値。
-     ⚠ ここを変えるならルール（CarFlow\carflow\firestore.rules）も一緒に変えること。 */
+     ⚠ ここを変えるならルール（_ルール\firestore.rules）も一緒に変えること。 */
   var MASTER_UID = 'cIZsMOEsaaWWVVM957TFe6tvql53';
 
   var _wired = false, _handlers = { logout: null, help: null }, _tries = 0;

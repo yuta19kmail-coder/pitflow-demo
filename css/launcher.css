@@ -3,7 +3,7 @@
    中心＝CoreFlow（太陽・トリガーに被らないよう右上にオフセット）＋公転2周。
    ラベルは普段隠し球ホバーで表示。位置は各 .cf-lo-item の inline --dx/--dy。
 
-   ⚠ このファイルの本体は  D:\Claude\アプリ開発\_shared\launcher.css  です。
+   ⚠ このファイルの本体は  D:\Claude\CoreFlowアプリ\_shared\launcher.css  です。
       直す時はそこを直して、sync-shared.ps1 を実行して全アプリに配ること。
       各アプリの css\ に入っているのは配られたコピー。直接直すと次の配布で消えます。
       （2026-08-01：9アプリに手で配る運用をやめ、coreflow-icons.js と同じ「_shared が本体」に統一）

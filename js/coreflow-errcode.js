@@ -1,7 +1,7 @@
 /* ========================================
    coreflow-errcode.js ── エラー番号（CoreFlow 全アプリ共通・2026-08-17）
    ----------------------------------------
-   ⚠ このファイルの本体は  D:\Claude\アプリ開発\_shared\coreflow-errcode.js  です。
+   ⚠ このファイルの本体は  D:\Claude\CoreFlowアプリ\_shared\coreflow-errcode.js  です。
       直す時はそこを直して、sync-shared.ps1 を実行して全アプリに配ること。
       各アプリの js\ に入っているのは配られたコピー。直接直すと次の配布で消えます。
 

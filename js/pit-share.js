@@ -1487,6 +1487,23 @@ w.pitDivisionColor = pitDivisionColor;
   var PIT_SHAKEN_ACTS = ['done', 'repass', 'recheck', 'flip', 'cancel', 'reopen', 'reedit', 'redrop'];
   w.PIT_SHAKEN_ACTS = PIT_SHAKEN_ACTS;
 
+  /* 🔴🔴 v2.88.0（2026-09-11）**落ちた所の「よく使う言葉」も、ここ1本。**
+     ⚠ もとは shaken.js の中だけに書いてあった。MHS にも同じ窓を出す（MHS v1.65.0）ので、
+        書き写した瞬間**片方だけ言葉が増える**（2026-08-15 の食い違い4件と同じ筋）。
+     ⚠ 押すと足される／もう一度押すと外れる。区切りは「・」＝並べ方も1本（下の pitShkNgToggle）。 */
+  var PIT_SHK_NG_WORDS = ['光軸', 'サイドスリップ', '排ガス', '制動力', 'スピードメーター',
+                          'ブーツ切れ', '下回りのオイル漏れ', '灯火類'];
+  w.PIT_SHK_NG_WORDS = PIT_SHK_NG_WORDS;
+
+  /* 入っていなければ足す／入っていれば外す。返すのは**新しい1行**（120字で切る）。 */
+  function pitShkNgToggle(line, word){
+    var a = String(line || '').split('・').map(function(x){ return x.trim(); }).filter(Boolean);
+    var i = a.indexOf(word);
+    if (i >= 0) a.splice(i, 1); else a.push(word);
+    return a.join('・').slice(0, 120);
+  }
+  w.pitShkNgToggle = pitShkNgToggle;
+
   function _shkSlotT(sl){ return sl === 'pm' ? '午後' : '午前'; }
   function _shkMD(iso){
     if (!iso) return '';

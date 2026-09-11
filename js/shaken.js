@@ -727,7 +727,9 @@
   /* 📝 再検合格・不合格のあとに切り替わる「落ちた所」の窓。
      ⚠ 空のままでも記録できる（今までどおり）。
      🔴 よく使う言葉を札で出す（ゆうた指定）。押すと足される／もう一度押すと外れる。 */
-  var SHK_NG_WORDS=['光軸','サイドスリップ','排ガス','制動力','スピードメーター','ブーツ切れ','下回りのオイル漏れ','灯火類'];
+  /* 🔴 v2.88.0 よく使う言葉は **pit-share.js の `PIT_SHK_NG_WORDS` 1本**（MHS も同じ窓を出すため）。
+     ⚠ ここに書き写さない。写した瞬間、片方だけ言葉が増える。 */
+  function SHK_NG_WORDS(){ return window.PIT_SHK_NG_WORDS || []; }
   window.shkNotePop=function(id,act){
     _shkPend=_grabFields();                 /* 🔴 消える前に控える */
     var c=card(id); if(!c) return; var s=ins(c);
@@ -738,7 +740,7 @@
         + (isNg?'自社に戻して修理。行く日は候補に戻ります。':'一度落ちたが、その回で受かった記録です。')+'</div>'
       + '<label class="shk-plabel">落ちた所（1行・空でもOK）</label>'
       + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
-      + '<div class="shk-pwords">'+SHK_NG_WORDS.map(function(w){
+      + '<div class="shk-pwords">'+SHK_NG_WORDS().map(function(w){
           return '<button type="button" class="shk-pw" onclick="shkAddWord(\''+w+'\')">'+w+'</button>'; }).join('')+'</div>'
       + '<button class="shk-pbtn '+(isNg?'re':'ok2')+'" onclick="shkActNote(\''+id+'\',\''+act+'\')">記録する</button>'
       + '<button class="shk-pbtn ghost" onclick="shkChipMenu(\''+id+'\')">← 戻る</button>');
@@ -746,10 +748,8 @@
   /* 札を押した時＝入っていなければ足す／入っていれば外す。区切りは「・」 */
   window.shkAddWord=function(w){
     var el=document.getElementById('shk-note'); if(!el) return;
-    var a=String(el.value||'').split('・').map(function(x){return x.trim();}).filter(Boolean);
-    var i=a.indexOf(w);
-    if(i>=0) a.splice(i,1); else a.push(w);
-    el.value=a.join('・').slice(0,120);
+    /* 🔴 v2.88.0 足す・外すの並べ方も pit-share.js の `pitShkNgToggle` 1本（MHS と同じ答えにする） */
+    el.value=window.pitShkNgToggle?pitShkNgToggle(el.value,w):el.value;
     el.focus();
   };
   window.shkActNote=function(id,act){

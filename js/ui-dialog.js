@@ -2,7 +2,7 @@
 // ui-dialog.js — ブラウザ標準の prompt / confirm / alert をやめて、
 //                アプリの中に自前のダイアログを出す共通部品
 //
-//   ⚠ このファイルの本体は  D:\Claude\アプリ開発\_shared\ui-dialog.js  です。
+//   ⚠ このファイルの本体は  D:\Claude\CoreFlowアプリ\_shared\ui-dialog.js  です。
 //      直す時はそこを直して、sync-shared.ps1 を実行して全アプリに配ること。
 //      各アプリの js\ に入っているのは配られたコピー。直接直すと次の配布で消えます。
 //      （2026-08-01：CoreNote と CoreBoard に同じものが2枚ある状態をやめ、

@@ -65,8 +65,27 @@
   grid-row:2;
   background:var(--bg2);
   border-right:1px solid var(--border);
-  overflow-y:auto;
+  /* 🔴 ここは流れない。流れるのは中の #si-scroll だけ（v2.89.0）
+     ＝アプリランチャーを流れる箱の外に出して、画面下に張り付かせるため。
+     ここを overflow-y:auto に戻すと、ランチャーが一緒に流れて下に消える。 */
+  overflow:hidden;
   padding:12px 0;
+  display:flex;
+  flex-direction:column;
+}
+/* アプリランチャー＝流れる箱の外に居るので、スクロールに関係なく画面下に張り付く。
+   線が無いとメニューが下まで流れた時に境目が分からない。
+   共通の css/launcher.css は配布物で触れないので、足りない分はここで足す（v2.89.0） */
+#sidebar>[data-cf-launcher]{
+  flex:0 0 auto;
+  padding-top:8px;
+  border-top:1px solid var(--border);
+}
+/* メニュー本体＝サイドバーで唯一の流れる箱。min-height:0 が無いと縮まず、はみ出す */
+#si-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
   display:flex;
   flex-direction:column;
 }
@@ -195,10 +214,14 @@
     height:auto;
     display:flex;
     overflow-x:auto;
+    overflow-y:auto;
     padding:0;
     border-right:none;
     border-bottom:1px solid var(--border);
   }
+  /* スマホは横一列の帯。張り付かせる相手（画面下）が無いので、
+     箱ごと無かったことにして中身を #sidebar の直下に戻す＝v2.89.0 前とまったく同じ並び */
+  #si-scroll{display:contents}
   .si-section-title{display:none}
   .si-item{
     border-left:none;

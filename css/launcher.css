@@ -8,6 +8,9 @@
       各アプリの css\ に入っているのは配られたコピー。直接直すと次の配布で消えます。
       （2026-08-01：9アプリに手で配る運用をやめ、coreflow-icons.js と同じ「_shared が本体」に統一）
 
+   v2.6（2026-09-12・ゆうた指定「他のサイドバーがあるアプリも共通でいれてほしい」）：
+      **サイドバーのあるアプリで、ランチャーを画面の下に浮かせる**（→ ファイル末尾）。
+
    v2.3（2026-08-01）：閉じている時のトリガーの丸を「C＋虹リング」から CoreFlow の丸ロゴへ。
       **開いた時に中心へ出る太陽（.cf-lo-sun）とまったく同じ作り**＝暗い丸＋うすい枠＋ロゴ。
       開く前と後で見た目がつながる。画像が読めなかった時は今までどおり「C」に戻る。
@@ -155,3 +158,50 @@ body.cf-open .cf-lo-item{transform:translate(var(--dx,0), var(--dy,0)) scale(1);
 body.cf-open .cf-lo-item.cf-current{opacity:.55}
 .cf-lo-ball[aria-disabled="true"]{cursor:default}
 .cf-lo-ball[aria-disabled="true"]:hover{transform:translate(-50%,-50%) scale(1);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+
+
+/* ============================================================================
+   🔴 v2.6（2026-09-12）サイドバーのあるアプリ ＝ ランチャーは**画面の下に居る**
+   　　（PitFlow v2.89.0〜v2.90.0 でひとつずつ確かめたものを、ここへ引き上げた）
+
+   🗣 ゆうた「メニューの下段ではなく、スクロールに関係なく画面下に張り付く」
+   🗣 ゆうた「外枠は無しでホバーしてる感じで、**一番下に行った時だけ**
+   　　　　　ちゃんとランチャーが収まるスペースがあってピタッとはまる」
+
+   🔴🔴 **その2つは `sticky` 1つで両方出る。作り分けないこと。**
+      ・途中　　＝ 画面の下に留まり、メニューが**裏を流れていく**＝浮いて見える
+      ・一番下　＝ **本来の居場所**（メニューの最後の次）に追いつくので、そこへ着地する
+      ＝「収まるスペース」は作らない。**もともと本来の居場所がそれ**。
+
+   🔴🔴 **`bottom` は 0。サイドバーの `padding-bottom` と同じ値にしてはいけない。**
+      貼り付く位置の物差しは**サイドバーの「中身の箱」**で、`padding-bottom` は**もう引かれている**。
+      足すとその分だけ手前で止まる＝**本来の位置まで降りてこない**。
+      実測（PitFlow・窓700px）：本来 688 ／ 12px 指定だと 676 ＝ **最後の1行に12px重なる。**
+      🧪 **目では気付けない。直す時は必ず数字で見ること。**
+
+   🔴 **なぜ `[data-cf-launcher]` 一発ではなく、置き場所を名指ししているか。**
+      `sticky` は「**流れる箱の直下に居る**」時だけ効く。ランチャーの置き場所はアプリで違う：
+        ・`#sidebar` の直下 … PitFlow / MHS / CoreMembers / StockFlow
+        ・`#side` の直下　　 … CoreTools
+        ・`.sidebar > .sb-bottom` の中 … CarFlow（**囲みがある**ので、貼るのは囲みのほう）
+        ・サイドバーが無い　 … CoreBoard / CoreNote（専用の dock）・CoreTemplate（左下に固定）
+      ＝ **名指ししないと、サイドバーの無いアプリで画面ごと貼り付いて壊れる。**
+      ⚠ サイドバーを持つアプリが増えたら、**ここに1行足す**。アプリ側に写しを作らないこと。
+   ============================================================================ */
+#sidebar>[data-cf-launcher],   /* PitFlow / MHS / CoreMembers / StockFlow */
+#side>[data-cf-launcher],      /* CoreTools */
+.sidebar>.sb-bottom{           /* CarFlow */
+  position:sticky;
+  bottom:0;
+  z-index:3;
+}
+/* 浮いて見せるのは影だけ。裏を通るメニューは**ボタン自身の地の色（--bg3）が隠す**ので、
+   下に敷き紙（背景）を足す必要はない。半透明のリキッドでも透けない。 */
+#sidebar>[data-cf-launcher] .cf-launcher-trigger,
+#side>[data-cf-launcher] .cf-launcher-trigger,
+.sidebar>.sb-bottom .cf-launcher-trigger{
+  box-shadow:0 6px 18px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.16);
+}
+/* ⚠ CarFlow だけ、囲み（.sb-bottom）の中にランチャーと**区切り線**が同居している。
+   浮かせると線も一緒に浮いて「外枠」に見える＝ゆうたが要らないと言ったもの。だから出さない。 */
+.sidebar>.sb-bottom>.sb-div{display:none}

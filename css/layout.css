@@ -65,29 +65,40 @@
   grid-row:2;
   background:var(--bg2);
   border-right:1px solid var(--border);
-  /* 🔴 ここは流れない。流れるのは中の #si-scroll だけ（v2.89.0）
-     ＝アプリランチャーを流れる箱の外に出して、画面下に張り付かせるため。
-     ここを overflow-y:auto に戻すと、ランチャーが一緒に流れて下に消える。 */
-  overflow:hidden;
+  overflow-y:auto;
   padding:12px 0;
   display:flex;
   flex-direction:column;
 }
-/* アプリランチャー＝流れる箱の外に居るので、スクロールに関係なく画面下に張り付く。
-   線が無いとメニューが下まで流れた時に境目が分からない。
-   共通の css/launcher.css は配布物で触れないので、足りない分はここで足す（v2.89.0） */
+/* ============================================================
+   アプリランチャー ＝ 画面の下に居る（v2.89.0 → v2.90.0 で見た目を直した・ゆうた指定）
+
+   🗣 v2.89.0「メニューの下段ではなく、スクロールに関係なく画面下に張り付く」
+   🗣 v2.90.0「外枠は無しでホバーしてる感じで、**一番下に行った時だけ**
+   　　　　　 ちゃんとランチャーが収まるスペースがあってピタッとはまる」
+
+   🔴🔴 **その2つは sticky 1つで両方出る。別々に作らないこと。**
+      ・途中　　＝ 画面の下に留まり、メニューが**裏を流れていく**＝浮いて見える
+      ・一番下　＝ 本来の居場所（メニュー26件の次）に追いつくので、**そこへ着地する**
+      ＝「収まるスペース」は作らなくてよい。**もともと本来の居場所がそれ**。
+
+   🔴🔴 **`bottom` は 0。12px（＝#sidebar の padding-bottom）にしてはいけない。**
+      貼り付く位置の物差しは **#sidebar の「中身の箱」**で、padding-bottom は**もう引かれている**。
+      12px を足すとさらに12px上で止まる＝**本来の位置まで降りてこない**。
+      実測：窓700pxで 本来 688 / 12px指定だと 676 ＝ **着地しきれず、ヘルプの行に12px重なる。**
+
+   ⚠ v2.89.0 は `#si-scroll` という箱を作って外に出していた（＝外枠が出た）。
+      v2.90.0 で**箱ごとやめた**。線も引かない。浮いて見せるのは**影だけ**。
+   ⚠ 共通の `css/launcher.css` は `_shared` からの配布物なので触らない。足す分はここ。
+   ============================================================ */
 #sidebar>[data-cf-launcher]{
-  flex:0 0 auto;
-  padding-top:8px;
-  border-top:1px solid var(--border);
+  position:sticky;
+  bottom:0;
+  z-index:3;
 }
-/* メニュー本体＝サイドバーで唯一の流れる箱。min-height:0 が無いと縮まず、はみ出す */
-#si-scroll{
-  flex:1 1 auto;
-  min-height:0;
-  overflow-y:auto;
-  display:flex;
-  flex-direction:column;
+/* 裏を通るメニューは、ボタン自身の地の色（--bg3）が隠す＝ここに背景を足す必要はない */
+#sidebar>[data-cf-launcher] .cf-launcher-trigger{
+  box-shadow:0 6px 18px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.16);
 }
 .si-section-title{
   font-size:10px;
@@ -214,14 +225,13 @@
     height:auto;
     display:flex;
     overflow-x:auto;
-    overflow-y:auto;
     padding:0;
     border-right:none;
     border-bottom:1px solid var(--border);
   }
-  /* スマホは横一列の帯。張り付かせる相手（画面下）が無いので、
-     箱ごと無かったことにして中身を #sidebar の直下に戻す＝v2.89.0 前とまったく同じ並び */
-  #si-scroll{display:contents}
+  /* スマホは横一列の帯。張り付く相手（画面の下）が無いので、浮かせない＝v2.89.0 前と同じ */
+  #sidebar>[data-cf-launcher]{position:static}
+  #sidebar>[data-cf-launcher] .cf-launcher-trigger{box-shadow:none}
   .si-section-title{display:none}
   .si-item{
     border-left:none;

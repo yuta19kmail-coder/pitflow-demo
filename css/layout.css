@@ -70,36 +70,11 @@
   display:flex;
   flex-direction:column;
 }
-/* ============================================================
-   アプリランチャー ＝ 画面の下に居る（v2.89.0 → v2.90.0 で見た目を直した・ゆうた指定）
-
-   🗣 v2.89.0「メニューの下段ではなく、スクロールに関係なく画面下に張り付く」
-   🗣 v2.90.0「外枠は無しでホバーしてる感じで、**一番下に行った時だけ**
-   　　　　　 ちゃんとランチャーが収まるスペースがあってピタッとはまる」
-
-   🔴🔴 **その2つは sticky 1つで両方出る。別々に作らないこと。**
-      ・途中　　＝ 画面の下に留まり、メニューが**裏を流れていく**＝浮いて見える
-      ・一番下　＝ 本来の居場所（メニュー26件の次）に追いつくので、**そこへ着地する**
-      ＝「収まるスペース」は作らなくてよい。**もともと本来の居場所がそれ**。
-
-   🔴🔴 **`bottom` は 0。12px（＝#sidebar の padding-bottom）にしてはいけない。**
-      貼り付く位置の物差しは **#sidebar の「中身の箱」**で、padding-bottom は**もう引かれている**。
-      12px を足すとさらに12px上で止まる＝**本来の位置まで降りてこない**。
-      実測：窓700pxで 本来 688 / 12px指定だと 676 ＝ **着地しきれず、ヘルプの行に12px重なる。**
-
-   ⚠ v2.89.0 は `#si-scroll` という箱を作って外に出していた（＝外枠が出た）。
-      v2.90.0 で**箱ごとやめた**。線も引かない。浮いて見せるのは**影だけ**。
-   ⚠ 共通の `css/launcher.css` は `_shared` からの配布物なので触らない。足す分はここ。
-   ============================================================ */
-#sidebar>[data-cf-launcher]{
-  position:sticky;
-  bottom:0;
-  z-index:3;
-}
-/* 裏を通るメニューは、ボタン自身の地の色（--bg3）が隠す＝ここに背景を足す必要はない */
-#sidebar>[data-cf-launcher] .cf-launcher-trigger{
-  box-shadow:0 6px 18px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.16);
-}
+/* 🔴 アプリランチャーを画面の下に浮かせる指定は **css/launcher.css（_shared が本体）へ移した**
+   （v2.91.0）。PitFlow v2.89.0〜v2.90.0 でここに書いていたが、ゆうた指定
+   「他のサイドバーがあるアプリも共通でいれてほしい」で6アプリ共通になったため。
+   🔴 **ここに書き戻さないこと**＝写しが2枚になる。直す時は `_shared\launcher.css` →
+      `sync-shared.ps1` を走らせる。 */
 .si-section-title{
   font-size:10px;
   color:var(--text3);
@@ -229,9 +204,6 @@
     border-right:none;
     border-bottom:1px solid var(--border);
   }
-  /* スマホは横一列の帯。張り付く相手（画面の下）が無いので、浮かせない＝v2.89.0 前と同じ */
-  #sidebar>[data-cf-launcher]{position:static}
-  #sidebar>[data-cf-launcher] .cf-launcher-trigger{box-shadow:none}
   .si-section-title{display:none}
   .si-item{
     border-left:none;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.88.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.89.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -11,7 +11,7 @@
 <meta name="theme-color" content="#1f7a4d">
 <link rel="stylesheet" href="css/coreflow-ui.css?v=756022d3"><!-- 見た目の基準（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <link rel="stylesheet" href="css/base.css?v=12">
-<link rel="stylesheet" href="css/layout.css?v=9">
+<link rel="stylesheet" href="css/layout.css?v=10">
 <link rel="stylesheet" href="css/views.css?v=59">
 <link rel="stylesheet" href="css/polish.css?v=233">
 <link rel="stylesheet" href="css/fleet-cal.css?v=5"><!-- 🗓 v2.70.0 車両カレンダー・代車カレンダーの整備予定。polish.css より **後ろ**（ここが上書きする側） -->
@@ -132,7 +132,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.88.0</div>
+    <div class="login-ver">v2.89.0</div>
   </div>
 </div>
 
@@ -146,7 +146,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.88.0</span>
+    <span class="ver">v2.89.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -168,6 +168,8 @@
 
   <!-- ===== サイドバー ===== -->
   <div id="sidebar">
+    <!-- 🔴 メニュー本体はこの箱の中だけが縦に流れる。ランチャーを外に出しているので画面下に張り付く（v2.89.0） -->
+    <div id="si-scroll">
 
     <!-- ダッシュボード（自分で組めるビルダー＝TOP） -->
     <div class="si-item active" data-view="dashboard" onclick="showView('dashboard')">
@@ -211,6 +213,7 @@
     <div class="si-item" data-view="help" onclick="showView('help')"><span class="icon"><i data-ic=help data-ics=16></i></span><span>ヘルプ</span></div>
 
 
+    </div><!-- /#si-scroll ＝ここまでが縦に流れる。この下のランチャーは流れない -->
     <!-- CoreFlow アプリランチャー（共通） -->
     <div data-cf-launcher data-current="pitflow"></div>
 

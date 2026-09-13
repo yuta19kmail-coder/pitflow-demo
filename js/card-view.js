@@ -829,15 +829,17 @@
         const _of = window.pitShakenOffice ? pitShakenOffice(c) : _ofOf(_si);
         const _rd = window.pitShakenRound  ? pitShakenRound(c)  : 0;
         h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=search data-ics=16></i> 車検</div>'
-          + '<div class="cv-shdone"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> '
+          + '<div class="cv-shdone"><div class="cv-shok-i" onclick="cvShDoneOpen()" title="押すと、この合格の記録を直す・取り消す"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> '
           /* 🔴 v2.56.0 一度落ちてその回で受かった＝「再検合格」。済とひとまとめにしない（ゆうた確定 2026-09-04） */
           + ((window.pitShakenIsRepass&&pitShakenIsRepass(_si))?'車検 再検合格':'車検済') + '　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc((window.pitShakenStaffFull?pitShakenStaffFull(c):(_si.resultStaff||''))||'—') +'</span></div>'
           + '<div class="cv-shwhere"><span class="cv-shw"><i data-ic=location data-ics=15></i> 陸運局：'+ esc(_of||'—') +'</span>'
           + '<span class="cv-shw"><i data-ic=clock data-ics=15></i> ラウンド：'+ (_rd? _rd+'R' : '—') +'</span></div>'
           /* 🔴 v2.56.0 再検合格で書いた「落ちた所」。入っている時だけ出す */
           + (((window.pitShakenIsRepass&&pitShakenIsRepass(_si))&&_si.repassNote)?'<div class="cv-shrc">落ちた所：'+esc(_si.repassNote)+'</div>':'')
+          /* ✓ v2.102.0 合格の記録も**押して直す・取り消す**（再検と同じ出し方・ゆうた指定 2026-09-13） */
+          + '<div class="cv-shok-hint">✎ 押すと、日付・担当・陸運局・R・一発／再検合格を直せます（取り消しもここから）</div></div>'
           + (_rcH.length? '<div class="cv-shrc">不合格 '+_rcH.length+'回：'+_rcTxt+'</div>':'')
-          + '<button class="cv-shbtn ghost" onclick="cvShakenReopen()">↩ 済を取り消す</button></div></div>';
+          + '</div></div>';
       } else {
         h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=calendar data-ics=16></i> 車検スケジュール（AI配車の材料・MHSへ）</div>'
           + '<div class="cv-csched"><div class="cv-cspick"><label>いつ行く？</label>'
@@ -2809,6 +2811,92 @@
         detail: canBack
           ? (md+' の記録を消して、その日を「決定（これから行く）」に戻します。担当も戻します。')
           : (md+' の記録を消します。行く日はいまの予定のままです（もう決め直しているため）。'),
+        ok:'取り消す', cancel:'やめる', danger:true
+      }).then(function(k){ if(k) go(); });
+    } else go();
+  };
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     ✓ v2.102.0 **合格（済）の記録も、再検と同じく「押して直す・取り消す」**（ゆうた指定 2026-09-13）
+     --------------------------------------------------------------------------
+     🗣「再検系の場合だと予約カード詳細から色々変更できるんだけど、合格しちゃってる場合取り消すしかない」
+     🗣「合格も出し方を再検風にしてもらって、合格後にも変更を出来るようにしたい」
+     🔴 直せるもの＝行った日・時間帯・担当・陸運局・R・一発合格／再検合格・落ちた所
+     🔴 取り消し＝窓の中の赤いボタン（今までの「済を取り消す」＝予定に戻す と同じ動き）
+     🔴 中身の作り方は pit-share.js の `pitShakenApply('doneedit')` 1本。窓の部品は記録する窓と同じ id。
+     ══════════════════════════════════════════════════════════════════════════ */
+  window.cvShDoneOpen = function(){
+    if(!_c) return;
+    const s=_c.inspSchedule||{};
+    if(s.result!=='done') return;
+    const d=s.resultDate||s.decided||'';
+    const sl=((s.resultSlot||s.decidedSlot)==='pm')?'pm':'am';
+    window._cvShDoneAt = { date:d, slot:sl };
+    window._cvShSlot = sl;
+    window._cvShKind = (window.pitShakenIsRepass&&pitShakenIsRepass(s)) ? 'repass' : 'done';
+    const staffOpts = '<option value="">（未定）</option>'
+      + (state.staff||[]).map(function(m){ return '<option value="'+esc(m.name)+'"'+(s.resultStaff===m.name?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
+    const body = '<div class="cv-shpb">'
+      + '<label>合格の種類</label><div class="cv-shslot" id="cv-shkind">'
+        + '<button type="button" data-k="done" class="'+(window._cvShKind==='done'?'on':'')+'" onclick="cvShKind(this)">一発合格</button>'
+        + '<button type="button" data-k="repass" class="'+(window._cvShKind==='repass'?'on':'')+'" onclick="cvShKind(this)">再検合格</button></div>'
+      + '<label>行った日</label><input type="date" id="cv-shdate" value="'+esc(d)+'">'
+      + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(sl==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(sl==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
+      + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      + '<label>陸運局</label><select id="cv-shoffice"><option value="">（未定）</option>'
+        + (window.pitRikuunList?pitRikuunList():[]).map(function(o){ return '<option value="'+esc(o.id)+'"'+(s.office===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')
+        + '</select>'
+      + '<label>R（ラウンド）</label><select id="cv-shround"><option value="">（未定）</option>'
+        + [1,2,3,4].map(function(n){ return '<option value="'+n+'"'+(Number(s.round)===n?' selected':'')+'>'+n+'R</option>'; }).join('')
+        + '</select>'
+      + '<div id="cv-shnote-row" style="display:'+(window._cvShKind==='repass'?'contents':'none')+'">'
+        + '<label>落ちた所（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" value="'+esc(s.repassNote||'')+'" placeholder="例：光軸／サイドスリップ／ブーツ切れ"></div>'
+      + '<div class="cv-shpb-act"><button class="cv-shbtn ok" onclick="cvShDoneSave()">この内容で直す</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
+      + '<button class="cv-shbtn re cv-shrc-del" onclick="cvShDoneDrop()">🗑 この合格の記録を取り消す（予定に戻す）</button>'
+      + '</div>';
+    let back=document.getElementById('cv-shpop');
+    if(!back){ back=document.createElement('div'); back.id='cv-shpop'; back.className='modal-backdrop'; pitModalOutside(back, cvShClose); document.body.appendChild(back); }
+    back.innerHTML='<div class="pdp-box cv-shbox"><div class="pdp-head"><span><i data-ic=check data-ics=16></i> 合格の記録を直す</span><button class="pdp-x" onclick="cvShClose()"><i data-ic=close data-ics=16></i></button></div>'+body+'</div>';
+    back.classList.add('show');
+  };
+  window.cvShKind = function(btn){
+    window._cvShKind = (btn.getAttribute('data-k')==='repass') ? 'repass' : 'done';
+    const w=document.getElementById('cv-shkind'); if(w) w.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b===btn); });
+    const row=document.getElementById('cv-shnote-row'); if(row) row.style.display = (window._cvShKind==='repass') ? 'contents' : 'none';
+  };
+  window.cvShDoneSave = function(){
+    const at=window._cvShDoneAt; if(!_c||!at) return;
+    const s=_c.inspSchedule||{};
+    const off=(document.getElementById('cv-shoffice')||{}).value||'';
+    const r=window.pitShakenApply ? pitShakenApply(s, 'doneedit', { at:at, patch:{
+      date : (document.getElementById('cv-shdate')||{}).value || at.date,
+      slot : (window._cvShSlot==='pm')?'pm':'am',
+      staff: (document.getElementById('cv-shstaff')||{}).value || '',
+      office: off,
+      officeName: off ? ((window.pitLocName?pitLocName(off):'')||'') : '',
+      round: Number((document.getElementById('cv-shround')||{}).value||0),
+      kind : window._cvShKind==='repass' ? 'repass' : 'done',
+      note : (document.getElementById('cv-shnote')||{}).value || ''
+    }}) : null;
+    if(!r){
+      if(window.UI&&UI.alert) UI.alert('この記録は、ほかの端末で先に直されたようです。',
+        { detail:'いったん閉じて、カードを開き直してから、もう一度やってください。' });
+      return;
+    }
+    _c.inspSchedule=r.insp;
+    if(r.log && window.logFlow) logFlow(_c, r.log);
+    save(); cvShClose(); window._cvShDoneAt=null;
+    renderCardView(_c,'md-body-modal');
+    if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();
+    if(window.renderShakenLog && window.state && state.currentView==='shakenlog') renderShakenLog();
+  };
+  window.cvShDoneDrop = function(){
+    const at=window._cvShDoneAt; if(!_c||!at) return;
+    const md = window.fmtMD ? fmtMD(at.date) : at.date;
+    const go = function(){ cvShClose(); window._cvShDoneAt=null; cvShakenReopen(); };
+    if(window.UI && UI.confirm){
+      UI.confirm('この合格の記録を取り消しますか？', {
+        detail: md+' の合格を消して、その日を「決定（これから行く）」に戻します。',
         ok:'取り消す', cancel:'やめる', danger:true
       }).then(function(k){ if(k) go(); });
     } else go();

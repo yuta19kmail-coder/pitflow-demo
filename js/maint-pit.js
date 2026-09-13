@@ -138,6 +138,44 @@
       return c.maintVehId === vehId && c.workType === work && c.maintYm === ym && c.status === 'reserved';
     })[0] || null;
   }
+  /* ==================================================================
+     🔴🔴 v2.92.0（ゆうた報告 2026-09-13「L57688 で非カウントの実績に入ってるにも関わらず、
+     　　 代車管理の方から完了にできない」）**行がカードを探す物差しを、置く道と分けた。**
+     ------------------------------------------------------------------
+     ◎正体
+       車検・12点の行は**計算で出る**。その行が自分のカードを探すのに、上の `cardForPlan`
+       （＝**予約中のカードだけ**）を使っていた。
+       ＝ **入庫した瞬間に、行とカードが切れていた。**
+         ・入庫中 …「作業中」にならず「候補がまだ1本もありません」と騒ぐ
+         ・実績に入っても `doneReady` が立たない ＝ **「完了する」が永久に出ない**（L57688）
+         ・カードの側（手で足した行の道）は「計算の行がもう出している」と黙るので、どこにも出ない
+       ⚠ 見張りの見本はカードの月が車検の月とズレていて、**手で足した行の道**を通っていた＝緑のまま。
+     ◎いま
+       ・**置く道**（候補を足す）… 今までどおり `cardForPlan`＝予約中だけ。
+         入庫した・実績に入ったカードに候補を足すと、終わった作業に予定が生えてくるため。
+       ・**見る道**（行・完了の判定）… 下の `planCard` / `planDone`＝**状態を問わず**探す。
+     🔴 「この目標に当たるカードか」は `planHit` 1本。行①（計算）と行②（カード）の両方がこれを使う
+        （片方だけ変えると、同じカードが2行出る／どちらにも出ない）。
+     🔴 月は「帯の最初の月 〜 いまの目標の月」まで当てる。
+        12点は目安の月を過ぎると**今月へスライド**して `p.ym` が変わる。月ぴったりで当てると、
+        ・スライド前に置いたカードを見失う
+        ・**済ませた12点が、翌月「できませんでした」と出し直される**
+     ================================================================== */
+  function planHit(c, vehId, p){
+    if (!c || c.maintVehId !== vehId || c.workType !== p.work) return false;
+    var ym = String(c.maintYm || ''), from = arr(p.months)[0] || p.ym;
+    if (from > p.ym) from = p.ym;
+    return !!ym && ym >= from && ym <= p.ym;
+  }
+  /* まだ「完了する」を押していない、この目標のカード。**動いているもの（入庫〜実績）を先に**返す。 */
+  function planCard(vehId, p){
+    var hits = mcards().filter(function(c){ return !c.maintDone && planHit(c, vehId, p); });
+    return hits.filter(function(c){ return c.status !== 'reserved'; })[0] || hits[0] || null;
+  }
+  /* この目標は「完了する」を押して済ませてあるか */
+  function planDone(vehId, p){
+    return mcards().some(function(c){ return c.maintDone && planHit(c, vehId, p); });
+  }
   function saveCards(){ if (w.PitDB) w.PitDB.save(); }
 
   /* 🔴 作業タイプは **社内区分「代車」の相方4つ（PIT_LOANER_MATES）と同じ**にそろえる。
@@ -185,8 +223,9 @@
         /* 🔴 v2.53.0 この月・この作業の「完了する」を押してあれば、もう出さない。
            ⚠ 車検は満了日を進めれば勝手に消えるが、**12ヶ月点検は満了日から計算している**ので
               満了日が動かない＝押した印を見ないと永久に出続ける。 */
-        var _done = cardForPlan(v.id, p.work, p.ym);
-        if (_done && _done.maintDone) return;
+        /* 🔴 v2.92.0 前は `cardForPlan`（予約中だけ）で探していた＝**済んだカードは予約中ではない**ので、
+           この行は一度も効いていなかった。12点が消えなかったのはこれ。 */
+        if (planDone(v.id, p)) return;
         out.push(buildRow(v, p, td));
       });
       /* ② 計算で出ない予定＝**カードが実体を持っているもの**（修理・B.P、手で足した車検 など）
@@ -203,7 +242,9 @@
              🗣「押し忘れて残っているのが目に入るほうが良い」＝自動では消さない。
            ⚠ だから入庫中・返車済みの行もここに出る。状態は buildRow が出し分ける。 */
         if (c.maintDone) return;                             /* 完了を押した＝ボードの仕事は終わり */
-        var matched = plans.some(function(p){ return p.work === c.workType && p.ym === c.maintYm; });
+        /* 🔴 v2.92.0 行①と**同じ物差し**（planHit）。月ぴったりで見ると、スライドした12点が2行出る。
+           ⚠ 半年より先で行①が出していない目標は、ここでも拾わない（今までどおり）。 */
+        var matched = plans.some(function(p){ return planHit(c, v.id, p); });
         if (matched) return;                                 /* ①がもう出している */
         var ym = c.maintYm || ymOf(td);
         var slip = ym < ymOf(td);
@@ -228,7 +269,8 @@
     /* 🔴 v2.49.0 束ねる鍵＝**実体のカードがあればそのid**。まだ1本も置いていなければ計算の仮鍵。
        ⚠ 仮鍵のまま置きにいくと、置く時に「どの月の目標か」が分からなくなる（PF-3056）。
           なので `flMaintPlaceSave` は vehId / work / ym から実体を作る（または探す）。 */
-    var _card = p.manualId ? cardOf(p.manualId) : cardForPlan(v.id, p.work, p.ym);
+    /* 🔴 v2.92.0 見る道は `planCard`（状態を問わない）。置く道の `cardForPlan` を使わないこと（上の説明） */
+    var _card = p.manualId ? cardOf(p.manualId) : planCard(v.id, p);
     var gid = (_card && _card.id) || p.manualId || groupIdOf(v.id, p.work, p.ym);
     var mine = recs().filter(function(r){
       if (r.vehicleId !== v.id) return false;

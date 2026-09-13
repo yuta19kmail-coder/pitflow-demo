@@ -954,6 +954,20 @@
         return r.length ? ('空：' + r.map(function(x){ return x.label; }).join('・')) : '';
       } },
 
+    /* 🔢 v2.105.0（ゆうた指定 2026-09-13・8月の総点検）**金額が「文字」で入っている。**
+       ⚠ 見た目は同じ数字でも、足し算が「文字のつなぎ合わせ」になる所がある（8月、平均単価が 839億円 になった）。
+          マスター入力で作ったカード4台がこうなっていた（v2.103.0 で入口は直した）。 */
+    { id:'D10', cat:'data', level:'amber',
+      title:'金額が「文字」で入っている',
+      why:'見た目は同じ数字でも、足し算が文字のつなぎ合わせになる所があります（8月に平均単価が 839億円 になっていました）。',
+      fix:'「ここを直す」で開いて、そのまま保存してください（同じ金額のまま、数字として入り直します）。',
+      each: function(c){
+        if (!c || c._draft) return '';
+        var L = { amountFinal:'確定金額', amountOrder:'受注金額', amountQuote:'見積金額', estAmount:'概算金額', feeAmount:'諸費用' };
+        var bad = Object.keys(L).filter(function(k){ return typeof c[k] === 'string' && c[k] !== ''; });
+        return bad.length ? (bad.map(function(k){ return L[k] + '「' + c[k] + '」'; }).join('・') + ' が文字です') : '';
+      } },
+
     { id:'D02', cat:'data', level:'gray',
       title:'入れたほうがいい項目が、空のまま',
       why:'無くても動きますが、あとで探す時・整備ソフトと突き合わせる時に困ります。',
@@ -1151,6 +1165,23 @@
       why:'フロント別の売上に数えられません（「担当なし」に落ちます）。',
       fix:'カードでフロント担当を選んでください。',
       each: function(c){ return (isDone(c) && !t(c.frontStaff) && !t(c.staff)) ? 'フロント担当が空です' : ''; } },
+
+    /* 📅 v2.105.0（ゆうた指定 2026-09-13・8月の総点検）**返車済みなのに、入庫日が返車日より後。**
+       ⚠ 立ち上げ月にあとから入力したカードに多い形（8月に27台。入庫日＝入力した日になっていた）。
+          預かり日数が計算できず、その車だけ「預り平均」などの数字から黙って抜ける。 */
+    { id:'T10', cat:'state', level:'amber',
+      title:'返車済みなのに、入庫日が返車日より後',
+      why:'あとから入力したカードに多い形です。預かり日数が計算できず、その車だけ「預り平均」などの数字から抜けます。',
+      fix:'「ここを直す」で入庫日・実入庫日を本当の日にしてください（分からなければ返車日と同じ日で構いません）。',
+      each: function(c){
+        if (!isDone(c)) return '';
+        var ret = t(c.returnDateFinal || c.returnDate);
+        if (!ret) return '';
+        var a = [];
+        if (t(c.reserveDate) && t(c.reserveDate) > ret) a.push('入庫日 ' + t(c.reserveDate));
+        if (t(c.actualInAt) && t(c.actualInAt).slice(0, 10) > ret) a.push('実入庫日 ' + t(c.actualInAt).slice(0, 10));
+        return a.length ? (a.join('・') + ' が返車日 ' + ret + ' より後です') : '';
+      } },
 
     { id:'T05', cat:'state', level:'red',
       title:'キャンセルだが、「予約キャンセル」か「未入庫」か分からない',

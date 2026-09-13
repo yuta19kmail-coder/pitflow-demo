@@ -73,6 +73,26 @@
     return { vin: a.filter(canVin).length, den: a.filter(canDen).length };
   }
 
+  /* 📒🔴 v2.105.0（ゆうた指定 2026-09-13）**書き込み済みかは、お客様の車のデータから数える。**
+     ◎前は「書き込みました」を**画面の覚え**にしか持っていなかった＝閉じると消える。
+       残した結果には伝票の中身（明細）が無いので、あとで残りが0になっても**PDFを入れ直さないと書けない**。
+       ＝ 8月Q3・Q4の85枚が、誰にも気づかれないまま抜けかけていた（総点検で発覚）。
+     🔴 数え方：その予約の車に **同じ予約番号＋同じ伝票番号** の伝票が入っていれば「書けた」。
+     ⚠ ナンバーが無い（仮登録車両など）＝書く先の車が無い行は、分母に入れず別に数える。 */
+  function writeCount(R){
+    var out = { 書けた: 0, 対象: 0, 書く先なし: 0, 未: [] };
+    rows(R).forEach(function (p) {
+      var plate = t(p.pit.ナンバー) || t(p.soft.ナンバー);
+      var h = (plate && w.pitVehByPlate) ? w.pitVehByPlate(plate) : null;
+      if (!h || !h.veh){ out.書く先なし++; return; }
+      out.対象++;
+      var res = t(p.pit.予約番号), no = t(p.soft.伝票);
+      var ok = (h.veh.伝票 || []).some(function (d) { return d && t(d.予約番号) === res && t(d.伝票番号) === no; });
+      if (ok) out.書けた++; else out.未.push(no);
+    });
+    return out;
+  }
+
   /* ================================================================
      ✍ 帯（残りが0の時だけ）
      ================================================================ */
@@ -94,14 +114,25 @@
     var 再生 = !!(U && U.再生);
     var 断り = 再生 ? '<span class="q-wr-n">⚠ 伝票の中身は残していないので、'
                     + '来店履歴にぶら下げるぶんは書けません（PDFを入れ直すと書けます）。</span>' : '';
+    var wc = writeCount(R);
+    var 状況 = '伝票の書き込み ' + wc.書けた + '/' + wc.対象
+             + (wc.書く先なし ? '（ナンバーが無い ' + wc.書く先なし + '枚は書く先がありません）' : '');
     if (!c.vin && !c.den){
-      return '<div class="q-wr done"><div class="q-wr-l"><b>書き込むものはありません</b>'
-        + '<span>' + (再生 ? '車体番号はもう入っています' : '車体番号も伝票も、もう入っています') + '</span>'
-        + 断り + '</div></div>';
+      /* 📒 v2.105.0 「書き込むものはありません」と言う前に、**本当に書き込まれているか**を車のデータで見る */
+      if (wc.未.length){
+        return '<div class="q-wr warn"><div class="q-wr-l"><b>伝票が ' + wc.未.length + '枚、まだ書き込まれていません</b>'
+          + '<span>' + esc(状況) + '</span>'
+          + '<span class="q-wr-n">' + (再生 ? '⚠ PDFを入れ直すと書けます（残した結果には伝票の中身が無いため）'
+                                          : '⚠ 伝票の明細が額と合わないので書けません（PDFの読み取りを確かめてください）') + '</span>'
+          + '</div></div>';
+      }
+      return '<div class="q-wr done"><div class="q-wr-l"><b>書き込み済みです</b>'
+        + '<span>' + esc(状況) + '</span></div></div>';
     }
     return '<div class="q-wr">'
       + '<div class="q-wr-l"><b>この結果を書き込めます</b>'
       + '<span>車体番号 ' + c.vin + '件／伝票 ' + c.den + '件</span>'
+      + '<span>' + esc(状況) + '</span>'
       + 断り + '</div>'
       + '<button class="q-wr-b go" onclick="pitQWriteGo()">書き込む</button>'
       + '</div>';
@@ -317,6 +348,7 @@
   }
 
   w.pitQWritePanel = panel;
+  w.pitQWriteCount = writeCount;   /* 📒 v2.105.0 書き込み済みの数（お客様の車のデータから） */
   w.pitQWriteView  = view;
   w.pitQWriteGo    = go;
   w.pitQDenTable   = denTable;      /* 🧾 顧客詳細からも同じものを呼ぶ */

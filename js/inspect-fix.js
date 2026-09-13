@@ -78,6 +78,7 @@
 
     /* ---- 日付 ---- */
     { id:'reserveDate', label:'入庫日',        type:'date' },
+    { id:'actualInAt',  label:'実入庫日',      type:'date' },   /* 📅 v2.105.0 T10 で直せるように */
     { id:'reserveTime', label:'入庫時刻',      type:'time' },
     { id:'returnDate',  label:'返車予定日',    type:'date' },
     { id:'returnTime',  label:'返車時間',      type:'time' },
@@ -178,11 +179,13 @@
     D01: function(c){ return missKeys(c, 'red'); },
     D09: function(c){ return missKeys(c, 'red'); },
     D02: function(c){ return missKeys(c, 'yellow'); },
+    D10: ['amountFinal', 'amountOrder', 'amountQuote', 'estAmount', 'feeAmount'],   /* 🔢 v2.105.0 */
     D03: ['customer'],
     D04: ['tel'],
     D05: ['tel'],
     D08: ['customer', 'kana'],
     /* 状態の矛盾 */
+    T10: ['reserveDate', 'actualInAt'],   /* 📅 v2.105.0 */
     T04: ['frontStaff'],
     T07: ['amountFinal', 'amountOrder']
   };
@@ -342,7 +345,9 @@
       var nv = t(el.value);
       if (fd.type === 'money') nv = (nv === '') ? '' : String(num(nv));
       var ov = valOf(fd, c);
-      if (nv === ov) return;
+      /* 🔢 v2.105.0 金額が「文字」で入っている車（D10）は、同じ数のままでも数字で保存し直す */
+      var 文字の金額 = (fd.type === 'money' && typeof c[fd.id] === 'string' && c[fd.id] !== '');
+      if (nv === ov && !文字の金額) return;
       /* 🔴 実績カウント日は空にできない（空＝どの月にも数えられなくなる） */
       /* 🛡 v2.9.0 保険は**入金日を入れるまで実績日が空**が正しい（＝空に戻せないと直せなくなる）。 */
       if (fd.id === 'completedAt' && !nv && !(w.pitCardInsurance && pitCardInsurance(c))){

@@ -372,7 +372,7 @@ function flMonthCalHtml(){
       const _le = window.pitLeaseEnd ? pitLeaseEnd(v) : '';
       if (_le && _le.slice(0,7) === ym)
         inner += '<div class="fl-due lease' + (v.leaseUpFixed ? '' : ' tbd') + '" title="リースアップ日' + (v.leaseUpFixed ? '（確定）' : '（暫定）') + '">'
-               + '🏁 リースアップ ' + _flMd(_le) + (v.leaseUpFixed ? '' : '（暫定）') + '</div>';
+               + '🏁 リースアップ ' + (v.leaseUpFixed ? _flMd(_le) : '（暫定・' + (+_le.slice(5, 7)) + '月）') + '</div>';
       /* ④ 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） */
       /* 🔴 v2.70.1 ここで `!x.auto` を書かない。**物差し（loaner-free.js）が弾く。**
          ⚠ 画面側で隠していたせいで、隠していない代車カレンダーにだけ残って見えていた。同じことを繰り返さない。 */
@@ -448,8 +448,14 @@ function flDayCalHtml(y, mo){
       if (v.shakenDate === ds){ cls += ' d-exp'; inner += '<div class="fl-big">満了<small>' + _flMd(ds) + '</small></div>'; }
       /* 🏁 v2.106.0 リースアップ日＝紫で塗る（暫定は薄く）／その先はグレー（貸出は止めない） */
       const _le2 = window.pitLeaseEnd ? pitLeaseEnd(v) : '';
-      if (_le2 && _le2 === ds){ cls += ' d-lease' + (v.leaseUpFixed ? '' : ' tbd'); inner += '<div class="fl-big">🏁 リースアップ<small>' + _flMd(ds) + (v.leaseUpFixed ? '' : ' 暫定') + '</small></div>'; }
-      else if (_le2 && ds > _le2) cls += ' fl-leaseout';
+      /* 🏁 v2.107.0 暫定（年月）＝その月をまるごと薄い紫（名札は1日だけ）／確定＝その日を紫。どちらも過ぎた先はグレー */
+      const _ll2 = (window.pitLeaseLast ? pitLeaseLast(v) : _le2) || _le2;
+      if (_le2 && v.leaseUpFixed && _le2 === ds){ cls += ' d-lease'; inner += '<div class="fl-big">🏁 リースアップ<small>' + _flMd(ds) + '</small></div>'; }
+      else if (_le2 && !v.leaseUpFixed && ds >= _le2 && ds <= _ll2){
+        cls += ' d-lease tbd';
+        if (ds === _le2) inner += '<div class="fl-big">🏁 リースアップ<small>暫定・' + (+ds.slice(5, 7)) + '月</small></div>';
+      }
+      else if (_le2 && ds > _ll2) cls += ' fl-leaseout';
       if (padAt[di]) cls += ' barpad';
       const bb = barAt[di];
       if (bb){
@@ -606,9 +612,8 @@ window.flLeaseToggle = function(){
 };
 /* リースアップ日の言い方（和暦＋確定／暫定）。判定は loaner-free.js の pitLeaseEnd 1本 */
 function _flLeaseText(v){
-  const e = window.pitLeaseEnd ? pitLeaseEnd(v) : String((v && (v.leaseUpFixed || v.leaseUp)) || '');
-  if (!e) return '';
-  return (window.pitWareki ? pitWareki(e) : e) + (v.leaseUpFixed ? '（確定）' : '（暫定）');
+  /* 🏁 v2.107.0 暫定＝年月／確定＝日。言い方は loaner-free.js の pitLeaseLabel 1本 */
+  return window.pitLeaseLabel ? pitLeaseLabel(v) : '';
 }
 function _flLeaseFoot(v){
   const tx = _flLeaseText(v);
@@ -971,7 +976,7 @@ function fleetOpenModal(id){
   _flLinkRender();
   /* 🏁 v2.106.0 リース車両 */
   const _ls = document.getElementById('fl-lease'); if (_ls) _ls.checked = !!v.lease;
-  const _lu = document.getElementById('fl-leaseup'); if (_lu) _lu.value = v.leaseUp || '';
+  const _lu = document.getElementById('fl-leaseup'); if (_lu) _lu.value = String(v.leaseUp || '').slice(0, 7);   /* 🏁 v2.107.0 年月 */
   const _lf = document.getElementById('fl-leaseup-fix'); if (_lf) _lf.value = v.leaseUpFixed || '';
   flLeaseToggle();
   flNumberCheck();
@@ -1032,7 +1037,7 @@ function _fleetSubmitInner(){
   const camera=!!(document.getElementById('fl-camera')||{}).checked;
   /* 🏁 v2.106.0 リース車両＝顧客との紐づけ・車検満了日は**持たない**。リースアップ日（暫定／確定）を持つ */
   const lease = !!(document.getElementById('fl-lease') || {}).checked;
-  const leaseUp = lease ? ((document.getElementById('fl-leaseup') || {}).value || '') : '';
+  const leaseUp = lease ? String((document.getElementById('fl-leaseup') || {}).value || '').slice(0, 7) : '';   /* 🏁 v2.107.0 暫定は年月だけ */
   const leaseUpFixed = lease ? ((document.getElementById('fl-leaseup-fix') || {}).value || '') : '';
   if (!model){ pitAlert('車種名を入れてください（例：タント）', { code:'PF-3031' }); return false; }   /* false＝保存していない（閉じない） */
   /* 🔗 v2.62.0 お客様の車1台に、自社の車は1台まで。

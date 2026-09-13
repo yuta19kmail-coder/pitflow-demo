@@ -491,14 +491,16 @@
       if (!end) return;
       var from = ymAdd(ymOf(end), -2) + end.slice(7);          /* 2ヶ月前の同じ日 */
       if (td < from) return;
-      var fixed = !!v.leaseUpFixed, d = daysBetween(td, end);
+      var fixed = !!v.leaseUpFixed;
+      var last = (w.pitLeaseLast ? w.pitLeaseLast(v) : end) || end;   /* 🏁 v2.107.0 暫定＝その月の末日 */
+      var d = daysBetween(td, fixed ? end : last);
       var level, msg, cls = 'g';
       if (fixed && td >= end){ level = 'done'; msg = 'リースアップ日を迎えました。車を返したら「予定通りリースアップでアーカイブ」を押してください'; }
-      else if (!fixed && td > end){ level = 'bad'; cls = 'b'; msg = '🚨 暫定のリースアップ日を過ぎています（' + (-d) + '日）。日を決めて確定してください'; }
-      else if (!fixed){ level = 'warn'; msg = 'リースアップ日（暫定）が近づいています。日ビューで確定日を決めてください'; }
+      else if (!fixed && td > last){ level = 'bad'; cls = 'b'; msg = '🚨 暫定のリースアップ月（' + ymText(ymOf(end)) + '）を過ぎています（' + (-d) + '日）。日を決めて確定してください'; }
+      else if (!fixed){ level = 'warn'; msg = 'リースアップ（暫定 ' + ymText(ymOf(end)) + '）が近づいています。日ビューで確定日を決めてください'; }
       else { level = 'go'; msg = '確定済み。この日から先は代車カレンダーでグレーになり、貸出には警告が出ます'; }
       out.push({ lease:true, veh:v, vehicleId:v.id, isLoaner:isLoaner(v), work:'lease', workLabel:'リースアップ',
-                 level:level, msg:msg, msgCls:cls, end:end, fixed:fixed, days:d, sortKey:end,
+                 level:level, msg:msg, msgCls:cls, end:end, last:last, fixed:fixed, days:d, sortKey:end,
                  plan:{ ym:ymOf(end), months:[ymOf(end)], dueDate:end } });
     });
     return out;
@@ -516,9 +518,9 @@
       + '<div class="mb-no">' + (r.isLoaner ? ('代車' + esc(vehNo(v))) : '社用車') + '</div>'
       + '<span class="mb-kind mb-k-lease">🏁 リースアップ</span></div>'
       + '<div class="mb-mid"><div class="mb-line">'
-      + '<span class="mb-due">' + (r.fixed ? '確定 ' : '暫定 ') + esc(r.end) + '</span>'
-      + '<span>' + (r.days >= 0 ? ('あと' + r.days + '日') : ((-r.days) + '日過ぎ')) + '</span>'
-      + ((r.fixed && v.leaseUp && v.leaseUp !== v.leaseUpFixed) ? '<span>（暫定は ' + esc(v.leaseUp) + '）</span>' : '')
+      + '<span class="mb-due">' + esc((w.pitLeaseLabel && w.pitLeaseLabel(v)) || r.end) + '</span>'
+      + '<span>' + (r.days >= 0 ? ((r.fixed ? 'あと' : '月末まであと') + r.days + '日') : ((-r.days) + '日過ぎ')) + '</span>'
+      + ((r.fixed && v.leaseUp) ? '<span>（暫定は ' + esc(ymText(String(v.leaseUp).slice(0, 7))) + '）</span>' : '')
       + '</div>'
       + '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>'
       + '</div><div class="mb-act">'
@@ -534,11 +536,11 @@
     var v = vehOf(vehId); if (!v || !v.lease) return Promise.resolve(false);
     return w.pitAsk('リースアップ日を ' + md(ds) + ' に確定しますか？', { ok:'確定する',
       detail:'・この日から先は代車カレンダーでグレーになり、貸出を入れようとすると警告が出ます'
-           + (v.leaseUp && v.leaseUp !== ds ? '\n・暫定の ' + md(v.leaseUp) + ' は控えとして残ります' : '') })
+           + (v.leaseUp ? '\n・暫定の ' + ymText(String(v.leaseUp).slice(0, 7)) + ' は控えとして残ります' : '') })
       .then(function(yes){
         if (!yes) return false;
         v.leaseUpFixed = ds;
-        if (!v.leaseUp) v.leaseUp = ds;
+        if (!v.leaseUp) v.leaseUp = ds.slice(0, 7);   /* 🏁 v2.107.0 暫定は年月 */
         saveCards();
         try { if (w.pitLog) w.pitLog('リースアップ日を確定した', { kind:'loaner', label: vehName(v) + ' ' + ds }); } catch(e){}
         if (w.renderFleet) w.renderFleet();
@@ -857,7 +859,7 @@
       h += '<button class="lo-bpop-b" onclick="flLeaseFix(\'' + vehId + '\',\'' + ds + '\')">'
          + '<span class="mb-dot lease"></span>🏁 <b>' + esc(md(ds)) + ' をリースアップ日に確定</b><small>'
          + (lv.leaseUpFixed ? ('いまの確定 ' + esc(md(lv.leaseUpFixed)) + ' を置きかえます')
-                            : ('暫定 ' + esc(lv.leaseUp ? md(lv.leaseUp) : '未入力') + ' → 確定にします')) + '</small></button>';
+                            : ('暫定 ' + esc(lv.leaseUp ? ymText(String(lv.leaseUp).slice(0, 7)) : '未入力') + ' → 確定にします')) + '</small></button>';
     }
     ps.forEach(function(r){
       h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\',\'' + to + '\',\'' + r.plan.ym + '\')">'

@@ -16,11 +16,12 @@
      PORT=8968 node _boxcatalog.mjs  [出力先.html]
    ============================================================ */
 import { chromium } from 'playwright';
+import { chromePath } from './_chrome.mjs';
 import fs from 'fs';
 import path from 'path';
 
 const PORT = process.env.PORT || 8968;
-const cp   = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const cp   = chromePath();   /* 🧪 2026-09-13 場所は _chrome.mjs 1本（Windows でも走る） */
 const out  = process.argv[2] || ('PitFlow_BOXカタログ_' + new Date().toISOString().slice(0, 10) + '.html');
 
 const b = await chromium.launch({ executablePath: cp });

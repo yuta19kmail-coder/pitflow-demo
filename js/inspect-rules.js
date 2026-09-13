@@ -1018,6 +1018,21 @@
       title:'同じ電話番号なのに、お名前の書き方が違う',
       why:'同じお客様が別々の人として数えられています（来店回数・売上が分かれます）。',
       fix:'どちらかの書き方に揃えてください。',
+      /* 👤🔴🔴 v2.95.0（ゆうた報告 2026-09-13・番号 D08-254938）**「何通りの書き方」ではなく「何人に分かれているか」で数える。**
+         🗣「これは顧客統合で直したはずなのに出る」
+         ◎正体
+           顧客統合（cust-merge.js）は、②を指していた**全部のカードのつながり（`customerId`）を①へ付け替える**が、
+           🔴 **お名前の書き方は当時のまま残す**（決めごと＝過去の記録は書き換えない）。
+           ところが D08 は**カードに書いてある名前の文字**だけで数えていた。
+           ＝ 統合して**同じお客様につながっているのに**、昔のカードに「ミゾグチ」「溝口」が残る限り**永久に出る**。
+           D08 が困っているのは「別々の人として数えられる（来店回数・売上が分かれる）」こと。**つながっていれば、もう分かれていない。**
+         ◎いま＝同じ番号のカードを**人ごと**にまとめて、2人以上に分かれている時だけ言う。
+           ・つながっているカード … **つながり先のお客様**が1人（統合で残った人を指していたら、統合先までたどる）
+           ・つながっていないカード … 今までどおり**名前の文字**で1人。
+             ただし、その番号でつながっているお客様が**同じ書き方を使っている**なら、その人に含める
+             （控えの名前・カナ・別名、またはつながっているカードに書かれた名前）
+         ⚠ つながっていないこと自体は **D07** が見ている。ここで二重に責めない。
+         ⚠ 統合を**取り消した**ら、つながりが②へ戻る＝**また出る**（正しい）。 */
       all: function(ctx){
         var g = {}, out = [];
         ctx.cards.forEach(function(c){
@@ -1026,11 +1041,43 @@
           if (tel.length < 9) return;
           (g[tel] = g[tel] || []).push(c);
         });
+        var byId = ctx.custById || {};
+        /* 統合で残った人は、統合先までたどる（輪になっていても止まるように回数で切る） */
+        function root(id){
+          var cur = t(id), seen = 0;
+          while (cur && byId[cur] && byId[cur].mergedInto && seen++ < 10) cur = t(byId[cur].mergedInto);
+          return cur;
+        }
+        function nameOf(c){ return t(c.kana) || t(c.customer); }
         Object.keys(g).forEach(function(tel){
-          var names = {};
-          g[tel].forEach(function(c){ var n = t(c.kana) || t(c.customer); if (n) names[n] = 1; });
-          var list = Object.keys(names);
-          if (list.length < 2) return;
+          var people = {}, order = [];              /* 人の鍵 → その人の書き方の一覧 */
+          function add(key, n){
+            if (!people[key]) { people[key] = []; order.push(key); }
+            if (n && people[key].indexOf(n) < 0) people[key].push(n);
+          }
+          /* ① つながっているカード＝お客様ごと */
+          var loose = [];
+          g[tel].forEach(function(c){
+            var id = root(c.customerId);
+            if (id) add('cu:' + id, nameOf(c)); else loose.push(c);
+          });
+          /* 各お客様が使っている書き方（カードの名前＋控えの名前・カナ・別名） */
+          var owner = {};
+          order.slice().forEach(function(key){
+            var cu = byId[key.slice(3)];
+            var names = people[key].slice();
+            if (cu) [cu.name, cu.kana].concat(Array.isArray(cu.oldNames) ? cu.oldNames : [])
+              .forEach(function(x){ if (t(x)) names.push(t(x)); });
+            names.forEach(function(n){ if (!(n in owner)) owner[n] = key; });
+          });
+          /* ② つながっていないカード＝同じ書き方の人がいればその人、いなければ名前で1人 */
+          loose.forEach(function(c){
+            var n = nameOf(c);
+            if (!n) return;
+            if (owner[n]) add(owner[n], n); else add('nm:' + n, n);
+          });
+          if (order.length < 2) return;
+          var list = order.map(function(k){ return people[k].join('・') || '（名前なし）'; });
           g[tel].forEach(function(c){
             out.push({ refId:c.id, text:'同じ番号（' + t(c.tel) + '）に ' + list.join('／') + ' があります' });
           });
@@ -1246,8 +1293,11 @@
       if (k && !custByKana[k]) custByKana[k] = cu;
     });
 
+    /* 👤 v2.95.0 お客様を id で引く表（D08 が「統合した先」までたどるのに使う）。統合で残った人も入れる */
+    var custById = {};
+    ((w.state && state.customers) || []).forEach(function (cu) { if (cu && cu.id) custById[cu.id] = cu; });
     var ctx = { today: td, cards: all, assigns: asg, vehs: vehs, vehIds: vehIds,
-                custByTel: custByTel, custByKana: custByKana };
+                custByTel: custByTel, custByKana: custByKana, custById: custById };
     sweepEscapes();                       /* 🔴 v1.172.0 「これでOK」で隠していたものを出し直す */
     var mk = marks(), mu = mutes();
     var byId = {}; all.forEach(function(c){ if (c && c.id) byId[c.id] = c; });

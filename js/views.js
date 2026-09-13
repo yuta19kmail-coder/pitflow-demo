@@ -136,6 +136,8 @@ function showView(viewId){
   if (viewId === 'shakencal' && window.renderShaken) renderShaken();
   if (viewId === 'shakenlog' && window.renderShakenLog) renderShakenLog();
   if (viewId === 'sales' && window.renderSales) renderSales();
+  /* 🚪 v2.96.0 データチェックに**別のビューから入った時だけ**、前の結果を捨ててボタン2つから（背後の描き直しでは捨てない） */
+  if (viewId === 'inspect' && !_pitSame && window.pitInspectReset) pitInspectReset();
   if (viewId === 'inspect' && window.renderInspect) renderInspect();   // 🩺 v1.170.0 データチェック（日常チェック／クォーターチェック）
   if (viewId === 'worksum' && window.renderWorkSummary) renderWorkSummary();   // <i data-ic=user data-ics=16></i> 作業サマリー（v0.129.0）
   if (viewId === 'parking' && window.renderParking) renderParking();

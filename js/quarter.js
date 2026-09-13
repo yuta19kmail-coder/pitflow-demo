@@ -537,26 +537,33 @@
     var h = '<div class="q-plan"><div class="q-plan-b">';
     plan.forEach(function (x) { h += qBox(U, x); });
     h += '</div>';
-    /* ⚠ PDF が**別の月にもまたがっていた**時。月バーは今の月のままなので、
-       ここに出さないと、その組が画面のどこからも押せなくなる。**隠さない。** */
-    var extra = '';
-    (U.groups || []).forEach(function (g, i) {
+    /* ================================================================
+       🗓🔴 v2.97.0（ゆうた指定 2026-09-13）**Qの枠は、表示中の月の Q1〜Q4 の4つだけ。**
+       🗣「8月〜9月中旬ぐらいまでのPDFを入れた場合に、8月のQが増えて表示される。
+       　　この場合は8月は4Qで、9月側に表示自体をふってほしい」
+       ◎前まで … PDF がほかの月にまたがると、その組を**この月の4つの後ろに枠として足していた**
+         （v2.3.0「押せなくならないように隠さない」）。＝ 8月なのに枠が6つ並んだ。
+       ◎いま … ほかの月の組は**枠にしない。** 1行で「9月のぶんも入っています」と言い、**その月へ動くボタン**を置く。
+         ＝ 隠してはいない（そこから必ず行ける）。行った先では、PDF を持ったまま9月の Q1〜Q4 に並ぶ。
+       ⚠ 出すのは **PDF から来た組だけ**（保存から借りた組は、その月を開けば出る）。
+       ================================================================ */
+    var more = {};
+    (U.groups || []).forEach(function (g) {
+      if (g.出どころ === '保存') return;
       var inPlan = plan.some(function (x) { return g.from <= x.to && g.to >= x.from; });
       if (inPlan) return;
-      var nok = w.pitQNokori ? w.pitQNokori(g.res) : 0;
-      var okQ = !!g.res && !nok;   /* 🔢 v2.77.0 同上 */
-      extra += '<div class="q-pqwrap"><button class="q-pq now'
-        + (U.gi === i ? ' on' : '') + (okQ ? ' ok' : ' done') + (g.全部 ? '' : ' part')
-        + '" onclick="pitQPickGroup(' + i + ')">'
-        + '<span class="q-pq-l"><span class="q-pq-t">' + esc(g.label)
-        +   (g.全部 ? '' : '<em class="q-pq-part">' + esc(dd(g.from)) + '〜' + esc(dd(g.to)) + '日だけ</em>')
-        + '</span>'
-        /* 🔢 v2.77.0 ここの「+◯円」も消した（Qの箱は3か所とも同じ形） */
-        + '<span class="q-pq-d">このPDF ' + g.soft.length + '枚</span></span>'
-        + '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
-        + '</button></div>';
+      var m = s(g.from).slice(0, 7);
+      (more[m] = more[m] || []).push(g);
     });
-    if (extra) h += '<div class="q-plan-b q-plan-x">' + extra + '</div>';
+    Object.keys(more).sort().forEach(function (m) {
+      var gs = more[m];
+      var p2 = m.split('-');
+      var ml = (+p2[1]) + '月';
+      h += '<div class="q-plan-more">このPDFには <b>' + esc(ml) + 'のぶん</b>（'
+         + gs.map(function (g) { return esc('Q' + g.no) + (g.全部 ? '' : '一部'); }).join('・')
+         + '・' + gs.reduce(function (a, g) { return a + g.soft.length; }, 0) + '枚）も入っています。'
+         + '<button class="q-plan-go" onclick="pitInspectSetYm(\'' + esc(m) + '\')">' + esc(ml) + 'を見る</button></div>';
+    });
     if (off) h += '<div class="q-plan-off">' + esc(off) + '</div>';
     return h + '</div>';
   }
@@ -1391,6 +1398,56 @@
       if (w.renderInspect) renderInspect();
     });
   };
+
+  /* ================================================================
+     🗓🔴 v2.97.0 **月を動かした時、いま読んだPDFがその月にもまたがっていれば、PDFは捨てない。**
+     ----------------------------------------------------------------
+     🗣「8月〜9月中旬のPDFを入れた場合、8月は4Qで、9月側に表示自体をふってほしい」
+     ◎前まで … 月を動かすと**必ず** `pitQClearForMonth`＝入れたPDFごと捨てていた（v2.10.0）。
+       ＝ 9月のぶんを見に行くと、9月の組も一緒に消えて見られなかった。
+     ◎いま … 戻り値 true ＝ PDFを持ったまま、その月の Q1〜Q4 に組み直した（呼んだ側は捨てない）。
+       　　　　 false ＝ そのPDFはこの月に掛かっていない → 呼んだ側が今までどおり捨てる。
+     🔴 捨てるのは**保存から借りた組と、見ていた結果だけ**。PDFの組は全部残す（どの月へ行っても使える）。
+     ⚠ crossLink は buildMonth の中で1回（ここで呼ばない）。
+     ⚠ 組み直したあとは、その月の組のうち**残りがあるもの**を開く。無ければその月の最初の組。
+     ================================================================ */
+  w.pitQMonthMove = function (ym){
+    var U = Q();
+    ym = s(ym).slice(0, 7);
+    if (!ym || U.busy) return false;
+    var pdfs = (U.groups || []).filter(function (g) { return g.出どころ !== '保存'; });
+    if (!U.pdf || !pdfs.length) return false;
+    var plans = w.pitQMonthPlan ? w.pitQMonthPlan(ym, U.list || []) : [];
+    var hit = pdfs.some(function (g) { return plans.some(function (x) { return overlaps(g, x); }); });
+    if (!hit) return false;
+    U.ym = ym;
+    U.groups = pdfs;
+    U.res = null; U.soft = null; U.saved = null; U.savedId = ''; U.再生 = null; U.gi = -1; U.viewer = false;
+    U.月そろえた = ''; U.月に無い = {};
+    U.busy = ymText(ym) + 'のクォーターを見ています…';
+    buildMonth(U, ym, { force: true }).then(function () {
+      U.busy = '';
+      var gs = U.groups || [], idx = -1, first = -1;
+      gs.forEach(function (g, i) {
+        if (!plans.some(function (x) { return overlaps(g, x); })) return;
+        if (first < 0) first = i;
+        if (idx < 0 && g.res && w.pitQNokori && w.pitQNokori(g.res) > 0) idx = i;
+      });
+      if (idx < 0) idx = first;
+      if (idx >= 0){
+        U.gi = idx; applyGroup(U); U.tab = 'data';
+        var g = gs[idx];
+        U.再生 = (g.出どころ === '保存') ? (g.保存 || { at:'', by:'', pdf:'' }) : null;
+      }
+      if (w.renderInspect) renderInspect();
+    }).catch(function (e) {
+      U.busy = '';
+      if (w.pitToast) pitToast('クォーターを組み直せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.renderInspect) renderInspect();
+    });
+    return true;
+  };
+  function ymText(ym){ var p = s(ym).split('-'); return p.length === 2 ? (+p[1]) + '月' : ''; }
 
   /* 🔴 v2.10.0 月が変わった＝**前の月の結果は捨てる。**
      ＝ 月バーを動かしても数字が残っていて、それを今月のものだと思ってしまう

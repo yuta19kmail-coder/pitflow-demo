@@ -113,7 +113,14 @@
 
     /* ⚠ 「売上なしアーカイブ」は**わざと実績カウント日を空にする**（実績・売上に乗る道を無くすため）。
        ＝ そこは止めない。ふつうの返車済みだけ見る。 */
-    if (返車済み && !dt && !c.noSale) stop.push('返車済みなのに、実績カウント日が空です');
+    /* 🛡 v2.99.0 保険の入金待ち（返車済み・入金日なし）は、実績カウント日が空で正しい */
+    var 入金待ち = !!(w.pitInsPayWait && w.pitInsPayWait(c));
+    if (返車済み && !dt && !c.noSale && !入金待ち) stop.push('返車済みなのに、実績カウント日が空です');
+    if (入金待ち) warn.push('保険の入金待ちで保存します（まだ実績・売上に乗りません。入金日を入れた日で乗ります）');
+    if (w.pitCardInsurance && w.pitCardInsurance(c) && 返車済み && t(c.paymentDate) && dt !== t(c.paymentDate))
+      stop.push('保険の車は、入金日（' + t(c.paymentDate) + '）がそのまま実績カウント日です');
+    if (BEFORE && w.pitCardInsurance && w.pitCardInsurance(c) && t(BEFORE.completedAt) !== dt)
+      warn.push('保険なので、実績カウント日を入金日に合わせます（' + (t(BEFORE.completedAt) || '空') + ' → ' + (dt || '空') + '）');
     if (返車済み && !c.noSale && !amt)
       stop.push('返車済みなのに、確定金額が空です（売上に数えないなら「売上なし」を押してください）');
     /* 🔴 見るのは**確定金額（請求額）だけ**。
@@ -195,6 +202,7 @@
   function _save(print, noSale){
     if (!Array.isArray(st().cards)) st().cards = [];
     syncWorkTypes(M);   /* 🔧 v2.98.0 保存する前に、バッジの並びを基本＋併用可にそろえる（古いカードを直した時も） */
+    syncInsurance(M);   /* 🛡 v2.99.0 保険なら、実績カウント日＝入金日にそろえてから保存 */
     var live = null;
     if (MODE === 'fix'){
       live = (st().cards || []).filter(function(x){ return x && x.id === M.id; })[0];
@@ -241,7 +249,8 @@
   };
 
   /* ===== 欄をいじる ===== */
-  /* 🔧 v2.98.0 作業タイプのバッジの並び（`workTypes`）＝基本＋併用可。**カード詳細の `_syncWorkTypes` と同じ形**。 */
+  /* 🔧 v2.98.0 作業タイプのバッジの並び（`workTypes`）＝基本＋併用可。**カード詳細の `_syncWorkTypes` と同じ形**。
+     ⚠ v2.99.0 から押した時は `pitWorkTypeBind` がそろえる。ここは**保存する直前の念押し**だけに使う。 */
   function syncWorkTypes(c){
     if (!c) return;
     var ids = [];
@@ -249,50 +258,39 @@
     (Array.isArray(c.workAddons) ? c.workAddons : []).forEach(function(a){ if (a && ids.indexOf(a) < 0) ids.push(a); });
     c.workTypes = ids;
   }
+  /* ================================================================
+     🛡🔴 v2.99.0（ゆうた指定 2026-09-13）**保険の車の流れ＝返車済み → 入金待ち → 入金日で実績。**
+     🗣「保険にした場合のストーリーの分岐がないと思う。実際には返車済み、入金待ち なども状態も存在するし、
+     　　入金日みたいな表記もいるかと」
+     🔴 決まりは insurance-pit.js の1本（`pitCardInsurance` / `pitInsPayWait` / `pitInsSetPaid` / `pitInsNote`）。
+        ・保険＝**入金日がそのまま実績カウント日**。入金日が無い返車済み＝**入金待ち**（実績・売上にまだ乗らない）
+        ・売掛（入金日の欄）は保険を付けたら入る
+     ⚠ ここでは**そろえるだけ**。返車済みなら 実績カウント日＝入金日（空なら空）に合わせる。
+     ================================================================ */
+  function syncInsurance(c){
+    if (!(c && w.pitCardInsurance && w.pitCardInsurance(c))) return;
+    c.paymentSeparate = true;
+    if (c.status === 'returned') c.completedAt = t(c.paymentDate);
+  }
   w.pitMasterSet = function(key, v){
     if (!M) return;
-    M[key] = v;
-    if (key === 'workType'){
-      if (!v) M.workType = null;
-      /* 📦 物販は常に単独＝選んだら併用可はおろす（カード詳細と同じ） */
-      if (v === 'goods') M.workAddons = [];
-      syncWorkTypes(M);
+    if (key === 'paymentDate'){
+      /* 🛡 入金日は insurance-pit.js の1本で入れる（保険なら実績カウント日も一緒に動く） */
+      if (w.pitInsSetPaid) w.pitInsSetPaid(M, v); else M.paymentDate = v || null;
+    } else {
+      M[key] = v;
     }
-    render();
-  };
-  /* 🔧 v2.98.0 併用可を付ける／外す。 */
-  w.pitMasterAddon = function(id){
-    if (!M || !id) return;
-    if (w.pitInternKind && w.pitInternKind(M)) return;      /* 社内区分の間は押せない */
-    if (!Array.isArray(M.workAddons)) M.workAddons = [];
-    var i = M.workAddons.indexOf(id);
-    if (i >= 0) M.workAddons.splice(i, 1); else M.workAddons.push(id);
-    if (M.workType === 'goods') M.workType = null;          /* 物販は単独＝併用可を押したらおりる */
-    syncWorkTypes(M);
+    syncInsurance(M);
     render();
   };
   /* 🔎 見張り用（画面を開かずに確かめる）。画面からは呼ばない。 */
   w.pitMasterCurrent = function(){ return M; };
-  w.pitMasterSec2Html = function(){ if (!M) M = blank(); return sec2(); };
+  /* ⚠ v2.99.0 の書き換えで、この3つを**一度消してしまった**（区分・付加の受け口を消す範囲が広すぎた）。
+     打っている途中の入力・見積相談などのボタン・入庫時刻が効かなくなるので、元のまま戻した。消さないこと。 */
   w.pitMasterSetQuiet = function(key, v){ if (!M) return; M[key] = v; paintFoot(); };
   w.pitMasterToggle = function(key){ if (!M) return; M[key] = !M[key]; render(); };
   /* 🕐 入庫時刻＝新規予約とまったく同じ整形（`_normTime` 1本。ここで直さない） */
   w.pitMasterTime = function(v){ if (!M) return; M.reserveTime = (w._normTime ? w._normTime(v) : t(v)); render(); };
-  w.pitMasterIntern = function(k){
-    if (!M) return;
-    if (k === 'loanercar') return;   /* 🔴 代車はここからは選べない（v2.53.0 の決めごとと同じ） */
-    var now = (w.pitInternKind ? w.pitInternKind(M) : '');
-    if (w.pitInternSet) w.pitInternSet(M, now === k ? '' : k); else M.internKind = (now === k ? '' : k);
-    syncWorkTypes(M);   /* 🔧 v2.98.0 区分が作業タイプをおろしたら、バッジの並びもそろえる */
-    render();
-  };
-  w.pitMasterSpecial = function(id){
-    if (!M) return;
-    if (!Array.isArray(M.workSpecials)) M.workSpecials = [];
-    var i = M.workSpecials.indexOf(id);
-    if (i >= 0) M.workSpecials.splice(i, 1); else M.workSpecials.push(id);
-    render();
-  };
   w.pitMasterResNo = function(){ if (!M) return; M.resNo = (w.pitGenResNo ? w.pitGenResNo() : M.resNo); render(); };
 
   function hist(){
@@ -501,7 +499,6 @@
       + '<span class="ms-note">受けた時の話</span></div><div class="ms-pad"><div class="ms-grid">';
     h += fld('入庫日', dte('reserveDate'), { req:true });
     h += fld('受付タイプ', sel('dropType', st().dropTypes, '—'), { req:true });
-    h += fld('作業タイプ', sel('workType', (st().workTypes || []).filter(function(x){ return !x.combinable; }), '—'), { req: !kind });
     h += fld('フロント担当', sel('frontStaff', (st().staff || []).filter(function(x){ return x && x.front; })
              .map(function(x){ return { id:x.name, label:x.name }; }), '—'), { hint:'フロント別の売上は、ここで決まります' });
     h += fld('課', sel('division', st().divisions, '—'));
@@ -512,50 +509,28 @@
     h += fld('入庫時刻', timeField(), { wide:true, hint:'新規予約と同じ言葉です（打ち込みもできます）' });
     h += '</div>';
     /* ================================================================
-       🔧🔴 v2.98.0（ゆうた報告 2026-09-13「マスター入力機能の作業タイプにBPがない」）
-       **作業タイプの「併用可」（B.P・1Y・3M・車販依頼）を、新規予約・予約詳細と同じ形で置いた。**
-       ◎前まで … 上の選択欄を `!combinable` で絞っていて、**併用可の型がどこにも出ていなかった**。
-         ＝ B.P の車をマスター入力で作れない／直せない（開いて保存すると B.P が付けられない）。
-       ◎いま … 上の選択欄＝基本（1つ）。ここ＝併用可（何個でも・**これだけでも付けられる**）。
-       🔴 決まりはカード詳細（card-detail.js）と同じ：
-          ・物販（単独）を選んだら併用可はおろす／併用可を押したら物販はおろす
-          ・社内区分（中古・内部）を選んでいる間は押せない（`pitInternSet` がおろすため）
-       🔴 押すたびに `workTypes`（バッジの並び）をそろえる（`syncWorkTypes`）。
-       ⚠ 必須の判定は `pitCardMisses` のまま（基本 **か** 併用可が1つあれば足りる）。
+       🔧🔴 v2.99.0（ゆうた指定 2026-09-13）**作業タイプは、新規予約・予約詳細と同じ部品をそのまま使う。**
+       🗣「わかりにくい。作業タイプは新規予約の物をそのまま全部使って欲しい
+       　　（車検などはプルダウン、BP等がバッチという構造が）」
+       ◎v2.98.0 … 選択欄（基本）＋自前のチップ（併用可）＋自前の付加・社内区分の並び＝**別の形**だった。
+       ◎いま … card-detail.js の `pitWorkTypeFieldsHtml`（作業タイプ｜併用可｜その他）と
+         `pitWorkTypeOtherPanelHtml`（その他の引き出し＝付加・社内区分・物販）を**描くだけ**。
+         押した時は `pitWorkTypeBind`（render の最後で張る・保存は保存ボタンで一度に＝save:false）。
+       🔴 マスター入力の中に作業タイプの決まりを**1行も書かない**（書くと予約詳細と食い違う日が来る）。
        ================================================================ */
-    var combo = (st().workTypes || []).filter(function(x){ return x && x.combinable && !x.drawer; });
-    if (combo.length){
-      var adds = Array.isArray(M.workAddons) ? M.workAddons : [];
-      h += '<div class="ms-lb" style="margin-top:11px">作業タイプ（併用可）'
-        + '<span>上の作業タイプと重ねても、これだけでも付けられます</span></div><div class="ms-chips">';
-      combo.forEach(function(it){
-        var on = adds.indexOf(it.id) >= 0;
-        var col = it.color || '';
-        var style = col ? (on ? ('background:' + col + ';border-color:' + col + ';color:#fff;') : ('border-color:' + col + ';color:' + col + ';')) : '';
-        h += '<button type="button" class="ms-chip' + (on ? ' on' : '') + (kind ? ' off' : '') + '"'
-          + (kind ? ' disabled title="社内区分を選んでいる間は、作業タイプは選びません"' : ' title="' + esc(it.desc || '') + '"')
-          + (style ? ' style="' + style + '"' : '')
-          + ' onclick="pitMasterAddon(\'' + esc(it.id) + '\')">' + esc(it.label) + '</button>';
-      });
-      h += '</div>';
-    }
+    h += '<div class="ms-f wide ms-wt" id="ms-wt" style="margin-top:11px"><label>作業タイプ'
+      + (kind ? '' : ' <span class="ms-req">必須</span>') + '</label>'
+      + (w.pitWorkTypeFieldsHtml
+          ? '<div class="cf-row" style="flex-wrap:wrap;align-items:flex-start">' + w.pitWorkTypeFieldsHtml(M) + '</div>'
+            + (w.pitWorkTypeOtherPanelHtml ? w.pitWorkTypeOtherPanelHtml(M) : '')
+          : '<div class="ms-hint">作業タイプの部品が読み込めていません。画面を開き直してください。</div>')
+      + '</div>';
     h += '<div class="ms-f wide" style="margin-top:11px"><label>作業内容</label>'
       +  '<textarea onchange="pitMasterSet(\'menu\',this.value)">' + esc(M.menu) + '</textarea></div>';
-    /* 🔧 その他＝新規予約の「その他」の引き出しと**同じ並び**（ゆうた指定 2026-09-07） */
+    /* 🔧 v2.99.0 付加（保証・保険・社員）・社内区分（中古・代車・内部）・物販は、上の作業タイプの「その他」の引き出しに入っている
+       （新規予約・予約詳細と同じ部品）。🔴 ここに自前の並びを戻さないこと＝写しが2つになる。
+       ⚠ 代車の区分は引き出しの中でも押せない（作業予定ボードからだけ・v2.53.0 の決めごと）。 */
     h += '<hr class="ms-sep">';
-    h += '<div class="ms-lb">付加<span>作業タイプとセットで付ける印。売上・実績は通常どおり</span></div><div class="ms-chips">';
-    (w.PIT_WORK_SPECIALS || []).forEach(function(it){
-      h += chip((M.workSpecials || []).indexOf(it.id) >= 0, it.label, "pitMasterSpecial('" + it.id + "')", 'grey');
-    });
-    h += '</div>';
-    h += '<div class="ms-lb" style="margin-top:10px">社内区分<span>自社の車。売上には数えません（実績には残ります）</span></div><div class="ms-chips">';
-    (w.PIT_INTERN_KINDS || []).forEach(function(it){
-      var lock = (it.id === 'loanercar');   /* 🔴 代車は作業予定ボードからだけ（v2.53.0 と同じ決めごと） */
-      h += '<button type="button" class="ms-chip' + (kind === it.id ? ' on' : '') + (lock ? ' off' : '') + '"'
-        + (lock ? ' disabled title="代車は作業予定ボードからだけ作れます"' : ' title="' + esc(it.desc || '') + '"')
-        + ' onclick="pitMasterIntern(\'' + it.id + '\')">' + esc(it.label) + '</button>';
-    });
-    h += '</div>';
     /* ⚠ ここに「急ぎ」を置かないこと（v0.35.5 で画面から外れてキーだけ温存＝使われていない） */
     h += '<div class="ms-lb" style="margin-top:10px">受け方</div><div class="ms-chips">';
     h += chip(!!M.consult, '見積相談', "pitMasterToggle('consult')");
@@ -660,9 +635,22 @@
       + '<option value="returnWait"' + (M.returnStage === 'returnWait' ? ' selected' : '') + '>済（返車待ち）</option></select>');
     h += fld('返車予定日', dte('returnDate'));
     h += fld('確定返車日', dte('returnDateFinal'), { mon:true });
-    h += fld('実績カウント日', dte('completedAt'), { mon:true });
+    var ins = !!(w.pitCardInsurance && w.pitCardInsurance(M));
+    if (ins){
+      /* 🛡 v2.99.0 保険＝実績カウント日は**入金日から決まる**（手で打たせない＝入金日とずれる道を作らない） */
+      h += fld('実績カウント日', '<input value="' + esc(M.completedAt || '') + '" disabled placeholder="入金日が入ると入ります">',
+               { mon:true, hint:'保険は、入金日がそのまま実績カウント日です' });
+      h += fld('入金日（保険）', dte('paymentDate'), { mon:true, hint:'入れた日で実績・売上に乗ります。空なら入金待ちです' });
+    } else {
+      h += fld('実績カウント日', dte('completedAt'), { mon:true });
+    }
     h += fld('売上日', dte('salesDate'), { mon:true });
-    h += '</div><hr class="ms-sep">';
+    h += '</div>';
+    if (ins){
+      h += '<div class="ms-chk ' + ((w.pitInsPayWait && w.pitInsPayWait(M)) ? 'wa' : 'ok') + '" style="margin-top:9px">🛡 '
+        + esc(w.pitInsNote ? w.pitInsNote(M) : '保険：入金日で実績に計上します') + '</div>';
+    }
+    h += '<hr class="ms-sep">';
     if (kind){
       h += '<div class="ms-chk ok">' + esc(w.pitInternLabel ? w.pitInternLabel(M) : '社内車両')
         + '（社内車両）です。金額・完TEL・洗車・伝票はありません。実績には残りますが、売上には数えません。</div>';
@@ -706,9 +694,11 @@
     var amt = num(M.amountFinal), mo = t(M.completedAt).slice(5,7).replace(/^0/,'');
     var 返車済み = (M.status === 'returned');
     var col = ((((st().boards || [])[0] || {}).cols) || []).filter(function(x){ return x.id === M.status; })[0];
-    var where = 返車済み ? '実績（返車済み）'
+    var 入金待ち = !!(w.pitInsPayWait && w.pitInsPayWait(M));
+    var where = 返車済み ? (入金待ち ? '実績（返車済み・保険の入金待ち）' : '実績（返車済み）')
               : (M.status === 'reserved' ? '予約カレンダー' : ('タスクボード「' + ((col && col.name) || M.status) + '」'));
-    var sales = (返車済み && !M.noSale && amt) ? (mo + '月に +' + yen(amt) + ' 円') : 'まだ乗りません';
+    var sales = 入金待ち ? 'まだ乗りません（保険：入金日を入れた月に乗ります）'
+              : ((返車済み && !M.noSale && amt) ? (mo + '月に +' + yen(amt) + ' 円') : 'まだ乗りません');
     var lo = (st().loaners || []).filter(function(l){ return l && l.id === M.loanerId; })[0];
     var h = '<div class="ms-res"><div class="ms-resh">このまま保存するとどうなるか</div><div class="ms-resb">';
     h += '<div class="ms-rr"><div class="k">出る場所</div><div class="v">' + esc(where) + '</div></div>';
@@ -755,6 +745,7 @@
       return;
     }
     if (!M) M = blank();
+    syncInsurance(M);   /* 🛡 v2.99.0 保険なら、返車済みの実績カウント日を入金日にそろえてから描く */
     var h = head() + callHtml() + findHtml();
     if (MODE === 'new' || (MODE === 'fix' && BEFORE)){
       h += sec1() + sec2() + sec3() + secShaken() + sec4() + '<div id="ms-foot">' + foot() + '</div>';
@@ -762,6 +753,9 @@
       h += '<div class="ms-card"><div class="ms-pad"><div class="ms-hint">上で直すカードを探して選んでください。</div></div></div>';
     }
     body.innerHTML = h;
+    /* 🔧 v2.99.0 作業タイプの欄に、予約詳細と同じ処理を張る（保存は保存ボタンで一度に＝save:false） */
+    var wt = body.querySelector('#ms-wt');
+    if (wt && M && w.pitWorkTypeBind) w.pitWorkTypeBind(wt, M, render, { save: false });
     if (w.icoBoot) try { w.icoBoot(body); } catch(e){}
   }
   w.renderMaster = function(){ if (!M) w.pitMasterOpen(); else render(); };

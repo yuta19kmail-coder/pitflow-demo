@@ -140,7 +140,8 @@
   /* ===== ⑥ まだ結ばれていない代車・自社車両（0にする対象） =====
      ⚠ 引退した車は数えない（もう使っていないので、結んでも意味が無い）。 */
   function unlinked(){
-    return all().filter(function(x){ return !x.v.retired && !isLinked(x.v); });
+    /* 🏁 v2.106.0 リース車両は顧客と紐づけない（自社登録ではない）＝0にする対象に数えない */
+    return all().filter(function(x){ return !x.v.retired && !x.v.lease && !isLinked(x.v); });
   }
 
   /* ===== ⑦ 🚙🔴 v2.79.0 **顧客控えの車種名に、代車の呼び名が入り込んでいないか**（ゆうた指定 2026-09-07）

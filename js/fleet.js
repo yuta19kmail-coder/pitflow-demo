@@ -121,6 +121,8 @@ function renderFleet(){
             + '"><i data-ic=link data-ics=12></i>済</span></div>'
         : (v.retired ? ''
             : '<div class="fl-card-link"><span class="fl-link-bdg off" title="編集 ▸「顧客車両との紐づけ」から結べます">未紐づけ</span></div>');
+      /* 🏁 v2.106.0（ゆうた指定）**「🔗済」のボタンの代わりに「リース車両」の札。** */
+      const _bdg = v.lease ? '<div class="fl-card-link"><span class="fl-link-bdg lease" title="リース車両（顧客との紐づけはありません）">リース車両</span></div>' : _lkBdg;
       const _dims = [
         v.length != null ? '長 ' + _fleetEsc(v.length) : '',
         v.width  != null ? '幅 ' + _fleetEsc(v.width)  : '',
@@ -135,7 +137,7 @@ function renderFleet(){
            + '<span class="fl-more"><i data-ic=right data-ics=16></i></span>'
          + '</div>'
          + (v.plate ? '<div class="fl-card-plate">' + _fleetEsc(v.plate) + '</div>' : '')
-         + _lkBdg   /* 🔗 v2.64.0 顧客車両との紐づけ */
+         + _bdg   /* 🔗 v2.64.0 顧客車両との紐づけ／🏁 v2.106.0 リース車両 */
          /* v1.14.5：社用車も代車と同じ中身を出す（入力できるものは全部見えるように） */
          + ((_cat || v.color || _seat)
              ? '<div class="fl-card-line">'
@@ -151,10 +153,10 @@ function renderFleet(){
                  + (v.camera ? '<span class="fl-opttag">Bカメ</span>' : '')
                + '</div>' : '')
          + (_dims ? '<div class="fl-card-dims">' + _dims + ' cm</div>' : '')
-         + (v.shakenDate ? '<div class="fl-card-foot">'
+         + (v.lease ? _flLeaseFoot(v) : (v.shakenDate ? '<div class="fl-card-foot">'
              + '<span class="fl-fk shaken">車検</span><b>' + _fleetEsc(window.pitWareki ? pitWareki(v.shakenDate) : v.shakenDate) + '</b>'
              + (_tk ? '<span class="fl-fk tenken">点検</span><b>' + _fleetEsc(window.pitWareki ? pitWareki(_tk, 'ym') : _tk) + '</b>' : '')
-           + '</div>' : '<div class="fl-card-foot none">車検満了日 未入力</div>')
+           + '</div>' : '<div class="fl-card-foot none">車検満了日 未入力</div>'))
          + '</div>';
     });
     h += '</div></div>';
@@ -366,6 +368,11 @@ function flMonthCalHtml(){
          ⚠ 車検の満了日は**本物の期限**なので、ここは残す。 */
       if (v.shakenDate && String(v.shakenDate).slice(0,7) === ym)
         inner += '<div class="fl-due" title="車検の満了日">満了 ' + _flMd(v.shakenDate) + '</div>';
+      /* 🏁 v2.106.0（ゆうた指定）**リースアップ日は月ビューに暫定で出す。**過ぎた月のマスはグレー。 */
+      const _le = window.pitLeaseEnd ? pitLeaseEnd(v) : '';
+      if (_le && _le.slice(0,7) === ym)
+        inner += '<div class="fl-due lease' + (v.leaseUpFixed ? '' : ' tbd') + '" title="リースアップ日' + (v.leaseUpFixed ? '（確定）' : '（暫定）') + '">'
+               + '🏁 リースアップ ' + _flMd(_le) + (v.leaseUpFixed ? '' : '（暫定）') + '</div>';
       /* ④ 自由イベント＝小さい丸＋名前ぜんぶ（4文字で切らない） */
       /* 🔴 v2.70.1 ここで `!x.auto` を書かない。**物差し（loaner-free.js）が弾く。**
          ⚠ 画面側で隠していたせいで、隠していない代車カレンダーにだけ残って見えていた。同じことを繰り返さない。 */
@@ -375,7 +382,7 @@ function flMonthCalHtml(){
                  + ' onclick="event.stopPropagation();flOpenEventModal(null,null,\'' + x.id + '\')">'
                  + '<i style="background:' + x.color + '"></i><span>' + _fleetEsc(x.label) + '</span></div>';
         });
-      h += '<div class="fl-cal-cell' + (padAt[mi] ? ' barpad' : '') + '"'
+      h += '<div class="fl-cal-cell' + (padAt[mi] ? ' barpad' : '') + ((_le && ym > _le.slice(0,7)) ? ' fl-leaseout' : '') + '"'
          + ' onclick="flOpenEventModal(\'' + v.id + '\',\'' + first + '\')">' + inner + '</div>';
     });
    });
@@ -439,6 +446,10 @@ function flDayCalHtml(y, mo){
          ＝ 目安の日をマスごと橙に塗ると「この日が期限」に見える。12点にその日は無い。
          ⚠ 車検の満了日だけ残す。こちらは**その日を過ぎたら切れる**本物の期限。 */
       if (v.shakenDate === ds){ cls += ' d-exp'; inner += '<div class="fl-big">満了<small>' + _flMd(ds) + '</small></div>'; }
+      /* 🏁 v2.106.0 リースアップ日＝紫で塗る（暫定は薄く）／その先はグレー（貸出は止めない） */
+      const _le2 = window.pitLeaseEnd ? pitLeaseEnd(v) : '';
+      if (_le2 && _le2 === ds){ cls += ' d-lease' + (v.leaseUpFixed ? '' : ' tbd'); inner += '<div class="fl-big">🏁 リースアップ<small>' + _flMd(ds) + (v.leaseUpFixed ? '' : ' 暫定') + '</small></div>'; }
+      else if (_le2 && ds > _le2) cls += ' fl-leaseout';
       if (padAt[di]) cls += ' barpad';
       const bb = barAt[di];
       if (bb){
@@ -579,6 +590,31 @@ window.flKindChange = function(){
   const n = document.getElementById('fl-number'); if (n) n.value = _flNextNum(k);
   if (window.flNumberCheck) flNumberCheck();
 };
+/* 🏁 v2.106.0（ゆうた指定 2026-09-13）**リース車両のスイッチ。**
+   🗣「顧客との紐づけ→なし（リースなので自社登録してない）／車検満了日→入力なし 打てないようにしてほしい／
+   　　新規 リースアップ日入力 日付ピッカーで入力」
+   🔴 チェックを入れたら：紐づけ欄と車検満了日の欄を**打てなくする**（見た目も薄く）＋リースアップ日の欄を出す。
+   ⚠ 保存の時にも、リースなら紐づけと車検満了日を**書かない**（画面を薄くしただけで済ませない＝_fleetSubmitInner）。 */
+window.flLeaseToggle = function(){
+  const on = !!(document.getElementById('fl-lease') || {}).checked;
+  const box = document.getElementById('fl-lease-box'); if (box) box.style.display = on ? '' : 'none';
+  ['fl-link-row', 'fl-shaken-row'].forEach(function(id){ const r = document.getElementById(id); if (r) r.classList.toggle('fl-off', on); });
+  ['fl-sh-era', 'fl-sh-y', 'fl-sh-m', 'fl-sh-d'].forEach(function(id){ const e = document.getElementById(id); if (e) e.disabled = on; });
+  const lk = document.getElementById('fl-link');
+  if (lk) lk.querySelectorAll('button,input,select').forEach(function(e){ e.disabled = on; });
+  const tp = document.getElementById('fl-tenken-preview'); if (tp && on) tp.textContent = '';
+};
+/* リースアップ日の言い方（和暦＋確定／暫定）。判定は loaner-free.js の pitLeaseEnd 1本 */
+function _flLeaseText(v){
+  const e = window.pitLeaseEnd ? pitLeaseEnd(v) : String((v && (v.leaseUpFixed || v.leaseUp)) || '');
+  if (!e) return '';
+  return (window.pitWareki ? pitWareki(e) : e) + (v.leaseUpFixed ? '（確定）' : '（暫定）');
+}
+function _flLeaseFoot(v){
+  const tx = _flLeaseText(v);
+  return tx ? '<div class="fl-card-foot"><span class="fl-fk lease">リースアップ</span><b>' + _fleetEsc(tx) + '</b></div>'
+            : '<div class="fl-card-foot none">リースアップ日 未入力</div>';
+}
 function _flPlateParts(p){ const a=String(p||'').trim().split(/\s+/); return { region:a[0]||'', cls:a[1]||'', kana:a[2]||'', num:a[3]||'' }; }
 function _flPlateJoin(){ const v=function(id){return (document.getElementById(id).value||'').trim();}; return [v('fl-pl-region'),v('fl-pl-cls'),v('fl-pl-kana'),v('fl-pl-num')].filter(Boolean).join(' '); }
 function _flZ2H(s){ return String(s==null?'':s).replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-0xFEE0);}); }
@@ -741,7 +777,7 @@ window.fleetOpenDetail = function (id) {
            ⚠ 結ばれていない時も**行を空にしない**（空だと「項目が無い」のか「まだ結んでいない」のか分からない）。
            ⚠ お名前・ナンバー・車種はここに出さない（v2.64.0 は出していたが「うるさい」）＝
               誰と結んであるかは title に回す。カルテNo は**その車を指す番号**なので出す。 */
-        + row('顧客紐づけ', (function(){
+        + row('顧客紐づけ', v.lease ? '<span class="fl-link-bdg lease">リース車両</span>（紐づけなし）' : (function(){
             var lk = window.pitFleetLinkTarget ? pitFleetLinkTarget(v) : null;
             if (!lk) return '<span class="fd-nolink" title="編集 ▸「顧客車両との紐づけ」から結べます">未紐づけ</span>';
             var kt = String(lk.veh.karteNo || '').trim();
@@ -755,6 +791,7 @@ window.fleetOpenDetail = function (id) {
         + row('区分', e(cat))
         + (seatTxt ? row('定員', e(seatTxt)) : '')
         + row('寸法', [v.length != null ? '長 ' + e(v.length) : '', v.width != null ? '幅 ' + e(v.width) : '', v.height != null ? '高 ' + e(v.height) : ''].filter(Boolean).join(' / ') + (v.height != null || v.width != null || v.length != null ? ' cm' : ''))
+        + (v.lease ? row('リースアップ', e(_flLeaseText(v) || '未入力')) : '')   /* 🏁 v2.106.0 */
         + row('車検満了', v.shakenDate ? e(window.pitWareki ? pitWareki(v.shakenDate) : v.shakenDate) : '')
         + row('12ヶ月点検', tk ? (e(window.pitWareki ? pitWareki(tk, 'ym') : tk) + '<span class="fd-auto">（車検の1年前／1年後・自動）</span>') : '')
         + '</table>'
@@ -765,7 +802,9 @@ window.fleetOpenDetail = function (id) {
            🔴 飛び先はどちらも既存の1本を呼ぶだけ（`custHistory` ／ `flMaintAdd`）。ここで組み立てない。 */
         + '<div class="fd-btns"><button class="vh-btn" onclick="fleetCloseDetail()">閉じる</button>'
         + '<button class="vh-btn" onclick="fleetGoHistory(\'' + v.id + '\')"'
-          + (window.pitFleetLinked && pitFleetLinked(v) ? '' : ' disabled title="先に「顧客車両との紐づけ」で結んでください"')
+          + (window.pitFleetLinked && pitFleetLinked(v) ? ''
+             : (v.lease ? ' disabled title="リース車両は顧客と紐づけないので、履歴はありません"'
+                        : ' disabled title="先に「顧客車両との紐づけ」で結んでください"'))
           + '><i data-ic=clock data-ics=16></i> 履歴</button>'
         + '<button class="vh-btn" onclick="fleetCloseDetail();flMaintAdd(\'' + v.id + '\')"><i data-ic=wrench data-ics=16></i> 作業予定</button>'
         + '<button class="vh-btn primary" onclick="fleetCloseDetail();fleetOpenModal(\'' + v.id + '\')"><i data-ic=pencil data-ics=16></i> 編集</button></div>';
@@ -930,6 +969,11 @@ function fleetOpenModal(id){
   /* 🔗 v2.62.0 顧客車両との紐づけ。⚠ 保存を押すまでは控え（_flLink）にしか入れない */
   _flLink = { custId: (v.custId||''), custVehId: (v.custVehId||'') };
   _flLinkRender();
+  /* 🏁 v2.106.0 リース車両 */
+  const _ls = document.getElementById('fl-lease'); if (_ls) _ls.checked = !!v.lease;
+  const _lu = document.getElementById('fl-leaseup'); if (_lu) _lu.value = v.leaseUp || '';
+  const _lf = document.getElementById('fl-leaseup-fix'); if (_lf) _lf.value = v.leaseUpFixed || '';
+  flLeaseToggle();
   flNumberCheck();
   document.getElementById('fleet-modal').classList.add('show');
   const n = document.getElementById('fl-model'); if (n) n.focus();
@@ -986,10 +1030,14 @@ function _fleetSubmitInner(){
   const seats = ((document.getElementById('fl-seats') || {}).value || '').trim() || null;
   const etc=!!document.getElementById('fl-etc').checked, navi=!!document.getElementById('fl-navi').checked, iso=!!document.getElementById('fl-iso').checked;
   const camera=!!(document.getElementById('fl-camera')||{}).checked;
+  /* 🏁 v2.106.0 リース車両＝顧客との紐づけ・車検満了日は**持たない**。リースアップ日（暫定／確定）を持つ */
+  const lease = !!(document.getElementById('fl-lease') || {}).checked;
+  const leaseUp = lease ? ((document.getElementById('fl-leaseup') || {}).value || '') : '';
+  const leaseUpFixed = lease ? ((document.getElementById('fl-leaseup-fix') || {}).value || '') : '';
   if (!model){ pitAlert('車種名を入れてください（例：タント）', { code:'PF-3031' }); return false; }   /* false＝保存していない（閉じない） */
   /* 🔗 v2.62.0 お客様の車1台に、自社の車は1台まで。
      ⚠ 窓を開けている間に別の端末が結んだ時のため、**保存の時にもう一度見る**（画面の中だけの判定にしない）。 */
-  if (_flLink.custId && _flLink.custVehId && window.pitFleetHeldBy){
+  if (!lease && _flLink.custId && _flLink.custVehId && window.pitFleetHeldBy){
     const _held = pitFleetHeldBy(_flLink.custId, _flLink.custVehId, _fleetEditId || '');
     if (_held){
       pitAlert('その車は「' + (window.pitFleetBadgeText ? pitFleetBadgeText(_held.kind, _held.v) : '別の車') + '」にもう紐づいています',
@@ -1009,19 +1057,23 @@ function _fleetSubmitInner(){
     if (f){
       if (f.kind !== kind){ const fromArr=f.kind==='loaner'?state.loaners:state.companyCars, toArr=kind==='loaner'?state.loaners:state.companyCars; fromArr.splice(fromArr.indexOf(f.v),1); toArr.push(f.v); }
       f.v.name = (kind==='loaner'?'代車'+number:(model||f.v.name)); f.v.number = number; f.v.model = model; f.v.color = color; f.v.plate = plate;
-      f.v.shakenDate = shaken; delete f.v.tenkenDate;   /* 12ヶ月点検は持たない（自動計算） */
+      f.v.shakenDate = lease ? '' : shaken; delete f.v.tenkenDate;   /* 🏁 v2.106.0 リースは車検満了日なし */   /* 12ヶ月点検は持たない（自動計算） */
       f.v.height=height; f.v.width=width; f.v.length=length; f.v.category=category; f.v.seats=seats; f.v.etc=etc; f.v.navi=navi; f.v.iso=iso; f.v.camera=camera;
       /* 🔗 v2.62.0 紐づけ。外した時は欄ごと消す（空文字を残すと「結んである」と読み違える元） */
-      if (_flLink.custId && _flLink.custVehId){ f.v.custId=_flLink.custId; f.v.custVehId=_flLink.custVehId; }
+      if (!lease && _flLink.custId && _flLink.custVehId){ f.v.custId=_flLink.custId; f.v.custVehId=_flLink.custVehId; }
       else { delete f.v.custId; delete f.v.custVehId; }
+      /* 🏁 v2.106.0 リース車両。外した時は欄ごと消す（空文字を残すと「リース」と読み違える元） */
+      if (lease){ f.v.lease = true; f.v.leaseUp = leaseUp; f.v.leaseUpFixed = leaseUpFixed; }
+      else { delete f.v.lease; delete f.v.leaseUp; delete f.v.leaseUpFixed; }
     }
   } else {
     const id = (kind === 'loaner' ? 'L' : 'C') + Date.now().toString(36);
-    const rec = { id:id, name:labelName, number:number, model:model, color:color, plate:plate, shakenDate:shaken,
+    const rec = { id:id, name:labelName, number:number, model:model, color:color, plate:plate, shakenDate:(lease ? '' : shaken),
       height:height, width:width, length:length, category:category, seats:seats, etc:etc, navi:navi, iso:iso, camera:camera };
     if (dupLoaner && repDate){ rec.replaceOf = dupLoaner.id; rec.replaceDate = repDate; }
     /* 🔗 v2.62.0 紐づけ（選んでいる時だけ書く） */
-    if (_flLink.custId && _flLink.custVehId){ rec.custId=_flLink.custId; rec.custVehId=_flLink.custVehId; }
+    if (!lease && _flLink.custId && _flLink.custVehId){ rec.custId=_flLink.custId; rec.custVehId=_flLink.custVehId; }
+    if (lease){ rec.lease = true; rec.leaseUp = leaseUp; rec.leaseUpFixed = leaseUpFixed; }   /* 🏁 v2.106.0 */
     (kind === 'loaner' ? state.loaners : state.companyCars).push(rec);
     _fleetEditId = id;   /* v1.14.2：万一もう一度押されても、増やさずに同じ車両を直す */
     // 入替予定＝旧車のカレンダーに「代車入替」イベント（〜入替日）＋新車にも開始予定
@@ -1194,6 +1246,33 @@ function fleetRetire(id){
   });
 }
 window.fleetRetire = fleetRetire;
+
+/* 🏁 v2.106.0（ゆうた指定 2026-09-13）**「予定通りリースアップでアーカイブ」＝引退にする。**
+   🗣「確定日で過ぎたら、予定通りリースアップでアーカイブする みたいなボタン」→（どうなる？）「その車を『引退』にする」
+   🔴 中身は上の「引退させる」と同じ（記録は残る・あとから「引退を取り消す」で戻せる）。作業予定ボードはここを呼ぶだけ。 */
+function fleetLeaseArchive(id){
+  const f = _fleetFind(id);
+  if (!f || !f.v.lease) return Promise.resolve(false);
+  const nm = f.v.name || f.v.model || '';
+  return pitAsk('「' + nm + '」を予定通りリースアップでアーカイブしますか？', {
+    ok: 'アーカイブ（引退）する',
+    detail: '・この車を「引退」にします（代車カレンダーの列から消え、新しく貸せなくなります）\n'
+          + '・今までの貸出（' + _flUsedCount(id) + '件）の記録はそのまま残ります\n'
+          + '・あとから「引退を取り消す」で戻せます'
+  }).then(function(yes){
+    if (!yes) return false;
+    const td = (window.ymd ? ymd(new Date()) : '');
+    f.v.retired = true;
+    f.v.retiredAt = td;
+    f.v.leaseArchivedAt = td;
+    if (window.PitDB) PitDB.save();
+    try { if (window.pitLog) pitLog('リースアップでアーカイブした', { kind:'loaner', label: nm + ' ' + (window.pitLeaseEnd ? pitLeaseEnd(f.v) : '') }); } catch(e){}
+    renderFleet();
+    if (window.pitToast) pitToast('「' + nm + '」をリースアップでアーカイブしました（記録は残っています）');
+    return true;
+  });
+}
+window.fleetLeaseArchive = fleetLeaseArchive;
 
 function fleetUnretire(id){
   const f = _fleetFind(id);

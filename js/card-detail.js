@@ -2339,7 +2339,8 @@ window.cfAddVehicle = function(kind){
             if (veh.karteNo) c.karteNo=veh.karteNo;
             if (veh.boardId) c.boardId=veh.boardId;
             if (veh.division) c.division=veh.division;
-            if (veh.frontStaff) c.frontStaff=veh.frontStaff;
+            /* 🔴 v2.103.0 担当は番号ごと引き継ぐ（名前だけだと、名簿の読み直しで前の人に戻る） */
+            if (veh.frontStaff){ c.frontStaff=veh.frontStaff; c.frontStaffId=veh.frontStaffId||''; }
           }
           if (window.PitDB) PitDB.save();
           renderCardForm(c);

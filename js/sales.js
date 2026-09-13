@@ -518,7 +518,7 @@
     (state.cards||[]).forEach(function(c){ var tr=qTierOf(c,qw.s,qw.e,nqE,todayStr); if(!tr)return; qt[tr].sum+=amtOf(c,tr); qt[tr].count++; });
     var qLanding=sumTiers(qt,TIER_IDS);
     h+='<div class="sv-hero"><div class="sv-hero-row">';
-    h+='<div class="sv-hero-main"><div class="sv-hero-lb">現クォーター Q'+(todayQ+1)+'（'+qw.f+'〜'+qw.t+'日）実績</div><div class="sv-hero-num" style="color:#1db97a">'+man(qt.actual.sum)+'<span>円</span></div><div class="sv-hero-sub">Q目標 '+man(qMin[todayQ])+'〜'+man(qMax[todayQ])+'</div></div>';
+    h+='<div class="sv-hero-main"><div class="sv-hero-lb">'+(isThis?'現クォーター':(ymdL(today)>moE?'最終クォーター':'最初のクォーター'))+' Q'+(todayQ+1)+'（'+qw.f+'〜'+qw.t+'日）実績</div><div class="sv-hero-num" style="color:#1db97a">'+man(qt.actual.sum)+'<span>円</span></div><div class="sv-hero-sub">Q目標 '+man(qMin[todayQ])+'〜'+man(qMax[todayQ])+'</div></div>';
     h+='<div class="sv-hero-main"><div class="sv-hero-lb">着地見込み（翌Qまで含む）</div><div class="sv-hero-num" style="color:'+(qLanding>=qMin[todayQ]?'#1db97a':'#f59e0b')+'">'+man(qLanding)+'<span>円</span></div><div class="sv-hero-sub">当月実績合計 '+man(actualM)+'</div></div>';
     h+='</div>'+stackBarSvg(qt,qMin[todayQ],qMax[todayQ],qLanding)+'</div>';
     // 6区分カード
@@ -530,7 +530,7 @@
     h+='<div class="sv-card"><div class="sv-card-h"><span><i data-ic=calendar data-ics=16></i> クォーター実績（月4分割・営業日配分）</span><span class="sv-legend"><i class="sv-lg sv-lg-actual"></i>実績累計 <i class="sv-lg sv-lg-min"></i>目標累計(最低)</span></div>'+quarterChartSvg(qAct,qMin,todayQ)+'<div class="sv-note">クォーター＝1〜7 / 8〜15 / 16〜23 / 24〜末。実績は実績カウント日で計上。上の区分は現Qの着地見込み（実績待/確定/予定/見込/予測は返車予定日で振り分け・翌Q末までが上限）。</div></div>';
     h+='<div class="sv-qcards">';
     for(i=0;i<4;i++){ var p=pct(qAct[i],qMin[i]); var pc=p>=100?'ok':(p>=85?'near':'warn');
-      h+='<div class="sv-qcard'+(i===todayQ?' now':'')+'"><div class="sv-qcard-h">Q'+(i+1)+' <span>'+qs[i].f+'〜'+qs[i].t+'日</span>'+(i===todayQ?'<em>進行中</em>':'')+'</div><div class="sv-qcard-num" style="color:#1db97a">'+man(qAct[i])+'</div><div class="sv-qbar"><i class="sv-'+pc+'" style="width:'+Math.min(100,p)+'%"></i></div><div class="sv-qcard-sub">目標 '+man(qMin[i])+'〜'+man(qMax[i])+' ／ <b class="sv-'+pc+'">'+p+'%</b> ／ '+qCnt[i]+'台</div></div>';
+      h+='<div class="sv-qcard'+((i===todayQ&&isThis)?' now':'')+'"><div class="sv-qcard-h">Q'+(i+1)+' <span>'+qs[i].f+'〜'+qs[i].t+'日</span>'+((i===todayQ&&isThis)?'<em>進行中</em>':'')+'</div><div class="sv-qcard-num" style="color:#1db97a">'+man(qAct[i])+'</div><div class="sv-qbar"><i class="sv-'+pc+'" style="width:'+Math.min(100,p)+'%"></i></div><div class="sv-qcard-sub">目標 '+man(qMin[i])+'〜'+man(qMax[i])+' ／ <b class="sv-'+pc+'">'+p+'%</b> ／ '+qCnt[i]+'台</div></div>';
     }
     h+='</div><div class="sv-foot">6区分の考え方は「売上」と同じ。クォーター版はパイプライン（確定/予定/見込/予測）を翌クォーター末までを上限に計上します。</div>';
     wrap.innerHTML=h;

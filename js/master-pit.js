@@ -203,6 +203,7 @@
     if (!Array.isArray(st().cards)) st().cards = [];
     syncWorkTypes(M);   /* 🔧 v2.98.0 保存する前に、バッジの並びを基本＋併用可にそろえる（古いカードを直した時も） */
     syncInsurance(M);   /* 🛡 v2.99.0 保険なら、実績カウント日＝入金日にそろえてから保存 */
+    numFields(M);       /* 🔢 v2.103.0 金額・日数は数字で保存（文字のまま残さない） */
     var live = null;
     if (MODE === 'fix'){
       live = (st().cards || []).filter(function(x){ return x && x.id === M.id; })[0];
@@ -251,6 +252,24 @@
   /* ===== 欄をいじる ===== */
   /* 🔧 v2.98.0 作業タイプのバッジの並び（`workTypes`）＝基本＋併用可。**カード詳細の `_syncWorkTypes` と同じ形**。
      ⚠ v2.99.0 から押した時は `pitWorkTypeBind` がそろえる。ここは**保存する直前の念押し**だけに使う。 */
+  /* 🔢🔴 v2.103.0（8月の総点検・2026-09-13）**金額・日数は数字で保存する。**
+     ⚠ 欄に打った値は文字（"317180"）のまま M に入る。前はそのまま保存していたので、
+        マスター入力で作ったカードの金額が **文字** になり、足し算が「文字の連結」になる所があった
+        （state.js の平均単価が 839億円 になっていた）。
+     🔴 空欄は空欄のまま残す（0 にしない＝「未入力」と「0円」を区別する）。 */
+  var NUM_FIELDS = ['estAmount', 'amountQuote', 'amountOrder', 'amountFinal', 'feeAmount', 'estHoldDays'];
+  function numFields(c){
+    if (!c) return;
+    NUM_FIELDS.forEach(function(k){
+      var v = c[k];
+      if (typeof v !== 'string') return;
+      var x = v.replace(/[^0-9.\-]/g, '');
+      var n = Number(x);
+      c[k] = (x === '' || x === '-' || x === '.' || !isFinite(n)) ? '' : n;
+    });
+  }
+  w.pitMasterNumFields = numFields;
+
   function syncWorkTypes(c){
     if (!c) return;
     var ids = [];

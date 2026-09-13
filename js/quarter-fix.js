@@ -302,6 +302,10 @@
       var b4 = t(c.frontStaff || c.staff), to4 = t(known2.name);
       if (b4 === to4) return Promise.resolve(false);
       c.frontStaff = to4;
+      /* 🔴🔴 v2.103.0 **番号も一緒に入れる。** 名前だけ変えると、名簿を読み直した時に
+         members-pit.js の `pitSyncCustomerStaffNames` が **古い番号の名前に黙って戻す**
+         （伝票 0754 矢野様で実際に起きた＝記録は「専務にした」のにカードは社長のまま）。 */
+      c.frontStaffId = t(known2.id);
       if (w.logFlow) logFlow(c, 'フロント担当を ' + (b4 || '（なし）') + ' → ' + to4
                               + ' に変更（伝票の受付担当に合わせた／突き合わせの画面から）');
       if (w.pitLog) pitLog('突き合わせ：フロント担当を直した', { cardId: c.id, kind: 'inspect',
@@ -475,9 +479,15 @@
     });
   }
   function rowDone(p){
-    if (rowDidMarks(p).length) return true;                 /* ② 実際に直した */
-    var tot = rowTotal(p);
-    return tot > 0 && rowLeft(p) === 0;                      /* ① 印を全部押した */
+    /* 🔴🔴 v2.103.0（8月の総点検・2026-09-13）**まだズレが残っている行は、記録があっても片づいたにしない。**
+       ⚠ 前は「直した記録（DID）が1つでもあれば片づいた」だった。すると
+          ・売上日を直した記録がある行の **金額 171円のズレ**（伝票 0785）
+          ・担当を直したのに **あとで元の名前に戻った** 行（伝票 0754）
+          が、どちらも「チェック済み」に隠れて **残り0・書き込みOK** に見えていた。
+       🔴 片づいた＝**押していないズレが0**（rowLeft===0）で、そのうえ「印を押した」か「実際に直した」行。
+          ＝ 直した記録は「何をしたか」を残すためのもの。**ズレが消えたかどうかは、今の中身で毎回見る。** */
+    if (rowLeft(p) > 0) return false;
+    return rowTotal(p) > 0 || rowDidMarks(p).length > 0;
   }
 
   w.pitQMarkKey   = markKey;

@@ -372,7 +372,12 @@
     });
     /* 🔗 v2.8.0 **伝票が別のQに在ることが分かっているものは、残りに数えない。**
        ＝ Qの境目の車は、伝票が在るほうのQで1回見れば済む（二度追いかけない）。 */
-    n += (R.PitFlowだけ || []).filter(function (x) { return !x.別のQ; }).length;
+    /* 🔴🔴 v2.101.0（ゆうた指定 2026-09-13「伝票がない場合はアカでOK」「Q3の分がでたら再度Q3に赤が入る挙動で全然OK」）
+       **数えないのは「別のQで実際に照合できた（別のQ確定）」行だけ。**
+       ◎前まで（v2.8.0）… カード自身の売上日から「伝票は別のQにあるはず」と**推して言えるだけ**でも数えなかった（黄）。
+       ◎いま … 照合はフロントマンの伝票の日付が基準。**伝票が見つからない限りは赤で数える**。
+         月をまたいだ車は、次の月のPDFを入れて照合できた時に消える（多くは伝票を直す対象）。 */
+    n += (R.PitFlowだけ || []).filter(function (x) { return !x.別のQ確定; }).length;
     return n;
   }
   w.pitQNokori = nokoriOf;
@@ -818,7 +823,8 @@
       確定金額: r.金額, 予約番号: r.予約番号, 車体番号: r.車体番号,
       フロント担当: r.フロント, 生: { id: r.カードid },
       別のQ: r.別のQ,                               /* 🔗 v2.8.0 */
-      別のQ確定: !!r.別のQ確定                      /* 🧾 v2.9.1 */
+      別のQ確定: !!r.別のQ確定,                     /* 🧾 v2.9.1 */
+      別のQ先: r.別のQ先 || null                    /* 🟢 v2.101.0 */
     };
   }
 
@@ -913,7 +919,8 @@
     /* 🔗 v2.8.0 **伝票が別のQに在ることが分かっているものは、赤にしない。**
        ＝ Qの境目の車が「伝票が無い車」として毎回赤で出るのを止める（ゆうた 2026-08-25）。
        ⚠ 判定は書き写さない。`pitQMatch` / `pitQCrossLink` が貼った名札を読むだけ。 */
-    if (o.k === 'pit') return (o.x && o.x.別のQ) ? 'yellow' : 'red';
+    /* 🟢 v2.101.0 PitFlowだけの行＝**別のQで照合できた（別のQ確定）なら OK（緑）**。それ以外は赤（推しただけの「別のQ」は黄にしない） */
+    if (o.k === 'pit') return (o.x && o.x.別のQ確定) ? 'okq' : 'red';
     return (o.x && o.x.カード) ? 'yellow' : 'red';
   }
 
@@ -1035,16 +1042,22 @@
     var lv = oneLevel({ x:x, k:kind });
     /* 🔗 v2.8.0 Qの境目の車＝「無い」ではなく「**別のQに在る**」 */
     var 別Q = soft ? s(x.カード別Q) : s(x.別のQ);
+    /* 🟢 v2.101.0 別のQで照合できた PitFlowだけの行＝「そのQで照合済みなので OK」。照合先の番号も出す */
+    var okq = (lv === 'okq');
+    var 先 = (!soft && x.別のQ先) || null;
+    var 先No = (先 && w.pitQRowNo) ? w.pitQRowNo({ soft: { 売上日: 先.売上日, 伝票: 先.伝票 }, pit: { 生: { id: (x.生 && x.生.id) } } }) : '';
+    var 先Q = 先 ? (s(先.label).replace(/^\d+月\s*第(\d)クォーター$/, 'Q$1') || s(先.label)) : '';
     var head = soft ? (c ? (別Q ? 'このQでは実績になっていない' : 'まだ実績になっていない') : 'PitFlow にカードが無い')
-                    : (別Q ? '伝票は別のQにあります' : 'フロントマンに伝票が無い');
+                    : (okq ? ('伝票は ' + (先Q || '別のQ') + ' で照合済み ─ このQで直すところはありません')
+                           : 'フロントマンに伝票が無い');
     var no = soft ? (w.pitQSoftNo ? w.pitQSoftNo(x) : '') : (w.pitQPitNo ? w.pitQPitNo(x) : '');
     var mk = w.pitQOneMarkOf ? w.pitQOneMarkOf(x) : null;
     var S = soft ? x.soft : x;
     var cid = soft ? (c && c.生 && c.生.id) : (x.生 && x.生.id);
-    return '<div class="q-c ' + (lv === 'red' ? 'gone' : 'gone-y') + (mk ? ' is-done' : '') + '">'
+    return '<div class="q-c ' + (lv === 'red' ? 'gone' : (okq ? 'okq' : 'gone-y')) + (mk ? ' is-done' : '') + '">'
       + '<div class="q-c-h">' + noBtn(no)
-      +   '<span class="' + (lv === 'red' ? 'q-c-gone' : 'q-c-gone-y') + '">'
-      +     (lv === 'red' ? '⚠ ' : '') + esc(head) + '</span></div>'
+      +   '<span class="' + (lv === 'red' ? 'q-c-gone' : (okq ? 'q-c-okq' : 'q-c-gone-y')) + '">'
+      +     (lv === 'red' ? '⚠ ' : (okq ? '✓ ' : '')) + esc(head) + '</span></div>'
       + '<div class="q-c-body"><div class="q-c-main">'
       + '<div class="q-c-who">' + esc((soft ? S.顧客名 : S.顧客名) || '（名前なし）')
       +   '<span class="q-c-plate">' + esc(S.ナンバー || 'ナンバーなし')
@@ -1070,16 +1083,42 @@
           ? (c ? '<span class="q-c-g">カードは有る（' + esc(STATE_JA[c.状態] || c.状態) + '）'
                  + (c.返車日 ? '・返車 ' + esc(c.返車日) : '・まだ返車済みにしていない') + '</span>'
                : '<span class="q-c-g bad">PitFlow にカードそのものがありません</span>')
-          : (別Q ? '' : '<span class="q-c-g">PDF に伝票が載っていません</span>'))
-      /* 🔗 v2.8.0 別のQに在るなら、**どこに在るか**をそのまま出す（物差しの言葉のまま） */
-      + (別Q ? '<span class="q-c-g cross">' + esc(別Q) + '</span>' : '')
+          : (okq ? '' : '<span class="q-c-g">PDF に伝票が載っていません</span>'))
+      /* 🔗 v2.8.0 別のQに在るなら、**どこに在るか**をそのまま出す（物差しの言葉のまま）
+         ⚠ v2.101.0 照合できていない PitFlowだけの行では「ヒント」（カードの売上日から推しただけ）と断る */
+      + (別Q ? '<span class="q-c-g cross">' + ((!soft && !okq) ? 'ヒント：' : '') + esc(別Q)
+             + ((!soft && !okq) ? '（そのQ・月のPDFで照合できると消えます）' : '') + '</span>' : '')
       + '</div>'
       + '<div class="q-c-st">' + (soft ? 'フロントマン <b>' + esc(S.受付担当 || '—') + '</b>'
                                        : 'PitFlow <b>' + esc(S.フロント担当 || '—') + '</b>') + '</div>'
       + '</div>'
-      + '<div class="q-act q-c-act">' + (saved ? savedAct({ pit:{ 生:{ id:cid } } }) : oneFix(x, kind, lv, c, cid, mk)) + '</div>'
+      + '<div class="q-act q-c-act">' + (okq ? okqAct(先, 先No, 先Q, saved)
+                                           : (saved ? savedAct({ pit:{ 生:{ id:cid } } }) : oneFix(x, kind, lv, c, cid, mk))) + '</div>'
       + '</div></div>';
   }
+  /* ================================================================
+     🟢🔴 v2.101.0（ゆうた指定 2026-09-13）**別のQで照合済みの PitFlowだけの行＝変更できるボタンを置かない。**
+     🗣「省略表示はわかりにくいから、やっぱりフルサイズでだしてほしい。
+     　　ただし Q3で照合してあるからOK 的なニュアンスをつよくして、特に変更できるボタン等はなくしてほしい」
+     ◎前まで … 黄のカードに「伝票を立てて出し直す」「実績を取り消す」が出ていた＝**直す必要が無いのに直せと言っていた**。
+     ◎いま  … 「◯ で照合済み（Q-######）なので OK」と言い切る。置くのは**見に行くだけ**のボタン1つ（何も変えない）。
+     ================================================================ */
+  function okqAct(先, 先No, 先Q, saved){
+    var h = '<div class="q-fx"><span class="q-act-ok">✓ <b>' + esc(先Q || '別のQ') + ' で照合済み'
+      + (先No ? '（' + esc(先No) + '）' : '') + 'なので OK</b><br>'
+      + '<em>照合はフロントマンの伝票の日付（' + esc(先 ? 先.売上日 : '—') + '）のQで行っています。変更は要りません。</em></span></div>';
+    if (先 && 先.from && !saved){
+      h += '<div class="q-fx"><button class="q-fx-go" onclick="pitQJumpFrom(\'' + esc(先.from) + '\')">' + esc(先Q || '別のQ') + ' のカードを見る</button></div>';
+    }
+    return h;
+  }
+  /* 🟢 v2.101.0 照合先のQへ飛ぶ（見るだけ）。組の並びは期間の始まりで探す */
+  w.pitQJumpFrom = function (from){
+    var U = Q();
+    var i = (U.groups || []).map(function (g) { return s(g.from); }).indexOf(s(from));
+    if (i >= 0 && w.pitQPickGroup) w.pitQPickGroup(i);
+  };
+
   function oneFix(x, kind, lv, c, cid, mk){
     var open = cid ? '<button class="q-fx-go" onclick="pitInspectGo(\'' + esc(cid) + '\')">' : '';
     if (kind === 'pit'){

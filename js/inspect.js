@@ -80,6 +80,10 @@
   function cats(){ return window.PIT_INSPECT_CATS || []; }
   function levels(){ return window.PIT_INSPECT_LEVELS || []; }
   function markDefs(){ return window.PIT_INSPECT_MARKS || []; }
+  /* 🆕 v2.93.0 札の言い方。**規則が okLabel を持っていれば、「確認した」をその言い方にする**
+     （T02＝「完TELなしでOK」）。⚠ 中身は同じ 'ok'。言い方をここで綴らない＝規則の表が持つ。 */
+  function markLabel(m, f){ return (m && m.judge && f && f.okLabel) ? f.okLabel : (m ? m.label : ''); }
+  function markNote(m, f){ return (m && m.judge && f && f.okNote) ? f.okNote : (m ? m.note : ''); }
   function rules(){ return window.PIT_INSPECT_RULES || []; }
   function ruleById(id){ return rules().filter(function(r){ return r.id === id; })[0] || {}; }
   function levelOf(id){ return levels().filter(function(l){ return l.id === id; })[0] || {}; }
@@ -493,7 +497,7 @@
           +   noBtn
           +   '<div class="ins-row-m">'
           +     '<div class="ins-row-who">' + who + badge + jb
-          +       (mk ? '<span class="ins-badge">' + esc(mk.label) + '</span>' : '') + okby + '</div>'
+          +       (mk ? '<span class="ins-badge">' + esc(markLabel(mk, f)) + '</span>' : '') + okby + '</div>'
           +     (sub.length ? '<div class="ins-row-sub">' + sub.join('　/　') + '</div>' : '')
           +     '<div class="ins-row-txt">' + esc(f.text) + '</div>'
           +   '</div>'
@@ -512,8 +516,8 @@
     markDefs().forEach(function (m) {
       if (m.judge && !f.judge) return;
       h += '<button class="ins-mk' + (f.mark === m.id ? ' on' : '') + (m.judge ? ' judge' : '') + '"'
-         +   ' title="' + esc(m.note) + '"'
-         +   ' onclick="pitInspectMarkUI(\'' + esc(f.key) + '\',\'' + m.id + '\')">' + esc(m.label) + '</button>';
+         +   ' title="' + esc(markNote(m, f)) + '"'
+         +   ' onclick="pitInspectMarkUI(\'' + esc(f.key) + '\',\'' + m.id + '\')">' + esc(markLabel(m, f)) + '</button>';
     });
     h += '</div></div>';
     return h;

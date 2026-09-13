@@ -155,19 +155,36 @@
      🔴 月の覚えはここ1つ（`UI.ym`）。クォーターチェックの画面は自分では動かさない。
      ⚠ これが無いと、7月のPDFを入れても月バーが8月のままになり、
         Qの箱が「8月ぶん4つ」＋「7月ぶん4つ」で**8個並んでしまう**（実際そうなっていた）。 */
+  /* 🔴🔴 v2.97.0（2026-09-13）**ここで PDF を捨てない。**
+     ◎前まで … 月が違えば `pitQClearForMonth` を呼んでいた＝**読んだばかりのPDFの組を丸ごと捨てていた。**
+       呼ぶのは quarter.js の readFile だけで、**組を作った直後**に呼ばれる。
+       ＝ 月バーが9月のまま 8月〜9月のPDFを入れると、8月へ合わせた瞬間にPDFが消えていた。
+     ◎いま … 月の覚えを動かすだけ。直後に readFile が buildMonth でその月をそろえる。 */
   window.pitInspectGoYm = function (y){
     y = String(y == null ? '' : y).slice(0, 7);
     if (!/^\d{4}-\d{2}$/.test(y)) return;
-    if (UI.q && UI.q.ym && UI.q.ym !== y && window.pitQClearForMonth) window.pitQClearForMonth(y);
     UI.ym = y;
     if (UI.q){ UI.q.ym = y; UI.q.saved = null; UI.q.savedId = ''; }
   };
   window.pitInspectMonth = function (n){
-    if (!+n){ UI.ym = ymNow(); }
-    else {
-      var p = ym().split('-');
-      var d = new Date(+p[0], (+p[1]) - 1 + (+n), 1);
-      UI.ym = d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1);
+    if (!+n){ moveMonth(ymNow()); return; }
+    var p = ym().split('-');
+    var d = new Date(+p[0], (+p[1]) - 1 + (+n), 1);
+    moveMonth(d.getFullYear() + '-' + (d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1));
+  };
+  /* 🗓 v2.97.0 「9月を見る」のボタン（クォーターチェックの案内の1行）から、月を名指しで動かす */
+  window.pitInspectSetYm = function (y){
+    y = String(y == null ? '' : y).slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(y)) return;
+    moveMonth(y);
+  };
+  function moveMonth(y){
+    UI.ym = y;
+    /* 🗓🔴 v2.97.0 **いま読んだPDFがその月にもまたがっていれば、PDFは持ったまま**その月を組み直す。
+       判断と組み直しは quarter.js の `pitQMonthMove` 1本（true＝引き取った）。 */
+    if (UI.mode === 'quarter' && window.pitQMonthMove && window.pitQMonthMove(UI.ym)){
+      renderInspect();
+      return;
     }
     /* クォーターチェックの画面も同じ月を見る（覚えは1つ）
        🔴 v2.10.0（ゆうた「PDFを読み込むまで古いデータが出てたりもしてる」）

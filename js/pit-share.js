@@ -1484,7 +1484,8 @@ w.pitDivisionColor = pitDivisionColor;
   /* 🔴 v2.56.0 'repass' … **再検合格で完了**（一度落ちたが、その場で直して同じ回で受かった）。
      ⚠ 'done'（一発合格）と分けたのは、**押し直した時に印を確実に消すため**。
         1つの指示に旗を足す形にすると、一発合格で押し直しても前の印が残る道ができる。 */
-  var PIT_SHAKEN_ACTS = ['done', 'repass', 'recheck', 'flip', 'cancel', 'reopen', 'reedit', 'redrop'];
+  /* ✓ v2.102.0 'doneedit' … **合格（済）の記録を、あとから直す**（日・時間帯・担当・陸運局・R・一発／再検合格・落ちた所） */
+  var PIT_SHAKEN_ACTS = ['done', 'repass', 'recheck', 'flip', 'cancel', 'reopen', 'reedit', 'redrop', 'doneedit'];
   w.PIT_SHAKEN_ACTS = PIT_SHAKEN_ACTS;
 
   /* 🔴🔴 v2.88.0（2026-09-11）**落ちた所の「よく使う言葉」も、ここ1本。**
@@ -1567,6 +1568,40 @@ w.pitDivisionColor = pitDivisionColor;
       return { insp: s, act: act,
                log: '車検 不合格の記録を取り消した（' + _shkMD(row.date) + ' ' + _shkSlotT(row.slot) + '）'
                     + (back ? '／予定に戻した' : '') };
+    }
+
+    /* ══ ✓ v2.102.0（ゆうた指定 2026-09-13）**合格（済）の記録を直す** ══
+       🗣「合格しちゃってる場合取り消すしかない。合格も出し方を再検風にして、合格後にも変更を出来るようにしたい」
+       ◎opt.at    … 開いた時の { date, slot }。**今の合格の日・時間帯と合わなければ何もしない**（再検と同じ関門）
+       ◎opt.patch … { date, slot, staff, office, officeName, round, kind:'done'|'repass', note }
+       ⚠ 取り消しはここに作らない＝今までの 'reopen'（予定に戻す）をそのまま使う。
+       ⚠ 行った日を動かしたら「決定」も同じ日に揃える（車検予定の画面は決定の日で並べるため）。 */
+    if (act === 'doneedit'){
+      if (s.result !== 'done') return null;
+      var at3 = opt.at || {};
+      var cd = s.resultDate || s.decided || '';
+      var cs = ((s.resultSlot || s.decidedSlot) === 'pm') ? 'pm' : 'am';
+      if (at3.date != null && String(at3.date) !== cd) return null;
+      if (at3.slot != null && (at3.slot === 'pm' ? 'pm' : 'am') !== cs) return null;
+      var p3 = opt.patch || {};
+      if (p3.date != null && /^\d{4}-\d{2}-\d{2}$/.test(String(p3.date))) cd = String(p3.date);
+      if (p3.slot != null) cs = (p3.slot === 'pm') ? 'pm' : 'am';
+      s.resultDate = cd; s.resultSlot = cs; s.decided = cd; s.decidedSlot = cs;
+      if (p3.staff != null) s.resultStaff = String(p3.staff);
+      if (p3.office != null){
+        var of3 = String(p3.office || '');
+        s.officeName = of3 ? String(p3.officeName || (of3 === s.office ? s.officeName : '') || '') : '';
+        s.office = of3;
+      }
+      if (p3.round != null){ var r3 = Number(p3.round || 0); s.round = (r3 >= 1 && r3 <= 4) ? r3 : 0; }
+      if (p3.kind === 'done' || p3.kind === 'repass') s.repass = (p3.kind === 'repass');
+      /* 🔴 一発合格に直したら「落ちた所」も必ず消す（v2.56.0 と同じ＝印を残さない） */
+      if (!s.repass) s.repassNote = '';
+      else if (p3.note != null) s.repassNote = String(p3.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
+      return { insp: s, act: act,
+               log: '車検 合格の記録を直した' + (s.repass ? '（再検合格）' : '（一発合格）') + ' ' + _shkMD(cd) + ' ' + _shkSlotT(cs)
+                    + '（回送:' + (s.resultStaff || '—') + '／' + (s.officeName || '陸運局未定')
+                    + '／' + (s.round ? s.round + 'R' : 'R未定') + '）' + (s.repassNote ? '／' + s.repassNote : '') };
     }
 
     var today = opt.today || _shkToday();

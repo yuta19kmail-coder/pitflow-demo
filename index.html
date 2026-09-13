@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.101.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.102.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="css/work-content.css?v=9">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=2d7b23ed">
-<link rel="stylesheet" href="css/card-view.css?v=43">
+<link rel="stylesheet" href="css/card-view.css?v=44">
 <link rel="stylesheet" href="css/card-hover.css?v=26">
 <link rel="stylesheet" href="css/sales.css?v=8">
 <link rel="stylesheet" href="css/shaken.css?v=25">
@@ -132,7 +132,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.101.0</div>
+    <div class="login-ver">v2.102.0</div>
   </div>
 </div>
 
@@ -146,7 +146,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.101.0</span>
+    <span class="ver">v2.102.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -878,7 +878,7 @@
 <!-- ===== JS ===== -->
 <script src="js/coreflow-icons.js?v=9ae48aea"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
-<script src="js/pit-share.js?v=30"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
+<script src="js/pit-share.js?v=31"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=8d7c4b2d"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
 <script src="js/errcode-pit.js?v=24"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
@@ -911,7 +911,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-detail.js?v=150"></script>
 <script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=76"></script>
+<script src="js/card-view.js?v=77"></script>
 <script src="js/cover-print.js?v=16"></script>
 <script src="js/avail.js?v=8"></script>
 <script src="js/card-tabs.js?v=15"></script>

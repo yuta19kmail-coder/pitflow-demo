@@ -1187,8 +1187,15 @@
     var h = '';
     kinds.forEach(function (k) {
       var mk = w.pitQMarkOf ? w.pitQMarkOf(k.kind, p.soft, id) : null;
+      /* ⏳ v2.104.0 「伝票を直した」を押したのに、そのあと読んだ伝票でもズレが同じ＝印は効いていない */
+      var old = (!mk && w.pitQStaleMarkOf) ? w.pitQStaleMarkOf(k.kind, p.soft, id) : null;
       h += '<div class="q-fx' + (mk ? ' is-done' : '') + '">';
       h += '<b class="q-fx-k">' + esc(k.kind) + '</b>';
+      if (old){
+        h += '<span class="q-fx-stale" title="印を押したあとに読んだ伝票でも、まだ同じズレがあります">⚠ '
+           + esc(s(old.at).slice(5, 10).replace('-', '/')) + ' に「伝票を直した」を押しましたが、'
+           + esc(s(p.soft.読んだ).slice(5, 10).replace('-', '/')) + ' に読んだ伝票はまだ変わっていません</span>';
+      }
       if (mk){
         /* 🔴 押しても**消さない**。誰がいつ決めたかを残す（データチェックの「確認した」と同じ作法）。 */
         h += '<span class="q-fx-done">' + (k.保つ ? esc(k.label || 'このままでよい') : '伝票を直した')
@@ -1322,6 +1329,9 @@
       return w.pitQLoadRun(id).then(function (r) {
         var den = (r && Array.isArray(r.伝票)) ? r.伝票 : [];
         if (!den.length){ U.月に無い[periodKey(x)] = 1; return null; }
+        /* ⏳ v2.104.0 前の版で残した伝票には読んだ時刻が無い。**その回を走らせた日時**で補う
+           （開き直しただけでは走らせた日時は変わらない＝v2.10.0 の決めごと） */
+        den.forEach(function (d) { if (d && !d.読んだ) d.読んだ = s(r.走らせた日時); });
         var pit = w.pitQCollect({ from: x.from, to: x.to }).明細;
         return { no: x.no, label: x.label, from: x.from, to: x.to, 全部: true,
                  soft: den, res: w.pitQMatch(den, pit, { from: x.from, to: x.to }),
@@ -1560,10 +1570,13 @@
         if (w.renderInspect) renderInspect();
         return;
       }
+      /* ⏳ v2.104.0 いつ読んだ伝票かを1行ずつ付ける（「伝票を直した」の印がそのあとに確かめられたかを見るため） */
+      var 読んだ時 = (new Date()).toISOString();
       var soft = r.伝票.map(function (x) {
         return { 売上日:x.売上日, 伝票:x.伝票, ナンバー:x.ナンバー, 顧客名:x.顧客名,
                  車種:x.車種, 金額:x.比べる金額, 受付担当:x.受付担当,
                  /* 🚗🧾 v2.2.0 書き込みに使う（車体番号と伝票の中身） */
+                 読んだ: 読んだ時,
                  車台:x.車台, 明細:x.明細, 明細が合う:x.明細が合う,
                  法定:x.法定, 原価:x.原価, 消費税:x.消費税, 伝票計:x.伝票計 };
       });

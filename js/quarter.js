@@ -505,7 +505,9 @@
       +   '<span class="q-pq-l"><span class="q-pq-t">' + hd + '</span>'
       +     (r
              /* 🔢 v2.77.0 ここの「+◯円」も消した（いま読んだ組と同じ形にそろえる） */
-             ? '<span class="q-pq-d">' + esc(s(r.走らせた日時).slice(0, 10)) + ' に実施</span>'
+             /* 🚪 v2.96.0 ここに来るのは**伝票を残していない古い形式**だけ（組み直せない）。
+                ＝ 件数は**残した時のもの**。いまの数ではないことを言う（黙って古い数を出さない）。 */
+             ? '<span class="q-pq-d">' + esc(s(r.走らせた日時).slice(0, 10)) + ' に実施（残した時の件数）</span>'
              : '<span class="q-pq-d">まだ実施していません</span>')
       +   '</span>'
       +   '<span class="q-pq-r">' + (r ? (ok2 ? 'OK' : '残 <b>' + nok2 + '</b>件') : '<em>まだ</em>') + '</span>'
@@ -1346,6 +1348,50 @@
     });
   };
 
+  /* ================================================================
+     🚪🔴 v2.96.0（ゆうた指定 2026-09-13）**クォーターチェックを押した時＝その月を、いまのデータで組み直す。**
+     ----------------------------------------------------------------
+     🗣「Qの枠をクリックして再度考えさせると0になる。あってるか不安になる」
+     ◎前まで … 枠の「残 ◯件」は**保存した時の件数**（`x.run.直す件数`）。押すまで組み直さなかった。
+     ◎いま  … 押した時に Q1〜Q4 の**残してある伝票を全部読み直し**、いまの PitFlow と突き合わせてから出す。
+       ＝ 枠の件数は `pitQNokori(g.res)`（組み直した生の数）。**押す前と後で数字が変わらない。**
+     🔴 呼ぶのは inspect.js の画面だけ（「この月の結果をまだ何も持っていない時」）。
+     ⚠ いま読んだPDFの組は捨てない（PDFが最優先・buildMonth の決めごと）。捨てるのは**保存から借りた組だけ**。
+     ⚠ 残りがあるQを自動で開く。無ければいちばん新しいQ。1つも無ければ何も開かない（PDFを入れる案内のまま）。
+     ⚠ 読みに行く書類は、その月の Q1〜Q4 の4つだけ。
+     ================================================================ */
+  w.pitQFreshMonth = function (ym){
+    var U = Q();
+    if (U.busy) return;
+    ym = s(ym).slice(0, 7);
+    if (ym) U.ym = ym;
+    U.res = null; U.soft = null; U.saved = null; U.savedId = ''; U.再生 = null; U.gi = -1; U.viewer = false;
+    U.groups = (U.groups || []).filter(function (g) { return g.出どころ !== '保存'; });
+    U.月そろえた = ''; U.月に無い = {};
+    U.list = null; U.listBusy = true;              /* 一覧も読み直す（planRow が二重に読みに行かないように印を立てる） */
+    U.busy = 'いまのデータで、この月のクォーターを考えています…';
+    var list = w.pitQLoadList ? w.pitQLoadList() : Promise.resolve([]);
+    list.catch(function () { return []; }).then(function (l) {
+      U.list = l || []; U.listBusy = false;
+      return buildMonth(U, ym || monthOf(U, ''), { force: true });
+    }).then(function () {
+      U.busy = '';
+      var gs = U.groups || [], idx = -1;
+      gs.forEach(function (g, i) { if (idx < 0 && g.res && w.pitQNokori && w.pitQNokori(g.res) > 0) idx = i; });
+      if (idx < 0 && gs.length) idx = gs.length - 1;
+      if (idx >= 0){
+        U.gi = idx; applyGroup(U); U.tab = 'data';
+        var g = gs[idx];
+        U.再生 = (g.出どころ === '保存') ? (g.保存 || { at:'', by:'', pdf:'' }) : null;
+      }
+      if (w.renderInspect) renderInspect();
+    }).catch(function (e) {
+      U.busy = ''; U.listBusy = false; if (U.list == null) U.list = [];
+      if (w.pitToast) pitToast('クォーターを組み直せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.renderInspect) renderInspect();
+    });
+  };
+
   /* 🔴 v2.10.0 月が変わった＝**前の月の結果は捨てる。**
      ＝ 月バーを動かしても数字が残っていて、それを今月のものだと思ってしまう
        （ゆうた「読み込んだ後に、PDFを読み込むまで古いデータが出てたりもしてる」）。
@@ -1616,6 +1662,8 @@
     U.元のPDF = null; U.印刷中 = '';
     U.saved = null; U.savedId = ''; U.savedAt = '';
     U.再生 = null;
+    /* 🚪 v2.96.0 空にした＝次に描く時に、いまのデータで組み直す（inspect.js が groups==null を見て呼ぶ） */
+    U.月そろえた = ''; U.月に無い = {};
     if (w.renderInspect) renderInspect();
     if (w.pitToast) pitToast('画面を空にしました（残してある結果はそのままです）');
   };

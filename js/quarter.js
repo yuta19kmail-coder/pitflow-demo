@@ -504,6 +504,7 @@
         +       (保存 ? (esc(s(g.保存 && g.保存.at).slice(0, 10)) + ' に実施（残してある伝票 ' + g.soft.length + '枚）')
                       : ('このPDF ' + g.soft.length + '枚'))
         +     '</span>'
+        +     wBox(g, nok, 保存)
         /* 🔢 v2.77.0 Qの箱の「+◯円」を消した（右の「残 ◯件」だけで見る） */
         +   '</span>'
         +   '<span class="q-pq-r">' + (okQ ? 'OK' : '残 <b>' + nok + '</b>件') + '</span>'
@@ -529,6 +530,18 @@
       + (r ? '<button class="q-pq-x" title="この結果を消して「まだ」に戻す"'
              + ' onclick="pitQDropRun(\'' + x.from + '\',\'' + x.to + '\')">×</button>' : '')
       + '</div>';
+  }
+
+  /* 📒 v2.105.0（ゆうた指定 2026-09-13）**Qの箱に「伝票の書き込み 37/39」。** 数えるのは quarter-write.js の1本
+     （お客様の車のデータから＝画面を閉じても消えない）。まだの分があれば、次に何をすれば書けるかを言う。 */
+  function wBox(g, nok, 保存){
+    if (!g || !g.res || !w.pitQWriteCount) return '';
+    var wc = w.pitQWriteCount(g.res);
+    if (!wc.対象) return '';
+    var left = wc.未.length;
+    var how = !left ? '' : (nok > 0 ? '・残りを0にすると書けます'
+                                    : (保存 ? '・PDFを入れ直すと書けます' : '・下の「書き込む」で書けます'));
+    return '<span class="q-pq-w' + (left ? ' ng' : '') + '">伝票の書き込み ' + wc.書けた + '/' + wc.対象 + esc(how) + '</span>';
   }
 
   function planRow(U){

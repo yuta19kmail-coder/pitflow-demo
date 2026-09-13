@@ -53,7 +53,6 @@
   function t(v){ return s(v).trim(); }
   function num(v){ v = +v; return isFinite(v) ? v : 0; }
   function yen(n){ return num(n).toLocaleString(); }
-  var CAP = 800;
 
   function co(){ try { return (w.fb && w.fb.company) ? w.fb.company() : null; } catch (e) { return null; } }
   function cloud(){ return !!(w.PIT_CLOUD && co()); }
@@ -131,41 +130,82 @@
     return (m && isStale(m, soft)) ? m : null;
   }
 
+  /* 🗄🔴🔴 v2.105.0（ゆうた指定 2026-09-13）**印は1件ずつ書く。同時に押しても消し合わない／上限なし。**
+     ◎前の作り … 書類 `pitSettings/qmarks` の `一覧`（配列）を、**開いた時に1回読んで、押すたびに丸ごと上書き**。
+       ＝ 2人が同じ時間にチェックすると、**あとから保存した人が、先の人の印を黙って消す**
+         （v2.9.8 で直した「一覧の上書き合戦」と同じ形）。さらに 800件を超えると古い印から黙って消えた。
+     ◎いまの作り … 新しい書類 `pitSettings/qmarks-map` の **`印`（鍵 → 1件）の地図**に、**押した1件だけを merge で書く**。
+       ・外した時も**消した記録（`消した: true`）を1件書く**＝古い一覧に残っている同じ印が、よみがえらない
+       ・読む時は **新しい地図＋前の一覧** を合わせて、**鍵ごとに `at` がいちばん新しいもの**を採る
+     ⚠ なぜ別の書類か：まだ新しくなっていない端末は `qmarks` を**書類ごと** set する。同じ書類に地図を置くと、
+        その1回で**地図ごと消える**。別の書類なら、古い端末が何をしても新しい印は消えない。
+     ⚠ 前の一覧（`qmarks`）は**読むだけで書き換えない**（全部の端末が新しくなれば、ただの古い控えになる）。
+     ⚠ 🔴 Firestore のルールは1文字も触っていない（`pitSettings/{id}` はどの名前でも読み書きできる）。
+     ⚠ 大きさ：1件 約250バイト・書類は1MBまで＝およそ4,000件（1か月 40件なら8年ぶん）。3,000件を超えたら知らせる。
+     ⚠ 手元の `_pitQMarks`（配列）は今までどおり＝読む側（markOf など）は1文字も変えていない。 */
+  var DOC_MAP = 'qmarks-map';
+  function colRef(){ var c = co(); return c ? c.collection('pitSettings') : null; }
+  function newer(a, b){ return t(a && a.at) > t(b && b.at); }
+
   function loadMarks(){
-    var c = co();
-    if (!cloud() || !c){ w._pitQMarks = []; return Promise.resolve([]); }
-    return c.collection('pitSettings').doc('qmarks').get().then(function (snap) {
-      w._pitQMarks = (snap.exists && snap.data() && snap.data().一覧) || [];
-      return w._pitQMarks;
+    var col = colRef();
+    if (!cloud() || !col){ w._pitQMarks = []; return Promise.resolve([]); }
+    return Promise.all([
+      col.doc(DOC_MAP).get(),
+      col.doc('qmarks').get().catch(function () { return null; })     /* 前の一覧（読むだけ） */
+    ]).then(function (r) {
+      var d = (r[0] && r[0].exists && r[0].data()) || {};
+      var map = (d.印 && typeof d.印 === 'object') ? d.印 : {};
+      var old = (r[1] && r[1].exists && r[1].data() && r[1].data().一覧) || [];
+      var best = {};
+      (Array.isArray(old) ? old : []).forEach(function (m) {
+        if (m && m.key && (!best[m.key] || newer(m, best[m.key]))) best[m.key] = m;
+      });
+      Object.keys(map).forEach(function (k) {
+        var m = map[k];
+        if (m && m.key && (!best[m.key] || !newer(best[m.key], m))) best[m.key] = m;   /* 同じ時刻なら新しい地図を採る */
+      });
+      var list = Object.keys(best).map(function (k) { return best[k]; })
+        .filter(function (m) { return !m.消した; })
+        .sort(function (a, b) { return newer(a, b) ? -1 : (newer(b, a) ? 1 : 0); });
+      if (Object.keys(map).length > 3000) console.warn('[qmarks] 印の地図が ' + Object.keys(map).length + '件。書類の上限（1MB）に近づいたら月ごとに分けること');
+      w._pitQMarks = list;
+      return list;
     }).catch(function () { w._pitQMarks = []; return []; });
   }
 
-  /* ⚠ 練習用サイト（本番でない）では**この端末の中だけ**に置く。
+  /* 1件だけ書く。⚠ 練習用サイト（本番でない）では**この端末の中だけ**に置く。
      🔴 ただし「残った」と嘘をつかない＝戻り値 false で伝え、画面がそう書く。
         （黙って消えるのがいちばん困る。2026-08-13 の決めごと） */
-  function saveMarks(){
-    var c = co();
-    var list = marks().slice(0, CAP);
-    if (!cloud() || !c) return Promise.resolve(false);
-    return c.collection('pitSettings').doc('qmarks').set({ 一覧: list }).then(function () { return true; });
+  function writeOne(m){
+    var col = colRef();
+    if (!cloud() || !col) return Promise.resolve(false);
+    var one = {}; one[m.key] = m;
+    return col.doc(DOC_MAP).set({ 印: one }, { merge: true }).then(function () { return true; });
+  }
+  function putMark(m){
+    w._pitQMarks = marks().filter(function (x) { return x && x.key !== m.key; });
+    w._pitQMarks.unshift(m);
+    return writeOne(m);
+  }
+  /* 外す＝**消した記録を1件書く**（前の一覧に同じ印が残っていても、こちらが新しいので採られない） */
+  function dropMark(key){
+    w._pitQMarks = marks().filter(function (x) { return x && x.key !== key; });
+    return writeOne({ key: key, 消した: true, at: (new Date()).toISOString(), by: me() });
   }
 
   /* 印を付ける／外す。⚠ **消さない**＝外した記録も残さないが、付けた記録は誰がいつを持つ。 */
   function mark(kind, soft, pit, on){
     var cardId = t(pit && pit.生 && pit.生.id);
     var k = markKey(kind, soft, cardId);
-    var list = marks().filter(function (x) { return x && x.key !== k; });
-    if (on){
-      list.unshift({
+    var save = on ? putMark({
         key: k, 種類: t(kind),
         売上日: t(soft && soft.売上日), 伝票: t(soft && soft.伝票),
         ナンバー: t(soft && soft.ナンバー), お客様: t(soft && soft.顧客名),
         カードid: cardId,
         at: (new Date()).toISOString(), by: me()
-      });
-    }
-    w._pitQMarks = list;
-    return saveMarks().then(function (saved) {
+      }) : dropMark(k);
+    return save.then(function (saved) {
       var c = card(cardId);
       if (c && w.logFlow){
         logFlow(c, on ? ('整備ソフト側を直した（' + t(kind) + '／伝票 ' + t(soft && soft.伝票) + '）'
@@ -414,8 +454,8 @@
      無くても今までどおり動く（番号だけ残る）。 */
   function oneMark(no, on, x){
     var k = oneKey(no);
-    var list = marks().filter(function (m) { return m && m.key !== k; });
-    if (on) list.unshift({
+    if (!on) return dropMark(k);
+    return putMark({
       key: k, 種類: '確認した', 番号: t(no),
       売上日: t((x && x.soft && x.soft.売上日) || (x && x.数える日)),
       伝票: t(x && x.soft && x.soft.伝票),
@@ -424,8 +464,6 @@
       内容: '確認した（片方にしか無いが、見て納得した）',
       at: (new Date()).toISOString(), by: me()
     });
-    w._pitQMarks = list;
-    return saveMarks();
   }
 
   /* ================================================================
@@ -447,16 +485,13 @@
     var cardId = t(p && p.pit && p.pit.生 && p.pit.生.id);
     var soft = (p && p.soft) || {};
     var k = didKey(kind, soft, cardId);
-    var list = marks().filter(function (m) { return m && m.key !== k; });
-    list.unshift({
+    return putMark({
       key: k, 種類: t(kind), 直した: true, 内容: t(内容),
       売上日: t(soft.売上日), 伝票: t(soft.伝票),
       ナンバー: t(soft.ナンバー), お客様: t(soft.顧客名),
       カードid: cardId, 番号: pairNo(p),
       at: (new Date()).toISOString(), by: me()
     });
-    w._pitQMarks = list;
-    return saveMarks();
   }
 
   /* その行に「まだ片づいていないズレ」がいくつ残っているか。
@@ -526,6 +561,7 @@
   w.pitQMarkOf    = markOf;
   w.pitQStaleMarkOf = staleMarkOf;   /* ⏳ v2.104.0 効かなくなった「伝票を直した」の印 */
   w.pitQLoadMarks = loadMarks;
+  w.pitQMarksDoc  = DOC_MAP;      /* 🗄 v2.105.0 印の地図の書類名（見張り用） */
   w.pitQMark      = mark;
   w.pitQFixKinds  = fixKinds;
   w.pitQKeepKinds = keepKinds;    /* 🗓 v2.2.0 実績日の「このままでよい」 */

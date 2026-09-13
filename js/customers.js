@@ -595,7 +595,7 @@
         c.perVisit=false; c.vehId=v.id;
         c.plate=v.plate||c.plate; c.maker=v.maker||c.maker; c.car=v.car||c.car;
       }
-      if(v.boardId)c.boardId=v.boardId; if(v.division)c.division=v.division; if(v.frontStaff)c.frontStaff=v.frontStaff; if(v.karteNo)c.karteNo=v.karteNo;
+      if(v.boardId)c.boardId=v.boardId; if(v.division)c.division=v.division; if(v.frontStaff){c.frontStaff=v.frontStaff; c.frontStaffId=v.frontStaffId||'';} if(v.karteNo)c.karteNo=v.karteNo;   /* 🔴 v2.103.0 担当は番号ごと */
     }
     renderCardForm(c);
   };
@@ -1487,7 +1487,7 @@
            カルテNo.・担当・課・区分だけ引き継ぐ。 */
         if(isPerVisit(v)){ over.perVisit=true; over.vehId=v.id; over.plate=''; over.maker=''; over.car=''; }
         else { over.plate=v.plate||''; over.maker=v.maker||''; over.car=v.car||''; over.vehId=v.id; }
-        if(v.boardId)over.boardId=v.boardId; if(v.division)over.division=v.division; if(v.frontStaff)over.frontStaff=v.frontStaff; if((v.karteNo||'').trim())over.karteNo=v.karteNo.trim();
+        if(v.boardId)over.boardId=v.boardId; if(v.division)over.division=v.division; if(v.frontStaff){over.frontStaff=v.frontStaff; over.frontStaffId=v.frontStaffId||'';}   /* 🔴 v2.103.0 担当は番号ごと */ if((v.karteNo||'').trim())over.karteNo=v.karteNo.trim();
       }
     }
     _openReserveWith(over);

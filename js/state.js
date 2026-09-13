@@ -585,10 +585,11 @@ function pitUnitPrice(team){
     const done = (state.cards || []).filter(function(c){
       /* 🔴 v1.99.0 売上なしでアーカイブした車は平均単価の材料にしない（金額が残っていても実績ではない） */
       if (window.pitCardNoSale && pitCardNoSale(c)) return false;
-      return c.boardId === team && c.status === 'returned' && c.returnDate && c.returnDate >= since && c.amountFinal > 0;
+      return c.boardId === team && c.status === 'returned' && c.returnDate && c.returnDate >= since && Number(c.amountFinal) > 0;
     });
     if (done.length >= 10){
-      const sum = done.reduce(function(a, c){ return a + c.amountFinal; }, 0);
+      /* 🔢 v2.103.0 金額が文字で入っているカードがあると連結になる（839億円の事故）。必ず数にしてから足す */
+      const sum = done.reduce(function(a, c){ return a + Number(c.amountFinal); }, 0);
       return Math.round(sum / done.length);
     }
   } catch (e) {}

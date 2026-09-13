@@ -466,9 +466,96 @@
   /* ==================================================================
      ボードのHTML
      ================================================================== */
+  /* ==================================================================
+     🏁🔴 v2.106.0（ゆうた指定 2026-09-13）**リースアップを作業予定ボードに出す。**
+     ------------------------------------------------------------------
+     🗣「作業予定と同じように、近づいてきたら日ビューにして締め切りを設定」
+     🗣「作業予定カードにも入る（作業ではないから確定日で過ぎたら、予定通りリースアップでアーカイブする みたいなボタン）」
+     🗣（いつから）「2ヵ月前から案内　ただし　わかればもっと手前から入力は出来るように」
+     🗣（アーカイブ）「その車を『引退』にする」
+     ◎出す期間 … リースアップ日（確定→無ければ暫定）の **2ヶ月前から**。確定日は日ビューのマスや設定の窓でいつでも入れられる。
+     ◎状態
+       暫定・まだ先     … 警告「確定日を決めてください」＋［日を決める］
+       暫定・過ぎた     … 赤「暫定の日を過ぎています」＋［日を決める］
+       確定・まだ先     … 「確定済み」＋［日ビューで見る］
+       確定・当日から   … いちばん上「予定通りリースアップでアーカイブ」＝**引退にする**（記録は残る）
+     🔴 車検の行（rows / buildRow）には混ぜない。**計算の目標（pitLoanerMaintPlans）とは別物**なので、
+        月カレンダーの札・日ビューのメニュー（plansFor）に入り込まないよう、ボードでだけ足す。
+     ================================================================== */
+  function leaseRows(td){
+    td = td || today();
+    var out = [];
+    vehicles().forEach(function(v){
+      if (!v || v.retired || !v.lease) return;
+      var end = w.pitLeaseEnd ? w.pitLeaseEnd(v) : String(v.leaseUpFixed || v.leaseUp || '');
+      if (!end) return;
+      var from = ymAdd(ymOf(end), -2) + end.slice(7);          /* 2ヶ月前の同じ日 */
+      if (td < from) return;
+      var fixed = !!v.leaseUpFixed, d = daysBetween(td, end);
+      var level, msg, cls = 'g';
+      if (fixed && td >= end){ level = 'done'; msg = 'リースアップ日を迎えました。車を返したら「予定通りリースアップでアーカイブ」を押してください'; }
+      else if (!fixed && td > end){ level = 'bad'; cls = 'b'; msg = '🚨 暫定のリースアップ日を過ぎています（' + (-d) + '日）。日を決めて確定してください'; }
+      else if (!fixed){ level = 'warn'; msg = 'リースアップ日（暫定）が近づいています。日ビューで確定日を決めてください'; }
+      else { level = 'go'; msg = '確定済み。この日から先は代車カレンダーでグレーになり、貸出には警告が出ます'; }
+      out.push({ lease:true, veh:v, vehicleId:v.id, isLoaner:isLoaner(v), work:'lease', workLabel:'リースアップ',
+                 level:level, msg:msg, msgCls:cls, end:end, fixed:fixed, days:d, sortKey:end,
+                 plan:{ ym:ymOf(end), months:[ymOf(end)], dueDate:end } });
+    });
+    return out;
+  }
+  function sortBoard(list){
+    var rank = { done:0, bad:1, warn:2, doing:3, go:4, idle:5 };
+    return list.sort(function(a, b){
+      return (rank[a.level] - rank[b.level]) || (String(a.sortKey) < String(b.sortKey) ? -1 : 1);
+    });
+  }
+  function leaseRowHtml(r){
+    var v = r.veh;
+    return '<div class="mb-row mb-' + r.level + ' mb-lease">'
+      + '<div class="mb-veh"><div class="mb-nm">' + esc(vehName(v)) + '</div>'
+      + '<div class="mb-no">' + (r.isLoaner ? ('代車' + esc(vehNo(v))) : '社用車') + '</div>'
+      + '<span class="mb-kind mb-k-lease">🏁 リースアップ</span></div>'
+      + '<div class="mb-mid"><div class="mb-line">'
+      + '<span class="mb-due">' + (r.fixed ? '確定 ' : '暫定 ') + esc(r.end) + '</span>'
+      + '<span>' + (r.days >= 0 ? ('あと' + r.days + '日') : ((-r.days) + '日過ぎ')) + '</span>'
+      + ((r.fixed && v.leaseUp && v.leaseUp !== v.leaseUpFixed) ? '<span>（暫定は ' + esc(v.leaseUp) + '）</span>' : '')
+      + '</div>'
+      + '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>'
+      + '</div><div class="mb-act">'
+      + (r.level === 'done'
+          ? '<button class="vh-btn mb-done" onclick="flLeaseArchive(\'' + v.id + '\')"><i data-ic=box data-ics=16></i> 予定通りリースアップでアーカイブ</button>'
+          : '<button class="vh-btn" onclick="flMaintGoto(\'' + v.id + '\',\'' + ymOf(r.end) + '\')">' + (r.fixed ? '日ビューで見る' : '日を決める') + '</button>')
+      + '</div></div>';
+  }
+
+  /* 🏁 v2.106.0 日ビューのマスから「この日をリースアップ日に確定」 */
+  w.flLeaseFix = function(vehId, ds){
+    if (w.flMaintPopClose) w.flMaintPopClose();
+    var v = vehOf(vehId); if (!v || !v.lease) return Promise.resolve(false);
+    return w.pitAsk('リースアップ日を ' + md(ds) + ' に確定しますか？', { ok:'確定する',
+      detail:'・この日から先は代車カレンダーでグレーになり、貸出を入れようとすると警告が出ます'
+           + (v.leaseUp && v.leaseUp !== ds ? '\n・暫定の ' + md(v.leaseUp) + ' は控えとして残ります' : '') })
+      .then(function(yes){
+        if (!yes) return false;
+        v.leaseUpFixed = ds;
+        if (!v.leaseUp) v.leaseUp = ds;
+        saveCards();
+        try { if (w.pitLog) w.pitLog('リースアップ日を確定した', { kind:'loaner', label: vehName(v) + ' ' + ds }); } catch(e){}
+        if (w.renderFleet) w.renderFleet();
+        if (w.pitToast) w.pitToast('リースアップ日を ' + md(ds) + ' に確定しました');
+        return true;
+      });
+  };
+  /* 🏁 v2.106.0 「予定通りリースアップでアーカイブ」＝**引退にする**。
+     🔴 **このボードは知らせるだけ**（test_maint_board ⑦「貸出の可否に手を出していない」）。
+        引退にする中身は車両管理の `fleetLeaseArchive`（fleet.js・「引退させる」の隣）1本に任せる。ここは呼ぶだけ。 */
+  w.flLeaseArchive = function(vehId){
+    return w.fleetLeaseArchive ? w.fleetLeaseArchive(vehId) : Promise.resolve(false);
+  };
+
   function boardHtml(){
     var td = today();
-    var list = rows(td);
+    var list = sortBoard(rows(td).concat(leaseRows(td)));   /* 🏁 v2.106.0 リースアップの行も同じ並びに入れる */
     var nBad = list.filter(function(r){ return r.level === 'bad'; }).length;
     var nWarn = list.filter(function(r){ return r.level === 'warn'; }).length;
 
@@ -484,6 +571,7 @@
 
     h += '<div class="mb-rows">';
     list.forEach(function(r){
+      if (r.lease){ h += leaseRowHtml(r); return; }   /* 🏁 v2.106.0 */
       var p = r.plan;
       h += '<div class="mb-row mb-' + r.level + '">'
         + '<div class="mb-veh"><div class="mb-nm">' + esc(vehName(r.veh)) + '</div>'
@@ -763,6 +851,14 @@
     var ps = plansFor(vehId, ds);
     var per = (ds === to) ? md(ds) : (md(ds) + '〜' + md(to));
     var h = '<div class="lo-bpop-h">' + esc(per) + (ds === to ? '' : '<small>（' + (Math.round((_pd(to) - _pd(ds)) / 86400000) + 1) + '日）</small>') + '</div>';
+    /* 🏁 v2.106.0 リース車両＝この日をリースアップ日に確定（2ヶ月前より手前でも、分かっていれば入れられる） */
+    var lv = vehOf(vehId);
+    if (lv && lv.lease){
+      h += '<button class="lo-bpop-b" onclick="flLeaseFix(\'' + vehId + '\',\'' + ds + '\')">'
+         + '<span class="mb-dot lease"></span>🏁 <b>' + esc(md(ds)) + ' をリースアップ日に確定</b><small>'
+         + (lv.leaseUpFixed ? ('いまの確定 ' + esc(md(lv.leaseUpFixed)) + ' を置きかえます')
+                            : ('暫定 ' + esc(lv.leaseUp ? md(lv.leaseUp) : '未入力') + ' → 確定にします')) + '</small></button>';
+    }
     ps.forEach(function(r){
       h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\',\'' + to + '\',\'' + r.plan.ym + '\')">'
          + '<span class="mb-dot"></span>🔧 ' + esc(r.workLabel) + ' の<b>候補</b>を置く<small>この期間のどこかでやる、の提示</small></button>';
@@ -1485,6 +1581,7 @@
   w.pitMaintCalItems = calItems;
   w.pitMaintDayBars  = dayBars;
   w.flMaintBoardHtml = boardHtml;
+  w.pitMaintLeaseRows = leaseRows;   /* 🏁 v2.106.0 リースアップの行（見張り用） */
   w.PIT_MAINT_WORK_LB = WORK_LB;
   w.PIT_MAINT_WORK_SHORT = WORK_SHORT;
   w.pitMaintWorkDot = workDot;

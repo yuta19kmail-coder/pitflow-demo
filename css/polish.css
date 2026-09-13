@@ -814,6 +814,19 @@
 .fl-link-bdg{ display:inline-flex; align-items:center; gap:5px; max-width:100%;
   font-size:11px; font-weight:800; line-height:1.5; padding:2px 9px; border-radius:999px;
   border:1px solid; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* 🏁 v2.106.0 リース車両（紫＝リースアップの色） */
+.fl-link-bdg.lease{ background:rgba(139,92,246,.16); color:#c4b5fd; border-color:rgba(139,92,246,.5); }
+.fl-fk.lease{ background:rgba(139,92,246,.2); color:#c4b5fd; }
+.fl-mlb.fl-off{ opacity:.45; pointer-events:none; }
+.fl-mlb.fl-off::after{ content:attr(data-off); font-size:11px; font-weight:700; color:#c4b5fd; }
+.fl-lease-dates{ display:flex; gap:12px; flex-wrap:wrap; }
+.fl-lease-dates label{ display:flex; align-items:center; gap:6px; font-size:12px; }
+.mb-k-lease{ background:rgba(139,92,246,.18); color:#c4b5fd; }
+.mb-dot.lease{ background:#8b5cf6; }
+.lo-cell.lo-leaseout .lo-lsbg{ position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:rgba(120,128,140,.32); }   /* ⚠ 網掛けは使わず、ベタのグレー（管理カレンダーとそろえる） */
+.lo-ls-tag{ position:absolute; left:4px; top:3px; z-index:3; pointer-events:none; white-space:nowrap;
+  font-size:10.5px; font-weight:800; color:#fff; background:#8b5cf6; border-radius:5px; padding:1px 6px; }
 .fl-link-bdg.on{ background:rgba(168,85,247,.16); color:#c4a3fb; border-color:rgba(168,85,247,.45); }
 .fl-link-bdg.off{ background:var(--bg1); color:var(--text3); border-color:var(--border2); font-weight:700; }
 .fd-nolink{ color:var(--text3); }

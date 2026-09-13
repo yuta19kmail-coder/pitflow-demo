@@ -125,6 +125,12 @@
    ⚠ 「ベタ塗り＝超過だけ」の決めごとを、**「ベタ塗り＝手遅れになると困る日」**に広げた。
    🔴 v2.71.0 **12点の日は塗らない**（ゆうた「あくまで位だから」）＝12点に期限の日は無い。
       塗ると「この日が期限」に見える。12点は2ヶ月ぶんの帯（やること）だけで出す。 */
+/* 🏁 v2.106.0 リースアップ日（紫）とその先（グレー）。暫定は薄く＋点線の枠 */
+.fl-cal-new .fl-cal-cell.d-lease{ background:rgba(139,92,246,.55) !important; }
+.fl-cal-new .fl-cal-cell.d-lease.tbd{ background:rgba(139,92,246,.28) !important; box-shadow:inset 0 0 0 2px rgba(196,181,253,.7); }
+.fl-cal-new .fl-cal-cell.fl-leaseout{ background:rgba(120,128,140,.26) !important; }   /* ⚠ 網掛けは使わない（このカレンダーの決めごと・test_fleet_cal ②） */
+.fl-due.lease{ color:#c4b5fd; }
+.fl-due.lease.tbd{ border-bottom:1px dashed rgba(196,181,253,.6); }
 .fl-cal-new .fl-cal-cell.d-exp{ background:var(--red) !important; box-shadow:inset 0 0 0 2px rgba(255,255,255,.42); }
 .fl-big{ margin-top:auto; margin-bottom:auto; text-align:center; color:#fff; font-weight:900;
   font-size:13px; line-height:1.2; letter-spacing:.5px; text-shadow:0 1px 2px rgba(0,0,0,.4); }

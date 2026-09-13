@@ -77,6 +77,8 @@
     var m = dayOf(l.id, ds, opt).main;
     if (!m) return null;
     if (m.kind === 'event') return { kind: 'event', event: m.event, item: m };
+    /* 🏁 v2.106.0 リースアップ後は「代車自身の予定」と同じ形で答える（古い呼び方の画面を壊さない） */
+    if (m.kind === 'leaseout') return { kind: 'event', event: { type: 'lease', label: m.label, fromDate: m.from, toDate: m.from }, item: m };
     return { kind: 'assign', assign: m.assign, hold: (m.kind === 'hold'), item: m };
   }
 
@@ -125,7 +127,9 @@
     lend:  { label: '貸出',    busy: true  },
     hold:  { label: '仮押さえ', busy: true  },
     event: { label: '予定',    busy: true  },
-    maint: { label: '整備の枠', busy: null  }   /* null＝stage で決まる（下の _maintBusy） */
+    maint: { label: '整備の枠', busy: null  },  /* null＝stage で決まる（下の _maintBusy） */
+    /* 🏁 v2.106.0 リース車両＝リースアップ日（確定→無ければ暫定）の**当日から先**。もう居ない車＝貸せない */
+    leaseout: { label: 'リースアップ後', busy: true }
   };
 
   /* ==================================================================
@@ -155,6 +159,36 @@
         ＝ 出すのは**警告だけ**。`pitLoanerUsable` からは外さない。**ここに貸出停止を書き足さないこと。**
      ================================================================== */
   function _maintBusy(it) { return it && it.stage === 'fixed'; }
+
+  /* ==================================================================
+     🏁🔴 v2.106.0（ゆうた指定 2026-09-13）**リース車両のリースアップ。**
+     ------------------------------------------------------------------
+     🗣「代車にリース車両を追加。顧客との紐づけ→なし／車検満了日→入力なし／リースアップ日入力」
+     🗣「代車カレンダーにも入る（かつそれ以降はグレーアウトみたいな感じにする）」
+     🗣（過ぎた日の貸出は）「グレー＋貸出は警告」
+     ◎持ち方（車の側・fleetEvents には書かない＝計算で出す）
+       `lease:true` ／ `leaseUp`（暫定・設定の窓で入れる）／ `leaseUpFixed`（確定・日ビューか設定の窓で入れる）
+     🔴 使う日は **確定 → 無ければ暫定**。判定はここ1本（`pitLeaseEnd`）。画面で綴らない。
+     🔴 **その日の当日から先は「ふさがり」**（車を返しに行く日も貸せない）。
+        ＝ 代車カレンダーのグレー／空いている代車の数・最短入庫日の案内から外れる／貸出の窓で警告
+     🔴🔴 **貸出は止めない。**貸出の窓は今までどおり「それでも登録しますか？」と聞くだけ（ゆうた指定）。
+     ================================================================== */
+  function _vehById(id) {
+    var a = arr(w.state && w.state.loaners).concat(arr(w.state && w.state.companyCars));
+    return a.filter(function (x) { return x && x.id === id; })[0] || null;
+  }
+  function leaseEnd(v) {
+    if (!v || !v.lease) return '';
+    return String(v.leaseUpFixed || v.leaseUp || '').slice(0, 10);
+  }
+  function leaseFixed(v) { return !!(v && v.lease && v.leaseUpFixed); }
+  function _leaseItem(v, end) {
+    return {
+      kind: 'leaseout', id: 'lease_' + v.id, from: end, to: '9999-12-31',
+      vehicle: v, fixed: leaseFixed(v), memo: '',
+      label: 'リースアップ' + (leaseFixed(v) ? '' : '（暫定）'), color: '#8b5cf6'
+    };
+  }
 
   function _assignItem(a) {
     return {
@@ -206,7 +240,7 @@
     if (opt && opt.noEvents) items = items.filter(function (x) { return x.kind !== 'event'; });
     /* 並びは 貸出 → 整備の確定 → 仮押さえ → 整備の候補 → 予定
        （画面が「主役」を取りたい時は先頭を見る。**決まっているものほど前**） */
-    var ord = { lend: 0, maintFixed: 1, hold: 2, maint: 3, event: 4 };
+    var ord = { lend: 0, maintFixed: 1, hold: 2, maint: 3, event: 4, leaseout: 5 };
     var rank = function (x) { return ord[(x.kind === 'maint' && x.stage === 'fixed') ? 'maintFixed' : x.kind]; };
     return items.slice().sort(function (a, b) { return (rank(a) - rank(b)) || (a.from < b.from ? -1 : 1); });
   }
@@ -254,6 +288,9 @@
         out.push(_maintItem(c, sp));   /* 整備の枠は「代車自身の予定（青帯）」と kind を分ける */
       });
     });
+    /* 🏁 v2.106.0 リース車両＝リースアップ日の当日から先（期間にかかっていれば1件） */
+    var _lv = _vehById(loanerId), _le = leaseEnd(_lv);
+    if (_le && _le <= to) out.push(_leaseItem(_lv, _le));
     return _pick(out, opt);
   }
   function dayOf(loanerId, ds, opt) {
@@ -266,6 +303,7 @@
       events: items.filter(function (x) { return x.kind === 'event'; }),
       main:   items[0] || null,
       maints: items.filter(function (x) { return x.kind === 'maint'; }),
+      leaseOut: items.filter(function (x) { return x.kind === 'leaseout'; }),   /* 🏁 v2.106.0 */
       /* 🔴 貸せないか。整備の枠は **確定だけ** 数える（候補は塞がない＝ゆうた確定） */
       busy:   items.some(function (x) {
                 var k = KINDS[x.kind];
@@ -499,9 +537,15 @@
 
   /* 期間にかかる「代車自身の予定」（車検入庫など）。貸出とは別に知らせたい時に使う */
   function eventsIn(loanerId, from, to) {
-    return arr(w.state && w.state.fleetEvents).filter(function (e) {
+    var list = arr(w.state && w.state.fleetEvents).filter(function (e) {
       return e.vehicleId === loanerId && overlap(from, to, e.fromDate, e.toDate);
     });
+    /* 🏁 v2.106.0 リースアップ日から先にかかる貸出＝窓で「この代車自身の予定と重なります」と聞く（止めない） */
+    var lv = _vehById(loanerId), le = leaseEnd(lv);
+    if (le && le <= to) list.push({ id: 'lease_' + loanerId, vehicleId: loanerId, type: 'lease',
+      label: 'リースアップ（' + le + (leaseFixed(lv) ? '' : '・暫定') + '）から先は使えない車です',
+      fromDate: le, toDate: le });
+    return list;
   }
 
   /* ------------------------------------------------------------------
@@ -640,4 +684,6 @@
   w.pitLoanerOverlap     = overlap;
   w.pitLoanerConflicts   = conflicts;
   w.pitLoanerEventsIn    = eventsIn;
+  w.pitLeaseEnd          = leaseEnd;     /* 🏁 v2.106.0 リースアップ日（確定→暫定） */
+  w.pitLeaseFixed        = leaseFixed;   /* 🏁 v2.106.0 確定しているか */
 })();

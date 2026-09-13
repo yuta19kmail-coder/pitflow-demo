@@ -779,7 +779,7 @@
     groups.forEach(function (g) {
       (g.res.結びついた || []).forEach(function (p) {
         var id = cardIdOf(p.pit);
-        if (id) byCard[id] = { label: t(g.label), 売上日: t(p.soft.売上日), 伝票: t(p.soft.伝票) };
+        if (id) byCard[id] = { label: t(g.label), from: t(g.from), 売上日: t(p.soft.売上日), 伝票: t(p.soft.伝票) };
       });
     });
     /* ② 名札を貼り直す */
@@ -789,6 +789,8 @@
         if (!m || m.label === t(g.label)) return;
         x.別のQ = '伝票は ' + m.label + '（' + m.売上日 + '・' + (m.伝票 || '伝票番号なし') + '）にあります';
         x.別のQ確定 = true;                     /* 🔴 実際に結ばれた＝いちばん強い証拠 */
+        /* 🧾 v2.101.0 照合した先（どのQの、どの伝票か）。画面が「Q3 で照合済み（Q-538013）」と言い、そのQへ飛ぶのに使う */
+        x.別のQ先 = { label: m.label, from: m.from, 売上日: m.売上日, 伝票: m.伝票 };
       });
       (g.res.整備ソフトだけ || []).forEach(function (x) {
         var m = byCard[cardIdOf(x.カード)];

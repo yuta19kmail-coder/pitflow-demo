@@ -194,6 +194,7 @@
 
   function _save(print, noSale){
     if (!Array.isArray(st().cards)) st().cards = [];
+    syncWorkTypes(M);   /* 🔧 v2.98.0 保存する前に、バッジの並びを基本＋併用可にそろえる（古いカードを直した時も） */
     var live = null;
     if (MODE === 'fix'){
       live = (st().cards || []).filter(function(x){ return x && x.id === M.id; })[0];
@@ -240,7 +241,39 @@
   };
 
   /* ===== 欄をいじる ===== */
-  w.pitMasterSet = function(key, v){ if (!M) return; M[key] = v; render(); };
+  /* 🔧 v2.98.0 作業タイプのバッジの並び（`workTypes`）＝基本＋併用可。**カード詳細の `_syncWorkTypes` と同じ形**。 */
+  function syncWorkTypes(c){
+    if (!c) return;
+    var ids = [];
+    if (c.workType) ids.push(c.workType);
+    (Array.isArray(c.workAddons) ? c.workAddons : []).forEach(function(a){ if (a && ids.indexOf(a) < 0) ids.push(a); });
+    c.workTypes = ids;
+  }
+  w.pitMasterSet = function(key, v){
+    if (!M) return;
+    M[key] = v;
+    if (key === 'workType'){
+      if (!v) M.workType = null;
+      /* 📦 物販は常に単独＝選んだら併用可はおろす（カード詳細と同じ） */
+      if (v === 'goods') M.workAddons = [];
+      syncWorkTypes(M);
+    }
+    render();
+  };
+  /* 🔧 v2.98.0 併用可を付ける／外す。 */
+  w.pitMasterAddon = function(id){
+    if (!M || !id) return;
+    if (w.pitInternKind && w.pitInternKind(M)) return;      /* 社内区分の間は押せない */
+    if (!Array.isArray(M.workAddons)) M.workAddons = [];
+    var i = M.workAddons.indexOf(id);
+    if (i >= 0) M.workAddons.splice(i, 1); else M.workAddons.push(id);
+    if (M.workType === 'goods') M.workType = null;          /* 物販は単独＝併用可を押したらおりる */
+    syncWorkTypes(M);
+    render();
+  };
+  /* 🔎 見張り用（画面を開かずに確かめる）。画面からは呼ばない。 */
+  w.pitMasterCurrent = function(){ return M; };
+  w.pitMasterSec2Html = function(){ if (!M) M = blank(); return sec2(); };
   w.pitMasterSetQuiet = function(key, v){ if (!M) return; M[key] = v; paintFoot(); };
   w.pitMasterToggle = function(key){ if (!M) return; M[key] = !M[key]; render(); };
   /* 🕐 入庫時刻＝新規予約とまったく同じ整形（`_normTime` 1本。ここで直さない） */
@@ -250,6 +283,7 @@
     if (k === 'loanercar') return;   /* 🔴 代車はここからは選べない（v2.53.0 の決めごとと同じ） */
     var now = (w.pitInternKind ? w.pitInternKind(M) : '');
     if (w.pitInternSet) w.pitInternSet(M, now === k ? '' : k); else M.internKind = (now === k ? '' : k);
+    syncWorkTypes(M);   /* 🔧 v2.98.0 区分が作業タイプをおろしたら、バッジの並びもそろえる */
     render();
   };
   w.pitMasterSpecial = function(id){
@@ -477,6 +511,34 @@
       { lock:true, hint:'手で入れると番号が重なります（データチェックが毎回拾います）' });
     h += fld('入庫時刻', timeField(), { wide:true, hint:'新規予約と同じ言葉です（打ち込みもできます）' });
     h += '</div>';
+    /* ================================================================
+       🔧🔴 v2.98.0（ゆうた報告 2026-09-13「マスター入力機能の作業タイプにBPがない」）
+       **作業タイプの「併用可」（B.P・1Y・3M・車販依頼）を、新規予約・予約詳細と同じ形で置いた。**
+       ◎前まで … 上の選択欄を `!combinable` で絞っていて、**併用可の型がどこにも出ていなかった**。
+         ＝ B.P の車をマスター入力で作れない／直せない（開いて保存すると B.P が付けられない）。
+       ◎いま … 上の選択欄＝基本（1つ）。ここ＝併用可（何個でも・**これだけでも付けられる**）。
+       🔴 決まりはカード詳細（card-detail.js）と同じ：
+          ・物販（単独）を選んだら併用可はおろす／併用可を押したら物販はおろす
+          ・社内区分（中古・内部）を選んでいる間は押せない（`pitInternSet` がおろすため）
+       🔴 押すたびに `workTypes`（バッジの並び）をそろえる（`syncWorkTypes`）。
+       ⚠ 必須の判定は `pitCardMisses` のまま（基本 **か** 併用可が1つあれば足りる）。
+       ================================================================ */
+    var combo = (st().workTypes || []).filter(function(x){ return x && x.combinable && !x.drawer; });
+    if (combo.length){
+      var adds = Array.isArray(M.workAddons) ? M.workAddons : [];
+      h += '<div class="ms-lb" style="margin-top:11px">作業タイプ（併用可）'
+        + '<span>上の作業タイプと重ねても、これだけでも付けられます</span></div><div class="ms-chips">';
+      combo.forEach(function(it){
+        var on = adds.indexOf(it.id) >= 0;
+        var col = it.color || '';
+        var style = col ? (on ? ('background:' + col + ';border-color:' + col + ';color:#fff;') : ('border-color:' + col + ';color:' + col + ';')) : '';
+        h += '<button type="button" class="ms-chip' + (on ? ' on' : '') + (kind ? ' off' : '') + '"'
+          + (kind ? ' disabled title="社内区分を選んでいる間は、作業タイプは選びません"' : ' title="' + esc(it.desc || '') + '"')
+          + (style ? ' style="' + style + '"' : '')
+          + ' onclick="pitMasterAddon(\'' + esc(it.id) + '\')">' + esc(it.label) + '</button>';
+      });
+      h += '</div>';
+    }
     h += '<div class="ms-f wide" style="margin-top:11px"><label>作業内容</label>'
       +  '<textarea onchange="pitMasterSet(\'menu\',this.value)">' + esc(M.menu) + '</textarea></div>';
     /* 🔧 その他＝新規予約の「その他」の引き出しと**同じ並び**（ゆうた指定 2026-09-07） */

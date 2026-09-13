@@ -584,11 +584,7 @@ function renderCardForm(c){
   h += sec('予約内容', '<i data-ic=sticky data-ics=16></i>');
   /* 1行目：作業タイプ(基本)｜併用可(B.P/1Y/3M)｜課 を1行に（v0.94.0）。v0.94.3 上揃え＝ラベル/チップの上端を揃える */
   h += '<div class="cf-row" style="flex-wrap:nowrap;align-items:flex-start">';
-  h += '<div class="cf-field" style="flex:0 1 auto;min-width:0"><div class="cf-label">作業タイプ</div>' + workTypeChips(c) + '</div>';
-  h += '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">併用可</div>' + workTypeComboChips(c) + '</div>';
-  /* 🔧 v2.6.0 「特殊」→「**その他**」。バッジを並べるのをやめて、押すと開く引き出しにした。
-     　　ふだんあまり使わない印（保証・保険・社員／中古・代車・内部）をここにまとめる。 */
-  h += '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">その他</div>' + workTypeOtherBtn(c) + '</div>';
+  h += workTypeFieldsHtml(c);   /* 🔧 v2.99.0 作業タイプ｜併用可｜その他＝マスター入力と同じ1本 */
   h += '<div class="cf-field" style="flex:0 0 auto;margin-left:auto"><div class="cf-label">課</div>' + chips(c, 'division', state.divisions, true) + '</div>';
   h += '</div>';
   h += otherPanelHtml(c);
@@ -1906,6 +1902,24 @@ function workTypeOtherBtn(c){
        + (sum.length ? ' active' : '') + '" title="保証・保険・社員／中古・代車・内部">'
        + lb + ' <span class="cf-other-caret">' + (_cfOtherOpen ? '▲' : '▼') + '</span></button></div>';
 }
+/* ================================================================
+   🔧🔴 v2.99.0（ゆうた指定 2026-09-13）**作業タイプの3つの欄＝どの画面でも同じ1本。**
+   🗣「わかりにくい。作業タイプは新規予約の物をそのまま全部使って欲しい」
+   ◎前まで … マスター入力は「選択欄＋自前のチップ」で**別の形**を持っていた（v2.98.0）。
+   ◎いま  … 新規予約・予約詳細・マスター入力が、**この関数と `pitWorkTypeBind` を呼ぶだけ**。
+     ＝ 見た目も押した時の決まり（物販は単独・代車は相方1つ・保険で売掛 など）も1か所。
+   ⚠ 「その他」の引き出しの中身は `otherPanelHtml`（下）。これも同じく1本。
+   ================================================================ */
+function workTypeFieldsHtml(c){
+  /* 🔧 v2.6.0 「特殊」→「**その他**」。バッジを並べるのをやめて、押すと開く引き出しにした。
+     　　ふだんあまり使わない印（保証・保険・社員／中古・代車・内部）をここにまとめる。 */
+  return '<div class="cf-field" style="flex:0 1 auto;min-width:0"><div class="cf-label">作業タイプ</div>' + workTypeChips(c) + '</div>'
+       + '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">併用可</div>' + workTypeComboChips(c) + '</div>'
+       + '<div class="cf-field" style="flex:0 0 auto"><div class="cf-label">その他</div>' + workTypeOtherBtn(c) + '</div>';
+}
+window.pitWorkTypeFieldsHtml = workTypeFieldsHtml;
+window.pitWorkTypeOtherPanelHtml = function (c) { return otherPanelHtml(c); };
+
 function otherPanelHtml(c){
   if (!_cfOtherOpen) return '';
   var GREY = '#6b7280';
@@ -2541,6 +2555,145 @@ function conditionChips(c){
 /* ========================================
    イベントバインド：入力即反映（自動保存）
    ======================================== */
+/* ================================================================
+   🔧🔴 v2.99.0（ゆうた指定 2026-09-13）**作業タイプを押した時の処理＝どの画面でも同じ1本。**
+   ----------------------------------------------------------------
+   root   … 作業タイプの欄（`workTypeFieldsHtml` と `otherPanelHtml` を描いた入れ物）
+   c      … いじるカード（予約詳細＝本物のカード／マスター入力＝下書き M）
+   redraw … 押したあとに描き直す（予約詳細＝renderCardForm／マスター入力＝マスター入力の render）
+   opt.save … 押すたびに保存するか（予約詳細＝true＝今までどおり／マスター入力＝false＝保存ボタンで一度に）
+   🔴 中身は v2.98.0 までの予約詳細（bindCardFormEvents）の処理を**そのまま移しただけ**。決まりは1つも変えていない。
+      ・基本（単一）… 同じチップでもう一度押すと外れる／概算を入れ直す／代車なら併用可をおろす
+      ・併用可・付加・「その他」の開閉・物販（単独）・社内区分 … 下の区間（移したまま）
+   ================================================================ */
+function pitWorkTypeBind(root, c, redraw, opt){
+  opt = opt || {};
+  if (!root || !c) return;
+  redraw = redraw || function(){};
+
+  // 基本（単一選択＝c.workType）。⚠ 引き出しの物販（data-drawerwt）は下の専用ハンドラ
+  root.querySelectorAll('.cf-chips[data-key="workType"]:not([data-drawerwt])').forEach(group => {
+    group.querySelectorAll('.cf-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newVal = btn.dataset.val;
+        const wasActive = btn.classList.contains('active');
+        c.workType = wasActive ? null : newVal;   // 同じ値クリックで解除
+        // 作業タイプを選んだら概算（日数・金額）を自動セット（後から手で直せる）
+        if (window.pitEstHold)   c.estHoldDays = c.workType ? pitEstHold(c.workType, c.dropType, pitTeamKey(c)) : '';
+        if (window.pitEstAmount && c.workType) c.estAmount = pitEstAmount(c.workType, pitTeamKey(c));
+        /* 🚙 v2.6.0 代車は相方1つだけ＝基本を選んだら併用可はおろす */
+        if (window.pitInternKind && pitInternKind(c) === 'loanercar') c.workAddons = [];
+        _syncWorkTypes(c); _clearSpecialsIfNoWork(c);   // 表示用バッジ列を同期＋付加の整合（v0.116.0）
+        redraw();
+      });
+    });
+  });
+
+  // 作業タイプの「併用可」チップ（追加トグル＝c.workAddons[]）
+  root.querySelectorAll('.cf-chips[data-combo]').forEach(group => {
+    const key = group.dataset.key;   // workAddons
+    if (!Array.isArray(c[key])) c[key] = [];
+    group.querySelectorAll('.cf-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.dataset.val;
+        const idx = c[key].indexOf(v);
+        if (idx >= 0) c[key].splice(idx, 1);
+        else {
+          /* 🚙 v2.6.0 代車は相方1つだけ＝ほかを全部おろしてから付ける */
+          if (window.pitInternKind && pitInternKind(c) === 'loanercar'){ c[key] = []; c.workType = null; }
+          c[key].push(v);
+        }
+        /* 📦 v2.51.0（G）物販は常に単独。ふつうの作業タイプを押したら物販は外れる（逆向きも塞ぐ） */
+        if (c.workType === 'goods') c.workType = null;
+        _syncWorkTypes(c);
+        _clearSpecialsIfNoWork(c);   // v0.116.0 併用可も無く基本も無ければ付加を外す
+        // v0.94.1 併用可は単独利用も可：主作業(workType)が無く併用可だけの時は、その先頭で概算を自動入力
+        if (!c.workType){
+          const eff = (c.workAddons || [])[0] || '';
+          if (window.pitEstHold)   c.estHoldDays = eff ? pitEstHold(eff, c.dropType, pitTeamKey(c)) : '';
+          if (window.pitEstAmount) c.estAmount   = eff ? pitEstAmount(eff, pitTeamKey(c)) : c.estAmount;
+        }
+        redraw();
+      });
+    });
+  });
+
+  // v0.116.0 作業タイプ「特殊」チップ（保証/保険）＝c.workSpecials[]。作業タイプ（基本 or 併用可）がある時だけ付けられる（単体では選べない）。
+  root.querySelectorAll('.cf-chips[data-special]').forEach(group => {
+    const key = group.dataset.key;   // workSpecials
+    if (!Array.isArray(c[key])) c[key] = [];
+    group.querySelectorAll('.cf-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v = btn.dataset.val;
+        const idx = c[key].indexOf(v);
+        if (idx >= 0){
+          c[key].splice(idx, 1);   // 解除はいつでも可
+        } else {
+          const hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
+          if (!hasWork){
+            if (window.pitToast) pitToast('保証・保険は作業タイプとセットで選んでください', 'PF-1004');
+            return;   // 単体では付けない
+          }
+          c[key].push(v);
+        }
+        /* 🛡 v2.9.0 保険を付けたら**自動で売掛チェックが入る**（ゆうた指定 2026-08-25）。
+           🔴 判定も書き込みも `insurance-pit.js` の1本。ここで 'insurance' と書き分けない。 */
+        if (window.pitInsOnBadge) pitInsOnBadge(c);
+        if (opt.save && window.PitDB) PitDB.save();
+        redraw();
+      });
+    });
+  });
+
+  /* 🗄 v2.6.0 「その他」の引き出しを開け閉め（カードには保存しない＝画面の都合だけ） */
+  {
+    const ob = root.querySelector('#cf-other-btn');
+    if (ob) ob.addEventListener('click', () => { _cfOtherOpen = !_cfOtherOpen; redraw(); });
+  }
+  /* 📦 v2.51.0（G）引き出しの作業タイプ（物販）＝**選ぶと他の作業タイプを全部おろす。** */
+  root.querySelectorAll('.cf-chips[data-drawerwt]').forEach(group => {
+    group.querySelectorAll('.cf-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const v = btn.dataset.val;
+        if (c.workType === v){ c.workType = null; }
+        else {
+          c.workType   = v;
+          c.workAddons = [];        /* 併用可を全部おろす（常に単独） */
+          c.workSpecials = [];      /* 付加（保証・保険・社員）も外す */
+          /* 洗車・車販依頼はこの予約では使わないので、印が残らないようにおろす */
+          c.needWash = false; c.washNote = '';
+          c.salesReq = false; c.salesReqMemo = ''; c.coatingOK = false; c.headlight = false;
+          if (window.pitEstHold)   c.estHoldDays = pitEstHold(v, c.dropType, pitTeamKey(c));
+          if (window.pitEstAmount) c.estAmount   = pitEstAmount(v, pitTeamKey(c));
+        }
+        _syncWorkTypes(c);
+        if (opt.save && window.PitDB) PitDB.save();
+        redraw();
+      });
+    });
+  });
+
+  /* 🏢 v2.6.0 社内区分チップ（中古／代車／内部）＝1つだけ。もう一度押すと外れる。
+     ⚠ 付け替えの後始末（作業タイプ・付加・概算・代車を落とす）は
+        **intern-pit.js の `pitInternSet` 1本**。ここに書き写さないこと。 */
+  root.querySelectorAll('.cf-chips[data-intern]').forEach(group => {
+    group.querySelectorAll('.cf-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const v   = btn.dataset.val;
+        const now = window.pitInternKind ? pitInternKind(c) : '';
+        if (window.pitInternSet) pitInternSet(c, now === v ? '' : v);
+        _syncWorkTypes(c);
+        _cfOtherOpen = true;
+        if (opt.save && window.PitDB) PitDB.save();
+        redraw();
+      });
+    });
+  });
+
+}
+window.pitWorkTypeBind = pitWorkTypeBind;
+
 function bindCardFormEvents(root){
   const c = state.cards.find(x => x.id === _editingCardId);
   if (!c) return;
@@ -2702,7 +2855,8 @@ function bindCardFormEvents(root){
      　　拾うと汎用のハンドラと専用のハンドラが二重に走り、押しても元に戻ってしまう。 */
   /* ⚠ v2.51.0 `[data-drawerwt]`（その他の引き出しの物販）も**ここで拾わない**。
      同じ `data-key="workType"` を使っているので、外さないと押した時に二重に効く。 */
-  root.querySelectorAll('.cf-chips:not([data-multi]):not([data-combo]):not([data-special]):not([data-intern]):not([data-other]):not([data-drawerwt]):not(.cf-dual)').forEach(group => {
+  /* ⚠ v2.99.0 基本の作業タイプ（`data-key="workType"`）も**ここで拾わない**。pitWorkTypeBind が受け持つ（二重に効かないように）。 */
+  root.querySelectorAll('.cf-chips:not([data-multi]):not([data-combo]):not([data-special]):not([data-intern]):not([data-other]):not([data-drawerwt]):not([data-key="workType"]):not(.cf-dual)').forEach(group => {
     const key = group.dataset.key;
     group.querySelectorAll('.cf-chip').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2735,107 +2889,8 @@ function bindCardFormEvents(root){
     });
   });
 
-  // 作業タイプの「併用可」チップ（追加トグル＝c.workAddons[]）
-  root.querySelectorAll('.cf-chips[data-combo]').forEach(group => {
-    const key = group.dataset.key;   // workAddons
-    if (!Array.isArray(c[key])) c[key] = [];
-    group.querySelectorAll('.cf-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const v = btn.dataset.val;
-        const idx = c[key].indexOf(v);
-        if (idx >= 0) c[key].splice(idx, 1);
-        else {
-          /* 🚙 v2.6.0 代車は相方1つだけ＝ほかを全部おろしてから付ける */
-          if (window.pitInternKind && pitInternKind(c) === 'loanercar'){ c[key] = []; c.workType = null; }
-          c[key].push(v);
-        }
-        /* 📦 v2.51.0（G）物販は常に単独。ふつうの作業タイプを押したら物販は外れる（逆向きも塞ぐ） */
-        if (c.workType === 'goods') c.workType = null;
-        _syncWorkTypes(c);
-        _clearSpecialsIfNoWork(c);   // v0.116.0 併用可も無く基本も無ければ付加を外す
-        // v0.94.1 併用可は単独利用も可：主作業(workType)が無く併用可だけの時は、その先頭で概算を自動入力
-        if (!c.workType){
-          const eff = (c.workAddons || [])[0] || '';
-          if (window.pitEstHold)   c.estHoldDays = eff ? pitEstHold(eff, c.dropType, pitTeamKey(c)) : '';
-          if (window.pitEstAmount) c.estAmount   = eff ? pitEstAmount(eff, pitTeamKey(c)) : c.estAmount;
-        }
-        renderCardForm(c);
-      });
-    });
-  });
-
-  // v0.116.0 作業タイプ「特殊」チップ（保証/保険）＝c.workSpecials[]。作業タイプ（基本 or 併用可）がある時だけ付けられる（単体では選べない）。
-  root.querySelectorAll('.cf-chips[data-special]').forEach(group => {
-    const key = group.dataset.key;   // workSpecials
-    if (!Array.isArray(c[key])) c[key] = [];
-    group.querySelectorAll('.cf-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const v = btn.dataset.val;
-        const idx = c[key].indexOf(v);
-        if (idx >= 0){
-          c[key].splice(idx, 1);   // 解除はいつでも可
-        } else {
-          const hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
-          if (!hasWork){
-            if (window.pitToast) pitToast('保証・保険は作業タイプとセットで選んでください', 'PF-1004');
-            return;   // 単体では付けない
-          }
-          c[key].push(v);
-        }
-        /* 🛡 v2.9.0 保険を付けたら**自動で売掛チェックが入る**（ゆうた指定 2026-08-25）。
-           🔴 判定も書き込みも `insurance-pit.js` の1本。ここで 'insurance' と書き分けない。 */
-        if (window.pitInsOnBadge) pitInsOnBadge(c);
-        if (window.PitDB) PitDB.save();
-        renderCardForm(c);
-      });
-    });
-  });
-
-  /* 🗄 v2.6.0 「その他」の引き出しを開け閉め（カードには保存しない＝画面の都合だけ） */
-  {
-    const ob = root.querySelector('#cf-other-btn');
-    if (ob) ob.addEventListener('click', () => { _cfOtherOpen = !_cfOtherOpen; renderCardForm(c); });
-  }
-  /* 📦 v2.51.0（G）引き出しの作業タイプ（物販）＝**選ぶと他の作業タイプを全部おろす。** */
-  root.querySelectorAll('.cf-chips[data-drawerwt]').forEach(group => {
-    group.querySelectorAll('.cf-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (btn.disabled) return;
-        const v = btn.dataset.val;
-        if (c.workType === v){ c.workType = null; }
-        else {
-          c.workType   = v;
-          c.workAddons = [];        /* 併用可を全部おろす（常に単独） */
-          c.workSpecials = [];      /* 付加（保証・保険・社員）も外す */
-          /* 洗車・車販依頼はこの予約では使わないので、印が残らないようにおろす */
-          c.needWash = false; c.washNote = '';
-          c.salesReq = false; c.salesReqMemo = ''; c.coatingOK = false; c.headlight = false;
-          if (window.pitEstHold)   c.estHoldDays = pitEstHold(v, c.dropType, pitTeamKey(c));
-          if (window.pitEstAmount) c.estAmount   = pitEstAmount(v, pitTeamKey(c));
-        }
-        _syncWorkTypes(c);
-        if (window.PitDB) PitDB.save();
-        renderCardForm(c);
-      });
-    });
-  });
-
-  /* 🏢 v2.6.0 社内区分チップ（中古／代車／内部）＝1つだけ。もう一度押すと外れる。
-     ⚠ 付け替えの後始末（作業タイプ・付加・概算・代車を落とす）は
-        **intern-pit.js の `pitInternSet` 1本**。ここに書き写さないこと。 */
-  root.querySelectorAll('.cf-chips[data-intern]').forEach(group => {
-    group.querySelectorAll('.cf-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const v   = btn.dataset.val;
-        const now = window.pitInternKind ? pitInternKind(c) : '';
-        if (window.pitInternSet) pitInternSet(c, now === v ? '' : v);
-        _syncWorkTypes(c);
-        _cfOtherOpen = true;
-        if (window.PitDB) PitDB.save();
-        renderCardForm(c);
-      });
-    });
-  });
+  /* 🔧 v2.99.0 作業タイプ（基本・併用可・その他の引き出し）は `pitWorkTypeBind` 1本（マスター入力も同じものを呼ぶ） */
+  pitWorkTypeBind(root, c, () => renderCardForm(c), { save: true });
 
   // チップ（複数選択：代車条件）
   root.querySelectorAll('.cf-chips[data-multi]').forEach(group => {

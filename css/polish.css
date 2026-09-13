@@ -825,6 +825,8 @@
 .mb-dot.lease{ background:#8b5cf6; }
 .lo-cell.lo-leaseout .lo-lsbg{ position:absolute; inset:0; z-index:1; pointer-events:none;
   background:rgba(120,128,140,.32); }   /* ⚠ 網掛けは使わず、ベタのグレー（管理カレンダーとそろえる） */
+/* 🏁 v2.107.0 暫定（年月）の月は薄い紫＝「この月のどこかで返す」 */
+.lo-cell.lo-leaseout.tbd .lo-lsbg{ background:rgba(139,92,246,.14); }
 .lo-ls-tag{ position:absolute; left:4px; top:3px; z-index:3; pointer-events:none; white-space:nowrap;
   font-size:10.5px; font-weight:800; color:#fff; background:#8b5cf6; border-radius:5px; padding:1px 6px; }
 .fl-link-bdg.on{ background:rgba(168,85,247,.16); color:#c4a3fb; border-color:rgba(168,85,247,.45); }

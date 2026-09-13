@@ -177,16 +177,48 @@
     var a = arr(w.state && w.state.loaners).concat(arr(w.state && w.state.companyCars));
     return a.filter(function (x) { return x && x.id === id; })[0] || null;
   }
+  /* 🏁🔴 v2.107.0（ゆうた指定 2026-09-13）**暫定は「年月」まで、確定は「日」まで。**
+     🗣「暫定予定は年 月 までにしておいてほしい　で確定は日まで入ってる感じ」
+     ◎持ち方 … `leaseUp`＝'YYYY-MM'（暫定）／`leaseUpFixed`＝'YYYY-MM-DD'（確定）
+       ⚠ v2.106.0 で日付まで入れたぶん（'YYYY-MM-DD'）は、**頭の年月だけ**を読む（書き換えない）。
+     ◎使う日
+       ・確定あり … その日（当日から先はふさがり）
+       ・暫定だけ … **その月の1日から**ふさがり（いつ返すか分からない月に、貸出の約束を入れない）
+       ・「暫定を過ぎた」の判定は **その月の末日**（`pitLeaseLast`）＝月の途中で赤くしない */
+  function _leaseYm(v) {
+    var ym = String((v && v.leaseUp) || '').slice(0, 7);
+    return /^\d{4}-\d{2}$/.test(ym) ? ym : '';
+  }
   function leaseEnd(v) {
     if (!v || !v.lease) return '';
-    return String(v.leaseUpFixed || v.leaseUp || '').slice(0, 10);
+    if (v.leaseUpFixed) return String(v.leaseUpFixed).slice(0, 10);
+    var ym = _leaseYm(v);
+    return ym ? ym + '-01' : '';
   }
   function leaseFixed(v) { return !!(v && v.lease && v.leaseUpFixed); }
+  /* 暫定の月の末日（確定ならその日） */
+  function leaseLast(v) {
+    if (!v || !v.lease) return '';
+    if (v.leaseUpFixed) return String(v.leaseUpFixed).slice(0, 10);
+    var ym = _leaseYm(v);
+    if (!ym) return '';
+    var d = new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0);
+    return ym + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  /* 言い方＝「令和8年11月（暫定）」／「令和8年11月20日（確定）」。和暦は loaner.js の pitWareki（呼ばれる時には居る） */
+  function leaseLabel(v) {
+    if (!v || !v.lease) return '';
+    var W = w.pitWareki;
+    if (v.leaseUpFixed) { var f = String(v.leaseUpFixed).slice(0, 10); return (W ? W(f) : f) + '（確定）'; }
+    var ym = _leaseYm(v);
+    if (!ym) return '';
+    return (W ? W(ym + '-01', 'ym') : ym) + '（暫定）';
+  }
   function _leaseItem(v, end) {
     return {
       kind: 'leaseout', id: 'lease_' + v.id, from: end, to: '9999-12-31',
-      vehicle: v, fixed: leaseFixed(v), memo: '',
-      label: 'リースアップ' + (leaseFixed(v) ? '' : '（暫定）'), color: '#8b5cf6'
+      vehicle: v, fixed: leaseFixed(v), last: leaseLast(v), memo: '',
+      label: 'リースアップ' + (leaseFixed(v) ? '' : '（暫定・' + (+end.slice(5, 7)) + '月）'), color: '#8b5cf6'
     };
   }
 
@@ -543,7 +575,7 @@
     /* 🏁 v2.106.0 リースアップ日から先にかかる貸出＝窓で「この代車自身の予定と重なります」と聞く（止めない） */
     var lv = _vehById(loanerId), le = leaseEnd(lv);
     if (le && le <= to) list.push({ id: 'lease_' + loanerId, vehicleId: loanerId, type: 'lease',
-      label: 'リースアップ（' + le + (leaseFixed(lv) ? '' : '・暫定') + '）から先は使えない車です',
+      label: 'リースアップ（' + (leaseFixed(lv) ? le : ((+le.slice(5, 7)) + '月・暫定')) + '）から先は使えない車です',
       fromDate: le, toDate: le });
     return list;
   }
@@ -686,4 +718,6 @@
   w.pitLoanerEventsIn    = eventsIn;
   w.pitLeaseEnd          = leaseEnd;     /* 🏁 v2.106.0 リースアップ日（確定→暫定） */
   w.pitLeaseFixed        = leaseFixed;   /* 🏁 v2.106.0 確定しているか */
+  w.pitLeaseLast         = leaseLast;    /* 🏁 v2.107.0 暫定の月の末日（確定ならその日） */
+  w.pitLeaseLabel        = leaseLabel;   /* 🏁 v2.107.0 「令和8年11月（暫定）」／「…20日（確定）」 */
 })();

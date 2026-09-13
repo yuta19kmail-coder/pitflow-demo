@@ -694,7 +694,7 @@ function loVehHover(headEl){
     + '<div class="lvh-dims">' + dim('長さ ', l.length != null ? l.length + 'cm' : null) + dim('幅 ', l.width != null ? l.width + 'cm' : null) + dim('高さ ', l.height != null ? l.height + 'cm' : null) + '</div>'
     /* 🏁 v2.106.0 リース車両は車検の代わりにリースアップ日 */
     + (l.lease ? '<div class="lvh-sub">🏁 リース車両　リースアップ '
-         + _loEsc((window.pitLeaseEnd && pitLeaseEnd(l)) ? (window.pitWareki(pitLeaseEnd(l)) + (l.leaseUpFixed ? '（確定）' : '（暫定）')) : '未入力') + '</div>' : '')
+         + _loEsc((window.pitLeaseLabel && pitLeaseLabel(l)) || '未入力') + '</div>' : '')   /* 🏁 v2.107.0 暫定＝年月／確定＝日 */
     + (l.shakenDate ? '<div class="lvh-sub">車検 ' + _loEsc(window.pitWareki(l.shakenDate))
          + '　<span class="lvh-tenken">12ヶ月点検 ' + _loEsc(window.pitWareki(window.pitTenkenFromShaken(l.shakenDate), 'ym')) + '</span></div>' : '');
   el.classList.add('show');
@@ -856,7 +856,7 @@ function _loRenderDays(start, n){
          ⚠ 何の日かは物差し（loaner-free.js の leaseout）が答える。ここで日付を比べない。 */
       if (day.leaseOut && day.leaseOut.length){
         const ls0 = day.leaseOut[0];
-        evCls += ' lo-leaseout';
+        evCls += ' lo-leaseout' + ((!ls0.fixed && ls0.last && dStr <= ls0.last) ? ' tbd' : '');   /* 🏁 v2.107.0 暫定の月は薄く */
         ov += '<span class="lo-lsbg"></span>'
             + (ls0.isStart ? '<span class="lo-ls-tag">🏁 ' + _loEsc(ls0.label) + '</span>' : '');
         if (!mtTitle) attrs += ' title="' + _loEsc(ls0.label + '　' + ls0.from + ' から先は使えない車です') + '"';

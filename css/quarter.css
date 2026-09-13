@@ -275,6 +275,8 @@
             border:1px solid rgba(29,185,122,.45); border-radius:6px; padding:1px 7px; }
 .q-fx-done i{ font-style:normal; font-weight:600; color:var(--text3); margin-left:4px; }
 .q-fx-un{ font-size:10.5px; color:var(--text3); background:transparent; border:none; text-decoration:underline; cursor:pointer; }
+/* ⏳ v2.104.0 「伝票を直した」を押したのに、あとで読んだ伝票でも変わっていない */
+.q-fx-stale{ display:block; width:100%; font-size:10.5px; font-weight:700; color:#f59e0b; margin:2px 0 4px; }
 .q-act-ok{ font-size:11px; color:var(--text3); }
 /* 一覧の頭に出す「2択の説明」 */
 .q-2way{ font-size:11.5px; color:var(--text2); background:var(--bg3); border-radius:8px; padding:8px 11px; margin-bottom:8px; line-height:1.6; }

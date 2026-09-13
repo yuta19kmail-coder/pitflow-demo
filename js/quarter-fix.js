@@ -101,9 +101,34 @@
     return [t(soft && soft.売上日), t(soft && soft.伝票), t(cardId), t(kind)].join('|');
   }
   function marks(){ return (w._pitQMarks = w._pitQMarks || []); }
-  function markOf(kind, soft, cardId){
+  /* ⏳🔴🔴 v2.104.0（ゆうた 2026-09-13「それはやろう」）**「伝票を直した」は約束の印。次のPDFで確かめる。**
+     ◎起きていたこと（8月の総点検）
+       0701 小黒様。8/25 に「伝票を直した（PitFlow はこのままでよい）」を押したが、
+       9/13 に読んだPDFでも伝票は 8/16 のまま。**印のせいでチェック済みに隠れ、残り0に見えていた。**
+     🔴 だから **売上日・金額・担当** の印は、**押したあとに読んだ伝票でも同じズレが残っていたら効かない**。
+        ＝ 赤に戻る。押し直せば、次のPDFを読むまでまた効く。
+     ⚠ 「このままでよい（実績日）」「確かめた（同じ車）」は**約束ではない**（PitFlow が合っている／目で見た）ので、古くても効いたまま。
+     ⚠ 読んだ時刻（`soft.読んだ`）が無い行＝前の版で残した伝票は、今までどおり効く（壊さない）。
+     ⚠ ここを通るのは「いまもズレがある種類」だけ（rowLeft が fixKinds の種類しか聞かない）＝
+        伝票が本当に直っていればズレ自体が消えるので、印が古いかどうかは関係なくなる。 */
+  var PROMISE = { '売上日': 1, '金額': 1, '担当': 1 };
+  function isStale(m, soft){
+    if (!m || !PROMISE[t(m.種類)]) return false;
+    var read = t(soft && soft.読んだ), at = t(m.at);
+    return !!(read && at && read > at);
+  }
+  function rawMarkOf(kind, soft, cardId){
     var k = markKey(kind, soft, cardId);
     return marks().filter(function (x) { return x && x.key === k; })[0] || null;
+  }
+  function markOf(kind, soft, cardId){
+    var m = rawMarkOf(kind, soft, cardId);
+    return (m && isStale(m, soft)) ? null : m;
+  }
+  /* 効かなくなった約束の印（画面が「◯/◯ に押したが、まだ変わっていない」と言うため） */
+  function staleMarkOf(kind, soft, cardId){
+    var m = rawMarkOf(kind, soft, cardId);
+    return (m && isStale(m, soft)) ? m : null;
   }
 
   function loadMarks(){
@@ -499,6 +524,7 @@
   w.pitQSoftNo    = softOnlyNo;
   w.pitQPitNo     = pitOnlyNo;
   w.pitQMarkOf    = markOf;
+  w.pitQStaleMarkOf = staleMarkOf;   /* ⏳ v2.104.0 効かなくなった「伝票を直した」の印 */
   w.pitQLoadMarks = loadMarks;
   w.pitQMark      = mark;
   w.pitQFixKinds  = fixKinds;

@@ -930,7 +930,21 @@ function _bindAutoKanaSeg(nameEl, kanaEl, onCommit){
    入力途中の値はカード（c）へ随時入っているので、描き直しで消えることはない。 */
 window.pitCardRepaint = function(){
   const c = state.cards.find(x => x.id === _editingCardId);
-  if (c && typeof renderCardForm === 'function') renderCardForm(c);
+  if (!c || typeof renderCardForm !== 'function') return;
+  /* 🔴🔴 v2.115.0（ゆうた報告 2026-09-14）**編集フォームを出していない時は描かない。**
+     🗣「予約詳細から編集で保存して、予約詳細に戻って、放っておく。恐らくデータ受信のタイミングで
+     　　予約詳細カードの表示がバグる。予約詳細編集画面？かなが変な拡大表示で出ちゃう」
+     ◎正体＝ここは「開いているカード」を**いつも編集フォームで**描いていた。
+       ポップアップで**予約詳細（見る画面）**を出している時も、MHS の予定・定休日カレンダーが届くと
+       予約詳細の枠の中に編集フォームが描かれた（枠が予約詳細用の見た目のままなので崩れて出る）。
+     ◎描いてよいのは2つだけ
+       ・全画面の新規予約を出している時
+       ・ポップアップで「予約を編集」している時
+     ⚠ 予約詳細（見る画面）は次に開いた時に最新で描かれる＝ここでは触らない。 */
+  if (_cardMode === 'modal'){
+    if (!(window.pitCardEditing && pitCardEditing())) return;
+  } else if (!(window.state && state.currentView === 'card')) return;
+  renderCardForm(c);
 };
 
 /* ===================================================================

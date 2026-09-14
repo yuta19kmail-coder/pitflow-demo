@@ -831,13 +831,14 @@
         h += '<div class="cv-sec"><div class="cv-sect"><i data-ic=search data-ics=16></i> 車検</div>'
           + '<div class="cv-shdone"><div class="cv-shok-i" onclick="cvShDoneOpen()" title="押すと、この合格の記録を直す・取り消す"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> '
           /* 🔴 v2.56.0 一度落ちてその回で受かった＝「再検合格」。済とひとまとめにしない（ゆうた確定 2026-09-04） */
-          + ((window.pitShakenIsRepass&&pitShakenIsRepass(_si))?'車検 再検合格':'車検済') + '　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc((window.pitShakenStaffFull?pitShakenStaffFull(c):(_si.resultStaff||''))||'—') +'</span></div>'
+          /* 🔴 v2.112.0 言い方は物差し（pitShakenResultLabel）1本＝再検の車は「再検で合格」 */
+          + (window.pitShakenResultLabel ? '車検済：'+esc(pitShakenResultLabel(_si)) : ((window.pitShakenIsRepass&&pitShakenIsRepass(_si))?'車検 再検合格':'車検済')) + '　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc((window.pitShakenStaffFull?pitShakenStaffFull(c):(_si.resultStaff||''))||'—') +'</span></div>'
           + '<div class="cv-shwhere"><span class="cv-shw"><i data-ic=location data-ics=15></i> 陸運局：'+ esc(_of||'—') +'</span>'
           + '<span class="cv-shw"><i data-ic=clock data-ics=15></i> ラウンド：'+ (_rd? _rd+'R' : '—') +'</span></div>'
           /* 🔴 v2.56.0 再検合格で書いた「落ちた所」。入っている時だけ出す */
           + (((window.pitShakenIsRepass&&pitShakenIsRepass(_si))&&_si.repassNote)?'<div class="cv-shrc">落ちた所：'+esc(_si.repassNote)+'</div>':'')
           /* ✓ v2.102.0 合格の記録も**押して直す・取り消す**（再検と同じ出し方・ゆうた指定 2026-09-13） */
-          + '<div class="cv-shok-hint">✎ 押すと、日付・担当・陸運局・R・一発／再検合格を直せます（取り消しもここから）</div></div>'
+          + '<div class="cv-shok-hint">✎ 押すと、日付・担当・陸運局・R'+((window.pitShakenIsRetry&&pitShakenIsRetry(_si))?'':'・一発／再検合格')+'を直せます（取り消しもここから）</div></div>'
           + (_rcH.length? '<div class="cv-shrc">不合格 '+_rcH.length+'回：'+_rcTxt+'</div>':'')
           + '</div></div>';
       } else {
@@ -855,9 +856,17 @@
           + (_rcH.length? '<div class="cv-shrc">↺ 不合格の記録 '+_rcH.length+'回：'+_rcTxt+'</div>':'')
           /* 🔴🔴 v2.56.0（ゆうた確定 2026-09-04）帰ってきた時の押し先を3つに分けた。
              一発合格／再検合格（その場で直して受かった＝実質1回）／不合格（戻して修理）。 */
-          + '<div class="cv-shact"><button class="cv-shbtn ok" onclick="cvShakenGo(\'done\')"><i data-ic=check data-ics=16></i> 車検済にする（一発合格）</button>'
-          + '<button class="cv-shbtn ok" onclick="cvShakenGo(\'repass\')"><i data-ic=check data-ics=16></i> 再検合格で済にする</button>'
-          + '<button class="cv-shbtn re" onclick="cvShakenGo(\'recheck\')">✕ 不合格を記録</button></div>'
+          /* 🔀 v2.112.0 押し先は物差し（pitShakenChoices）が配る＝再検の車は「今回は合格／今回も不合格」の2つ */
+          + '<div class="cv-shact">'
+          + (window.pitShakenChoices
+              ? pitShakenChoices(_si).items.map(function(it){
+                  return '<button class="cv-shbtn '+(it.tone==='re'?'re':'ok')+'" onclick="cvShakenGo(\''+it.act+'\')" title="'+esc(it.sub)+'">'
+                    + (it.tone==='re'?'✕ ':'<i data-ic=check data-ics=16></i> ')+esc(it.label)+'</button>';
+                }).join('')
+              : '<button class="cv-shbtn ok" onclick="cvShakenGo(\'done\')"><i data-ic=check data-ics=16></i> 車検済にする（一発合格）</button>'
+                + '<button class="cv-shbtn ok" onclick="cvShakenGo(\'repass\')"><i data-ic=check data-ics=16></i> 再検合格で済にする</button>'
+                + '<button class="cv-shbtn re" onclick="cvShakenGo(\'recheck\')">✕ 不合格を記録</button>')
+          + '</div>'
           + '</div></div>';
       }
     }
@@ -2665,7 +2674,10 @@
     const staffOpts = (state.staff||[]).map(function(m){ return '<option value="'+esc(m.name)+'"'+(cur===m.name?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
     /* 🔴 v2.56.0 kind＝'done'（一発合格）／'repass'（再検合格）／'recheck'（不合格） */
     const isDone = (kind==='done'||kind==='repass');
-    const title = (kind==='done')   ? '<i data-ic=check data-ics=16></i> 車検済を記録（一発合格）'
+    /* 🔴 v2.112.0 題も物差し（pitShakenChoices）の字＝押したボタンと同じ言葉 */
+    const _it = (window.pitShakenChoices?pitShakenChoices(s).items:[]).filter(function(x){ return x.act===kind; })[0];
+    const title = _it ? ((isDone?'<i data-ic=check data-ics=16></i> 記録：':'✕ 記録：')+esc(_it.label))
+                : (kind==='done')   ? '<i data-ic=check data-ics=16></i> 車検済を記録（一発合格）'
                 : (kind==='repass') ? '<i data-ic=check data-ics=16></i> 車検済を記録（再検合格）'
                                     : '✕ 不合格を記録';
     const body = '<div class="cv-shpb">'
@@ -2688,7 +2700,7 @@
          ⚠ 空のままでも記録できる（今までどおり）。書いた分は下の再検履歴に出る。
          ⚠ 済（受かった）には出さない＝書くことが無い。 */
       /* 🔴 v2.56.0 「落ちた所」は**再検合格と不合格の両方**で書ける（一発合格だけ書くことが無い） */
-      + (kind==='done' ? '' : '<label>落ちた所（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">')
+      + ((_it ? !_it.note : kind==='done') ? '' : '<label>落ちた所（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">')
       + '<div class="cv-shpb-act"><button class="cv-shbtn '+(isDone?'ok':'re')+'" onclick="cvShConfirm(\''+kind+'\')">記録する</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
       + '</div>';
     let back=document.getElementById('cv-shpop');
@@ -2836,10 +2848,16 @@
     window._cvShKind = (window.pitShakenIsRepass&&pitShakenIsRepass(s)) ? 'repass' : 'done';
     const staffOpts = '<option value="">（未定）</option>'
       + (state.staff||[]).map(function(m){ return '<option value="'+esc(m.name)+'"'+(s.resultStaff===m.name?' selected':'')+'>'+esc(m.name)+'</option>'; }).join('');
+    /* 🔀 v2.112.0 再検の車は合格の種類が1つ（再検で合格）＝選ばせない。字だけ出す */
+    const _retry = !!(window.pitShakenIsRetry && pitShakenIsRetry(s));
+    if(_retry) window._cvShKind = 'done';
     const body = '<div class="cv-shpb">'
-      + '<label>合格の種類</label><div class="cv-shslot" id="cv-shkind">'
-        + '<button type="button" data-k="done" class="'+(window._cvShKind==='done'?'on':'')+'" onclick="cvShKind(this)">一発合格</button>'
-        + '<button type="button" data-k="repass" class="'+(window._cvShKind==='repass'?'on':'')+'" onclick="cvShKind(this)">再検合格</button></div>'
+      + '<label>合格の種類</label>'
+      + (_retry
+        ? '<div class="cv-shkind-fix">'+esc(window.pitShakenResultLabel?pitShakenResultLabel(s):'再検で合格')+'</div>'
+        : '<div class="cv-shslot" id="cv-shkind">'
+          + '<button type="button" data-k="done" class="'+(window._cvShKind==='done'?'on':'')+'" onclick="cvShKind(this)">一発合格</button>'
+          + '<button type="button" data-k="repass" class="'+(window._cvShKind==='repass'?'on':'')+'" onclick="cvShKind(this)">再検合格（その場で直した）</button></div>')
       + '<label>行った日</label><input type="date" id="cv-shdate" value="'+esc(d)+'">'
       + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(sl==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(sl==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
       + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'

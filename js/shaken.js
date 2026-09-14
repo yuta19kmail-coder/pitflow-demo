@@ -228,6 +228,8 @@
     var mtip = (row && row.repass) ? '再検合格（一度落ちたが、その回で受かった）'
              : (row && row.re)     ? ('再検（前に不合格。もう一度受験しに行く）'
                                       + (row.reNo>=2 ? '／不合格 '+row.reNo+'回' : ''))
+             /* 🔴 v2.112.0 再検の回で受かった＝「再検済」（済にしても再検だったことを消さない） */
+             : (row && row.retry && kind==='done') ? ('再検で合格（不合格 '+row.reNo+'回のあと）')
              : (kind==='recheck')  ? '不合格（自社に戻して修理）' : '';
     /* 🔴 v2.56.0 この枠は118pxしかない＝**再検合格だけ「再合」に縮める**（ゆうた指定 2026-09-04）。
        ⚠ 4文字のままだと「五十嵐様」で車名の行まで詰まる。見本で実物の幅を出して決めた。
@@ -629,7 +631,9 @@
     if(s.result==='done'){
       /* 🔴 v2.56.0 完了が「再検合格」なら、そう書く（済とひとまとめにしない） */
       var _rp=window.pitShakenIsRepass?pitShakenIsRepass(s):!!s.repass;
-      body+='<div class="shk-pnote">'+(_rp?'再検合格':'完了')+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')
+      /* 🔴 v2.112.0 言い方は物差し（pitShakenResultLabel）1本＝再検の車は「再検で合格」 */
+      var _rl=window.pitShakenResultLabel?pitShakenResultLabel(s):(_rp?'再検合格':'完了');
+      body+='<div class="shk-pnote">'+esc(_rl)+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')
         +(_rp&&s.repassNote?'<br>落ちた所：'+esc(s.repassNote):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
     } else if(s.decided){
       /* 🔴🔴 v2.57.0（ゆうた指定 2026-09-04）**窓を3つの塊に分けて、線で区切った。**
@@ -640,7 +644,18 @@
             ＝ 行く日を外す道は「候補（行ける日）に戻す」1本。⚠ MHS には候補が無いので、あちらは残す。
          🔴 **理由の1行は、この窓から外して次の窓へ送った**（下の shkNotePop）。
             ＝ 窓を開いただけで入力欄が見えていると、「書かないと押せない」ように読める。 */
-      body+='<div class="shk-pnote">予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
+      /* 🔀 v2.112.0 帰ってきた時の押し先は **物差し（pitShakenChoices）が配る**。
+         1回目＝一発合格／再検合格（その場で直した）／不合格　・　再検の車＝今回は合格／今回も不合格 */
+      var _ch=window.pitShakenChoices?pitShakenChoices(s):null;
+      var _res=_ch ? _ch.items.map(function(it){
+          var cls=it.tone==='re'?'re':(it.tone==='ok2'?'ok2':'ok');
+          var go=it.note ? 'shkNotePop(\''+id+'\',\''+it.act+'\')' : 'shkAct(\''+id+'\',\''+it.act+'\')';
+          return '<button class="shk-pbtn '+cls+'" onclick="'+go+'" title="'+esc(it.sub)+'">'+(it.tone==='re'?'✕ ':'✓ ')+esc(it.label)+'</button>';
+        }).join('')
+        : '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（一発合格）</button>'
+        + '<button class="shk-pbtn ok2" onclick="shkNotePop(\''+id+'\',\'repass\')">✓ 完了（再検合格）</button>'
+        + '<button class="shk-pbtn re" onclick="shkNotePop(\''+id+'\',\'recheck\')">✕ 不合格（記録して候補へ戻す）</button>';
+      body+='<div class="shk-pnote">'+(_ch&&_ch.retry?'<b>再検</b>（不合格 '+_ch.reNo+'回のあと）　':'')+'予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
         + fieldsHtml(c)
         + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+id+'\')">この内容で保存</button>'
         + '<div class="shk-psep"></div>'
@@ -650,9 +665,7 @@
         + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'tocand\')">↩ 候補（行ける日）に戻す</button>'
         + '<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>'
         + '<div class="shk-psep"></div>'
-        + '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（一発合格）</button>'
-        + '<button class="shk-pbtn ok2" onclick="shkNotePop(\''+id+'\',\'repass\')">✓ 完了（再検合格）</button>'
-        + '<button class="shk-pbtn re" onclick="shkNotePop(\''+id+'\',\'recheck\')">✕ 不合格（記録して候補へ戻す）</button>';
+        + _res;
       pop('車検の予定', body); return;                      /* ⚠ 下の「カードを開く」は付けない（中の塊に入れた） */
     } else {
       body+='<div class="shk-pnote">この車の不合格の記録です。</div><button class="shk-pbtn" onclick="shkClosePop()">閉じる</button>';
@@ -734,10 +747,12 @@
     _shkPend=_grabFields();                 /* 🔴 消える前に控える */
     var c=card(id); if(!c) return; var s=ins(c);
     var isNg=(act==='recheck');
-    pop(isNg?'✕ 不合格を記録':'✓ 完了（再検合格）',
+    /* 🔴 v2.112.0 窓の題と説明も物差し（pitShakenChoices）の字＝押したボタンと同じ言葉で出す */
+    var _it=(window.pitShakenChoices?pitShakenChoices(s).items:[]).filter(function(x){ return x.act===act; })[0];
+    pop(_it?((isNg?'✕ ':'✓ ')+esc(_it.label)):(isNg?'✕ 不合格を記録':'✓ 完了（再検合格）'),
       '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+'</div>'
       + '<div class="shk-pnote">'+fmtMDW(s.decided)+' '+(s.decidedSlot==='pm'?'午後':'午前')+'　'
-        + (isNg?'自社に戻して修理。行く日は候補に戻ります。':'一度落ちたが、その回で受かった記録です。')+'</div>'
+        + (_it?esc(_it.sub)+'。':(isNg?'自社に戻して修理。行く日は候補に戻ります。':'一度落ちたが、その回で受かった記録です。'))+'</div>'
       + '<label class="shk-plabel">落ちた所（1行・空でもOK）</label>'
       + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
       + '<div class="shk-pwords">'+SHK_NG_WORDS().map(function(w){
@@ -757,7 +772,11 @@
     var r=_applyPend(id, act, el?el.value:'');
     if(!r) return;
     closePop();
-    if(window.pitToast) pitToast(act==='recheck'?'不合格を記録しました（候補に戻しました）':'再検合格で「済」にしました');
+    /* 🔴 v2.112.0 再検の車は「今回は合格／今回も不合格」の言葉で返す（記録したあとの回数で見分ける） */
+    var _n=window.pitShakenReCount?pitShakenReCount(r.insp):0;
+    if(window.pitToast) pitToast(act==='recheck'
+      ? (_n>=2?'今回も不合格を記録しました（候補に戻しました）':'不合格を記録しました（候補に戻しました）')
+      : (_n>=1?'再検で合格にしました':'再検合格で「済」にしました'));
   };
   /* 🔴🔴 v1.160.0（ゆうた指定 2026-08-20）**どう変わるかは pit-share.js の `pitShakenApply` 1本。**
      🗣「MHSに出てる当日の車検車両、入庫返車と同じように…クリックできるように」

@@ -25,16 +25,21 @@
         （＝臨時休業までは遡れない）。**下の ※ にそう書いてある。** */
   function dayOff(iso){ return window.pitShakenDayOff ? pitShakenDayOff(iso) : { off:false, kind:'', label:'', short:'' }; }
   function todayIso(){ var t=new Date(); t.setHours(0,0,0,0); return ymd(t); }
+  /* 👥 v2.113.0 担当の出し方＝「1人目＋2人目」（理由は吹き出しだけ）。 */
+  function staffTxt(r, withNote){ return r.staff2 ? ((r.staff||'—')+'＋'+r.staff2+(withNote&&r.staff2Note?'（'+r.staff2Note+'）':'')) : (r.staff||''); }
 
   // 事実ベースの実績レコードを収集
   function records(){
     var out=[];
     (state.cards||[]).forEach(function(c){ if(!isShaken(c)) return; var s=ins(c);
       /* 🔴 v2.56.0 済のうち「再検合格」は分かるようにして持ってくる（数は済のまま＝1台） */
+      /* 👥 v2.113.0 2人目（staff2）と理由も持ってくる。**担当別の数は1人目だけ**（staff）＝今までどおり */
       if(s.result==='done'){ var d=s.resultDate||s.decided; if(d) out.push({iso:d, slot:(s.resultSlot||s.decidedSlot)==='pm'?'pm':'am', c:c, result:'done', staff:s.resultStaff||'',
+        staff2:(s.resultStaff2&&s.resultStaff2!==s.resultStaff)?s.resultStaff2:'', staff2Note:s.resultStaff2Note||'',
         repass:(window.pitShakenIsRepass?pitShakenIsRepass(s):!!s.repass), note:s.repassNote||''}); }
       /* 🔴 v2.54.0 再検の理由（1行）も一緒に持ってくる＝吹き出しと検索で使う */
-      (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date) out.push({iso:h.date, slot:h.slot==='pm'?'pm':'am', c:c, result:'recheck', staff:h.staff||'', note:h.note||''}); });
+      (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date) out.push({iso:h.date, slot:h.slot==='pm'?'pm':'am', c:c, result:'recheck', staff:h.staff||'',
+        staff2:(h.staff2&&h.staff2!==h.staff)?h.staff2:'', staff2Note:h.staff2Note||'', note:h.note||''}); });
     });
     return out;
   }
@@ -50,7 +55,7 @@
     var res=recs.filter(function(r){
       var d=new Date(r.iso+'T00:00:00');
       var dstr=r.iso+' '+(d.getMonth()+1)+'/'+d.getDate()+' '+(d.getMonth()+1)+'月'+d.getDate()+'日 '+d.getFullYear();
-      var hay=[surname(r.c), r.c.customer||'', r.c.kana||'', carLabel(r.c), r.c.car||'', r.c.maker||'', r.c.plate||'', r.staff||'', r.note||'', dstr, (r.result==='done'?(r.repass?'済 done 再検合格 repass':'済 done'):'不合格 再検 recheck')].join(' ').toLowerCase();
+      var hay=[surname(r.c), r.c.customer||'', r.c.kana||'', carLabel(r.c), r.c.car||'', r.c.maker||'', r.c.plate||'', r.staff||'', r.staff2||'', r.staff2Note||'', r.note||'', dstr, (r.result==='done'?(r.repass?'済 done 再検合格 repass':'済 done'):'不合格 再検 recheck')].join(' ').toLowerCase();
       return terms.every(function(t){ return hay.indexOf(t)>=0; });
     }).sort(function(a,b){ return a.iso<b.iso?1:(a.iso>b.iso?-1:(a.slot<b.slot?-1:1)); });
     var h='<div class="skl-res-head">検索結果 <b>'+res.length+'</b>件</div>';
@@ -63,7 +68,7 @@
         +'<span class="skl-res-nm">'+esc(surname(r.c))+'様</span>'
         +'<span class="skl-res-car">'+(_car?esc(_car):'—')+'</span>'
         +'<span class="skl-rt">'+(r.result==='done'?'済':'再')+'</span>'
-        +'<span class="skl-res-stf">'+(r.staff?esc(r.staff):'—')+'</span>'
+        +'<span class="skl-res-stf"'+(r.staff2Note?' title="'+esc(staffTxt(r,true))+'"':'')+'>'+(staffTxt(r)?esc(staffTxt(r)):'—')+'</span>'
         +'</div>';
     });
     return h+'</div>';
@@ -110,12 +115,12 @@
         /* 🔴 祝日は日付を日曜と同じ赤に。＝**火曜なのに斜線**の理由が、字を出さなくても伝わる
              （ゆうた指定「理由の字は自社の休みの時だけ」なので、色で分かるようにする）。 */
         + '<div class="skl-dh"><span class="skl-d '+(off.kind==='holiday'?'holi':(w===0?'sun':w===6?'sat':''))+'">'+d.getDate()+'</span>'+offTag+(arr.length?'<span class="skl-cnt">'+arr.length+'</span>':'')+'</div>'
-        + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?(r.repass?'再検合格':'済'):'不合格')+' '+(r.slot==='pm'?'PM':'AM')+(r.staff?' / '+esc(r.staff):'')+(r.note?' / '+esc(r.note):'')+'">'
+        + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?(r.repass?'再検合格':'済'):'不合格')+' '+(r.slot==='pm'?'PM':'AM')+(staffTxt(r)?' / '+esc(staffTxt(r,true)):'')+(r.note?' / '+esc(r.note):'')+'">'
             + '<div class="skl-r1"><span class="skl-ap '+r.slot+'">'+(r.slot==='pm'?'PM':'AM')+'</span>'
             + '<span class="skl-nm">'+esc(surname(r.c))+'様</span>'
             + '<span class="skl-rt'+(r.repass?' rp':'')+'">'+(r.result==='done'?(r.repass?'再合':'済'):'不合')+'</span></div>'
             + '<div class="skl-r2"><span class="skl-car">'+(_car?esc(_car):'—')+'</span>'
-            + (r.staff?'<span class="skl-stf">'+esc(r.staff)+'</span>':'')+'</div>'
+            + (staffTxt(r)?'<span class="skl-stf">'+esc(staffTxt(r))+'</span>':'')+'</div>'
             + '</div>'; }).join('')
         + '</div>';
     }

@@ -54,6 +54,7 @@
         if(!h || h.result!=='recheck' || !h.date) return;
         if(h.date<moS || h.date>moE) return;
         trips.push({ iso:h.date, kind:'ng', c:c, team:team, staff:h.staff||'',
+          staff2:(h.staff2&&h.staff2!==h.staff)?h.staff2:'',   /* 👥 v2.113.0 見せるだけ。数えるのは staff（1人目） */
           office:h.officeName||'', round:num(h.round), slot:(h.slot==='pm')?'pm':'am', note:h.note||'' });
       });
       /* ② 合格＝この月に締まった車 */
@@ -63,7 +64,8 @@
           var reN = window.pitShakenReCount ? pitShakenReCount(s) : 0;
           var rp  = window.pitShakenIsRepass ? pitShakenIsRepass(s) : !!s.repass;
           trips.push({ iso:d, kind: rp?'repass':(reN?'passAfter':'pass1'), c:c, team:team,
-            staff:s.resultStaff||'', office:s.officeName||'', round:num(s.round),
+            staff:s.resultStaff||'', staff2:(s.resultStaff2&&s.resultStaff2!==s.resultStaff)?s.resultStaff2:'',
+            office:s.officeName||'', round:num(s.round),
             slot:((s.resultSlot||s.decidedSlot)==='pm')?'pm':'am', note: rp?(s.repassNote||''):'', reNo:reN });
         }
       }
@@ -314,7 +316,7 @@
         +'<td class="sv-td-name">'+esc(surname(t.c))+'様</td>'
         +'<td>'+esc(carOf(t.c))+'</td>'
         +'<td><span class="sln-team '+(t.team==='import'?'imp':'')+'">'+teamLabel(t.team)+'</span></td>'
-        +'<td>'+esc(staffOf(t.staff))+'</td>'
+        +'<td>'+esc(staffOf(t.staff))+(t.staff2?'＋'+esc(staffOf(t.staff2)):'')+'</td>'
         +'<td>'+esc(t.office||'')+'</td>'
         +'<td>'+(t.round?t.round+'R':'')+'</td>'
         +'<td>'+(t.note?esc(t.note):'<span class="sln-nonote">（未記入）</span>')+'</td></tr>';

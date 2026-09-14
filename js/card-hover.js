@@ -390,6 +390,9 @@
       h += '<div class="ph-sec ph-sec-shk"><div class="ph-sec-lb"><i data-ic=search data-ics=16></i> 車検の詳細</div>'
          + '<div class="ph-sec-body ph-shk-body">'
          + _row('担当（回送）', _sst)
+         /* 👥 v2.113.0 2人目がいる時だけ1行足す（理由はかっこ書き） */
+         + ((function(){ var _s=c.inspSchedule||{}; return (_s.resultStaff2&&_s.resultStaff2!==_s.resultStaff)
+             ? _row('2人目', (window.pitStaffFull?pitStaffFull(_s.resultStaff2):_s.resultStaff2)+(_s.resultStaff2Note?'（'+_s.resultStaff2Note+'）':'')) : ''; })())
          + _row('陸運局', _sof)
          + _row('R（ラウンド）', _srd ? (_srd + 'R') : '')
          + '</div></div>';

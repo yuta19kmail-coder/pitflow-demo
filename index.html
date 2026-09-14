@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.107.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.112.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -14,9 +14,9 @@
 <link rel="stylesheet" href="css/layout.css?v=12">
 <link rel="stylesheet" href="css/views.css?v=59">
 <link rel="stylesheet" href="css/polish.css?v=235">
-<link rel="stylesheet" href="css/fleet-cal.css?v=7"><!-- 🗓 v2.70.0 車両カレンダー・代車カレンダーの整備予定。polish.css より **後ろ**（ここが上書きする側） -->
+<link rel="stylesheet" href="css/fleet-cal.css?v=8"><!-- 🗓 v2.70.0 車両カレンダー・代車カレンダーの整備予定。polish.css より **後ろ**（ここが上書きする側） -->
 <link rel="stylesheet" href="css/floor.css?v=24">
-<link rel="stylesheet" href="css/board-notes.css?v=2">
+<link rel="stylesheet" href="css/coreflow-note-board.css?v=a29f6744"><!-- 📌 付箋ボードの見た目（全アプリ共通・_shared から配布）。v2.109.0 で前の付箋専用の見た目から置き換え -->
 <link rel="stylesheet" href="css/coreflow-note-reply.css?v=b5c2b3fb"><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.css より後ろに読む -->
 <link rel="stylesheet" href="css/coreflow-req.css?v=fd4a9c74"><!-- 📮 予定依頼（全アプリ共通・_shared から配布） -->
 <link rel="stylesheet" href="css/search.css?v=8">
@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="css/work-content.css?v=9">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=2d7b23ed">
-<link rel="stylesheet" href="css/card-view.css?v=44">
+<link rel="stylesheet" href="css/card-view.css?v=45">
 <link rel="stylesheet" href="css/card-hover.css?v=26">
 <link rel="stylesheet" href="css/sales.css?v=8">
 <link rel="stylesheet" href="css/shaken.css?v=25">
@@ -132,7 +132,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.107.0</div>
+    <div class="login-ver">v2.112.0</div>
   </div>
 </div>
 
@@ -146,7 +146,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.107.0</span>
+    <span class="ver">v2.112.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -771,126 +771,19 @@
   </div>
 </div>
 
-<!-- ===== <i data-ic=pin data-ics=16></i> 付箋ボード（全体タスク・v0.63.0） ===== -->
-<!-- ⋮ アクションシート -->
-<div class="modal-backdrop" id="modal-bn-actions" onclick="if(event.target.id==='modal-bn-actions')closeBoardNoteActions()">
-  <div class="bn-actionsheet" onclick="event.stopPropagation()">
-    <div class="bn-actionsheet-title" id="bn-actionsheet-title">付箋メニュー</div>
-    <button class="bn-actionsheet-btn" id="bn-action-edit" onclick="bnActionEdit()"><i data-ic=pencil data-ics=16></i> 編集</button>
-    <button class="bn-actionsheet-btn" id="bn-action-done" onclick="bnActionDone()"><i data-ic=check data-ics=16></i> 済にする</button>
-    <button class="bn-actionsheet-btn" id="bn-action-undone" onclick="bnActionUndone()" style="display:none">↩️ 未済に戻す</button>
-    <button class="bn-actionsheet-btn" id="bn-action-reply" onclick="bnActionReply()"><i data-ic=comment data-ics=16></i> 返信する</button>
-    <button class="bn-actionsheet-btn bn-danger" id="bn-action-delete" onclick="bnActionDelete()"><i data-ic=trash data-ics=16></i> 消去</button>
-    <button class="bn-actionsheet-btn bn-cancel" onclick="closeBoardNoteActions()">キャンセル</button>
-  </div>
-</div>
-
-<!-- 返信モーダル -->
-<div class="modal-backdrop" id="modal-bn-reply" onclick="if(event.target.id==='modal-bn-reply')closeBoardNoteReply()">
-  <div class="modal-box" style="max-width:480px">
-    <div class="modal-head">
-      <div class="modal-title"><i data-ic=comment data-ics=16></i> 返信する</div>
-      <button class="modal-close" onclick="closeBoardNoteReply()"><i data-ic=close data-ics=16></i></button>
-    </div>
-    <div class="modal-body">
-      <div style="font-size:12px;color:var(--text3)">対象：<span id="bn-reply-note-title" style="color:var(--text2)"></span></div>
-      <div class="bn-modal-body">
-        <div>
-          <label class="bn-lb">返信</label>
-          <textarea id="bn-reply-text" rows="3" maxlength="300" placeholder="例：まだ途中です／対応しました"></textarea>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">本文の下にあなたのアイコンと一緒に表示されます。「済にする」は別操作です。</div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button class="vh-btn" onclick="closeBoardNoteReply()">キャンセル</button>
-        <button class="vh-btn primary" onclick="submitBoardNoteReply()">送信</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 編集モーダル -->
-<div class="modal-backdrop" id="modal-board-note" onclick="if(event.target.id==='modal-board-note')closeBoardNoteModal()">
-  <div class="modal-box" style="max-width:560px">
-    <div class="modal-head">
-      <div class="modal-title" id="bn-modal-title">付箋を追加</div>
-      <button class="modal-close" onclick="closeBoardNoteModal()"><i data-ic=close data-ics=16></i></button>
-    </div>
-    <div class="modal-body">
-      <div class="bn-modal-body">
-        <div>
-          <label class="bn-lb">タイトル</label>
-          <input type="text" id="bn-inp-title" maxlength="60" placeholder="例：◯◯様 急ぎ洗車">
-        </div>
-        <div>
-          <label class="bn-lb">本文</label>
-          <textarea id="bn-inp-body" rows="3" maxlength="600" placeholder="例：来店予定あり、本日午後までに洗ってほしいです"></textarea>
-        </div>
-        <div>
-          <label class="bn-lb">色</label>
-          <div class="bn-color-picker">
-            <label><input type="radio" name="bn-color" id="bn-color-red"><span class="bn-color-swatch bn-sw-red"></span><span class="bn-color-pick-label">赤</span></label>
-            <label><input type="radio" name="bn-color" id="bn-color-orange"><span class="bn-color-swatch bn-sw-orange"></span><span class="bn-color-pick-label">橙</span></label>
-            <label><input type="radio" name="bn-color" id="bn-color-yellow" checked><span class="bn-color-swatch bn-sw-yellow"></span><span class="bn-color-pick-label">黄</span></label>
-            <label><input type="radio" name="bn-color" id="bn-color-green"><span class="bn-color-swatch bn-sw-green"></span><span class="bn-color-pick-label">緑</span></label>
-            <label><input type="radio" name="bn-color" id="bn-color-blue"><span class="bn-color-swatch bn-sw-blue"></span><span class="bn-color-pick-label">青</span></label>
-          </div>
-        </div>
-        <div>
-          <label class="bn-lb">種類</label>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;padding:2px 0">
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text1)"><input type="radio" name="bn-type" id="bn-type-execute" value="execute" checked> 実行（誰か1人がやればOK）</label>
-            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text1)"><input type="radio" name="bn-type" id="bn-type-circulate" value="circulate"> 回覧（担当全員が各自で確認）</label>
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">実行＝洗車などの作業向け（誰かが「済」にしたら完了）。回覧＝連絡の確認向け（担当全員が各自で「済」を入れたら完了）。</div>
-        </div>
-        <div>
-          <label class="bn-lb">期限（任意）</label>
-          <input type="date" id="bn-inp-deadline">
-        </div>
-        <div>
-          <label class="bn-lb">担当メンバー（任意・複数選択可）</label>
-          <div id="bn-group-quick" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
-          <div id="bn-inp-members" class="bn-member-list"></div>
-        </div>
-        <div>
-          <label class="bn-lb">画像（任意）</label>
-          <!-- 📎 見た目はアプリのボタンに揃える。input 本体は label の中に隠してある（機能はそのまま） -->
-          <label class="bn-file">
-            <span class="ic"><i data-ic=image data-ics=16></i></span>
-            <span>画像を選ぶ</span>
-            <input type="file" accept="image/*" onchange="bnOnPhotoChange(this)">
-          </label>
-          <span class="bn-file-name" id="bn-file-name"></span>
-          <div id="bn-inp-photo-preview" style="margin-top:8px"></div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button class="vh-btn" onclick="closeBoardNoteModal()">キャンセル</button>
-        <button class="vh-btn primary" onclick="saveBoardNoteFromModal()"><i data-ic=save data-ics=16></i> 保存</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 画像プレビュー -->
-<div class="modal-backdrop" id="modal-bn-image" onclick="closeBnImage()">
-  <button class="bn-image-close" onclick="closeBnImage()"><i data-ic=close data-ics=16></i></button>
-  <div class="bn-image-wrap" onclick="event.stopPropagation()">
-    <img id="bn-image-img" src="" alt="" onclick="closeBnImage()">
-  </div>
-</div>
+<!-- 📌 v2.109.0 付箋の窓（メニュー・編集・画像）は共通部品（js/coreflow-note-board.js）が自分で作る -->
 
 <!-- ===== Firebase SDK（クラウド保存の足場・現状は初期化のみ／認証は後日） ===== -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script><!-- 📎 v2.110.0 付箋の画像・PDF をファイル置き場へ（共通部品 coreflow-note-board.js が使う） -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-functions-compat.js"></script><!-- 🤖 AIに聞く窓口（鍵はサーバー側。functions/index.js の pfAsk） -->
 
 <!-- ===== JS ===== -->
 <script src="js/coreflow-icons.js?v=9ae48aea"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
-<script src="js/pit-share.js?v=31"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
+<script src="js/pit-share.js?v=32"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=8d7c4b2d"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
 <script src="js/errcode-pit.js?v=24"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
@@ -923,7 +816,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-detail.js?v=151"></script>
 <script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=77"></script>
+<script src="js/card-view.js?v=78"></script>
 <script src="js/cover-print.js?v=16"></script>
 <script src="js/avail.js?v=8"></script>
 <script src="js/card-tabs.js?v=15"></script>
@@ -939,7 +832,8 @@ window.PIT_DEMO = true;</script>
 <script src="js/parking.js?v=9"></script>
 <script src="js/coreflow-note-reply.js?v=a224b9c0"></script><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
 <script src="js/coreflow-note-all.js?v=830ce1ff"></script><!-- 📎 付箋のまとめて表示（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
-<script src="js/board-notes.js?v=11"></script>
+<script src="js/coreflow-note-board.js?v=fef50604"></script><!-- 📌 付箋ボード本体（全アプリ共通・_shared から配布）。board-notes.js より **前** に読む -->
+<script src="js/board-notes.js?v=13"></script>
 <script src="js/search.js?v=21"></script>
 <script src="js/insurance-pit.js?v=1"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
 <script src="js/sales-count.js?v=7"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
@@ -977,7 +871,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/task.js?v=24"></script>
 <script src="js/work.js?v=14"></script>
 <script src="js/result.js?v=18"></script>
-<script src="js/shaken.js?v=35"></script>
+<script src="js/shaken.js?v=36"></script>
 <script src="js/shaken-log.js?v=9"></script>
 <script src="js/outsource.js?v=5"></script>
 <script src="js/loaner.js?v=86"></script>
@@ -1001,9 +895,11 @@ window.PIT_DEMO = true;</script>
 <script src="js/mech-guard.js?v=6"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
 <script src="js/phase-popup.js?v=20"></script>
 <script src="js/return-popup.js?v=14"></script>
-<script src="js/help-content.js?v=66"></script>
+<script src="js/help-content.js?v=67"></script>
 <script src="js/help.js?v=2"></script>
-<script src="js/mydash.js?v=28"></script>
+<script src="js/mydash.js?v=29"></script>
+<script src="js/app-summary.js?v=2"></script><!-- 📡 v2.108.0 CoreFlow のダッシュボードへ概況を配る（mydash.js の物差しを借りる＝mydash.js より後ろ） -->
+<script src="js/feed-facts.js?v=1"></script><!-- 🔔 v2.111.0 FlowDesk の通知のもと（入庫・返車の時間過ぎ・長期預かり・売上）をサーバーだけが読む所へ置く（mydash.js の物差しを借りる＝mydash.js より後ろ） -->
 <script src="js/main.js?v=12"></script>
 <script src="js/auto-update.js?v=ffed3e38"></script>
   <script src="js/coreflow-power.js?v=caf3bb41"></script><!-- ⏻ 電源ボタン（全アプリ共通・_shared が本体） -->

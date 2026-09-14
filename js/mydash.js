@@ -1365,6 +1365,21 @@
      ・**BOXカタログ**（全部盛りの見本ページ）を、本物のBOXから作れるようにする
      ⚠ 中身は**読むだけ**。外から書き換えないこと（BOXを足すのは必ずこのファイルの中）。 */
   window.PIT_DASH_EL = EL;
+  /* 📡 v2.108.0 CoreFlow のダッシュボードへ概況を配る（js/app-summary.js）ための入口。
+     🔴 **どの車を数えるかは、ここの物差しを借りるだけ。** app-summary.js に条件を書き写さない
+        （書き写すと、PitFlow のBOXと CoreFlow の数字が食い違う）。中身は読むだけ。 */
+  window.PIT_DASH_API = {
+    ctx: buildCtx, amt: amt, nm: nm, carOf: carOf, countDate: mdCountDate, retDate: mdRetDate,
+    holdDays: holdDaysOf, longHoldDays: longHoldDays, returnedOn: mdReturnedOn, mdTot: mdTot, taskStaff: taskStaff,
+    pickIntake: pickIntake, pickReturnOut: pickReturnOut, pickHold: pickHold, pickLongHold: pickLongHold,
+    pickTelWait: pickTelWait, pickReturnWait: pickReturnWait, pickRetDateTbd: pickRetDateTbd, pickRetTimeTbd: pickRetTimeTbd, pickPay: pickPay,
+    pickApproval: pickApproval, pickTentative: pickTentative, pickIntakeTbd: pickIntakeTbd, pickNoShow: pickNoShow,
+    pickOrder: pickOrder, pickResultMonth: pickResultMonth, pickShakenPlan: pickShakenPlan, shakenKind: shakenKind,
+    shakenStat: shakenStat, shakenRecords: shakenRecords, loanerStat: loanerStat, csStat: csStat,
+    insStat: insStat, insGroups: insGroups, rpByDay: rpByDay, thxList: thxList, thxLeft: thxLeft, thxSent: thxSent,
+    pickPReserve: pickPReserve, pickPTask: pickPTask, pickPReturn: pickPReturn, pickPResStaff: pickPResStaff, pickPSales: pickPSales,
+    TASK_LABEL: TASK_LABEL
+  };
 
   function renderPresets() {
     var host = $('myd-presets'); if (!host) return;

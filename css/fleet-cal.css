@@ -153,7 +153,10 @@
      ・確定＝濃い／候補＝薄い。**候補は代車をふさがない**（今までどおり貸せる）
    ⚠ 色は車両管理と同じ「整備の色」（--pit-maint）。ここで別の色を作らない。
    ========================================================================== */
-.lo-cell{ position:relative; }
+/* 🔴 v2.110.1 見出しの行（.lo-head）は外す。ここは polish.css より後に読むので、
+   `.lo-cell{position:relative}` が見出しの `position:sticky` まで上書きして、
+   代車カレンダー上の車種名が上に貼り付かず流れて消えていた（v2.70.0 から）。見出しは polish.css で既に sticky＝枠の基準になる */
+.lo-cell:not(.lo-head){ position:relative; }
 .lo-mtline{ position:absolute; left:3px; top:-1px; bottom:-1px; width:6px; border-radius:0; z-index:2;
   background:var(--pit-maint,#d6a846); pointer-events:none; }
 .lo-mtline.st{ top:3px; border-top-left-radius:3px; border-top-right-radius:3px; }

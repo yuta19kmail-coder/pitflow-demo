@@ -324,12 +324,22 @@
     a[i][k] = v;
     /* 🔴 合格にしたら理由は消す（残すと「合格なのに理由がある」を自分で作る＝ゆうた指定） */
     if (k === 'result' && v === 'pass') a[i].why = '';
+    /* 👥 v2.113.0 2人目を外したら理由も消す／1人目と同じ人なら2人目は無し（揃え方は物差し1本） */
+    if ((k === 'staff' || k === 'staff2' || k === 'staff2Note') && w.pitShakenStaff2Norm){
+      var n2 = w.pitShakenStaff2Norm(a[i].staff, a[i].staff2, a[i].staff2Note);
+      if (n2.staff2){ a[i].staff2 = n2.staff2; a[i].staff2Note = n2.staff2Note; }
+      else { delete a[i].staff2; delete a[i].staff2Note; }
+    }
     render();
   };
   w.pitMasterShkPlan = function(k, v){
     if (!M) return;
     if (!M.inspSchedule) M.inspSchedule = { mode:'manual', slots:{}, history:[] };
     M.inspSchedule[k] = (k === 'round') ? (v ? Number(v) : 0) : v;
+    if ((k === 'resultStaff' || k === 'resultStaff2' || k === 'resultStaff2Note') && w.pitShakenStaff2Norm){
+      var s = M.inspSchedule, n2 = w.pitShakenStaff2Norm(s.resultStaff, s.resultStaff2, s.resultStaff2Note);
+      s.resultStaff2 = n2.staff2; s.resultStaff2Note = n2.staff2Note;
+    }
     render();
   };
 
@@ -603,6 +613,12 @@
       { hint: offices.length ? '' : '場所の表（メンバー画面）に陸運局が登録されていません' });
     h += fld('回送担当', '<select onchange="pitMasterShkPlan(\'resultStaff\',this.value)">'
       + opts(mem, s2.resultStaff, '—') + '</select>');
+    /* 👥 v2.113.0 回送の2人目と理由（2人目が空なら理由は出さない） */
+    h += fld('回送担当（2人目）', '<select onchange="pitMasterShkPlan(\'resultStaff2\',this.value)">'
+      + opts(mem, s2.resultStaff2, '—') + '</select>');
+    if (s2.resultStaff2)
+      h += fld('2人目の理由', '<input value="' + esc(s2.resultStaff2Note) + '" maxlength="60" placeholder="例：再検の帰りのみ運転"'
+        + ' onchange="pitMasterShkPlan(\'resultStaff2Note\',this.value)">');
     h += fld('R（何ラウンド）', '<select onchange="pitMasterShkPlan(\'round\',this.value)">'
       + opts((w.PIT_SHAKEN_ROUNDS || [1,2,3,4]).map(function(n){ return { id:String(n), label:n + 'R' }; }),
              String(s2.round || ''), 'まだ決めていない') + '</select>');
@@ -627,6 +643,11 @@
         +   opts([1,2,3,4].map(function(n){ return { id:String(n), label:n + 'R' }; }), String(x.round || ''), '—') + '</select>'
         + '<select onchange="pitMasterShkSet(' + i + ',\'staff\',this.value)">'
         +   opts(mem, x.staff, '—') + '</select>'
+        /* 👥 v2.113.0 2人目と理由 */
+        + '<select title="2人目" onchange="pitMasterShkSet(' + i + ',\'staff2\',this.value)">'
+        +   opts(mem, x.staff2, '2人目なし') + '</select>'
+        + '<input value="' + esc(x.staff2Note) + '" maxlength="60" placeholder="2人目の理由"' + (x.staff2 ? '' : ' disabled')
+        +   ' onchange="pitMasterShkSet(' + i + ',\'staff2Note\',this.value)">'
         + '<select onchange="pitMasterShkSet(' + i + ',\'result\',this.value)">'
         +   '<option value="recheck"' + (x.result === 'recheck' ? ' selected' : '') + '>不合格</option>'
         +   '<option value="pass"'    + (x.result === 'pass'    ? ' selected' : '') + '>合格</option>'

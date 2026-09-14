@@ -405,6 +405,9 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-shok-i:hover{ background:rgba(29,185,122,.14); border-color:rgba(29,185,122,.55); }
 .cv-shok-hint{ font-size:11px; color:var(--text2); margin-top:6px; opacity:.85; }
 /* 🔀 v2.112.0 再検の車は合格の種類が1つ＝選ぶボタンではなく字で出す */
+/* 👥 v2.113.0 2人目の担当（予約詳細の窓）。ラベルの上に隙間を作る .cv-shpb label と揃える */
+.cv-shpb .shk-s2{ margin:8px 0 0; }
+.cv-shstaff2{ margin-left:10px; color:var(--text2); }
 .cv-shkind-fix{ font-size:13px; font-weight:700; color:var(--text1); padding:6px 0; }
 .cv-shbtn{ border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-weight:700; padding:8px 14px; border-radius:9px; cursor:pointer; }
 .cv-shbtn:hover{ border-color:var(--brand,#1f7a4d); }

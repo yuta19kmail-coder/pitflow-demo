@@ -816,7 +816,10 @@
       const _rcTxt = _rcH.map(function(o){
         var r = o.x;
         /* 🔴 v1.127.0 カード詳細は**フルネーム**（ゆうた指定）。狭い枠だけ通称＆苗字。 */
-      var ex = [ (r.staff ? (window.pitStaffFull?pitStaffFull(r.staff):r.staff) : ''), _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
+      /* 👥 v2.113.0 2人目がいれば「1人目＋2人目（理由）」 */
+      var _stx = window.pitShakenStaffPair ? pitShakenStaffPair(r.staff, r.staff2, r.staff2Note, 'full', true)
+                                           : (r.staff ? (window.pitStaffFull?pitStaffFull(r.staff):r.staff) : '');
+      var ex = [ _stx, _ofOf(r), _rdOf(r) ].filter(Boolean).join('・');
         /* 🔴 v2.54.0 落ちた理由（1行）を後ろに出す。**入っているものだけ**出す
            （古い記録には入っていない＝無いものに「—」を書かない・2026-08-13 の決めごと）。 */
         return '<span class="cv-shrc-i" onclick="cvShReOpen('+o.i+')" title="押すと、この記録を直す・取り消す">'
@@ -832,7 +835,10 @@
           + '<div class="cv-shdone"><div class="cv-shok-i" onclick="cvShDoneOpen()" title="押すと、この合格の記録を直す・取り消す"><div class="cv-shdone-main"><i data-ic=check data-ics=16></i> '
           /* 🔴 v2.56.0 一度落ちてその回で受かった＝「再検合格」。済とひとまとめにしない（ゆうた確定 2026-09-04） */
           /* 🔴 v2.112.0 言い方は物差し（pitShakenResultLabel）1本＝再検の車は「再検で合格」 */
-          + (window.pitShakenResultLabel ? '車検済：'+esc(pitShakenResultLabel(_si)) : ((window.pitShakenIsRepass&&pitShakenIsRepass(_si))?'車検 再検合格':'車検済')) + '　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc((window.pitShakenStaffFull?pitShakenStaffFull(c):(_si.resultStaff||''))||'—') +'</span></div>'
+          + (window.pitShakenResultLabel ? '車検済：'+esc(pitShakenResultLabel(_si)) : ((window.pitShakenIsRepass&&pitShakenIsRepass(_si))?'車検 再検合格':'車検済')) + '　'+ (_si.resultDate&&window.fmtMD?fmtMD(_si.resultDate):(_si.resultDate||'')) +'　'+ _slT(_si.resultSlot) +'　<span class="cv-shstaff">担当（回送）：'+ esc((window.pitShakenStaffFull?pitShakenStaffFull(c):(_si.resultStaff||''))||'—') +'</span>'
+          /* 👥 v2.113.0 2人目（理由） */
+          + ((_si.resultStaff2 && _si.resultStaff2!==_si.resultStaff) ? '<span class="cv-shstaff cv-shstaff2">2人目：'+esc(window.pitStaffFull?pitStaffFull(_si.resultStaff2):_si.resultStaff2)+(_si.resultStaff2Note?'（'+esc(_si.resultStaff2Note)+'）':'')+'</span>' : '')
+          + '</div>'
           + '<div class="cv-shwhere"><span class="cv-shw"><i data-ic=location data-ics=15></i> 陸運局：'+ esc(_of||'—') +'</span>'
           + '<span class="cv-shw"><i data-ic=clock data-ics=15></i> ラウンド：'+ (_rd? _rd+'R' : '—') +'</span></div>'
           /* 🔴 v2.56.0 再検合格で書いた「落ちた所」。入っている時だけ出す */
@@ -2666,6 +2672,13 @@
   // ===== 車検 実施記録（済／再検・担当者入力・フローへ記録） =====
   function _isoToday(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
   function _mdOf(iso){ if(window.fmtMD) return fmtMD(iso); const p=String(iso).split('-'); return (+p[1])+'/'+(+p[2]); }
+  /* 👥 v2.113.0 2人目の担当（＋ 担当者を追加）。部品は pit-share.js の pitShkStaff2Html 1本。
+     ⚠ 3つの窓（記録する／不合格を直す／合格を直す）で同じ id を使い回す＝読み方も1本。 */
+  function _cvS2Html(staff2, note){
+    if(!window.pitShkStaff2Html) return '';
+    return pitShkStaff2Html({ id:'cv-sh', names:(state.staff||[]).map(function(m){ return m.name; }), staff2:staff2||'', note:note||'' });
+  }
+  function _cvS2Read(){ return window.pitShkStaff2Read ? pitShkStaff2Read('cv-sh') : { staff2:null, staff2Note:null }; }
   window.cvShakenGo = function(kind){
     if(!_c) return; const s=_c.inspSchedule||{};
     window._cvShSlot = (s.decidedSlot==='pm')?'pm':'am';
@@ -2684,6 +2697,7 @@
       + '<label>行った日</label><input type="date" id="cv-shdate" value="'+defDate+'">'
       + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(window._cvShSlot==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(window._cvShSlot==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
       + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      + _cvS2Html(s.resultStaff2, s.resultStaff2Note)
       /* 🔴 v1.120.0 ここでも陸運局とラウンドを確定できるようにした（ゆうた指定）。
          ⚠ 選択肢は **CoreMembers の場所マスターで「陸運局」のバッジが付いた場所**だけ。
             窓口は members-pit.js の `pitRikuunList()` 1本。ここで条件を書き直さない。
@@ -2729,8 +2743,9 @@
     const _ntEl=document.getElementById('cv-shnote');
     const _note=_ntEl ? String(_ntEl.value||'') : '';
     s.decided=iso; s.decidedSlot=slot;
+    const _s2 = _cvS2Read();
     const _r = window.pitShakenApply ? pitShakenApply(s, kind, {
-      staff: staff, office: s.office||'', officeName: s.officeName||'',
+      staff: staff, staff2: _s2.staff2, staff2Note: _s2.staff2Note, office: s.office||'', officeName: s.officeName||'',
       round: s.round||0, note: _note, today: _isoToday()
     }) : null;
     if(!_r){ if(window.pitToast) pitToast('記録できませんでした（PF-記録）'); return; }
@@ -2765,6 +2780,7 @@
       + '<label>行った日</label><input type="date" id="cv-shdate" value="'+esc(h.date||'')+'">'
       + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(window._cvShSlot==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(window._cvShSlot==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
       + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      + _cvS2Html(h.staff2, h.staff2Note)
       + '<label>陸運局</label><select id="cv-shoffice"><option value="">（未定）</option>'
         + (window.pitRikuunList?pitRikuunList():[]).map(function(o){ return '<option value="'+esc(o.id)+'"'+(h.office===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')
         + '</select>'
@@ -2800,10 +2816,12 @@
 
   window.cvShReSave = function(){
     const off=(document.getElementById('cv-shoffice')||{}).value||'';
+    const s2=_cvS2Read();
     _cvShReApply('reedit', { patch:{
       date : (document.getElementById('cv-shdate')||{}).value || (window._cvShReAt||{}).date,
       slot : (window._cvShSlot==='pm')?'pm':'am',
       staff: (document.getElementById('cv-shstaff')||{}).value || '',
+      staff2: s2.staff2, staff2Note: s2.staff2Note,
       office: off,
       officeName: off ? ((window.pitLocName?pitLocName(off):'')||'') : '',
       round: Number((document.getElementById('cv-shround')||{}).value||0),
@@ -2861,6 +2879,7 @@
       + '<label>行った日</label><input type="date" id="cv-shdate" value="'+esc(d)+'">'
       + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(sl==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(sl==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
       + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
+      + _cvS2Html(s.resultStaff2, s.resultStaff2Note)
       + '<label>陸運局</label><select id="cv-shoffice"><option value="">（未定）</option>'
         + (window.pitRikuunList?pitRikuunList():[]).map(function(o){ return '<option value="'+esc(o.id)+'"'+(s.office===o.id?' selected':'')+'>'+esc(o.name)+'</option>'; }).join('')
         + '</select>'
@@ -2886,10 +2905,12 @@
     const at=window._cvShDoneAt; if(!_c||!at) return;
     const s=_c.inspSchedule||{};
     const off=(document.getElementById('cv-shoffice')||{}).value||'';
+    const s2=_cvS2Read();
     const r=window.pitShakenApply ? pitShakenApply(s, 'doneedit', { at:at, patch:{
       date : (document.getElementById('cv-shdate')||{}).value || at.date,
       slot : (window._cvShSlot==='pm')?'pm':'am',
       staff: (document.getElementById('cv-shstaff')||{}).value || '',
+      staff2: s2.staff2, staff2Note: s2.staff2Note,
       office: off,
       officeName: off ? ((window.pitLocName?pitLocName(off):'')||'') : '',
       round: Number((document.getElementById('cv-shround')||{}).value||0),
@@ -2923,6 +2944,7 @@
   window.cvShakenReopen = function(){
     if(!_c) return; const s=_c.inspSchedule||{};
     s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
+    s.resultStaff2=''; s.resultStaff2Note='';   /* 👥 v2.113.0 2人目も一緒に落とす（物差しの reopen と同じ） */
     /* 🔴 v2.56.0 再検合格の印も一緒に落とす（残すと「予定に戻したのに再検合格」が出る） */
     s.repass=false; s.repassNote='';
     if(window.logFlow) logFlow(_c, '車検 済を取消');

@@ -168,7 +168,12 @@
      ⚠ 中身の読み出しは pit-share.js の物差し（pitShakenStaff / pitShakenOffice / pitShakenRound）。
         ここで条件を書き直さないこと。 */
   /* 🔴 v1.127.0 この画面は枠が狭いので**通称＆苗字**（ゆうた指定）。フルネームはカード詳細だけ。 */
-  function shStaff(c){ return window.pitShakenStaffCall ? pitShakenStaffCall(c) : ((c.inspSchedule||{}).resultStaff||''); }
+  function shStaff(c){
+    /* 👥 v2.113.0 2人目がいれば「1人目＋2人目」（狭い枠なので通称＆苗字・理由は出さない） */
+    var s=c.inspSchedule||{};
+    if(window.pitShakenStaffPair && s.resultStaff2) return pitShakenStaffPair(s.resultStaff, s.resultStaff2, '', 'call', false);
+    return window.pitShakenStaffCall ? pitShakenStaffCall(c) : (s.resultStaff||'');
+  }
   /* 🔴 v1.129.0 この画面は枠が狭いので**地名だけ**（ゆうた指定「野田 とか 習志野 とか」）。
      正式名はカード詳細とホバー情報カードで出す。 */
   function shOffice(c){ return window.pitShakenOfficeShort ? pitShakenOfficeShort(c) : ((c.inspSchedule||{}).officeName||''); }
@@ -587,6 +592,10 @@
       + (window.PIT_SHAKEN_ROUNDS||[1,2,3,4]).map(function(n){ return '<option value="'+n+'"'+(rd===n?' selected':'')+'>'+n+'R</option>'; }).join('');
     return '<label class="shk-plabel">担当（回送＝実際に車検に行く人）</label>'
       + '<select id="shk-staff" class="shk-psel">'+stOpts+'</select>'
+      /* 👥 v2.113.0 2人目の担当（＋ 担当者を追加）。部品は pit-share.js の pitShkStaff2Html 1本 */
+      + (window.pitShkStaff2Html ? pitShkStaff2Html({ id:'shk', staff2:s.resultStaff2||'', note:s.resultStaff2Note||'',
+          names:(window.state&&Array.isArray(state.staff)?state.staff:[]).map(function(m){ return m.name; }),
+          selCls:'shk-psel', inpCls:'shk-pinput' }) : '')
       + '<label class="shk-plabel">陸運局</label>'
       + '<select id="shk-office" class="shk-psel">'+ofOpts+'</select>'
       + (offs.length ? '' : '<div class="shk-phint">CoreMembers の場所マスターに「陸運局」の場所がありません。CoreMembers で登録すると、ここに出ます。</div>')
@@ -615,10 +624,17 @@
     var stEl=document.getElementById('shk-staff'), ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
     var staff=stEl?stEl.value:'', off=ofEl?ofEl.value:'', rd=rdEl?Number(rdEl.value||0):0;
     s.resultStaff=staff;
+    /* 👥 v2.113.0 2人目も一緒に保存（揃え方は物差しの pitShakenStaff2Norm 1本） */
+    var s2r=window.pitShkStaff2Read?pitShkStaff2Read('shk'):{staff2:null,staff2Note:null};
+    if(window.pitShakenStaff2Norm){
+      var n2=pitShakenStaff2Norm(staff, s2r.staff2!=null?s2r.staff2:s.resultStaff2, s2r.staff2Note!=null?s2r.staff2Note:s.resultStaff2Note);
+      s.resultStaff2=n2.staff2; s.resultStaff2Note=n2.staff2Note;
+    }
+    var staffTxt=window.pitShakenStaffPair?pitShakenStaffPair(staff, s.resultStaff2, s.resultStaff2Note, '', true):staff;
     s.office=off||'';
     s.officeName=off ? ((window.pitLocName?pitLocName(off):'') || s.officeName || '') : '';
     s.round=(rd>=1&&rd<=4)?rd:0;
-    if(window.logFlow) logFlow(c, '車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（回送:'+(staff||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）');
+    if(window.logFlow) logFlow(c, '車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（回送:'+(staffTxt||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）');
     save(); closePop(); renderShaken();
     if(window.pitToast) pitToast('車検の予定を保存しました');
   };
@@ -633,7 +649,7 @@
       var _rp=window.pitShakenIsRepass?pitShakenIsRepass(s):!!s.repass;
       /* 🔴 v2.112.0 言い方は物差し（pitShakenResultLabel）1本＝再検の車は「再検で合格」 */
       var _rl=window.pitShakenResultLabel?pitShakenResultLabel(s):(_rp?'再検合格':'完了');
-      body+='<div class="shk-pnote">'+esc(_rl)+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(s.resultStaff):'')
+      body+='<div class="shk-pnote">'+esc(_rl)+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(window.pitShakenStaffPair?pitShakenStaffPair(s.resultStaff,s.resultStaff2,s.resultStaff2Note,'',true):s.resultStaff):'')
         +(_rp&&s.repassNote?'<br>落ちた所：'+esc(s.repassNote):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
     } else if(s.decided){
       /* 🔴🔴 v2.57.0（ゆうた指定 2026-09-04）**窓を3つの塊に分けて、線で区切った。**
@@ -690,7 +706,9 @@
   function _grabFields(){
     var st=document.getElementById('shk-staff'), of=document.getElementById('shk-office'), rd=document.getElementById('shk-round');
     /* ⚠ 窓に無い時は null＝「触っていない」。空文字（消す指示）と区別する。 */
-    return { staff: st?st.value:null, office: of?(of.value||''):null,
+    /* 👥 v2.113.0 2人目も控える（窓を差し替えると消えるのは同じ） */
+    var s2r=window.pitShkStaff2Read?pitShkStaff2Read('shk'):{staff2:null,staff2Note:null};
+    return { staff: st?st.value:null, staff2: s2r.staff2, staff2Note: s2r.staff2Note, office: of?(of.value||''):null,
              officeName: (of&&of.value)?((window.pitLocName?pitLocName(of.value):'')||''):'',
              round: rd?Number(rd.value||0):null };
   }
@@ -698,7 +716,8 @@
     var c=card(id); if(!c) return null; var s=ins(c);
     var o=_shkPend||{staff:null,office:null,officeName:'',round:null};
     var r=window.pitShakenApply ? pitShakenApply(s, act, {
-      staff:o.staff, office:o.office, officeName:o.officeName, round:o.round,
+      staff:o.staff, staff2:(o.staff2==null?null:o.staff2), staff2Note:(o.staff2Note==null?null:o.staff2Note),
+      office:o.office, officeName:o.officeName, round:o.round,
       note:(note==null?null:note), today:todayIso()
     }) : null;
     if(!r) return null;
@@ -793,8 +812,10 @@
     /* ⚠ v2.57.0 落ちた所（理由）は**この道では渡さない**。
        再検合格・不合格は窓が切り替わる作りになったので、記録するのは shkActNote の側。
        ここに残っているのは 完了（一発合格）・予定に戻す・候補に戻す だけ。 */
+    var s2a=window.pitShkStaff2Read?pitShkStaff2Read('shk'):{staff2:null,staff2Note:null};
     var r=window.pitShakenApply ? pitShakenApply(s, act, {
       staff: stEl?staff:null,
+      staff2: s2a.staff2, staff2Note: s2a.staff2Note,
       office: off,
       officeName: off ? ((window.pitLocName?pitLocName(off):'')||s.officeName||'') : '',
       round: rdEl?Number(rdEl.value||0):null,

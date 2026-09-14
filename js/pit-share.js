@@ -1162,6 +1162,87 @@ w.pitDivisionColor = pitDivisionColor;
   w.pitShakenStaffFull = pitShakenStaffFull;
   w.pitShakenStaffCall = pitShakenStaffCall;
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     👥 v2.113.0（ゆうた指定 2026-09-14）**回送の担当は2人目まで持てる。2人目には理由を1行。**
+     --------------------------------------------------------------------------
+     🗣「基本は1人1台なのだが、まれに現場で乗る人が入れ替わることもある」
+     🗣「2人目担当者 〇〇 〇〇 ：再検で帰りのみ運転 みたいな感じ」
+     🗣「MHSの当日での変更も同様に揃えて」「過去を振り返っても同様の変更ができるように」
+
+     ◎入れ物（1人目は今までどおり。**足しただけ**＝過去の記録は1文字も変わらない）
+       ・いまの予定／合格の記録 … `inspSchedule.resultStaff2` ／ `inspSchedule.resultStaff2Note`
+       ・不合格の記録1本ずつ …… `history[].staff2` ／ `history[].staff2Note`
+     🔴 **数える（誰が何台行ったか・車検ライン・データチェック）のは1人目だけ。**
+        2人目は「途中で乗り換えた」事実を残すためのもの。`pitShakenStaff` は1人目のまま触らない。
+     🔴 2人目が空なら理由も持たない／1人目と同じ人なら2人目は無し（同じ人が2回並ぶ記録を作らない）。
+     🔴 窓の部品（＋ 担当者を追加）もここ1本。PitFlow の予約詳細・車検予定・MHS の当日ボードは呼ぶだけ。
+     ══════════════════════════════════════════════════════════════════════════ */
+  var PIT_SHK_S2_MAX = 60;
+  function _shkS2Note(v){ return String(v == null ? '' : v).replace(/[\r\n\t]+/g, ' ').trim().slice(0, PIT_SHK_S2_MAX); }
+  /* 1人目・2人目・理由を揃える（2人目が空／1人目と同じ → 2人目も理由も空） */
+  function pitShakenStaff2Norm(staff, staff2, note){
+    var a = String(staff == null ? '' : staff), b = String(staff2 == null ? '' : staff2).trim();
+    if (!b || b === a) return { staff2: '', staff2Note: '' };
+    return { staff2: b, staff2Note: _shkS2Note(note) };
+  }
+  w.pitShakenStaff2Norm = pitShakenStaff2Norm;
+
+  /* 2人を1つの言葉にする。how＝'full'（フルネーム）／'call'（通称＆苗字）／それ以外はそのまま。
+     withNote＝理由も（かっこ書きで）付ける。 */
+  function pitShakenStaffPair(staff, staff2, note, how, withNote){
+    var f = function(n){
+      if (!n) return '';
+      if (how === 'full' && w.pitStaffFull) return pitStaffFull(n);
+      if (how === 'call' && w.pitStaffCall) return pitStaffCall(n);
+      return String(n);
+    };
+    var a = f(staff), b = (staff2 && staff2 !== staff) ? f(staff2) : '';
+    if (!b) return a;
+    return (a || '—') + '＋' + b + ((withNote && note) ? '（' + note + '）' : '');
+  }
+  w.pitShakenStaffPair = pitShakenStaffPair;
+  function pitShakenStaff2(c){ var s = c && c.inspSchedule; return (s && s.resultStaff2) || ''; }
+  w.pitShakenStaff2 = pitShakenStaff2;
+
+  /* 窓の部品。o = { id:'cv-sh', names:[…], staff2, note, selCls, inpCls, btnCls }
+     🔴 2人目が入っていれば**開いた状態**で出す。閉じる（✕）＝2人目を外す。 */
+  function pitShkStaff2Html(o){
+    o = o || {};
+    var id = String(o.id || 'shk'), cur = String(o.staff2 || ''), on = !!cur;
+    var esc2 = function(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
+    var names = (o.names || []).slice();
+    if (cur && names.indexOf(cur) < 0) names.unshift(cur);   /* 辞めた人でも記録は消さない */
+    return '<div class="shk-s2' + (on ? ' on' : '') + '" id="' + id + '-s2">'
+      + '<button type="button" class="shk-s2-add' + (o.btnCls ? ' ' + o.btnCls : '') + '" onclick="pitShkStaff2Toggle(\'' + id + '\',true)">＋ 担当者を追加</button>'
+      + '<div class="shk-s2-body">'
+      +   '<div class="shk-s2-head"><span>2人目</span>'
+      +   '<button type="button" class="shk-s2-x" title="2人目を外す" onclick="pitShkStaff2Toggle(\'' + id + '\',false)">✕</button></div>'
+      +   '<select id="' + id + '-staff2"' + (o.selCls ? ' class="' + o.selCls + '"' : '') + '><option value="">（選択）</option>'
+      +   names.map(function(n){ return '<option value="' + esc2(n) + '"' + (n === cur ? ' selected' : '') + '>' + esc2(n) + '</option>'; }).join('')
+      +   '</select>'
+      +   '<input type="text" id="' + id + '-staff2note" maxlength="' + PIT_SHK_S2_MAX + '"' + (o.inpCls ? ' class="' + o.inpCls + '"' : '')
+      +   ' value="' + esc2(on ? (o.note || '') : '') + '" placeholder="理由（例：再検の帰りのみ運転）">'
+      + '</div></div>';
+  }
+  function pitShkStaff2Toggle(id, on){
+    var box = typeof document !== 'undefined' ? document.getElementById(id + '-s2') : null;
+    if (!box) return;
+    box.classList.toggle('on', !!on);
+    if (on){ var sel = document.getElementById(id + '-staff2'); if (sel) sel.focus(); }
+  }
+  /* 窓から読む。部品が無い＝null（触っていない）／閉じている＝空（2人目を外す指示） */
+  function pitShkStaff2Read(id){
+    var box = typeof document !== 'undefined' ? document.getElementById(id + '-s2') : null;
+    if (!box) return { staff2: null, staff2Note: null };
+    if (!box.classList.contains('on')) return { staff2: '', staff2Note: '' };
+    var sel = document.getElementById(id + '-staff2'), inp = document.getElementById(id + '-staff2note');
+    return { staff2: sel ? sel.value : '', staff2Note: inp ? inp.value : '' };
+  }
+  w.pitShkStaff2Html   = pitShkStaff2Html;
+  w.pitShkStaff2Toggle = pitShkStaff2Toggle;
+  w.pitShkStaff2Read   = pitShkStaff2Read;
+
   /* 🔴 v1.119.0 どこの陸運局へ行くか／何ラウンドか（2026-08-18・ゆうた指定）
      ・`inspSchedule.office`     … CoreMembers の場所マスターの id（**陸運支局のバッジが付いた場所**）
      ・`inspSchedule.officeName` … その名前の**写し**。⚠ 出す時は本家（CoreMembers）が優先。
@@ -1473,6 +1554,9 @@ w.pitDivisionColor = pitDivisionColor;
         /* 🔴 v1.127.0 ここに乗るのは**通称＆苗字**（狭い枠に出るものだから）。
            ⚠ MHS・前日LINEの画像もこれを使う。フルネームが要るのはカード詳細だけ。 */
         staff: pitShakenStaffCall(c),
+        /* 👥 v2.113.0 2人目（通称＆苗字）と理由。`staff` は1人目のまま（サーバーの前日LINEの画像が読むため） */
+        staff2: (s0.resultStaff2 && s0.resultStaff2 !== s0.resultStaff) ? (w.pitStaffCall ? pitStaffCall(s0.resultStaff2) : s0.resultStaff2) : '',
+        staff2Note: (s0.resultStaff2 && s0.resultStaff2 !== s0.resultStaff) ? (s0.resultStaff2Note || '') : '',
         /* 🔴 v1.129.0 陸運局も**地名だけ**（狭い枠に出るものだから）。正式名はカード詳細・ホバーで出す。 */
         office: pitShakenOfficeShort(c), round: pitShakenRound(c),
         div: pitDivisionLabel(c), divColor: pitDivisionColor(c)
@@ -1615,6 +1699,12 @@ w.pitDivisionColor = pitDivisionColor;
         if (q.date != null && /^\d{4}-\d{2}-\d{2}$/.test(String(q.date))) r2.date = String(q.date);
         if (q.slot != null) r2.slot = (q.slot === 'pm') ? 'pm' : 'am';
         if (q.staff != null) r2.staff = String(q.staff);
+        /* 👥 v2.113.0 2人目と理由（渡さなければ今のまま） */
+        if (q.staff2 != null || q.staff != null){
+          var n2r = pitShakenStaff2Norm(r2.staff, (q.staff2 != null ? q.staff2 : r2.staff2),
+                                        (q.staff2Note != null ? q.staff2Note : r2.staff2Note));
+          r2.staff2 = n2r.staff2; r2.staff2Note = n2r.staff2Note;
+        }
         if (q.office != null){
           r2.office = String(q.office || '');
           r2.officeName = r2.office ? String(q.officeName || r2.officeName || '') : '';
@@ -1624,7 +1714,7 @@ w.pitDivisionColor = pitDivisionColor;
         s.history[ix] = r2;
         return { insp: s, act: act,
                  log: '車検 不合格の記録を直した ' + _shkMD(r2.date) + ' ' + _shkSlotT(r2.slot)
-                      + '（回送:' + (r2.staff || '—') + '／' + (r2.officeName || '陸運局未定')
+                      + '（回送:' + (pitShakenStaffPair(r2.staff, r2.staff2, r2.staff2Note, '', true) || '—') + '／' + (r2.officeName || '陸運局未定')
                       + '／' + (r2.round ? r2.round + 'R' : 'R未定') + '）' + (r2.note ? '／' + r2.note : '') };
       }
       s.history.splice(ix, 1);
@@ -1634,6 +1724,7 @@ w.pitDivisionColor = pitDivisionColor;
       if (opt.restore && !s.decided && s.result !== 'done'){
         s.decided = row.date; s.decidedSlot = (row.slot === 'pm') ? 'pm' : 'am';
         if (row.staff) s.resultStaff = row.staff;
+        if (row.staff2){ s.resultStaff2 = row.staff2; s.resultStaff2Note = row.staff2Note || ''; }
         back = true;
       }
       return { insp: s, act: act,
@@ -1659,6 +1750,11 @@ w.pitDivisionColor = pitDivisionColor;
       if (p3.slot != null) cs = (p3.slot === 'pm') ? 'pm' : 'am';
       s.resultDate = cd; s.resultSlot = cs; s.decided = cd; s.decidedSlot = cs;
       if (p3.staff != null) s.resultStaff = String(p3.staff);
+      if (p3.staff2 != null || p3.staff != null){
+        var n2d = pitShakenStaff2Norm(s.resultStaff, (p3.staff2 != null ? p3.staff2 : s.resultStaff2),
+                                      (p3.staff2Note != null ? p3.staff2Note : s.resultStaff2Note));
+        s.resultStaff2 = n2d.staff2; s.resultStaff2Note = n2d.staff2Note;
+      }
       if (p3.office != null){
         var of3 = String(p3.office || '');
         s.officeName = of3 ? String(p3.officeName || (of3 === s.office ? s.officeName : '') || '') : '';
@@ -1674,13 +1770,16 @@ w.pitDivisionColor = pitDivisionColor;
       else if (p3.note != null) s.repassNote = String(p3.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
       return { insp: s, act: act,
                log: '車検 合格の記録を直した' + (retry3 ? '（再検で合格）' : s.repass ? '（再検合格）' : '（一発合格）') + ' ' + _shkMD(cd) + ' ' + _shkSlotT(cs)
-                    + '（回送:' + (s.resultStaff || '—') + '／' + (s.officeName || '陸運局未定')
+                    + '（回送:' + (pitShakenStaffPair(s.resultStaff, s.resultStaff2, s.resultStaff2Note, '', true) || '—') + '／' + (s.officeName || '陸運局未定')
                     + '／' + (s.round ? s.round + 'R' : 'R未定') + '）' + (s.repassNote ? '／' + s.repassNote : '') };
     }
 
     var today = opt.today || _shkToday();
     /* 🔴 窓に出ている3つは、どの指示でも一緒に確定する（v1.119.0 の決めごとをそのまま） */
     var staff = (opt.staff != null) ? String(opt.staff) : (s.resultStaff || '');
+    /* 👥 v2.113.0 2人目も窓に出ているものを一緒に確定する（渡さなければ今のまま） */
+    var n2 = pitShakenStaff2Norm(staff, (opt.staff2 != null ? opt.staff2 : s.resultStaff2),
+                                 (opt.staff2Note != null ? opt.staff2Note : s.resultStaff2Note));
     if (opt.office != null){
       s.office = String(opt.office || '');
       s.officeName = s.office ? String(opt.officeName || s.officeName || '') : '';
@@ -1689,7 +1788,7 @@ w.pitDivisionColor = pitDivisionColor;
       var r = Number(opt.round || 0);
       s.round = (r >= 1 && r <= 4) ? r : 0;
     }
-    var wh = '（回送:' + (staff || '—') + '／' + (s.officeName || '陸運局未定')
+    var wh = '（回送:' + (pitShakenStaffPair(staff, n2.staff2, n2.staff2Note, '', true) || '—') + '／' + (s.officeName || '陸運局未定')
            + '／' + (s.round ? s.round + 'R' : 'R未定') + '）';
     var log = '';
 
@@ -1702,6 +1801,7 @@ w.pitDivisionColor = pitDivisionColor;
     if (act === 'done' || act === 'repass'){
       var d = s.decided || today, sl = s.decidedSlot || 'am';
       s.result = 'done'; s.resultDate = d; s.resultSlot = sl; s.resultStaff = staff;
+      s.resultStaff2 = n2.staff2; s.resultStaff2Note = n2.staff2Note;
       /* 🔴 v2.56.0 再検合格＝完了の記録に印を1つ付けるだけ（数え方は完了1台のまま＝売上も件数も動かない）。
          ⚠ 一発合格で押した時は**必ず印を消す**（押し間違いを直せる道を、足すのと同じ回に用意する
             ＝ v2.55.0 の教訓「記録を残すを作ったら、間違えた時にどう戻すかも同じ回に決める」）。 */
@@ -1717,10 +1817,14 @@ w.pitDivisionColor = pitDivisionColor;
       /* 🔴 v2.54.0 **落ちた理由を1行だけ**（ゆうた指定）。改行は潰して1行にする。
          ⚠ 長さは120字で切る＝履歴は狭い所に何行も並ぶので、書ける量そのもので抑える。 */
       var note2 = (opt.note != null) ? String(opt.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120) : '';
-      s.history.push({ date: d2, slot: sl2, result: 'recheck', staff: staff,
-                       office: s.office || '', officeName: s.officeName || '', round: s.round || 0,
-                       note: note2 });
+      var hrow = { date: d2, slot: sl2, result: 'recheck', staff: staff,
+                   office: s.office || '', officeName: s.officeName || '', round: s.round || 0,
+                   note: note2 };
+      /* 👥 v2.113.0 2人目はいる時だけ記録に載せる（古い記録と同じ形を保つ） */
+      if (n2.staff2){ hrow.staff2 = n2.staff2; hrow.staff2Note = n2.staff2Note; }
+      s.history.push(hrow);
       s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
+      s.resultStaff2 = ''; s.resultStaff2Note = '';
       /* ⚠ 陸運局とRは**残す**＝次に決め直す時、たいてい同じ所へ行くので入れ直させない */
       log = '車検 不合格' + (retry ? '（再検でも・' + pitShakenReCount(s) + '回目）' : '') + ' '
           + _shkMD(d2) + ' ' + _shkSlotT(sl2) + wh + (note2 ? '／' + note2 : '');
@@ -1730,6 +1834,7 @@ w.pitDivisionColor = pitDivisionColor;
       log = '車検の予定を取り消し' + (d3 ? '（' + _shkMD(d3) + ' ' + _shkSlotT(sl3) + '）' : '');
     } else if (act === 'reopen'){
       s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
+      s.resultStaff2 = ''; s.resultStaff2Note = '';
       /* 🔴 v2.56.0 **再検合格の印も一緒に落とす。**残すと「予定に戻したのに再検合格」が出る。 */
       s.repass = false; s.repassNote = '';
       log = '車検を予定に戻した';
@@ -1742,6 +1847,9 @@ w.pitDivisionColor = pitDivisionColor;
           「担当を選んでから “午後に変更” を押すと担当が消える」状態だった。
        ⚠ 再検・予定に戻す は**わざと担当を空にする**指示なので、ここでは戻さない。 */
     if (opt.staff != null && act !== 'recheck' && act !== 'reopen') s.resultStaff = staff;
+    if ((opt.staff != null || opt.staff2 != null) && act !== 'recheck' && act !== 'reopen'){
+      s.resultStaff2 = n2.staff2; s.resultStaff2Note = n2.staff2Note;
+    }
     /* 🔴 v2.54.0 **暫定予定（仮押さえ）は、決まった・終わった・取り消した で必ず落とす。**
        ⚠ 残すと「決定と暫定が両方ある」状態ができて、どちらが本当か読めなくなる。 */
     if (act === 'done' || act === 'repass' || act === 'recheck' || act === 'cancel'){ s.tent = ''; s.tentSlot = ''; }

@@ -215,7 +215,9 @@
     const kana=(c.kana||'').trim();
     const _fm0 = window.pitStaffByName ? window.pitStaffByName(c.frontStaff) : null;   /* v1.5.0：担当をメンバーに結びつける */
     const rawPlate=(c.plate||'').trim();
-    const vehicle={ plate:(isRealPlate(rawPlate)?rawPlate:''), maker:(c.maker||'').trim(), car:(c.car||'').trim(), boardId:c.boardId||'', division:c.division||'', frontStaff:(c.frontStaff||'').trim(), frontStaffId:(_fm0?_fm0.id:''), karteNo:(c.karteNo||'').trim() };
+    const vehicle={ plate:(isRealPlate(rawPlate)?rawPlate:''), maker:(c.maker||'').trim(), car:(c.car||'').trim(), boardId:c.boardId||'', division:c.division||'', frontStaff:(c.frontStaff||'').trim(), frontStaffId:(_fm0?_fm0.id:''), karteNo:(c.karteNo||'').trim(),
+      /* 🚗 v2.114.0 車両の注意（左・M/T・車高・土禁）も車の控えへ。⚠ 空の時は書かない（_vehWrite） */
+      drive:(Array.isArray(c.drive)?c.drive.slice():[]) };
     /* 🔴 v1.53.0 ① 漢字が無くても **カナがあれば作る**（ここが14枚の取りこぼしの正体） */
     if(!name && !kana && !vehicle.plate) return;
     const contacts = Array.isArray(c.contacts)
@@ -344,6 +346,9 @@
     if(vehicle.boardId)v.boardId=vehicle.boardId; if(vehicle.division)v.division=vehicle.division;
     if(vehicle.frontStaff){v.frontStaff=vehicle.frontStaff; v.frontStaffId=vehicle.frontStaffId||'';}
     if(vehicle.karteNo)v.karteNo=vehicle.karteNo;
+    /* 🚗 v2.114.0 注意は**入っている時だけ**写す。空のカードで保存しても、車の控えの注意は消さない
+       （外すのは顧客の車両の修正画面で）。 */
+    if(Array.isArray(vehicle.drive) && vehicle.drive.length) v.drive=vehicle.drive.slice();
     v.updatedAt=Date.now();
     return v;
   }
@@ -351,6 +356,7 @@
     const base=p.vehicles[p.vehicles.length-1]||{};   // 新車両：未指定の担当/課/区分は既存からデフォ継承
     const v={ id:'v'+Date.now()+Math.floor(Math.random()*1000), plate:vehicle.plate, maker:vehicle.maker, car:vehicle.car,
       boardId:vehicle.boardId||base.boardId||'', division:vehicle.division||base.division||'', frontStaff:vehicle.frontStaff||base.frontStaff||'', frontStaffId:vehicle.frontStaffId||base.frontStaffId||'', karteNo:vehicle.karteNo||'', updatedAt:Date.now() };
+    if(Array.isArray(vehicle.drive) && vehicle.drive.length) v.drive=vehicle.drive.slice();   /* 🚗 v2.114.0 */
     p.vehicles.push(v);
     return v;
   }
@@ -594,6 +600,7 @@
       } else {
         c.perVisit=false; c.vehId=v.id;
         c.plate=v.plate||c.plate; c.maker=v.maker||c.maker; c.car=v.car||c.car;
+        const _dr=_vehDrive(cust, v); if(_dr) c.drive=_dr.slice();   /* 🚗 v2.114.0 車の注意も入れる */
       }
       if(v.boardId)c.boardId=v.boardId; if(v.division)c.division=v.division; if(v.frontStaff){c.frontStaff=v.frontStaff; c.frontStaffId=v.frontStaffId||'';} if(v.karteNo)c.karteNo=v.karteNo;   /* 🔴 v2.103.0 担当は番号ごと */
     }
@@ -831,6 +838,50 @@
   function _boardSel(v){ return '<select class="ce-board"><option value="">—</option><option value="default"'+(v==='default'?' selected':'')+'>国産</option><option value="import"'+(v==='import'?' selected':'')+'>輸入</option></select>'; }
   function _divSel(v){ return '<select class="ce-div"><option value="">—</option>'+(state.divisions||[]).map(d=>'<option value="'+d.id+'"'+(v===d.id?' selected':'')+'>'+esc(d.label)+'</option>').join('')+'</select>'; }
   function _frontSel(v){ return '<select class="ce-front"><option value="">—</option>'+frontStaffList().map(n=>'<option value="'+esc(n)+'"'+(v===n?' selected':'')+'>'+esc(n)+'</option>').join('')+'</select>'; }
+  /* ══════════════════════════════════════════════════════════════════════════
+     🚗 v2.114.0（ゆうた指定 2026-09-14）**車両の修正画面を新規予約とそろえた。**
+     🗣「顧客からの車両修正で ナンバーの入力欄が1行だから、新規予約と同じ各BOXに分かれるものにして」
+     🗣「MT 車高 など 各車両に保存されている注意事項を編集からチェックできるようにしてほしい」
+     ◎ナンバー＝新規予約の部品（card-detail.js の pitPlateGuideHtml／pitBindPlateGuide）を借りる。
+       保存の形は今までどおり1本の文字（「野田 300 ひ 5555」）。読み取りは隠した .ce-plate から。
+     ◎注意＝一覧は card-detail.js の PIT_DRIVE_ITEMS 1本。
+       🔴 それまで注意は**予約カードにしか無かった**（車の控えに無い）。車にも `drive` を持たせた。
+       ・車に `drive` がまだ無い＝その車の**いちばん新しい予約**の注意を初期値にする（_vehDrive）
+       ・保存すると車の `drive` になり、**まだ返車していないその車の予約**にも同じ注意を入れる
+       ・予約で車を呼び出す／車から新規予約 → 車の注意がカードに入る
+     ══════════════════════════════════════════════════════════════════════════ */
+  function _vehCards(cust, v){
+    if(!cust || !v) return [];
+    const pl = isRealPlate(v.plate) ? norm(v.plate) : '';
+    return (state.cards||[]).filter(function(c){
+      if(!c || c.customerId!==cust.id) return false;
+      if(c.vehId) return c.vehId===v.id;
+      return !!pl && norm(c.plate||'')===pl;
+    });
+  }
+  /* 車の注意。車に入っていればそれ／無ければいちばん新しい予約の注意／どちらも無ければ null */
+  function _vehDrive(cust, v){
+    if(!v) return null;
+    if(Array.isArray(v.drive)) return v.drive;
+    const cs = _vehCards(cust, v).filter(function(c){ return Array.isArray(c.drive); })
+      .sort(function(a,b){ return String(b.reserveDate||b.returnDate||'').localeCompare(String(a.reserveDate||a.returnDate||'')); });
+    return cs.length ? cs[0].drive : null;
+  }
+  function _driveChipsEdit(arr){
+    arr = Array.isArray(arr) ? arr : [];
+    return '<div class="ce-drive"><span class="ce-drive-l">車両注意</span><div class="cf-chips cf-drive">'
+      + (window.PIT_DRIVE_ITEMS||[]).map(function(it){
+          return '<button type="button" class="cf-chip cf-chip-drv'+(arr.indexOf(it.id)>=0?' active':'')+'" data-val="'+esc(it.id)+'" onclick="this.classList.toggle(\'active\')">'+esc(it.label)+'</button>';
+        }).join('')
+      + '</div></div>';
+  }
+  function _bindEditPlates(){
+    if(!window.pitBindPlateGuide) return;
+    document.querySelectorAll('#ce-vehicles .ce-veh').forEach(function(row){
+      const wrap=row.querySelector('.cf-plate'), hid=row.querySelector('.ce-plate');
+      if(wrap && hid) pitBindPlateGuide(wrap, function(val){ hid.value=val; });
+    });
+  }
   function _renderEdit(cust){
     let h='<div class="cm-head"><i data-ic=pencil data-ics=16></i> 顧客を編集 <span class="cm-sub">'+esc(custDispName(cust)||'')+'</span><button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div><div class="cm-body">';
     h+='<div class="cm-2"><div class="cm-f"><label>お客様名</label><input id="ce-name" value="'+esc(cust.name||'')+'"></div>'+
@@ -860,18 +911,24 @@
       const vTag = (vehArchivedSelf(v)?'<span class="ce-vtag arch"><i data-ic=box data-ics=13></i> アーカイブ済み</span>':'')
                  + (isPerVisit(v)?'<span class="ce-vtag pv"><i data-ic=swap data-ics=13></i> 都度車両変動（ナンバーなし）</span>':'');
       h+='<div class="ce-veh'+(vehArchivedSelf(v)?' ce-veh-arch':'')+'" data-vid="'+esc(v.id||'')+'">'+(vTag?'<div class="ce-vtags">'+vTag+'</div>':'')+'<div class="ce-veh-l">'+
-         '<input class="ce-plate" value="'+esc(v.plate||'')+'" placeholder="'+(isPerVisit(v)?'（都度変動＝ナンバーなし）':'野田 300 ひ 5555')+'"'+(isPerVisit(v)?' disabled':'')+'>'+
+         /* 🚗 v2.114.0 ナンバーは新規予約と同じ4つの箱（都度車両変動は今までどおり入れられない欄） */
+         ((!isPerVisit(v) && window.pitPlateGuideHtml)
+           ? '<input type="hidden" class="ce-plate" value="'+esc(v.plate||'')+'">'+pitPlateGuideHtml(v.plate||'')
+           : '<input class="ce-plate" value="'+esc(v.plate||'')+'" placeholder="'+(isPerVisit(v)?'（都度変動＝ナンバーなし）':'野田 300 ひ 5555')+'"'+(isPerVisit(v)?' disabled':'')+'>')+
          '<input class="ce-maker" value="'+esc(v.maker||'')+'" placeholder="メーカー">'+
          '<input class="ce-car" value="'+esc(v.car||'')+'" placeholder="車種">'+
          '<input class="ce-karte" value="'+esc(v.karteNo||'')+'" placeholder="カルテNo">'+
          /* 🚗 v2.2.0 車体番号。クォーターチェックが伝票から入れるが、手でも直せる */
          '<input class="ce-vin" value="'+esc(v.vin||'')+'" placeholder="車体番号">'+
          '</div><div class="ce-veh-r">'+_boardSel(v.boardId)+_divSel(v.division)+_frontSel(v.frontStaff)+
-         '<button type="button" class="cf-ct-del" onclick="custEditDelVehicle(this)"><i data-ic=trash data-ics=16></i></button></div></div>';
+         '<button type="button" class="cf-ct-del" onclick="custEditDelVehicle(this)"><i data-ic=trash data-ics=16></i></button></div>'+
+         (window.PIT_DRIVE_ITEMS ? _driveChipsEdit(_vehDrive(cust, v)) : '')+
+         '</div>';
     });
     h+='</div><button class="ce-add" onclick="custEditAddVehicle()">＋ 車両を追加</button>';
     h+='</div><div class="cm-foot"><button class="cm-cancel" onclick="custCloseModal()">キャンセル</button><button class="cm-save" onclick="custSaveEdit(\''+cust.id+'\')">保存</button></div>';
-    openModal(h);
+    openModal(h, 'ce-box');
+    _bindEditPlates();
   }
   function _readEdit(cust){
     const g=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
@@ -907,14 +964,30 @@
             画面に無い項目は触らない、が鉄則。 */
       const prev=((cust.vehicles||[]).find(x=>x&&x.id===vid))||{};
       const isPV=!!prev.perVisit;
-      if(plate||maker||car||isPV||(karteNo&&prev.id)) vehicles.push(Object.assign({}, prev, { id:vid, plate,maker,car,karteNo,vin,boardId,division,frontStaff, frontStaffId:(_fm?_fm.id:'') }));
+      /* 🚗 v2.114.0 注意のチップ。チップが画面に無い時は触らない（prev のまま） */
+      const dBox=row.querySelector('.ce-drive');
+      const extra = dBox ? { drive:[].map.call(dBox.querySelectorAll('.cf-chip.active'), function(b){ return b.dataset.val; }) } : {};
+      if(plate||maker||car||isPV||(karteNo&&prev.id)) vehicles.push(Object.assign({}, prev, { id:vid, plate,maker,car,karteNo,vin,boardId,division,frontStaff, frontStaffId:(_fm?_fm.id:'') }, extra));
     });
     cust.vehicles=vehicles;
   }
   window.custEdit=function(id){ const cust=list().find(x=>x.id===id); if(!cust) return; _renderEdit(cust); };
   window.custSaveEdit=function(id){
     const cust=list().find(x=>x.id===id); if(!cust) return;
+    /* 🚗 v2.114.0 注意を変えた車は、まだ返車していないその車の予約にも入れる */
+    const before={}; (cust.vehicles||[]).forEach(function(v){ if(v&&v.id) before[v.id]=JSON.stringify(_vehDrive(cust, v)||[]); });
     _readEdit(cust); cust.updatedAt=Date.now();
+    (cust.vehicles||[]).forEach(function(v){
+      if(!v || !Array.isArray(v.drive) || isPerVisit(v)) return;
+      if(before[v.id]!=null && before[v.id]===JSON.stringify(v.drive)) return;
+      let n=0;
+      _vehCards(cust, v).forEach(function(c){
+        if(c.status==='returned' || c.status==='cancelled' || c.status==='scrap') return;
+        if(JSON.stringify(c.drive||[])===JSON.stringify(v.drive)) return;
+        c.drive=v.drive.slice(); n++;
+      });
+      if(window.pitOpLog) try{ pitOpLog('車両注意を変更', (custDispName(cust)||'')+' / '+(v.plate||v.car||'')+'：'+(v.drive.join('・')||'なし')+(n?'（予約'+n+'件にも反映）':'')); }catch(e){}
+    });
     if(window.PitDB) PitDB.save(); closeModal(); renderCustomers();
   };
   window.custEditAddContact=function(){ const cust=_editTarget(); if(!cust) return; _readEdit(cust); cust.contacts.push({tel:'',label:'',primary:!cust.contacts.length}); _renderEdit(cust); };
@@ -1486,7 +1559,8 @@
         /* 🔴 v1.52.0 都度車両変動＝**ナンバーと車種は入れない**（毎回ちがう車なので、その場で打つ）。
            カルテNo.・担当・課・区分だけ引き継ぐ。 */
         if(isPerVisit(v)){ over.perVisit=true; over.vehId=v.id; over.plate=''; over.maker=''; over.car=''; }
-        else { over.plate=v.plate||''; over.maker=v.maker||''; over.car=v.car||''; over.vehId=v.id; }
+        else { over.plate=v.plate||''; over.maker=v.maker||''; over.car=v.car||''; over.vehId=v.id;
+               const _dr=_vehDrive(cust, v); if(_dr) over.drive=_dr.slice(); }   /* 🚗 v2.114.0 車の注意も入れる */
         if(v.boardId)over.boardId=v.boardId; if(v.division)over.division=v.division; if(v.frontStaff){over.frontStaff=v.frontStaff; over.frontStaffId=v.frontStaffId||'';}   /* 🔴 v2.103.0 担当は番号ごと */ if((v.karteNo||'').trim())over.karteNo=v.karteNo.trim();
       }
     }

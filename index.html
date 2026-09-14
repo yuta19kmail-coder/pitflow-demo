@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.113.1"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.114.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=12">
 <link rel="stylesheet" href="css/views.css?v=59">
-<link rel="stylesheet" href="css/polish.css?v=235">
+<link rel="stylesheet" href="css/polish.css?v=236">
 <link rel="stylesheet" href="css/fleet-cal.css?v=8"><!-- 🗓 v2.70.0 車両カレンダー・代車カレンダーの整備予定。polish.css より **後ろ**（ここが上書きする側） -->
 <link rel="stylesheet" href="css/floor.css?v=24">
 <link rel="stylesheet" href="css/coreflow-note-board.css?v=a29f6744"><!-- 📌 付箋ボードの見た目（全アプリ共通・_shared から配布）。v2.109.0 で前の付箋専用の見た目から置き換え -->
@@ -132,7 +132,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.113.1</div>
+    <div class="login-ver">v2.114.0</div>
   </div>
 </div>
 
@@ -146,7 +146,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.113.1</span>
+    <span class="ver">v2.114.0</span>
     <!-- 文字サイズ3分割（A小・A中・A大） -->
     <div class="tb-fontsize-group" id="tb-fontsize-group" title="文字サイズを変更">
       <button class="tb-fontsize-btn" data-fontsize="md" onclick="setFontSize('md')"><span style="font-size:10px;font-weight:600">A</span></button>
@@ -813,7 +813,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/views.js?v=60"></script>
 <script src="js/work-content.js?v=15"></script>
 <script src="js/card-miss.js?v=3"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
-<script src="js/card-detail.js?v=151"></script>
+<script src="js/card-detail.js?v=152"></script>
 <script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
 <script src="js/card-view.js?v=79"></script>
@@ -821,7 +821,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/avail.js?v=8"></script>
 <script src="js/card-tabs.js?v=15"></script>
 <script src="js/archive-pit.js?v=6"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
-<script src="js/customers.js?v=78"></script>
+<script src="js/customers.js?v=79"></script>
 <script src="js/veh-merge.js?v=4"></script><!-- 🚗 v2.31.0→v2.32.0 同じ車が2件に分かれている時に1台にまとめる（顧客はまたがない・入口は顧客詳細の編集の横だけ）。customers.js の器（custShowModal）を借りるので後ろに読む -->
 <script src="js/cust-merge.js?v=7"></script>
 <script src="js/dup-find.js?v=3"></script><!-- 🔎 v2.37.0 ダブりを洗い出す（読むだけ）。veh-merge / cust-merge へ飛ばすので後ろに読む --><!-- 👤 v2.36.0 同じお客様が2人に分かれている時に1人にまとめる（2本検索の専用UI）。customers.js の器と veh-merge の見た目を借りるので後ろに読む -->

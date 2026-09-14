@@ -349,6 +349,13 @@
 .ce-veh-l .ce-car{ flex:1 1 7em; }
 .ce-veh-l .ce-karte{ flex:0 0 7em; }
 .ce-veh-r{ display:flex; gap:6px; align-items:center; }
+/* 🚗 v2.114.0 車両の修正：ナンバーは新規予約と同じ4つの箱／車両注意のチップ */
+.cm-box.ce-box{ width:780px; }
+.ce-veh-l .cf-plate{ flex:1 1 13em; min-width:12em; position:relative; }
+.ce-veh-l .cf-plate .cf-plate-main{ width:100%; }
+.ce-veh .cf-plate-guide{ z-index:60; }
+.ce-drive{ display:flex; align-items:center; gap:8px; width:100%; }
+.ce-drive-l{ font-size:11px; font-weight:700; color:var(--text2); }
 .ce-board, .ce-div, .ce-front, .ce-veh input, .ce-ct input.ce-ctel, .ce-ct input.ce-clabel{ background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:7px 9px; font-size:12.5px; font-family:inherit; box-sizing:border-box; }
 .ce-board, .ce-div, .ce-front{ cursor:pointer; }
 .ce-add{ background:var(--bg3); border:1px solid var(--border); color:var(--text); border-radius:7px; padding:6px 12px; font-size:12px; cursor:pointer; margin-top:2px; }

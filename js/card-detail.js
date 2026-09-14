@@ -745,6 +745,8 @@ const DRIVE_ITEMS = [
   { id: 'lowCar',   label: '車高' },
   { id: 'noShoes',  label: '土禁' },
 ];
+/* 🚗 v2.114.0 顧客の車両の修正画面でも同じ一覧を使う（写しを作らない） */
+window.PIT_DRIVE_ITEMS = DRIVE_ITEMS;
 /* 入庫時刻のショートカット（メインBOXに直接入力も可） */
 /* 🔴 v1.33.0 入庫時間のショートカット。**中身と並び順は state.js の PIT_TIME_QUICK が正**。
    （）内の時間は画面に出さない＝ここではラベルだけ使う（時間は並び順の計算にだけ使われる）。 */

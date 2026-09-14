@@ -845,6 +845,15 @@
       if (!this._loaded) { console.warn('[PitDB] 読み込み前なので保存を見送りました'); return false; }
       const self = this;
       const ops = [];
+      /* 🔴🔴 v2.115.0（ゆうた報告 2026-09-14）**まだサーバーに届いていない書き込みは、次に回す。**
+         🗣「予約詳細を保存するときに 他の人が開いています みたいなものと 保存しました が同時にでて保存されている」
+         ◎正体＝「保存する」で保存が**立て続けに2回**走る（編集の見張りを外した時／顧客控えの反映のあと）。
+           1回目が届く前に2回目が同じカードを送ると、**同じ版の番号**（rev）を付けてしまう
+           ＝サーバーは「古い画面」と見て弾き、PF-0012「ほかの端末が先に直していた…」が出ていた。
+           中身は1回目で入っているので「保存されている」。
+         ◎直し＝送っている最中（_pending）のものは今回は送らず、届いたあとにもう一度保存する。
+         ⚠ 版の関門（v2.26.0）は1ミリも緩めていない。自分の2回目が自分の1回目とぶつからなくなるだけ。 */
+      let 後回し = false;
 
       Object.keys(this._COLS).forEach(function (k) {
         const col = self._COLS[k];
@@ -858,6 +867,7 @@
           const key = col + '/' + o.id;
           const js = self._js(o);
           if (self._shadow.docs[key] === js) return;
+          if (self._pending[key]) { 後回し = true; return; }   /* 🔴 v2.115.0 届くのを待ってから */
           const body = self._clean(o);
           /* 🔴 v2.26.0 **自分が見た版の次の番号**を添える。
              サーバーはこれが `いまの版 + 1` でなければ受け付けない＝古い画面は書けない。
@@ -870,17 +880,24 @@
           if (key.indexOf(col + '/') !== 0) return;
           const id = key.slice(col.length + 1);
           if (alive[id]) return;
+          if (self._pending[key]) { 後回し = true; return; }
           ops.push({ t: 'del', ref: self._co().collection(col).doc(id), key: key });
         });
       });
 
       const sjs = this._js(this._settingsPayload());
       if (sjs !== this._shadow.settings) {
-        ops.push({ t: 'set', ref: this._co().collection('pitSettings').doc('main'),
+        if (self._pending['@settings']) 後回し = true;
+        else ops.push({ t: 'set', ref: this._co().collection('pitSettings').doc('main'),
                    body: this._clean(this._settingsPayload()), key: '@settings', js: sjs });
       }
 
-      if (!ops.length) return true;
+      /* 後回しにしたもの＝送っている最中の分が届いてから、もう一度（下の then／catch で呼ぶ） */
+      const 続き = function () { if (後回し) self.save(); };
+      if (!ops.length) {
+        if (後回し) self._flushAgain = true;       /* 走っている方が終わった時に拾う */
+        return true;
+      }
       ops.forEach(function (op) { self._pending[op.key] = 1; });
       if (window.PitSync) PitSync.saving();
 
@@ -910,8 +927,12 @@
         self._cloudErr = 0;
         if (window.PitSync) PitSync.saved();
         console.log('[PitDB] 保存しました（' + ops.length + '件）');
+        /* 🔴 v2.115.0 待たせていた分を送る */
+        if (self._flushAgain) { self._flushAgain = false; 後回し = true; }
+        続き();
       }).catch(function (e) {
         ops.forEach(function (op) { delete self._pending[op.key]; });
+        if (self._flushAgain) { self._flushAgain = false; 後回し = true; }
         /* 🔴🔴🔴 v2.26.0 **版が古くてサーバーに弾かれた**＝この画面が古い。
            ◎やること＝**読み直すだけ。絶対に書き直さない。**
              ここで「じゃあ新しい版で書き直そう」とすると、

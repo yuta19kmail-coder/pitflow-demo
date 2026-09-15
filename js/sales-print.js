@@ -15,13 +15,25 @@
   function ensureJsPDF(){ return (window.jspdf&&window.jspdf.jsPDF)?Promise.resolve():loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'); }
   function ensureH2C(){ return window.html2canvas?Promise.resolve():loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'); }
 
-  // 日本語TTF（複数候補・最初に取れたものを使用。取得後はキャッシュ）
+  /* 日本語フォント（最初に取れたものを使用。取得後はキャッシュ）
+     🔴🔴 v2.119.0（ゆうた報告 2026-09-15「売り上げサマリーのPDFが文字化けしてなんも見えない」）
+     ◎正体＝前の取り先（minoryorg の NotoSansCJKjp-Regular.ttf）は、名前は .ttf でも**中身は OpenType（CFF）**だった。
+       jsPDF は **TrueType（glyf）しか扱えない**ので、エラーを出さずに字が化けた（PDFは20KB・中の字は記号の並び）。
+       しかも取れてしまうので、下の「写真で作る」逃げ道にも回らなかった。3つ目の取り先は404だった。
+     ◎今＝**PitFlow の中に置いた BIZ UDPゴシック（TrueType・SIL OFL 1.1・fonts/OFL.txt）** を最初に読む。外の置き場は予備。
+     🔴 取れたフォントが **TrueType でなければ使わない**（先頭4バイトで見る）＝化けたPDFを黙って出さず、写真で作る方へ回す。 */
   var FONT_URLS=[
-    'https://cdn.jsdelivr.net/gh/minoryorg/Noto-Sans-CJK-JP@master/fonts/NotoSansCJKjp-Regular.ttf',
-    'https://cdn.jsdelivr.net/npm/hakusyu-font@1.0.0/NotoSansJP-Regular.ttf',
-    'https://raw.githubusercontent.com/minoryorg/Noto-Sans-CJK-JP/master/fonts/NotoSansCJKjp-Regular.ttf'
+    'fonts/BIZUDPGothic-Regular.ttf',
+    'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/bizudpgothic/BIZUDPGothic-Regular.ttf',
+    'https://raw.githubusercontent.com/google/fonts/main/ofl/bizudpgothic/BIZUDPGothic-Regular.ttf'
   ];
   function ab2b64(buf){ var bytes=new Uint8Array(buf), bin='', CH=0x8000; for(var i=0;i<bytes.length;i+=CH){ bin+=String.fromCharCode.apply(null, bytes.subarray(i,i+CH)); } return btoa(bin); }
+  /* jsPDF が扱える TrueType か（0x00010000 または 'true'）。'OTTO'＝CFF は扱えない */
+  function isTrueType(buf){
+    var v=new DataView(buf); if(buf.byteLength<12) return false;
+    var tag=v.getUint32(0);
+    return tag===0x00010000 || tag===0x74727565;
+  }
   function loadJPFont(){
     if(window.__svJPFont) return Promise.resolve(window.__svJPFont);
     var i=0;
@@ -29,8 +41,12 @@
       if(i>=FONT_URLS.length) return Promise.reject(new Error('jp font unavailable'));
       var url=FONT_URLS[i++];
       return fetch(url).then(function(r){ if(!r.ok) throw new Error('http'); return r.arrayBuffer(); })
-        .then(function(b){ if(b.byteLength<100000) throw new Error('too small'); window.__svJPFont=ab2b64(b); return window.__svJPFont; })
-        .catch(function(){ return trynext(); });
+        .then(function(b){
+          if(b.byteLength<100000) throw new Error('too small');
+          if(!isTrueType(b)) throw new Error('not TrueType');
+          window.__svJPFont=ab2b64(b); return window.__svJPFont;
+        })
+        .catch(function(e){ console.warn('[sales-print] フォントを使えない:', url, e && e.message); return trynext(); });
     }
     return trynext();
   }

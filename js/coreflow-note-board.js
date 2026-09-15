@@ -477,7 +477,11 @@
     if (!ED) return;
     var g = function (i) { var e = d.getElementById(i); return e ? e.value : null; };
     var v = g('cfnb-ed-title'); if (v != null) ED.title = v;
-    v = g('cfnb-ed-body'); if (v != null) ED.body = v;
+    /* 🔴🔴 2026-09-15（ゆうた報告「タイトルはいいのだが、本文が保存されない。タイトルだけの付箋になってしまう」）
+       本文の入力欄は **`cfnb-ed-text`**。前は窓の入れ物（`cfnb-ed-body`）と**同じ名前**で、
+       ここが入れ物の方を掴んで本文を読めず、**開いた時の本文のまま**保存されていた（新規は必ず空）。
+       ⚠ 入れ物と入力欄に同じ名前を付けないこと。 */
+    v = g('cfnb-ed-text'); if (v != null) ED.body = v;
     v = g('cfnb-ed-deadline'); if (v != null) ED.deadline = v;
   }
   function edRender() {
@@ -519,7 +523,7 @@
     }
     box.innerHTML = appSeg +
       '<div class="cfnb-fld"><label>タイトル</label><input type="text" id="cfnb-ed-title" maxlength="60" value="' + esc(ED.title) + '" placeholder="例：急ぎ洗車"></div>' +
-      '<div class="cfnb-fld"><label>本文</label><textarea id="cfnb-ed-body" rows="3" maxlength="600" placeholder="例：来店予定あり、本日午後までに洗ってほしいです">' + esc(ED.body) + '</textarea></div>' +
+      '<div class="cfnb-fld"><label>本文</label><textarea id="cfnb-ed-text" rows="3" maxlength="600" placeholder="例：来店予定あり、本日午後までに洗ってほしいです">' + esc(ED.body) + '</textarea></div>' +
       '<div class="cfnb-fld"><label>色</label><div class="bn-color-picker">' + sw + '</div></div>' +
       '<div class="cfnb-fld"><label>種類</label>' + typeSeg + '<div class="cfnb-muted">実行＝誰かが「済」にしたら完了／回覧＝担当が各自「確認」して全員で完了</div></div>' +
       '<div class="cfnb-fld"><label>期限（任意）</label><input type="date" id="cfnb-ed-deadline" value="' + esc(ED.deadline) + '"></div>' +

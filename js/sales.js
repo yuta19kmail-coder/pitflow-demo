@@ -1005,7 +1005,30 @@
       var frontRows=Object.keys(d.fronts).map(function(n){ var f=d.fronts[n];
         return { n:n, a:(f.actual||0), cells:TIER_FRONT.map(function(id){ return man(f[id]||0); }) }; })
         .sort(function(a,b){return b.a-a.a;}).map(function(r){ return [r.n].concat(r.cells); });
-      return { title:'売上サマリー', period:ym.y+'年'+(ym.m+1)+'月',
+      /* 🎨 v2.120.0（ゆうた指定 2026-09-15「サマリー画面のようなインフォグラフィックな感じがいい」）
+         紙も画面と同じ並び（数字の帯・積み上げ帯・日次グラフ・確度カード・課別・フロント別）で描くための材料。
+         🔴 数字は画面と**同じ集め方**（collectMonth・TIERS・TIER_NEAR/HIGH/FRONT・target）から取る。ここで数え直さない。 */
+      var _td0=new Date(); _td0.setHours(0,0,0,0);
+      var _moS0=ymdL(new Date(ym.y,ym.m,1)), _moE0=ymdL(new Date(ym.y,ym.m+1,0));
+      var _isThis0=(_td0.getFullYear()===ym.y && _td0.getMonth()===ym.m);
+      var _todayIdx0=_isThis0 ? _td0.getDate() : (ymdL(_td0)>_moE0 ? d.lastDay : 0);
+      var _paceT0=tg.min*(_todayIdx0/d.lastDay);
+      var info={
+        actual:t.actual.sum, landing:_mAll(t), nearSure:sumTiers(t,TIER_NEAR), committed:sumTiers(t,TIER_HIGH),
+        min:tg.min, max:tg.max, isThis:_isThis0, todayIdx:_todayIdx0, lastDay:d.lastDay, cum:d.cum.slice(),
+        paceTarget:_paceT0, pacePct:(_paceT0>0?Math.round(t.actual.sum/_paceT0*100):0),
+        tiers:TIERS.map(function(x){ return { id:x.id, label:x.label, color:x.color, note:x.note, sum:t[x.id].sum, count:t[x.id].count }; }),
+        courses:[{id:'div1',label:'1課',team:'国産',color:'#1db97a'},{id:'div2',label:'2課',team:'輸入',color:'#ec4899'}].map(function(cd){
+          var cc=d.byCourse[cd.id];
+          return { label:cd.label, team:cd.team, color:cd.color, landing:sumTiers(cc,TIER_IDS),
+                   tiers:TIERS.map(function(x){ return { label:x.label, color:x.color, sum:cc[x.id].sum, count:cc[x.id].count }; }) }; }),
+        frontCols:TIER_FRONT.map(function(id){ return { label:TIER_BY[id].label, color:TIER_BY[id].color }; }),
+        fronts:Object.keys(d.fronts).map(function(n){ var f=d.fronts[n]; var vals=TIER_FRONT.map(function(id){ return f[id]||0; });
+          return { name:n, count:f.count, vals:vals, actual:vals[0], total:vals.reduce(function(a,b){return a+b;},0) }; })
+          .sort(function(a,b){ return b.actual-a.actual || b.total-a.total; }),
+        refNoCount:(window.pitInternCountText ? (pitInternCountText(_refNoCount(_moS0,_moE0))||'') : '')
+      };
+      return { title:'売上サマリー', period:ym.y+'年'+(ym.m+1)+'月', infographic:info,
         kpis:[{label:'実績（返車済）',value:man(t.actual.sum)},{label:'実績見込み（＋実績待）',value:man(sumTiers(t,TIER_NEAR))},{label:'着地見込み',value:man(_mAll(t))},{label:'月目標',value:man(tg.min)+'〜'+man(tg.max)}],
         sections:[
           {type:'table',title:'確度別',head:['区分','金額','台数'],rows:tierRows,align:['l','r','r']},
@@ -1070,6 +1093,8 @@
     return { title:'フロント別', period:period, kpis:[], sections:[{type:'table',title:'指標（実績＋受注）',head:['名','台','売上','平均','最高','預平','預長','受注','ズレ平','ズレ最','待→完','完→返','車検','12点','一般'],rows:frows,align:['l','r','r','r','r','r','r','r','r','r','r','r','r','r','r']}]};
   }
   window.svReportModel = svReportModel;
+  /* 🎨 v2.120.0 金額の「万」の書き方は画面と同じ1本（紙＝sales-print.js も借りる） */
+  window.svMan = man;
 
   window.renderSales = renderSales;
   window.svSetTab = function(t){ window._svTab=t; renderSales(); };

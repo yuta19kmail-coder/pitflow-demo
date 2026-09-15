@@ -291,10 +291,30 @@
               → ④人間の予約挿入（ラベルは見えるが強制しない＝従うか従わないかは受付の自由）
      AI判定（state.aiVerdicts[日付]）があればそれが優先。無ければ計算式の仮判定。 */
 
+  /* 🔴🔴 v2.116.0（ゆうた報告 2026-09-15「新規予約でバッジを押すと考え込んでからチェックが入る」）
+     **数え方は変えていない。数える手間だけ減らした。**
+     ◎前＝1日ぶん数えるたびに**全カードを最初から見直していた**。右パネルのカレンダーは何十日ぶんもあるので、
+       「日数 × 全カード」を描き直しのたびに繰り返していた（本番並みの件数で右パネルの半分以上）。
+     ◎今＝最初の1回だけ全カードを「課＋日」で仕分け、**同じ流れの間（1回の描き直し）はそれを使い回す**。
+       流れが終わったら（次の一拍）捨てる＝カードが変わったのに古い数を使う、が起きない。
+     ⚠ 条件（返車済・廃車を除く）は下の1か所だけ。ここを変える時は仕分けの条件も同じもの。 */
+  let _bookIdx = null;
+  function _bookKeep(c) { return c && c.status !== 'returned' && c.status !== 'scrap'; }
   function _bookCount(team, dStr) {   // その日の予約・入庫台数（返車済/廃車は除く）
-    return (state.cards || []).filter(function (c) {
-      return c.boardId === team && c.reserveDate === dStr && c.status !== 'returned' && c.status !== 'scrap';
-    }).length;
+    const cards = state.cards || [];
+    if (!_bookIdx || _bookIdx.src !== cards || _bookIdx.len !== cards.length) {
+      const m = Object.create(null);
+      for (let i = 0; i < cards.length; i++) {
+        const c = cards[i];
+        if (!_bookKeep(c)) continue;
+        const k = c.boardId + '|' + c.reserveDate;
+        m[k] = (m[k] || 0) + 1;
+      }
+      _bookIdx = { src: cards, len: cards.length, m: m };
+      const done = function () { _bookIdx = null; };
+      if (typeof queueMicrotask === 'function') queueMicrotask(done); else Promise.resolve().then(done);
+    }
+    return _bookIdx.m[team + '|' + dStr] || 0;
   }
 
   function _verdictTeamC(cfg, dStr, team) {

@@ -728,7 +728,8 @@ function renderCardForm(c){
 
   // v0.83.1 フォーム再描画のたびに自動保存（チップ＝作業/受付タイプ・相談・Ⓕ・車種固定などの選択を取りこぼさない）。
   //   ※デバウンス保存なので、カレンダー送り等の連続再描画でも localStorage 書き込みは1回にまとまる。
-  if (window.PitDB) PitDB.save();
+  /* 💾 v2.116.0 下書きの時は控えだけ（全件見比べの空回りをしない）＝_cfSaveFor */
+  _cfSaveFor(c);
 }
 
 /* ========================================
@@ -2583,10 +2584,52 @@ function conditionChips(c){
       ・基本（単一）… 同じチップでもう一度押すと外れる／概算を入れ直す／代車なら併用可をおろす
       ・併用可・付加・「その他」の開閉・物販（単独）・社内区分 … 下の区間（移したまま）
    ================================================================ */
+/* ===================================================================
+   ⚡ v2.116.0（ゆうた報告 2026-09-15）**バッジは押した瞬間にチェックを付ける。描き直しは直後。**
+   🗣「新規予約で 車検とか12点とかのバッチをクリックするとき異常に遅いときがある」
+   🗣「なんかかなり考え込んでから チェックが入るらしい」
+   ◎正体＝押すたびに画面まるごと（右パネルの空き状況カレンダー込み）を描き直し終わるまで、
+     チェックが見えなかった。本番並みの件数・事務所のPCで 0.35〜0.85秒（保存と重なると約1.1秒）。
+   ◎今＝①カードの中身は今までどおりその場で変える ②押したバッジの見た目だけ先に変える
+     ③画面が一度描かれてから（＝チェックが目に見えてから）まるごと描き直す。
+   ⚠ 素早く何回押しても、描き直しは最後の1回にまとまる（_cfRedrawSoon）。
+   ⚠ 見た目の先出しは「押したバッジとその並び」だけ。概算・右パネルなどは直後の描き直しで揃う。
+   =================================================================== */
+/* 💾 v2.116.0 **下書き（新規予約の書きかけ）の時は、全件見比べの保存を呼ばない。控えだけ取る。**
+   ◎なぜ＝下書きはクラウドにも本保存にも書かない決まり（blank-cards.js）。なのに押すたびに
+     PitDB.save が走り、0.5秒後に**全データを1件ずつ見比べて、送る物が0件**で終わっていた
+     （本番並みの件数・事務所のPCで1回 0.25〜0.45秒止まり、押した時と重なると待たされる）。
+   ◎控え（この端末の書きかけ）は PitDB.save に相乗りして取っていた＝**控えは今までどおり取る**（pitKeepDraft）。
+   ⚠ 新規予約の画面は下書き以外のデータ（代車の予定・顧客・設定）を書き換えない（2026-09-15 に確認）。
+      ここに下書き以外を書き換える処理を足す時は、そこで PitDB.save を呼ぶこと。 */
+function _cfSaveFor(c){
+  if (c && c._draft){ try { if (window.pitKeepDraft) pitKeepDraft(); } catch (e) {} return; }
+  if (window.PitDB) PitDB.save();
+}
+
+let _cfRedrawFn = null, _cfRedrawQ = false;
+function _cfRedrawSoon(fn){
+  _cfRedrawFn = fn;
+  if (_cfRedrawQ) return;
+  _cfRedrawQ = true;
+  const run = function(){ _cfRedrawQ = false; const f = _cfRedrawFn; _cfRedrawFn = null; if (f) f(); };
+  /* 次の描画（＝チェックが見える）を待ってから重い仕事に入る */
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function(){ setTimeout(run, 0); });
+  else setTimeout(run, 0);
+}
+/* 並び（単一選択）の見た目を先に揃える：押したものだけ active（解除なら全部外す） */
+function _cfChipPaintOne(btn, on){
+  const grp = btn.closest('.cf-chips');
+  if (grp) grp.querySelectorAll('.cf-chip').forEach(function(b){ b.classList.remove('active'); });
+  if (on) btn.classList.add('active');
+}
+
 function pitWorkTypeBind(root, c, redraw, opt){
   opt = opt || {};
   if (!root || !c) return;
   redraw = redraw || function(){};
+  /* ⚡ v2.116.0 opt.defer＝描き直しを直後に回す（新規予約・予約の編集フォーム）。マスター入力は今までどおり即時 */
+  if (opt.defer){ const now = redraw; redraw = function(){ _cfRedrawSoon(now); }; }
 
   // 基本（単一選択＝c.workType）。⚠ 引き出しの物販（data-drawerwt）は下の専用ハンドラ
   root.querySelectorAll('.cf-chips[data-key="workType"]:not([data-drawerwt])').forEach(group => {
@@ -2595,6 +2638,7 @@ function pitWorkTypeBind(root, c, redraw, opt){
         const newVal = btn.dataset.val;
         const wasActive = btn.classList.contains('active');
         c.workType = wasActive ? null : newVal;   // 同じ値クリックで解除
+        if (opt.defer) _cfChipPaintOne(btn, !wasActive);   /* ⚡ 先にチェックを見せる */
         // 作業タイプを選んだら概算（日数・金額）を自動セット（後から手で直せる）
         if (window.pitEstHold)   c.estHoldDays = c.workType ? pitEstHold(c.workType, c.dropType, pitTeamKey(c)) : '';
         if (window.pitEstAmount && c.workType) c.estAmount = pitEstAmount(c.workType, pitTeamKey(c));
@@ -2620,6 +2664,7 @@ function pitWorkTypeBind(root, c, redraw, opt){
           if (window.pitInternKind && pitInternKind(c) === 'loanercar'){ c[key] = []; c.workType = null; }
           c[key].push(v);
         }
+        if (opt.defer) btn.classList.toggle('active', c[key].indexOf(v) >= 0);   /* ⚡ 先にチェックを見せる */
         /* 📦 v2.51.0（G）物販は常に単独。ふつうの作業タイプを押したら物販は外れる（逆向きも塞ぐ） */
         if (c.workType === 'goods') c.workType = null;
         _syncWorkTypes(c);
@@ -2653,10 +2698,11 @@ function pitWorkTypeBind(root, c, redraw, opt){
           }
           c[key].push(v);
         }
+        if (opt.defer) btn.classList.toggle('active', c[key].indexOf(v) >= 0);   /* ⚡ 先にチェックを見せる */
         /* 🛡 v2.9.0 保険を付けたら**自動で売掛チェックが入る**（ゆうた指定 2026-08-25）。
            🔴 判定も書き込みも `insurance-pit.js` の1本。ここで 'insurance' と書き分けない。 */
         if (window.pitInsOnBadge) pitInsOnBadge(c);
-        if (opt.save && window.PitDB) PitDB.save();
+        if (opt.save) _cfSaveFor(c);
         redraw();
       });
     });
@@ -2673,6 +2719,7 @@ function pitWorkTypeBind(root, c, redraw, opt){
       btn.addEventListener('click', () => {
         if (btn.disabled) return;
         const v = btn.dataset.val;
+        if (opt.defer) _cfChipPaintOne(btn, c.workType !== v);   /* ⚡ 先にチェックを見せる */
         if (c.workType === v){ c.workType = null; }
         else {
           c.workType   = v;
@@ -2685,7 +2732,7 @@ function pitWorkTypeBind(root, c, redraw, opt){
           if (window.pitEstAmount) c.estAmount   = pitEstAmount(v, pitTeamKey(c));
         }
         _syncWorkTypes(c);
-        if (opt.save && window.PitDB) PitDB.save();
+        if (opt.save) _cfSaveFor(c);
         redraw();
       });
     });
@@ -2699,10 +2746,11 @@ function pitWorkTypeBind(root, c, redraw, opt){
       btn.addEventListener('click', () => {
         const v   = btn.dataset.val;
         const now = window.pitInternKind ? pitInternKind(c) : '';
+        if (opt.defer) _cfChipPaintOne(btn, now !== v);   /* ⚡ 先にチェックを見せる */
         if (window.pitInternSet) pitInternSet(c, now === v ? '' : v);
         _syncWorkTypes(c);
         _cfOtherOpen = true;
-        if (opt.save && window.PitDB) PitDB.save();
+        if (opt.save) _cfSaveFor(c);
         redraw();
       });
     });
@@ -2860,9 +2908,11 @@ function bindCardFormEvents(root){
         else cur[1] = v;                           // すでに2つ→2つ目を置き換え
         c.dropType  = cur[0] || null;
         c.dropType2 = cur[1] || null;
+        /* ⚡ v2.116.0 先にチェックを見せて、描き直しは直後 */
+        group.querySelectorAll('.cf-chip').forEach(function(b){ b.classList.toggle('active', cur.indexOf(b.dataset.val) >= 0); });
         // 概算（預かり日数）は主の受付タイプで計算（従来どおり）
         if (window.pitEstHold) c.estHoldDays = c.workType ? pitEstHold(c.workType, c.dropType, pitTeamKey(c)) : '';
-        renderCardForm(c);
+        _cfRedrawSoon(function(){ if (_editingCardId === c.id) renderCardForm(c); });
       });
     });
   });
@@ -2901,13 +2951,16 @@ function bindCardFormEvents(root){
             _syncWorkTypes(c); _clearSpecialsIfNoWork(c);   // 表示用バッジ列を同期＋付加の整合（v0.116.0）
           }
         }
-        renderCardForm(c);
+        /* ⚡ v2.116.0 先にチェックを見せて、描き直しは直後（国産/輸入は解除なし＝押したものが必ず付く） */
+        _cfChipPaintOne(btn, key === 'boardId' ? true : !wasActive);
+        _cfRedrawSoon(function(){ if (_editingCardId === c.id) renderCardForm(c); });
       });
     });
   });
 
   /* 🔧 v2.99.0 作業タイプ（基本・併用可・その他の引き出し）は `pitWorkTypeBind` 1本（マスター入力も同じものを呼ぶ） */
-  pitWorkTypeBind(root, c, () => renderCardForm(c), { save: true });
+  /* ⚡ v2.116.0 defer＝押した瞬間にチェック・描き直しは直後。⚠ 閉じた後に描かない（開いているカードの時だけ） */
+  pitWorkTypeBind(root, c, () => { if (_editingCardId === c.id) renderCardForm(c); }, { save: true, defer: true });
 
   // チップ（複数選択：代車条件）
   root.querySelectorAll('.cf-chips[data-multi]').forEach(group => {
@@ -2920,7 +2973,7 @@ function bindCardFormEvents(root){
         if (idx >= 0) c[key].splice(idx, 1);
         else c[key].push(v);
         btn.classList.toggle('active');
-        if (window.PitDB) PitDB.save();   // v0.83.1 代車条件の選択を自動保存
+        _cfSaveFor(c);   // v0.83.1 代車条件の選択を自動保存（💾 v2.116.0 下書きは控えだけ）
         // 代車条件を変えたら代車ガントを並べ替え直す（条件マッチを上へ）
         if (key === 'loanerConditions' && window.cfsLgRerender) cfsLgRerender();
       });

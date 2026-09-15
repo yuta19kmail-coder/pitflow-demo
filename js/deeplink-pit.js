@@ -70,3 +70,70 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(tick, STEP_MS); });
   else setTimeout(tick, STEP_MS);
 })();
+
+/* ========================================
+   ?fd=<やること>  -  FlowDesk のショートカットから「新規◯◯」をいきなり開く  PitFlow v2.118.0
+   ----------------------------------------
+   ◎なにをするもの
+     `https://pitflow.kobayashi-motors.com/?fd=new-reserve`   → 新規予約の画面
+     `https://pitflow.kobayashi-motors.com/?fd=new-customer`  → 新規顧客登録
+     知らない値は**何もしない**（ふつうに開くだけ）。
+
+   ◎画面の指定（#/today など）と一緒に来た時
+     画面の切り替えは coreflow-nav.js が起動時に済ませている（main.js の showView を包んでいる）。
+     こちらはログインとデータ読み込みの後に動くので、**画面 → やること** の順になる。
+     新規予約を閉じると、その画面に戻る（card-detail.js の _returnView）。
+
+   ◎待ち方（?card= と同じ考え方）
+     ・ログイン画面が出ている間は**いつまでも待つ**（時間切れで捨てない）
+     ・本番はクラウドの読み込み（PitDB._loaded）まで待つ。練習モードはログインだけでよい
+     ・動かす前にアドレスから ?fd= を消す（# の画面はそのまま）＝再読み込みで二重に開かない
+   ======================================== */
+(function () {
+  'use strict';
+
+  var m = /[?&]fd=([^&#]*)/.exec(location.search || '');
+  if (!m) return;
+
+  var act = '';
+  try { act = decodeURIComponent(m[1]); } catch (e) { act = m[1]; }
+
+  /* やること → 呼ぶ関数の名前。足す時はここに1行 */
+  var ACTIONS = {
+    'new-reserve':  'openNewReserve',
+    'new-customer': 'custNewCustomer'
+  };
+  var fn = ACTIONS[act];
+  if (!fn) return;   // 知らない値は無視
+
+  function stripParam(){
+    try {
+      var u = new URL(location.href);
+      u.searchParams.delete('fd');
+      history.replaceState(history.state, '', u.pathname + (u.search || '') + (u.hash || ''));   // coreflow-nav の印（state）は残す
+    } catch (e) {}
+  }
+
+  function ready(){
+    var login = document.getElementById('pit-login');
+    if (login && login.offsetParent !== null) return false;              // ログイン画面が出ている
+    if (!document.body.classList.contains('pit-authed')) return false;   // まだ入っていない
+    if (!window.state || !state.currentView) return false;                // 起動の画面がまだ
+    if (window.PIT_CLOUD && !(window.PitDB && PitDB._loaded)) return false; // 本番はデータ待ち
+    return typeof window[fn] === 'function';
+  }
+
+  var started = Date.now();
+  function tick(){
+    if (ready()){
+      stripParam();
+      try { window[fn](); } catch (e) { console.error('[deeplink] ?fd=' + act, e); }
+      return;
+    }
+    /* はじめの25秒はこまめに、そのあとはゆっくり（ログインを待っている間） */
+    setTimeout(tick, (Date.now() - started) < 25000 ? 300 : 1000);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(tick, 300); });
+  else setTimeout(tick, 300);
+})();

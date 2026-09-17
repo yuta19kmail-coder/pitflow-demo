@@ -1,5 +1,5 @@
 /* ========================================
-   app-summary.js — CoreFlow のダッシュボードへ PitFlow の概況を配る（appSummaries/pitflow）v2.108.0
+   app-summary.js — CoreFlow のダッシュボードへ PitFlow の概況を配る（appSummaries/pitflow）v2.108.0／v2.122.0 売上ボード
    ----------------------------------------
    🗣 ゆうた 2026-09-13「コアフローのダッシュボードを仕上げる」
       「基本考えうる全てを作成して欲しい　時間かかっていい」／売上は「金額も出す」
@@ -8,7 +8,7 @@
      { updatedAt, v:2,
        metrics:[{label,value,tone}], items:[{main,sub,right,warn,q}],      … 「PitFlow 概況」BOX
        sections:{ intake:{title,metrics,items,more}, … },                   … 項目ごとのBOX（30種あまり）
-       perUser:{ [メンバーid]:{ metrics, items, sections:{reserve,task,ret,resstaff,sales} } } }  … 「自分の◯◯」BOX
+       perUser:{ [メンバーid]:{ metrics, items, sections:{reserve,task,ret,resstaff,sales,front?} } } }  … 「自分の◯◯」BOX
      ・q ＝ 押した時に開く PitFlow の行き先（`card=<カードID>` → deeplink-pit.js が受ける）
      ・perUser の鍵＝**メンバーid（portalMembers の文書id）**。state.staff の id と同じ。
 
@@ -17,6 +17,20 @@
    🔴 **本番（PIT_CLOUD）でログインしている時だけ配る。** 見本データを本番のダッシュボードに混ぜない。
    ⚠ お客様は **名字＋車名だけ**（電話・住所は載せない）。CoreFlow のメンバーなら誰でも読める場所だから。
    ⚠ 書けない時は console.warn だけ（画面の邪魔をしない）。
+
+   🆕 v2.122.0（2026-09-17 ゆうた：FlowDesk のサイドバーに PitFlow の売上カード）
+     sections.salesBoard ＝機械で読む売上ボード（title・metrics:[]・items:[] は形合わせだけ）
+       { month:'YYYY-MM', day, days, min, max,
+         tiers:{act,wait,fixed,plan,est,fore}, counts:{…同じ鍵…},        … 売上画面「当月」の6区分（円・台）
+         divs:{ div1:{min,max,tiers,counts}, div2:{…} },                  … 1課(国産)/2課(輸入)。目標は ratioD（国産の％）で割る
+         fronts:[{ key, name, memberId, tiers:{act,wait,fixed,plan}, counts, avgPrice, avgStayDays }],  … 実績の多い順
+         company:{ avgPrice, avgStayDays } }
+     perUser[id].sections.front ＝その人がフロントの行（＋rank・of）
+     🔴 **数字は売上画面（sales.js の collectMonth / target）から借りる。**ここで区分・金額を数え直さない。
+     ・フロント＝カードの frontStaff（無ければ staff、どちらも無ければ「（未割当）」）＝画面のフロント別と同じ
+     ・memberId＝その名前の state.staff の id（perUser の鍵と同じ）。未割当・名簿に無い名前は null
+     ・平均預かり日数＝実績の車だけ。入庫日（actualInAt、無ければ reserveDate＝pitHoldFrom と同じ起点）→
+       実績カウント日（pitSalesCountDate）の日数差。0日＝当日返し。日付が逆転している車は数えない
    ======================================== */
 (function () {
   'use strict';
@@ -64,6 +78,65 @@
     return o;
   }
   var ORDER_LABEL = { parts: '部品', work: '作業', workDone: '作業完了', outsource: '外注' };
+
+  /* ---------- 🆕 v2.122.0 売上ボード（FlowDesk 用） ---------- */
+  var TK = { actual: 'act', actualWait: 'wait', confirmed: 'fixed', planned: 'plan', prospect: 'est', forecast: 'fore' };
+  var TK_ALL = ['act', 'wait', 'fixed', 'plan', 'est', 'fore'], TK_FRONT = ['act', 'wait', 'fixed', 'plan'];
+  var NO_FRONT = '（未割当）';   /* sales.js の collectMonth と同じ呼び名 */
+  function zeroes(keys) { var o = {}; keys.forEach(function (k) { o[k] = 0; }); return o; }
+  function dayOf(v) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(str(v)); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+  function stayOf(c) {
+    /* 入庫日＝実際に入庫した日（無ければ入庫予定日）＝ views.js の pitHoldFrom と同じ起点
+       返車＝実績カウント日（sales-count.js の pitSalesCountDate）＝この車を実績に数えた日 */
+    var a = dayOf(c.actualInAt || c.reserveDate), b = dayOf(window.pitSalesCountDate ? pitSalesCountDate(c) : '');
+    if (!a || !b) return null;
+    var d = Math.round((b - a) / 86400000);
+    return d >= 0 ? d : null;
+  }
+  function avg1(sum, n) { return n ? Math.round(sum / n * 10) / 10 : null; }
+  function salesBoard(C) {
+    if (!window.pitSalesMonthCollect || !window.pitSalesTarget) throw new Error('sales.js がまだ読めていない');
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var y = now.getFullYear(), m = now.getMonth();
+    var moS = ymd(new Date(y, m, 1)), moE = ymd(new Date(y, m + 1, 0));
+    var D = pitSalesMonthCollect(moS, moE), tg = pitSalesTarget();
+    var set = (state.settings && state.settings.target) || {};
+    var ratioD = set.ratioD != null ? +set.ratioD : 50;           /* 国産の％（rules.js の目標の割り方と同じ・既定50） */
+    if (!isFinite(ratioD)) ratioD = 50;
+    var mn = Math.round(tg.min), mx = Math.round(tg.max);
+    var d1Min = Math.round(mn * ratioD / 100), d1Max = Math.round(mx * ratioD / 100);
+    var o = sec('売上ボード', [], []);
+    o.month = moS.slice(0, 7); o.day = now.getDate(); o.days = D.lastDay;
+    o.min = mn; o.max = mx;
+    o.tiers = zeroes(TK_ALL); o.counts = zeroes(TK_ALL);
+    /* 輸入＝全体−国産（rules.js の iMin = monthMin − dMin と同じ）。丸めても足すと全体にそろう */
+    o.divs = { div1: { min: d1Min, max: d1Max, tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) },
+               div2: { min: mn - d1Min, max: mx - d1Max, tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) } };
+    var staffBy = {};
+    ((window.state && state.staff) || []).forEach(function (s) { if (s && s.id && !s.isSelf && s.name && !staffBy[s.name]) staffBy[s.name] = s.id; });
+    var F = {}, order = [], all = { s: 0, n: 0 };
+    D.rows.forEach(function (r) {
+      var k = TK[r.tier]; if (!k) return;
+      var amt = Math.round(+r.amt || 0), dv = o.divs[r.course] || o.divs.div1;
+      o.tiers[k] += amt; o.counts[k]++; dv.tiers[k] += amt; dv.counts[k]++;
+      var stay = k === 'act' ? stayOf(r.c) : null;
+      if (stay != null) { all.s += stay; all.n++; }
+      if (TK_FRONT.indexOf(k) < 0) return;
+      var nm = str(r.front) || NO_FRONT;
+      if (!F[nm]) { F[nm] = { name: nm, memberId: nm === NO_FRONT ? null : (staffBy[nm] || null), tiers: zeroes(TK_FRONT), counts: zeroes(TK_FRONT), s: 0, n: 0 }; order.push(F[nm]); }
+      var f = F[nm]; f.tiers[k] += amt; f.counts[k]++;
+      if (stay != null) { f.s += stay; f.n++; }
+    });
+    /* 並び＝実績の多い順（同じなら4区分の合計の多い順）＝売上画面のフロント別と同じ */
+    function tot(f) { return TK_FRONT.reduce(function (a, k) { return a + f.tiers[k]; }, 0); }
+    order.sort(function (a, b) { return b.tiers.act - a.tiers.act || tot(b) - tot(a); });
+    o.fronts = order.map(function (f) {
+      return { key: f.name, name: f.name, memberId: f.memberId, tiers: f.tiers, counts: f.counts,
+               avgPrice: f.counts.act ? Math.round(f.tiers.act / f.counts.act) : 0, avgStayDays: avg1(f.s, f.n) };
+    });
+    o.company = { avgPrice: o.counts.act ? Math.round(o.tiers.act / o.counts.act) : 0, avgStayDays: avg1(all.s, all.n) };
+    return o;
+  }
 
   /* ---------- 全社の概況 ---------- */
   function buildSections(C) {
@@ -253,6 +326,9 @@
                                met('台数・平均単価', act.length + '台・' + man(act.length ? sum / act.length : 0), 'info'),
                                met('最低目標', man(tg.monthMin), 'info'), met('上の目標', tg.monthMax ? man(tg.monthMax) : '—', 'purple')], rows);
     });
+    /* 🆕 v2.122.0 売上ボード（FlowDesk 用・機械で読む形）。
+       🔴 区分・金額・課・フロントは sales.js の collectMonth をそのまま使う＝売上画面「当月」と1円も違わない */
+    add('salesBoard', function () { return salesBoard(C); });
     add('salesStaff', function () {
       var by = {}, order = [];
       act.forEach(function (c) { var n = str(P.taskStaff(c)) || '担当なし'; if (!by[n]) { by[n] = { n: n, c: 0, a: 0 }; order.push(by[n]); } by[n].c++; by[n].a += (+A().amt(c) || 0); });
@@ -351,14 +427,18 @@
   /* ---------- 自分（担当者ごと） ----------
      🔴 担当の見分けは mydash.js の個人BOXと同じ＝**名前**で見る（pickP◯◯ に {p:[名前]} を渡す）。
      鍵は state.staff の id（＝ portalMembers の文書id）。CoreFlow 側は自分のメンバーidで引く。 */
-  function buildPerUser(C) {
+  function buildPerUser(C, S) {
     var P = A(), out = {};
+    /* 🆕 v2.122.0 フロントの順位＝売上ボードの並び（実績の多い順）。未割当は順位に入れない */
+    var SB = S && S.salesBoard;
+    var FR = (SB && Array.isArray(SB.fronts)) ? SB.fronts.filter(function (f) { return f.name !== NO_FRONT; }) : [];
     ((window.state && state.staff) || []).forEach(function (s) {
       if (!s || !s.id || s.isSelf || !s.name) return;
       try {
         var it = { p: [s.name] };
         var pr = P.pickPReserve(it), pt = P.pickPTask(it), pret = P.pickPReturn(it), prs = P.pickPResStaff(it), psl = P.pickPSales(it);
-        if (!pr.length && !pt.length && !pret.length && !prs.length && !psl.length) return;
+        var fi = -1; FR.forEach(function (f, i) { if (fi < 0 && f.name === s.name) fi = i; });
+        if (!pr.length && !pt.length && !pret.length && !prs.length && !psl.length && fi < 0) return;
         var L = P.TASK_LABEL || {};
         var todayRes = pr.filter(function (c) { return c.reserveDate === C.tStr; });
         var todayRet = pret.filter(function (c) { return P.retDate(c) === C.tStr; });
@@ -382,6 +462,11 @@
               psl.map(function (c) { return row(c, wt(c), yen(A().amt(c))); }), PLIM)
           }
         };
+        if (fi >= 0) {   /* 🆕 v2.122.0 自分のフロント成績（FlowDesk 用） */
+          var fr = FR[fi];
+          out[s.id].sections.front = { key: fr.key, name: fr.name, tiers: fr.tiers, counts: fr.counts, avgPrice: fr.avgPrice,
+                                       avgStayDays: fr.avgStayDays, rank: fi + 1, of: FR.length };
+        }
       } catch (e) { console.warn('[appSummary:pitflow] perUser ' + s.id, e); }
     });
     return out;
@@ -390,7 +475,7 @@
   function build() {
     var P = A(); if (!P) return null;
     var C = P.ctx();
-    var S = buildSections(C), pu = buildPerUser(C);
+    var S = buildSections(C), pu = buildPerUser(C, S);
     function pick(k, i) { var x = S[k] && S[k].metrics && S[k].metrics[i]; return x ? x.value : '—'; }
     function tone(k, i) { var x = S[k] && S[k].metrics && S[k].metrics[i]; return x ? x.tone : 'info'; }
     var metrics = [

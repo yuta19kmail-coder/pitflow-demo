@@ -105,29 +105,50 @@
       return sec('長期預かり', [met(lim + '日以上', l.length + '台', toneN(l.length, 'warn')), met((lim * 2) + '日以上', twice + '台', toneN(twice, 'warn'))],
         l.map(function (c) { var n = P.holdDays(c); return row(c, subOf(wt(c), team(c)), n + '日目', n >= lim * 2); }));
     });
+    /* 🔴 予約の埋まり（1日分）＝ fill と earliest.days が同じ数字を使う（2026-09-17 ゆうた） */
+    function capOf() {
+      var rc = (state.settings && state.settings.reserveCap) || { 'default': 5, 'import': 3 };
+      return { d: rc['default'] != null ? rc['default'] : 5, i: rc['import'] != null ? rc['import'] : 3 };
+    }
+    function fillDay(ds, cap) {
+      var eD = window.pitEffective ? pitEffective(ds, 'capDefault', cap.d) : { value: cap.d };
+      var eI = window.pitEffective ? pitEffective(ds, 'capImport', cap.i) : { value: cap.i };
+      return { closed: !!((window.PitCal && PitCal.isClosed(ds)) || eD.closed), capD: eD.value, capI: eI.value,
+               nD: window.dashIntake ? dashIntake('default', ds) : 0, nI: window.dashIntake ? dashIntake('import', ds) : 0 };
+    }
+    function num(v) { v = +v; return isFinite(v) ? v : 0; }
     add('earliest', function () {
-      function ed(tm, kind) {
+      /* 🔴 2026-09-17 ゆうた：FlowDesk「最短入庫日の案内」用に日付そのもの（grid）と3週間の空き（days）も配る */
+      function raw(tm, kind) {
         var d = window.dashEarliestIntake ? dashEarliestIntake(tm, kind, C.today) : null;
-        if (!d) return 'なし';
-        var ds = ymd(d); return ds === C.tStr ? '今日' : mdw(ds);
+        return d ? ymd(d) : null;
       }
-      var dn = ed('default', 'noLoaner'), dl = ed('default', 'loaner'), inl = ed('import', 'noLoaner'), il = ed('import', 'loaner'), same = ed('default', 'same');
-      return sec('最短入庫日', [met('国産・代車なし', dn, 'good'), met('国産・代車あり', dl, 'info'), met('輸入・代車なし', inl, 'purple'), met('輸入・代車あり', il, 'purple'), met('当日作業', same, 'gold')],
+      function fmt(ds) { return !ds ? 'なし' : (ds === C.tStr ? '今日' : mdw(ds)); }
+      var grid = { dom: { no: raw('default', 'noLoaner'), loan: raw('default', 'loaner'), same: raw('default', 'same') },
+                   imp: { no: raw('import', 'noLoaner'), loan: raw('import', 'loaner'), same: raw('import', 'same') } };
+      var dn = fmt(grid.dom.no), dl = fmt(grid.dom.loan), inl = fmt(grid.imp.no), il = fmt(grid.imp.loan), same = fmt(grid.dom.same);
+      var o = sec('最短入庫日', [met('国産・代車なし', dn, 'good'), met('国産・代車あり', dl, 'info'), met('輸入・代車なし', inl, 'purple'), met('輸入・代車あり', il, 'purple'), met('当日作業', same, 'gold')],
         [line('国産', '代車なし', dn), line('国産', '代車あり', dl), line('輸入', '代車なし', inl), line('輸入', '代車あり', il), line('当日作業', 'オイルなど', same)]);
+      /* 🔴 days＝fill と同じ21日。休みの日も数字は入れる（FlowDesk が「休」と出す）。label は短縮営業なども入る */
+      var cap = capOf(), total = window.pitLoanerUsableList ? pitLoanerUsableList().length : 0, days = [];
+      for (var k = 0; k < 21; k++) {
+        var ds = ymd(addDays(C.today, k)), f = fillDay(ds, cap);
+        var free = window.pitLoanerFreeOn ? pitLoanerFreeOn(ds).length : 0;
+        days.push({ ds: ds, closed: f.closed, label: str((window.PitCal && PitCal.label(ds)) || (f.closed ? '休み' : '')),
+                    dom: [num(f.nD), num(f.capD)], imp: [num(f.nI), num(f.capI)], loanFree: num(free), loanTotal: num(total) });
+      }
+      o.grid = grid; o.days = days;
+      return o;
     });
     add('fill', function () {
-      var rc = (state.settings && state.settings.reserveCap) || { 'default': 5, 'import': 3 };
-      var capD = rc['default'] != null ? rc['default'] : 5, capI = rc['import'] != null ? rc['import'] : 3;
+      var cap = capOf();
       var items = [], fullDays = 0, first = null;
       for (var k = 0; k < 21; k++) {
-        var ds = ymd(addDays(C.today, k));
-        var eD = window.pitEffective ? pitEffective(ds, 'capDefault', capD) : { value: capD };
-        var eI = window.pitEffective ? pitEffective(ds, 'capImport', capI) : { value: capI };
-        var closed = (window.PitCal && PitCal.isClosed(ds)) || eD.closed;
-        var nD = window.dashIntake ? dashIntake('default', ds) : 0, nI = window.dashIntake ? dashIntake('import', ds) : 0;
-        var full = !closed && nD >= eD.value && nI >= eI.value;
+        var ds = ymd(addDays(C.today, k)), f = fillDay(ds, cap);
+        var closed = f.closed, nD = f.nD, nI = f.nI;
+        var full = !closed && nD >= f.capD && nI >= f.capI;
         var r = closed ? line(mdw(ds), (window.PitCal && PitCal.label(ds)) || '休み', '休')
-                       : line(mdw(ds), full ? '満枠' : '', '国産 ' + nD + '/' + eD.value + '・輸入 ' + nI + '/' + eI.value, full);
+                       : line(mdw(ds), full ? '満枠' : '', '国産 ' + nD + '/' + f.capD + '・輸入 ' + nI + '/' + f.capI, full);
         if (full) fullDays++;
         if (k === 0) first = r;
         items.push(r);

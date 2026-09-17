@@ -88,11 +88,13 @@
     var lastDay = pd(moE).getDate();
     var dayActual = []; for (var i=0;i<=lastDay;i++) dayActual[i]=0;   // 1..lastDay
     var fronts = {};   // frontStaff -> { 区分ごとの金額 … , count }（区分は TIER_FRONT）
+    var rows = [];     /* 🆕 v2.122.0 1台ずつの内訳（FlowDesk の売上ボード用・app-summary.js が読む）。画面は使わない */
     (state.cards||[]).forEach(function(c){
       var tier = tierOf(c, moS, moE, todayStr); if (!tier) return;
       var amt = amtOf(c, tier);
       tiers[tier].sum += amt; tiers[tier].count++;
       var cs = course(c); byCourse[cs][tier].sum += amt; byCourse[cs][tier].count++;
+      rows.push({ c:c, tier:tier, amt:amt, course:cs, front:(c.frontStaff||c.staff||'（未割当）') });
       if (tier==='actual'){
         var d = countDate(c); var dd = pd(d).getDate();
         if (dd>=1 && dd<=lastDay) dayActual[dd] += amt;
@@ -106,8 +108,14 @@
     });
     // 日次累計
     var cum = []; cum[0]=0; for (var k=1;k<=lastDay;k++) cum[k] = cum[k-1] + dayActual[k];
-    return { tiers:tiers, byCourse:byCourse, lastDay:lastDay, cum:cum, fronts:fronts };
+    return { tiers:tiers, byCourse:byCourse, lastDay:lastDay, cum:cum, fronts:fronts, rows:rows };
   }
+  /* 🆕 v2.122.0（2026-09-17 ゆうた：FlowDesk のサイドバーに PitFlow の売上カード）
+     🔴 **app-summary.js の売上ボード（sections.salesBoard）は、この画面と同じ集め方を借りる。**
+        区分・金額・課・フロントの見分けを向こうで書き直すと、画面と FlowDesk の数字が食い違う（写しの罠）。
+     ⚠ ここは**呼び口だけ**。数え方を変える時は collectMonth / target の1本を直す。 */
+  window.pitSalesMonthCollect = collectMonth;
+  window.pitSalesTarget = target;
 
   function sumTiers(t, ids){ var s=0; ids.forEach(function(id){ s += t[id].sum; }); return s; }
 

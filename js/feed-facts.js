@@ -20,6 +20,13 @@
        intake:[{ id, time }],   … 今日の入庫予定で、まだ入庫していない・時刻がある車
        ret:[{ id, time }],      … 今日の返車予定で、まだ返車していない・時刻がある車
        hold:[{ id, days }],     … 預かり中の車と日数
+       🆕 2026-09-19 受付まわりの8つ（どれも PIT_DASH_API の物差しから作る）
+       retTbd:[{id}], retTimeTbd:[{id}],   … 返車日未定／返車時間未定（受付が決めに行く車）
+       thanks:[{id}],                      … その日のお礼LINEで、まだ送っていない人
+       sameDay:[{id,time}],                … その日の 待ち・当返 で、まだ返していない車
+       shakenCand:[{id}], shakenUnset:[{id}], … 車検の「行ける日候補が出た」／「店にいるのに予定なし」
+       loaner:[{id,rem}],                  … 代車の残り日数（マイナス＝超過）
+       dataCheck:{ n, red, amber },        … PitFlow のデータチェックで見つかっている数
        sales:{ sum, goalMin, goalMax, today, byDiv:{div:金額}, byStaff:{メンバーid:{order, sales}} } }
 
    🔴 本番（PIT_CLOUD）でログインしている時だけ置く。見本データを本番に混ぜない
@@ -78,11 +85,45 @@
       var open = P.pickOrder().filter(function (c) { return str(P.taskStaff(c)) === s.name; }).reduce(function (x, c) { return x + (+P.amt(c) || 0); }, 0);
       if (sales || open) byStaff[s.id] = { sales: sales, order: sales + open };
     });
+    /* =================================================================
+       🆕 2026-09-19 受付まわりの8つの通知のもと（FlowDesk 画面 v1.18.0）
+       🗣 ゆうた「通知の項目自体をふやすのもあり」→ 8つ選んでもらった物
+       🔴 **どれも物差しは PIT_DASH_API から借りるだけ**（条件をここで書き写さない）
+          ＝ PitFlow の画面で見える物と、通知で言う事が食い違わない
+       ================================================================= */
+    var idsOf = function (list) { return (list || []).map(function (c) { keep(c); return { id: c.id }; }); };
+    /* 返車日未定・返車時間未定＝受付が「決めに行く」車（mydash の同じ BOX と同じ物差し） */
+    var retTbd = idsOf(P.pickRetDateTbd ? P.pickRetDateTbd() : []);
+    var retTimeTbd = idsOf(P.pickRetTimeTbd ? P.pickRetTimeTbd() : []);
+    /* お礼LINE＝その日返した車のうち、まだ送っていない人（pitThanksNeeded／pitThanksSent が物差し） */
+    var thxAll = P.thxList ? P.thxList(C.tStr) : [];
+    var thanks = idsOf(P.thxLeft ? P.thxLeft(thxAll) : []);
+    /* 当返・待ち＝その日のうちに返す車で、まだ返していない物 */
+    var sameDay = (C.cards || []).filter(function (c) {
+      return c.reserveDate === C.tStr && (c.dropType === 'wait' || c.dropType === 'sameDay') && c.status !== 'returned' && c.status !== 'scrap' && c.status !== 'cancelled';
+    }).map(function (c) { keep(c); return { id: c.id, time: hm(c.reserveTime) }; });
+    /* 車検＝行ける日候補が出た物／店にいるのに予定が無い物（shakenStat が物差し） */
+    var sk = P.shakenStat ? P.shakenStat() : { candList: [], unsetList: [] };
+    var shakenCand = idsOf(sk.candList), shakenUnset = idsOf(sk.unsetList);
+    /* 代車＝返す日を過ぎた／残りわずか（pitLoanerRemainOf が物差し。ここで日付を引き算しない） */
+    var loaner = [];
+    (C.cards || []).forEach(function (c) {
+      if (!c || !(window.pitLoanerOf ? pitLoanerOf(c) : c.needLoaner)) return;
+      if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return;
+      var R2 = window.pitLoanerRemainOf ? pitLoanerRemainOf(c) : null;
+      if (!R2 || R2.back || R2.rem == null) return;
+      keep(c); loaner.push({ id: c.id, rem: R2.rem });
+    });
+    /* データの抜け＝PitFlow のデータチェックと同じ数（insStat） */
+    var ins = P.insStat ? P.insStat() : null;
     var tg = (state.settings && state.settings.target) || {};
     return {
       v: 1, day: C.tStr, month: C.tStr.slice(0, 7),
       staff: staff, names: names, memberDivs: memberDivs, divLabels: divLabels,
       cards: cards, intake: intake, ret: ret, hold: hold,
+      retTbd: retTbd, retTimeTbd: retTimeTbd, thanks: thanks, sameDay: sameDay,
+      shakenCand: shakenCand, shakenUnset: shakenUnset, loaner: loaner,
+      dataCheck: ins ? { n: ins.n || 0, red: ins.red || 0, amber: ins.amber || 0 } : null,
       sales: { sum: sum, goalMin: +tg.monthMin || 0, goalMax: +tg.monthMax || 0, today: today, byDiv: byDiv, byStaff: byStaff }
     };
   }

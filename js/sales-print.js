@@ -99,12 +99,14 @@
      売上サマリー（当月）は、画面と同じ並びで A4縦1枚に描く（ベクター・文字は選べる）。
        ① 数字の帯（実績／着地見込み／本日ペース）＋確度別の積み上げ帯（最低・最高の印）
        ② 日次の進捗（実績の面・着地予測の点線・最低／最高ペースの破線・今日の線）
-       ③ 確度別カード（目標＋6区分）　④ 1課・2課の内訳　⑤ フロント別
+       ③ 確度別カード（目標＋6区分）　④ 1課・2課＝積み上げの階段（v2.124.0〜メイン。フロント別はやめた）
      🔴 数字・色・区分は sales.js が渡す材料（model.infographic）だけを使う。ここで数え直さない。
      ⚠ 紙なので下地は明るい色。確度の色は画面と同じ。
      =================================================================== */
   function hexRgb(hex){ var h=String(hex||'#000000').replace('#',''); if(h.length===3) h=h.split('').map(function(c){return c+c;}).join(''); var n=parseInt(h,16)||0; return [(n>>16)&255,(n>>8)&255,n&255]; }
   function tint(hex, a){ var c=hexRgb(hex); return [Math.round(255-(255-c[0])*a),Math.round(255-(255-c[1])*a),Math.round(255-(255-c[2])*a)]; }
+  /* 紙（白地）で文字にする時だけ少し濃くする（実績待の黄緑は白地だと薄い） */
+  function deep(hex){ var c=hexRgb(hex); return [Math.round(c[0]*0.72),Math.round(c[1]*0.72),Math.round(c[2]*0.72)]; }
   function F(pdf,c){ pdf.setFillColor(c[0],c[1],c[2]); }
   function D(pdf,c){ pdf.setDrawColor(c[0],c[1],c[2]); }
   function T(pdf,c){ pdf.setTextColor(c[0],c[1],c[2]); }
@@ -133,7 +135,7 @@
     T(pdf,landC); pdf.setFontSize(23); pdf.text(MAN(I.landing), c2, y+17.5);
     pdf.setFontSize(7); var sx=c2;
     T(pdf,MUTED); pdf.text('実績見込み（実績＋実績待）', sx, y+23.5); sx+=pdf.getTextWidth('実績見込み（実績＋実績待）')+1.2;
-    T(pdf,hexRgb('#0f9488')); pdf.text(MAN(I.nearSure), sx, y+23.5); sx+=pdf.getTextWidth(MAN(I.nearSure))+4;
+    T(pdf,deep(I.tiers[1].color)); pdf.text(MAN(I.nearSure), sx, y+23.5); sx+=pdf.getTextWidth(MAN(I.nearSure))+4;
     T(pdf,MUTED); pdf.text('確度高（＋確定）', sx, y+23.5); sx+=pdf.getTextWidth('確度高（＋確定）')+1.2;
     T(pdf,hexRgb('#2563eb')); pdf.text(MAN(I.committed), sx, y+23.5);
     if (I.isThis && I.todayIdx>0){
@@ -157,7 +159,7 @@
     if (I.refNoCount){ T(pdf,MUTED); pdf.setFontSize(6.8); pdf.text('参考：'+I.refNoCount+'（売上には入っていません）', L+1, y+2.5); y += 5; }
 
     /* ── ② 日次の進捗 ── */
-    var chH=74;
+    var chH=62;   /* v2.124.0 74→62：課別をメインにするため、その分を課別へ回した */
     D(pdf,RULE); pdf.setLineWidth(0.25); pdf.roundedRect(L, y, W, chH, 2, 2, 'S');
     T(pdf,INK); pdf.setFontSize(9.5); pdf.text('日次の進捗（返車＝実績の累計）', L+4, y+6.5);
     /* 凡例 */
@@ -211,50 +213,71 @@
     });
     y += chh + 4;
 
-    /* ── ④ 課別 ── */
-    var bgap=4, bw2=(W-bgap)/2, bh2=33, cScale=Math.max(I.max, I.courses[0]?I.courses[0].landing:0, I.courses[1]?I.courses[1].landing:0, 1);
+    /* ── ④ 課別＝この紙のメイン ──
+       🆕 v2.124.0（ゆうた指定 2026-09-26「PDFはフロントごと要らない。それぞれの課の数字をメインに」）
+       画面の課別と同じ「積み上げの階段」：実績 → ＋実績待（ほぼ確実）→ ＋確定（確度高）→ … → ＋予測（着地）
+       帯の縦線＝課の目標（最低＝濃い実線／最高＝黄の点線）。物差しは1課・2課で共通（長さで比べられる）。 */
+    var bgap=4, bw2=(W-bgap)/2, bh2=Math.max(96, 287-y);
+    var cScale=Math.max.apply(null, I.courses.map(function(co){ return Math.max(co.max, co.landing); }).concat([1]))*1.06;
+    var MINC=[70,78,74], MAXC=hexRgb('#d99a06');
+    function cbar(x0, w0, yy, hh, co, upTo, hi){
+      F(pdf,[232,236,234]); pdf.roundedRect(x0, yy, w0, hh, Math.min(1.2,hh/2), Math.min(1.2,hh/2), 'F');
+      var xx2=x0;
+      co.tiers.forEach(function(tt, k){ if (k>upTo || !(tt.sum>0)) return; var ww=w0*tt.sum/cScale;
+        F(pdf, (hi<0 || hi===k) ? hexRgb(tt.color) : tint(tt.color,0.3)); pdf.rect(xx2, yy, Math.max(0,ww), hh, 'F'); xx2+=ww; });
+      var ext=Math.max(1, hh*0.35);
+      D(pdf,MINC); pdf.setLineWidth(0.45); var m1=x0+w0*co.min/cScale; pdf.line(m1, yy-ext, m1, yy+hh+ext);
+      D(pdf,MAXC); dashOn(pdf,[0.8,0.6]); var m2=x0+w0*co.max/cScale; pdf.line(m2, yy-ext, m2, yy+hh+ext); dashOn(pdf,[]);
+      return { m1:m1, m2:m2 };
+    }
     I.courses.forEach(function(co, i){
-      var bx2=L+i*(bw2+bgap);
+      var bx2=L+i*(bw2+bgap), ix=bx2+4, iw=bw2-8;
       F(pdf,[255,255,255]); D(pdf,RULE); pdf.setLineWidth(0.25); pdf.roundedRect(bx2, y, bw2, bh2, 1.8, 1.8, 'FD');
-      F(pdf,hexRgb(co.color)); pdf.roundedRect(bx2+3, y+2.8, 10, 4.6, 1, 1, 'F');
-      T(pdf,[255,255,255]); pdf.setFontSize(7); pdf.text(co.label, bx2+8, y+6.2, {align:'center'});
-      T(pdf,INK); pdf.setFontSize(8); pdf.text(co.team, bx2+15, y+6.3);
-      T(pdf,MUTED); pdf.setFontSize(7.5); pdf.text('着地 '+MAN(co.landing), bx2+bw2-3, y+6.3, {align:'right'});
-      var mx0=bx2+3, mw=bw2-6, my=y+9.5;
-      F(pdf,[232,236,234]); pdf.roundedRect(mx0, my, mw, 3.4, 0.8, 0.8, 'F');
-      var mxx=mx0; co.tiers.forEach(function(tt){ if(!(tt.sum>0)) return; var ww=mw*tt.sum/cScale; F(pdf,hexRgb(tt.color)); pdf.rect(mxx, my, Math.max(0,ww), 3.4, 'F'); mxx+=ww; });
-      var colW=(bw2-6)/3;
+      F(pdf,hexRgb(co.color)); pdf.rect(bx2, y+1.8, 1.2, bh2-3.6, 'F');
+      /* 見出し */
+      F(pdf,hexRgb(co.color)); pdf.roundedRect(ix, y+3.2, 12, 5.4, 1.2, 1.2, 'F');
+      T(pdf,[255,255,255]); pdf.setFontSize(8.5); pdf.text(co.label, ix+6, y+7.1, {align:'center'});
+      T(pdf,INK); pdf.setFontSize(9.5); pdf.text(co.team, ix+14.5, y+7.2);
+      T(pdf,MUTED); pdf.setFontSize(7.5); pdf.text('目標 '+MAN(co.min)+'〜'+MAN(co.max), ix+iw, y+7.2, {align:'right'});
+      /* 大きい数字3つ */
+      var kw=(iw-4)/3, ky=y+11;
+      [{lb:'実績', v:co.actual, c:hexRgb(co.tiers[0].color), sub:'最低の '+(co.min>0?Math.round(co.actual/co.min*100):0)+'%'},
+       {lb:'ほぼ確実', v:co.nearSure, c:deep(co.tiers[1].color), sub:'実績＋実績待'},
+       {lb:'着地見込み', v:co.landing, c:(co.landing>=co.min?GREEN:hexRgb('#d9443a')), sub:(co.landing>=co.max?'最高も超える':co.landing>=co.min?'最低を超える':'最低まで あと '+MAN(co.min-co.landing))}
+      ].forEach(function(k, j){
+        var kx=ix+j*(kw+2);
+        F(pdf,PANEL); D(pdf,RULE); pdf.setLineWidth(0.2); pdf.roundedRect(kx, ky, kw, 17, 1.3, 1.3, 'FD');
+        T(pdf,MUTED); pdf.setFontSize(6.5); pdf.text(k.lb, kx+2.4, ky+4.4);
+        T(pdf,k.c); pdf.setFontSize(15); pdf.text(MAN(k.v), kx+2.4, ky+11.2);
+        T(pdf,FAINT); pdf.setFontSize(5.8); pdf.text(k.sub, kx+2.4, ky+15);
+      });
+      /* 大きい帯＋目標の印 */
+      var by2=y+35.5, mk=cbar(ix, iw, by2, 6, co, co.tiers.length-1, -1);
+      pdf.setFontSize(6.2);
+      T(pdf,MINC); pdf.text('最低 '+MAN(co.min), mk.m1, by2-2.2, {align:'center'});
+      T(pdf,MAXC); pdf.text('最高 '+MAN(co.max), Math.min(mk.m2, ix+iw-8), by2-2.2, {align:'center'});
+      /* 積み上げの階段 */
+      var ly=y+48, lh=Math.min(11.5, (y+bh2-3-ly-4)/co.tiers.length);
+      var cN=ix, cV=ix+iw*0.47, cC=ix+iw*0.80, cP=ix+iw;
+      T(pdf,FAINT); pdf.setFontSize(6); pdf.text('区分', cN, ly); pdf.text('この区分', cV, ly, {align:'right'}); pdf.text('足した合計', cC, ly, {align:'right'}); pdf.text('最低比', cP, ly, {align:'right'});
+      ly += 1.5;
+      var cum=0;
       co.tiers.forEach(function(tt, k){
-        var gx=bx2+3+(k%3)*colW, gy=y+18.5+Math.floor(k/3)*8;
-        F(pdf,hexRgb(tt.color)); pdf.circle(gx+1, gy-1.1, 0.8, 'F');
-        T(pdf,MUTED); pdf.setFontSize(6.5); pdf.text(tt.label, gx+2.6, gy);
-        var lw=pdf.getTextWidth(tt.label);                       /* 区分名の幅のぶん右へ（「実績待」で詰まらない） */
-        T(pdf,INK); pdf.setFontSize(8.5); pdf.text(MAN(tt.sum), gx+Math.max(11, 2.6+lw+1.8), gy);
-        T(pdf,FAINT); pdf.setFontSize(5.8); pdf.text(tt.count+'台', gx+colW-2, gy, {align:'right'});
+        cum += tt.sum;
+        var ry=ly+k*lh, ty=ry+4.3, p=co.min>0?Math.round(cum/co.min*100):0;
+        if (tt.stage){ F(pdf,tint(co.color,0.07)); pdf.rect(ix-1.5, ry, iw+3, lh, 'F'); }
+        D(pdf,RULE); pdf.setLineWidth(0.1); pdf.line(ix-1.5, ry, ix+iw+1.5, ry);
+        F(pdf,hexRgb(tt.color)); pdf.circle(cN+1, ty-1.2, 1, 'F');
+        T(pdf,INK); pdf.setFontSize(8); pdf.text((k?'＋':'')+tt.label, cN+3, ty);
+        T(pdf, tt.sum>0 ? MUTED : FAINT); pdf.setFontSize(7.5); pdf.text(MAN(tt.sum), cV-6, ty, {align:'right'});
+        pdf.setFontSize(5.8); pdf.text(tt.count+'台', cV, ty, {align:'right'});
+        T(pdf,INK); pdf.setFontSize(10); pdf.text(MAN(cum), cC, ty+0.2, {align:'right'});
+        if (tt.stage){ T(pdf,hexRgb(co.color)); pdf.setFontSize(6); pdf.text(tt.stage, cC-pdf.getTextWidth(MAN(cum))*10/6-2.2, ty, {align:'right'}); }
+        T(pdf, cum>=co.max ? MAXC : (cum>=co.min ? GREEN : MUTED)); pdf.setFontSize(8); pdf.text(p+'%', cP, ty, {align:'right'});
+        cbar(ix, iw, ry+lh-4.2, 2.2, co, k, k);
       });
     });
-    y += bh2 + 5;
-
-    /* ── ⑤ フロント別 ── */
-    T(pdf,INK); pdf.setFontSize(9.5); pdf.text('フロント別（'+I.frontCols.map(function(c){return c.label;}).join('・')+'）', L+1, y+3);
-    y += 5;
-    var rowsF=I.fronts, avail=284-y, rh=Math.max(3.4, Math.min(5.2, avail/((rowsF.length||1)+1))), fs=Math.max(6, Math.min(8, rh*1.55));
-    var colsW=[W*0.28].concat(I.frontCols.map(function(){ return W*0.15; })).concat([W*0.12]);
-    F(pdf,[238,242,240]); pdf.rect(L, y, W, rh, 'F');
-    T(pdf,MUTED); pdf.setFontSize(fs*0.9); var hx=L;
-    ['フロント'].concat(I.frontCols.map(function(c){return c.label;})).concat(['台数']).forEach(function(hh, i){
-      if (i===0) pdf.text(hh, hx+2, y+rh-1.3); else pdf.text(hh, hx+colsW[i]-2, y+rh-1.3, {align:'right'}); hx+=colsW[i]; });
-    y += rh;
-    if (!rowsF.length){ T(pdf,FAINT); pdf.setFontSize(7); pdf.text('対象データがありません', L+2, y+rh-1.2); y+=rh; }
-    rowsF.forEach(function(r, ri){
-      if (ri%2===1){ F(pdf,[250,251,250]); pdf.rect(L, y, W, rh, 'F'); }
-      var rx=L; pdf.setFontSize(fs);
-      T(pdf,INK); pdf.text(String(r.name), rx+2, y+rh-1.2); rx+=colsW[0];
-      r.vals.forEach(function(v, i){ T(pdf,hexRgb(I.frontCols[i].color)); pdf.text(MAN(v), rx+colsW[i+1]-2, y+rh-1.2, {align:'right'}); rx+=colsW[i+1]; });
-      T(pdf,INK); pdf.text(String(r.count), rx+colsW[colsW.length-1]-2, y+rh-1.2, {align:'right'});
-      D(pdf,RULE); pdf.setLineWidth(0.1); pdf.line(L, y+rh, R, y+rh);
-      y += rh;
-    });
+    y += bh2;
 
     /* ── 注記 ── */
     T(pdf,FAINT); pdf.setFontSize(5.8);

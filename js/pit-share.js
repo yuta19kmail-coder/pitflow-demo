@@ -899,6 +899,54 @@ w.pitDivisionColor = pitDivisionColor;
     try { if (w.PitDB && w.PitDB.save) w.PitDB.save(); } catch(e){}
     return true;
   }
+  /* ===================================================================
+     📏 2026-09-19 **日数の物差しを、ここ（借りられる所）へ移した。**
+     -------------------------------------------------------------------
+     🗣 ゆうた 2026-09-19「PitFlow の共有側へ移す」
+     ＝ もとは views.js にあり、**PitFlow からしか使えなかった**。
+        FlowDesk の「完TEL依頼」カードが『預かり◯日目』を出すのに要るので、
+        写しを作らずに済むよう、MHS・FlowDesk も借りられるこの1本へ動かした。
+     🔴 中身は1文字も変えていない（views.js からは消して、ここだけにした）。
+        ・`daysFromToday(iso)` … その日 − 今日（未来＝＋）
+        ・`pitDayNo(iso)`      … 「◯日目」＝入れた日を1日目（カレンダーで数える・時刻は見ない）
+        ・`pitDayNoMs(ms)`     … 同じ物をミリ秒から（フローの記録・phaseAt 用）
+        ・`pitInShop(c)`       … もう入庫したか（`actualInAt` が無い昔のカードは、盤面にいれば入庫済み）
+        ・`pitHoldFrom(c)`     … 預かりの起算日。**入庫していなければ null**（＝日数を出さない）
+     =================================================================== */
+  function daysFromToday(s){
+    if (!s) return null;
+    var d = new Date(s + 'T00:00:00'); if (isNaN(d)) return null;
+    var t = new Date(); t.setHours(0,0,0,0);
+    return Math.round((d - t) / 86400000);
+  }
+  function pitDayNo(fromISO){
+    var n = daysFromToday(fromISO);
+    return (n == null) ? null : (1 - n);
+  }
+  function pitDayNoMs(ms){
+    if (ms == null) return null;
+    var d = new Date(+ms); if (isNaN(d.getTime())) return null;
+    d.setHours(0,0,0,0);
+    var t = new Date(); t.setHours(0,0,0,0);
+    return Math.round((t - d) / 86400000) + 1;
+  }
+  var PIT_NOT_IN_SHOP = ['reserved', 'cancelled', 'scrap'];
+  function pitInShop(c){
+    if (!c) return false;
+    if (c.actualInAt) return true;
+    return PIT_NOT_IN_SHOP.indexOf(c.status) < 0;
+  }
+  function pitHoldFrom(c){
+    if (!pitInShop(c)) return null;
+    return (c && (c.actualInAt || c.reserveDate)) || null;
+  }
+  w.daysFromToday   = daysFromToday;
+  w.pitDayNo        = pitDayNo;
+  w.pitDayNoMs      = pitDayNoMs;
+  w.PIT_NOT_IN_SHOP = PIT_NOT_IN_SHOP;
+  w.pitInShop       = pitInShop;
+  w.pitHoldFrom     = pitHoldFrom;
+
   w.pitThanksNeeded  = pitThanksNeeded;
   w.pitThanksSent    = pitThanksSent;
   w.pitThanksSetSent = pitThanksSetSent;

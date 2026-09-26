@@ -237,6 +237,14 @@
 .cfnb-done-main span { font-size: 11px; color: var(--text3, #888); }
 .cfnb-done-acts { display: flex; gap: 6px; }
 .cfnb-done-card { margin-top: 10px; }
+/* 🗂 2026-09-26 アーカイブ済付箋：上の検索BOX（PitFlow の検索窓に寄せた）・アーカイブの札・期限で消えた添付 */
+.cfnb-arc-q {
+  width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 10px 14px; font-size: 14px; font-family: inherit;
+  color: var(--text1, var(--text, #1f2937)); background: var(--bg2, #fff); border: 2px solid var(--border, #ddd); border-radius: 12px; outline: none;
+}
+.cfnb-arc-q:focus { border-color: var(--accent, var(--brand, #378ADD)); }
+.cfnb-arc-tag { font-style: normal; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: var(--bg3, #eee); color: var(--text2, #555); }
+.bn-att-gone { font-size: 11px; color: var(--text3, #888); border: 1px dashed var(--border, #ccc); border-radius: 6px; padding: 4px 8px; margin: 4px 0; }
 
 @media (max-width: 768px) {
   .bn-grid { grid-template-columns: 1fr; }

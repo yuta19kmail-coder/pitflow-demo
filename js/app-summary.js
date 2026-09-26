@@ -95,23 +95,21 @@
   }
   function avg1(sum, n) { return n ? Math.round(sum / n * 10) / 10 : null; }
   function salesBoard(C) {
-    if (!window.pitSalesMonthCollect || !window.pitSalesTarget) throw new Error('sales.js がまだ読めていない');
+    if (!window.pitSalesMonthCollect || !window.pitSalesTarget || !window.pitSalesDivTarget) throw new Error('sales.js がまだ読めていない');
     var now = new Date(); now.setHours(0, 0, 0, 0);
     var y = now.getFullYear(), m = now.getMonth();
     var moS = ymd(new Date(y, m, 1)), moE = ymd(new Date(y, m + 1, 0));
     var D = pitSalesMonthCollect(moS, moE), tg = pitSalesTarget();
-    var set = (state.settings && state.settings.target) || {};
-    var ratioD = set.ratioD != null ? +set.ratioD : 50;           /* 国産の％（rules.js の目標の割り方と同じ・既定50） */
-    if (!isFinite(ratioD)) ratioD = 50;
     var mn = Math.round(tg.min), mx = Math.round(tg.max);
-    var d1Min = Math.round(mn * ratioD / 100), d1Max = Math.round(mx * ratioD / 100);
+    /* 課の目標は sales.js の pitSalesDivTarget 1本（国産の％で割る・輸入＝全体−国産）＝売上ビューの縦線と同じ数字 */
+    var T1 = pitSalesDivTarget('div1'), T2 = pitSalesDivTarget('div2');
     var o = sec('売上ボード', [], []);
     o.month = moS.slice(0, 7); o.day = now.getDate(); o.days = D.lastDay;
     o.min = mn; o.max = mx;
     o.tiers = zeroes(TK_ALL); o.counts = zeroes(TK_ALL);
     /* 輸入＝全体−国産（rules.js の iMin = monthMin − dMin と同じ）。丸めても足すと全体にそろう */
-    o.divs = { div1: { min: d1Min, max: d1Max, tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) },
-               div2: { min: mn - d1Min, max: mx - d1Max, tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) } };
+    o.divs = { div1: { min: T1.min, max: T1.max, tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) },
+               div2: { min: T2.min, max: T2.max, tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) } };
     var staffBy = {};
     ((window.state && state.staff) || []).forEach(function (s) { if (s && s.id && !s.isSelf && s.name && !staffBy[s.name]) staffBy[s.name] = s.id; });
     var F = {}, order = [], all = { s: 0, n: 0 };

@@ -43,12 +43,16 @@
       '#uid-card input[type=text],#uid-card textarea{width:100%;background:var(--bg3,#1d242e);border:1px solid var(--border,rgba(255,255,255,.12));',
       '          color:var(--text,#e6edf3);border-radius:9px;padding:9px 11px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}',
       '#uid-card textarea{min-height:96px;resize:vertical;line-height:1.6}',
-      '#uid-card input[type=text]:focus,#uid-card textarea:focus{border-color:var(--acc,#ec4899)}',
+      '#uid-card input[type=text]:focus,#uid-card textarea:focus{border-color:var(--uid-acc,var(--acc,#94a3b8))}',
       '#uid-card .uid-b{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}',
       '#uid-card .uid-b button{border:1px solid var(--border,rgba(255,255,255,.14));background:var(--bg3,#1d242e);color:var(--text,#e6edf3);',
       '          border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}',
-      '#uid-card .uid-b button:hover{border-color:var(--acc,#ec4899)}',
-      '#uid-card .uid-b button.pri{background:var(--accd,#db2777);border-color:var(--accd,#db2777);color:#fff}',
+      '#uid-card .uid-b button:hover{border-color:var(--uid-acc,var(--acc,#94a3b8))}',
+      /* 🎨 2026-09-24 決定ボタンはアプリ色（ゆうた指定）。各アプリの index.html で --uid-acc／--uid-accd を1行指定する。
+         --acc／--accd は他の共通部品も使うので、ダイアログ専用の --uid-* を先に見る。
+         昔は無い時の色が CoreNote のピンク決め打ちで、6アプリがピンクになっていた。いまは無い時＝中立のグレー。
+         --uid-pri-fg＝決定ボタンの文字色（ポータルの白寄りグレーは濃い文字にする） */
+      '#uid-card .uid-b button.pri{background:var(--uid-accd,var(--accd,#475569));border-color:var(--uid-accd,var(--accd,#475569));color:var(--uid-pri-fg,#fff)}',
       '#uid-card .uid-b button.pri:hover{filter:brightness(1.12)}',
       '#uid-card .uid-b button.danger{background:#dc2626;border-color:#dc2626;color:#fff}',
       '#uid-card .uid-b button.danger:hover{filter:brightness(1.12)}',

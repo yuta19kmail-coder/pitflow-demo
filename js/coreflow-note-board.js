@@ -6,7 +6,7 @@
 
    ◎なにをするもの（ゆうた指定 2026-09-13）
      🗣「付箋に関しては見ためもだけど　なかみも共通にした方がいいのでは？？」
-     🗣 決めたこと：**中身も見た目も一気に**／済は **3日後に隠す＋一覧から戻せる**／消去は **今のまま**
+     🗣 決めたこと：**中身も見た目も一気に**／済は **3日後に隠す＋一覧から戻せる**／消去は **今のまま**（→ 2026-09-26 消去は無くしてアーカイブへ＝下の⑤）
      ＝ CarFlow・PitFlow・MHS の付箋ボードを、**この1本で描いて、この1本の決まりで動かす。**
         アプリ側に残すのは「どこに保存するか・名簿は誰か」だけ（差し込み＝アダプター）。
 
@@ -23,7 +23,16 @@
        ③ 済 … `doneAt` は**ミリ秒の数字**で書く（サーバー時刻の印は写しで壊れるので使わない）。
           **済から3日たったら盤面から隠す。データは消さない。**「済んだ付箋」から見て・戻せる
           ⚠ 壊れた `doneAt`（{_methodName}）は更新日時で読み、次に保存する時に数字へ直す
-       ④ 消す・直す人 … アプリが渡す `canEdit(n)`／`canDelete(n)`（今のまま）
+       ④ 直す人 … アプリが渡す `canEdit(n)`
+       ⑤ 🔴🔴 2026-09-26 **「消去」は無い。全部アーカイブ**（ゆうた確定・開発全体メモ「付箋に『消去』は無い」）
+          🗣「消去というのは言葉はアーカイブにして　消去という概念を無くして　全てをアーカイブにしてに残るように」
+          ◎きっかけ＝「済が1しかない」。調べたら ⋮→消去 で**完全に消していた**（9/26 だけで11件・戻せない）
+          ◎状態は3つ ＝ ①生きている ②済（ボードに出る・ハンコ）③アーカイブ（ふだん隠れる）
+             ③に入るのは「済から3日」と「人がアーカイブにした物」。置き場は1つ
+          ◎時計は **済になった日（doneAt）1本だけ**。3日＝アーカイブへ／3か月＝添付を消す／1年＝本文を消す
+             人が直接アーカイブにした時も「その時に済になった」扱い（doneAt を入れる）＝時計を増やさない
+          ◎3か月・1年で消すのは**サーバー**（_サーバー\functions\note-retention.js）。画面からは誰も消せない
+          ◎アーカイブの一覧は「アーカイブ済付箋」。**件数は出さない**。上に検索BOX
 
    ◎使い方（アプリ側・1回だけ）
      CFNoteBoard.mount({
@@ -35,14 +44,14 @@
        quickGroups: function(){ return [{label, ids}] 一括で選ぶボタン },
        labels: function(n){ return {red:'緊急',…} その付箋の出どころの色ラベル },
        save: function(note, info){ return Promise },  // info={isNew, app}
-       remove: function(note){ return Promise },
+       remove: （2026-09-26 から使わない。付箋は消さない＝アーカイブは save で書く）,
        reorder: function(notesInOrder){ return Promise } ← 無ければ並び替えなし,
        attach: { accept:'image/*,application/pdf,.pdf', storage:{ folder:'pitBoardNotes' か function(app), company:function(){ return 会社id } } }
                ← 🔴 v2026-09-13b 画像・PDF は **ファイル置き場（Firebase Storage）** の companies/{会社}/{folder}/{付箋id}.jpg / .pdf に置く
                   （画像は長い辺1200pxに縮めて JPEG・PDF は原本・1ファイル10MBまで＝storage.rules と同じ上限）
                   ⚠ 置き場が使えない時（見本・デモ）は、画像だけ縮小して付箋に直接持つ。PDF は付けられない
                ← upload(note,file,kind) を渡せば、そちらを使う／attach 自体が無ければ添付欄を出さない
-       canMutate, canEdit(n), canDelete(n), isForeign(n), badgeHtml(n), formatText(t),
+       canMutate, canEdit(n), isForeign(n), badgeHtml(n), formatText(t),
        headerExtraHtml(), postTargets:[{app,label}], targets(), sort(list), avatarHtml(id,px),
        onAutoEdit(n), onLog(msg), ask(msg,opt)→Promise<bool>, toast(msg), rerender()
      });
@@ -58,7 +67,9 @@
 
   var COLORS = ['red', 'orange', 'yellow', 'green', 'blue'];
   var COLOR_JP = { red: '赤', orange: '橙', yellow: '黄', green: '緑', blue: '青' };
-  var HIDE_DAYS = 3;
+  var HIDE_DAYS = 3;        /* 済から3日でアーカイブへ（盤面から隠す） */
+  var ATTACH_DAYS = 90;     /* 済から3か月で添付を消す（サーバー）。画面もこの日を過ぎたら添付を出さない */
+  var KEEP_DAYS = 365;      /* 済から1年で本文を消す（サーバー）。車に付いた付箋は車が見えている間は残す */
   var DAY = 86400000;
 
   /* =====================================================
@@ -75,7 +86,10 @@
     }
     return 0;   /* {_methodName:'FieldValue.serverTimestamp'} ＝ 写しで壊れたサーバー時刻の印 */
   }
-  function isBrokenStamp(v) { return !!(v && typeof v === 'object' && typeof v._methodName === 'string'); }
+  /* 壊れたサーバー時刻の印。🔴 2026-09-26 compat SDK の形（{_delegate:{_methodName}}）も見る */
+  function isBrokenStamp(v) {
+    return !!(v && typeof v === 'object' && (typeof v._methodName === 'string' || (v._delegate && typeof v._delegate._methodName === 'string')));
+  }
   function createdMs(n) {
     if (!n) return 0;
     var c = toMs(n.createdAt); if (c) return c;
@@ -85,14 +99,25 @@
     if (h) return +h[1];
     return 0;
   }
+  /* 済になった時刻（すべての時計の元）。
+     🔴 2026-09-26 壊れた doneAt の時は **作った時刻** を先に見る。前は更新日時を先に見ていて、
+        並べ替え（更新日時が変わる）のたびに古い済の付箋がボードへ3日間もどってきていた */
   function doneMs(n) {
     if (!n || n.status !== 'done') return 0;
-    return toMs(n.doneAt) || toMs(n.updatedAt) || createdMs(n) || 0;
+    return toMs(n.doneAt) || createdMs(n) || toMs(n.updatedAt) || 0;
   }
-  /* 🔴 済から3日たったら盤面から隠す（データは消さない）。時刻が1つも読めない済は隠さない＝見失わない */
+  function isArchived(n) { return !!(n && n.archived === true); }
+  /* 🔴 アーカイブ（盤面から隠す）＝人がアーカイブにした か 済から3日。データは消さない。
+     時刻が1つも読めない済は隠さない＝見失わない */
   function isHidden(n, now) {
+    if (isArchived(n)) return true;
     var t = doneMs(n);
     return !!t && ((now || Date.now()) - t) >= HIDE_DAYS * DAY;
+  }
+  /* 添付の期限（済から3か月）。過ぎたら画面にも出さない＝サーバーが消すまでの間も「無い」で揃える */
+  function attachExpired(n, now) {
+    var t = doneMs(n);
+    return !!t && ((now || Date.now()) - t) >= ATTACH_DAYS * DAY;
   }
   function assignees(n) {
     if (!n) return [];
@@ -120,10 +145,39 @@
   function canSee(n, me) { return !isSecret(n) || isMine(n.authorUid, me); }
   function isForMe(n, me) { return assignees(n).some(function (u) { return isMine(u, me); }); }
   function patchDone(n, me) { return { status: 'done', doneAt: Date.now(), doneByUid: meList(me)[0] || null }; }
+  /* 未済に戻す＝アーカイブからも出す（時計は止まる） */
   function patchUndone(n) {
-    var p = { status: 'open', doneAt: null, doneByUid: null };
+    var p = { status: 'open', doneAt: null, doneByUid: null, archived: false, archivedByUid: null };
     if (n && n.noteType === 'circulate') p.doneByUids = [];
     return p;
+  }
+  /* アーカイブにする。🔴 まだ済でなければ「いま済になった」扱い（時計は doneAt 1本）。済ならその日のまま */
+  function patchArchive(n, me) {
+    var who = meList(me)[0] || null;
+    var already = !!(n && n.status === 'done' && toMs(n.doneAt));
+    return {
+      status: 'done',
+      doneAt: already ? toMs(n.doneAt) : Date.now(),
+      doneByUid: (already && n.doneByUid) ? n.doneByUid : who,
+      archived: true,
+      archivedByUid: who
+    };
+  }
+  /* 🔎 アーカイブの検索（PitFlow の検索窓 search.js と同じならし方：NFKC・カタカナ→ひらがな・旧字→新字・空白を消す・スペースは全部含む） */
+  var KANJI = { '髙': '高', '﨑': '崎', '濵': '浜', '濱': '浜', '邊': '辺', '邉': '辺', '齋': '斎', '齊': '斉', '嶋': '島', '冨': '富', '澤': '沢', '國': '国', '眞': '真', '德': '徳', '瀨': '瀬' };
+  function searchNorm(s) {
+    var v = String(s == null ? '' : s);
+    try { v = v.normalize('NFKC'); } catch (e) {}
+    return v.replace(/\s+/g, '').replace(/[ァ-ヶ]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0x60); })
+      .replace(/[^\u0000-\u007F]/g, function (ch) { return KANJI[ch] || ch; }).toLowerCase();
+  }
+  function matchNote(n, q, nameOf) {
+    var ws = String(q || '').trim().split(/\s+/).map(searchNorm).filter(Boolean);
+    if (!ws.length) return true;
+    var reps = (Array.isArray(n.replies) ? n.replies : []).map(function (r) { return r && r.text; });
+    var who = nameOf ? [nameOf(n.authorUid), nameOf(n.doneByUid)].concat(assignees(n).map(nameOf)) : [];
+    var hay = searchNorm([n.title, bodyOf(n), n.pdfName].concat(reps, who).join(' '));
+    return ws.every(function (w) { return hay.indexOf(w) >= 0; });
   }
   /* 回覧の「自分が確認」。担当に入っている自分の番号（昔の番号でも）で記録する */
   function patchCirculate(n, me) {
@@ -147,7 +201,7 @@
       var v = n[k];
       if (v === undefined || typeof v === 'function') return;
       if (isBrokenStamp(v)) {
-        if (k === 'doneAt') v = (n.status === 'done') ? (toMs(n.updatedAt) || Date.now()) : null;
+        if (k === 'doneAt') v = (n.status === 'done') ? (createdMs(n) || toMs(n.updatedAt) || Date.now()) : null;   /* doneMs と同じ順 */
         else if (k === 'createdAt') v = createdMs(n) || Date.now();
         else return;
       }
@@ -158,10 +212,13 @@
   function newId() { return 'bn_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
   var rules = {
-    HIDE_DAYS: HIDE_DAYS, toMs: toMs, isBrokenStamp: isBrokenStamp, createdMs: createdMs, doneMs: doneMs,
-    isHidden: isHidden, assignees: assignees, bodyOf: bodyOf, meList: meList, isMine: isMine,
+    HIDE_DAYS: HIDE_DAYS, ATTACH_DAYS: ATTACH_DAYS, KEEP_DAYS: KEEP_DAYS, DAY: DAY,
+    toMs: toMs, isBrokenStamp: isBrokenStamp, createdMs: createdMs, doneMs: doneMs,
+    isArchived: isArchived, isHidden: isHidden, attachExpired: attachExpired,
+    assignees: assignees, bodyOf: bodyOf, meList: meList, isMine: isMine,
     isSecret: isSecret, secretFor: secretFor, canSee: canSee, isForMe: isForMe,
-    patchDone: patchDone, patchUndone: patchUndone, patchCirculate: patchCirculate,
+    patchDone: patchDone, patchUndone: patchUndone, patchArchive: patchArchive, patchCirculate: patchCirculate,
+    searchNorm: searchNorm, matchNote: matchNote,
     cleanForSave: cleanForSave, newId: newId
   };
 
@@ -202,7 +259,8 @@
   function foreign(n) { return !!(A && A.isForeign && call('isForeign', n)); }
   function canMutate() { return !(A && A.canMutate) || !!call('canMutate'); }
   function canEdit(n) { if (!canMutate() || foreign(n)) return false; return !(A && A.canEdit) || !!call('canEdit', n); }
-  function canDelete(n) { if (!canMutate() || foreign(n)) return false; return !(A && A.canDelete) || !!call('canDelete', n); }
+  /* アーカイブにできる人＝押せる人ぜんぶ（戻せるので絞らない）。よそのアプリの付箋はそのアプリで */
+  function canArchive(n) { return canMutate() && !foreign(n); }
   function fmt(t) { return (A && A.formatText) ? (call('formatText', t || '') || '') : esc(t || ''); }
   function labelsOf(n) { return call('labels', n) || {}; }
   function isTouch() { return ('ontouchstart' in w) || (navigator.maxTouchPoints > 0); }
@@ -254,7 +312,11 @@
       (isSecret(n) ? '<span class="bn-secret-badge" title="あなただけに見える付箋です（他の人の画面には出ません）">' + icon('lock', '🔒', 13) + ' 自分用</span>' : '');
     var body = bodyOf(n);
     var title = n.title ? fmt(n.title) : (body ? '' : '<span class="bn-empty-title">(無題)</span>');
-    var att = n.imageURL
+    /* 🔴 2026-09-26 添付は済から3か月で消える（サーバー）。過ぎたら画面にも出さず「消えました」と書く */
+    var gone = (n.imageURL || n.pdfURL || n.attachExpiredAt) && (attachExpired(n) || n.attachExpiredAt);
+    var att = gone
+      ? '<div class="bn-att-gone">' + icon('paperclip', '📎', 13) + ' 添付は期限（済から3か月）で消えました</div>'
+      : n.imageURL
       ? '<img class="bn-img" src="' + esc(n.imageURL) + '" alt="" onclick="event.stopPropagation();CFNoteBoard.preview(\'' + jsq(n.imageURL) + '\')">'
       : (n.pdfURL ? '<a class="bn-pdf" href="' + esc(n.pdfURL) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + icon('fileText', '📄', 15) + ' ' + esc(n.pdfName || 'PDF') + '</a>' : '');
     var dl = n.deadline ? '<div class="bn-deadline' + (od ? ' is-overdue' : '') + '">' + (od ? icon('siren', '🚨', 13) : icon('clock', '⏰', 13)) + ' ' + esc(deadlineText(n.deadline)) + '</div>' : '';
@@ -317,8 +379,8 @@
     var S = split(opt);
     var legendSrc = labelsOf({ color: 'yellow', app: A.app }) || {};
     var legend = COLORS.filter(function (c) { return legendSrc[c]; }).map(function (c) { return '<span class="bn-label-chip bn-label-' + c + '">' + esc(legendSrc[c]) + '</span>'; }).join('');
-    var doneBtn = S.hidden.length
-      ? '<button type="button" class="bn-done-btn" onclick="CFNoteBoard.openDone(' + (opt.mode === 'self' ? "'self'" : '') + ')" title="済から' + HIDE_DAYS + '日たった付箋。消えてはいません">' + icon('archive', '🗂', 14) + ' 済んだ付箋 <b>' + S.hidden.length + '</b></button>' : '';
+    /* 🔴 2026-09-26 「済んだ付箋 n」→「アーカイブ済付箋」。**件数は出さない**（数が「消えた」の誤解のもとだった）・いつも出す */
+    var doneBtn = '<button type="button" class="bn-done-btn" onclick="CFNoteBoard.openDone(' + (opt.mode === 'self' ? "'self'" : '') + ')" title="済から' + HIDE_DAYS + '日たった付箋と、アーカイブにした付箋。消えてはいません（済から1年で自動で片付きます）">' + icon('archive', '🗂', 14) + ' アーカイブ済付箋</button>';
     var extra = (A.headerExtraHtml ? (call('headerExtraHtml') || '') : '');
     var add = canMutate() ? '<button type="button" class="bn-add-btn" onclick="CFNoteBoard.openEditor(null)">＋ 付箋を追加</button>' : '';
     var head = '<div class="bn-header' + (opt.compact ? ' is-compact' : '') + '"><div class="bn-header-left">' +
@@ -327,7 +389,7 @@
     var cards = S.shown.length ? S.shown.map(function (n) {
       try { return cardHtml(n); }
       catch (e) { console.error('[note-board] card', n && n.id, e); return '<div class="bn-card bn-color-yellow"><div class="bn-title">' + icon('warn', '⚠', 14) + ' 表示エラー（' + esc(n && n.id) + '）</div></div>'; }
-    }).join('') : '<div class="bn-empty">' + esc(opt.empty || (S.hidden.length ? '出ている付箋はありません（済んだ付箋は上のボタンから見られます）' : '付箋はまだありません。「＋ 付箋を追加」から最初の1枚を作りましょう。')) + '</div>';
+    }).join('') : '<div class="bn-empty">' + esc(opt.empty || (S.hidden.length ? '出ている付箋はありません（済・アーカイブした付箋は上の「アーカイブ済付箋」から見られます）' : '付箋はまだありません。「＋ 付箋を追加」から最初の1枚を作りましょう。')) + '</div>';
     return '<div class="cfnb">' + head + '<div class="bn-grid" ondragover="CFNoteBoard._over(event)">' + cards + '</div></div>';
   }
   function render() {
@@ -363,7 +425,8 @@
       (!done && !circ ? b('done', icon('check', '✅', 15) + ' 済にする') : '') +
       (done ? b('undone', icon('undo', '↩️', 15) + ' 未済に戻す') : '') +
       b('reply', icon('comment', '💬', 15) + ' 返信する') +
-      (canDelete(n) ? b('delete', icon('trash', '🗑', 15) + ' 消去', 'bn-actionsheet-danger') : '') +
+      /* 🔴 2026-09-26 「消去」は無い。アーカイブ（戻せる） */
+      (canArchive(n) && !isArchived(n) ? b('archive', icon('archive', '🗂', 15) + ' アーカイブ') : '') +
       b('cancel', 'キャンセル', 'bn-actionsheet-cancel') + '</div>', 'is-sheet');
   }
   function act(a) {
@@ -372,7 +435,7 @@
     if (a === 'edit') return openEditor(id);
     if (a === 'done') return markDone(id);
     if (a === 'undone') return markUndone(id);
-    if (a === 'delete') return removeNote(id);
+    if (a === 'archive' || a === 'delete') return archiveNote(id);
     if (a === 'reply') {
       /* 返信は付箋の中の欄（共通部品 coreflow-note-reply.js）で書く。⋮ からはその欄を開くだけ */
       var card = d.querySelector('.bn-card[data-note-id="' + String(id).replace(/"/g, '') + '"]');
@@ -411,29 +474,50 @@
       render();
     }).catch(function (e) { console.error(e); toast('保存できませんでした'); });
   }
-  function removeNote(id) {
-    var n = find(id); if (!n || !canDelete(n)) return;
-    return ask('付箋「' + (n.title || bodyOf(n).slice(0, 20) || '(無題)') + '」を消去しますか？', { ok: '消去する', danger: true }).then(function (yes) {
-      if (!yes) return;
-      var r = call('remove', n);
-      return Promise.resolve(r).then(function () { attachCleanup(n); log('付箋を消去しました'); render(); });
-    }).catch(function (e) { console.error(e); toast('消去できませんでした'); });
+  /* 🗂 アーカイブにする（2026-09-26「消去」の代わり）。戻せるので確認は出さない */
+  function archiveNote(id) {
+    var n = find(id); if (!n) return;
+    if (!canArchive(n)) { toast(foreign(n) ? 'よそのアプリの付箋は、そのアプリでアーカイブしてください' : 'この付箋はアーカイブできません'); return; }
+    if (isArchived(n)) return;
+    Object.assign(n, patchArchive(n, me()));
+    return saveNote(n).then(function () {
+      log('付箋「' + (n.title || bodyOf(n).slice(0, 20) || '(無題)') + '」をアーカイブしました');
+      toast('アーカイブしました（「アーカイブ済付箋」から戻せます）');
+      render();
+    }).catch(function (e) { console.error(e); toast('アーカイブできませんでした'); });
   }
 
-  /* 済んだ付箋（3日たって隠れた分） */
-  function openDone(mode) {
+  /* 🗂 アーカイブ済付箋（済から3日たった物＋アーカイブにした物）。件数は出さない・上に検索BOX */
+  var _arcQ = '';
+  function archiveRows(mode) {
     var S = split({ mode: mode });
-    var rows = S.hidden.map(function (n) {
-      var t = doneMs(n), by = nameOf(n.doneByUid);
+    var list = S.hidden.filter(function (n) { return matchNote(n, _arcQ, nameOf); });
+    if (!list.length) return '<div class="bn-empty">' + (String(_arcQ).trim() ? '「' + esc(_arcQ) + '」に当たる付箋はありません' : 'アーカイブ済付箋はありません') + '</div>';
+    return list.map(function (n) {
+      var t = doneMs(n), by = nameOf(n.doneByUid), arcBy = isArchived(n) ? nameOf(n.archivedByUid) : '';
       return '<div class="cfnb-done-row"><div class="cfnb-done-main"><b>' + esc(n.title || bodyOf(n).slice(0, 40) || '(無題)') + '</b>' +
-        '<span>' + esc(fmtMdHm(t)) + ' 済' + (by ? '・' + esc(by) : '') + (foreign(n) && A.badgeHtml ? '' : '') + '</span></div>' +
+        '<span>' + esc(fmtMdHm(t)) + ' 済' + (by ? '・' + esc(by) : '') +
+          (isArchived(n) ? '<em class="cfnb-arc-tag">' + icon('archive', '🗂', 11) + ' アーカイブ' + (arcBy ? '・' + esc(arcBy) : '') + '</em>' : '') + '</span></div>' +
         '<div class="cfnb-done-acts"><button type="button" class="cfnb-btn" onclick="CFNoteBoard._doneView(\'' + jsq(n.id) + '\')">見る</button>' +
-        (canMutate() ? '<button type="button" class="cfnb-btn primary" onclick="CFNoteBoard._doneBack(\'' + jsq(n.id) + '\')">戻す</button>' : '') + '</div></div>';
+        (canArchive(n) ? '<button type="button" class="cfnb-btn primary" onclick="CFNoteBoard._doneBack(\'' + jsq(n.id) + '\')">戻す</button>' : '') + '</div></div>';
     }).join('');
-    overlay('cfnb-done', '<div class="cfnb-box"><div class="cfnb-head"><b>' + icon('archive', '🗂', 16) + ' 済んだ付箋（' + S.hidden.length + '）</b><button type="button" class="cfnb-x" onclick="CFNoteBoard._close(\'cfnb-done\')">' + icon('close', '✕', 15) + '</button></div>' +
-      '<div class="cfnb-body"><div class="cfnb-note">済にしてから' + HIDE_DAYS + '日たった付箋です。<b>消えてはいません。</b>「戻す」で未済に戻ってボードに出ます。</div>' +
-      (rows || '<div class="bn-empty">済んだ付箋はありません</div>') + '<div id="cfnb-done-view"></div></div></div>', '');
+  }
+  function openDone(mode) {
     openDone._mode = mode;
+    var el = d.getElementById('cfnb-done'), keep = !!(el && el.classList.contains('open'));
+    if (!keep) _arcQ = '';
+    overlay('cfnb-done', '<div class="cfnb-box"><div class="cfnb-head"><b>' + icon('archive', '🗂', 16) + ' アーカイブ済付箋</b><button type="button" class="cfnb-x" onclick="CFNoteBoard._close(\'cfnb-done\')">' + icon('close', '✕', 15) + '</button></div>' +
+      '<div class="cfnb-body">' +
+        '<input type="search" id="cfnb-arc-q" class="cfnb-arc-q" autocomplete="off" value="' + esc(_arcQ) + '" oninput="CFNoteBoard._arcSearch(this.value)" placeholder="🔎 題・本文・返信・人の名前で探す（ひらがなOK・スペースで全部含む）">' +
+        '<div class="cfnb-note">済から' + HIDE_DAYS + '日たった付箋と、アーカイブにした付箋です。<b>消えてはいません。</b>「戻す」で未済に戻ってボードに出ます。' +
+          '<br>済から1年で自動で片付きます（添付は3か月）。</div>' +
+        '<div id="cfnb-arc-list">' + archiveRows(mode) + '</div><div id="cfnb-done-view"></div></div></div>', '');
+    setTimeout(function () { var q = d.getElementById('cfnb-arc-q'); if (q && !keep) q.focus(); }, 60);
+  }
+  function arcSearch(v) {
+    _arcQ = v || '';
+    var box = d.getElementById('cfnb-arc-list'); if (box) box.innerHTML = archiveRows(openDone._mode);
+    var vw = d.getElementById('cfnb-done-view'); if (vw) vw.innerHTML = '';
   }
 
   /* 画像を大きく */
@@ -608,13 +692,7 @@
         return had ? del(pdf) : null;
       });
   }
-  /* 付箋を消した時、置き場のファイルも消す（見つからなくても気にしない） */
-  function attachCleanup(n) {
-    if (!A.attach || A.attach.upload || !(n.imageURL || n.pdfURL)) return;
-    var root = storageRoot(n.app || A.app); if (!root) return;
-    if (n.imageURL && /^https?:/.test(n.imageURL)) root.child(n.id + '.jpg').delete().catch(function () {});
-    if (n.pdfURL) root.child(n.id + '.pdf').delete().catch(function () {});
-  }
+  /* 🔴 2026-09-26 付箋を消す道が無くなったので、添付を消すのもサーバー（済から3か月）だけ */
 
   function onFile(input) {
     var f = input && input.files && input.files[0]; if (!f || !ED) return;
@@ -729,8 +807,10 @@
     markDone: markDone,
     markUndone: markUndone,
     circulate: circulate,
-    remove: removeNote,
+    archive: archiveNote,
+    remove: archiveNote,          /* 🔴 昔の呼び口（⋮ の「消去」・deleteBoardNoteFromCard）もアーカイブになる。消去は無い */
     openDone: openDone,
+    openArchive: openDone,
     preview: preview,
     peek: peek,
     hiddenCount: function (mode) { return A ? split({ mode: mode }).hidden.length : 0; },
@@ -740,7 +820,8 @@
     _file: onFile,
     _saveEditor: saveEditor,
     _drag: dragStart, _over: dragOver, _drop: dragDrop, _end: dragEnd,
-    _doneBack: function (id) { markUndone(id); setTimeout(function () { openDone(openDone._mode); }, 50); },
+    _arcSearch: arcSearch,
+    _doneBack: function (id) { Promise.resolve(markUndone(id)).then(function () { arcSearch(_arcQ); }); },
     _doneView: function (id) { var n = find(id), v = d.getElementById('cfnb-done-view'); if (n && v) v.innerHTML = '<div class="cfnb-done-card">' + cardHtml(n, { noDrag: true, noMenu: true }) + '</div>'; }
   };
 })(window, document);

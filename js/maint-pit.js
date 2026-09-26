@@ -165,7 +165,9 @@
     if (!c || c.maintVehId !== vehId || c.workType !== p.work) return false;
     var ym = String(c.maintYm || ''), from = arr(p.months)[0] || p.ym;
     if (from > p.ym) from = p.ym;
-    return !!ym && ym >= from && ym <= p.ym;
+    /* 🔴 v2.125.0 12点は目安の翌月（lateYm）までに置いたカードも同じ目標（別の行を生やさない） */
+    var to = (p.lateYm && p.lateYm > p.ym) ? p.lateYm : p.ym;
+    return !!ym && ym >= from && ym <= to;
   }
   /* まだ「完了する」を押していない、この目標のカード。**動いているもの（入庫〜実績）を先に**返す。 */
   function planCard(vehId, p){
@@ -843,7 +845,8 @@
       if (r.fixed) return false;                       /* もう確定しているものには置かない */
       var p = r.plan;
       if (p.openFrom && ds < p.openFrom) return false; /* 受けられる期間より前には置けない */
-      return p.months.indexOf(ym) >= 0 || p.ym === ym || (p.overdue || p.slipped);
+      /* 🔴 v2.125.0 12点は目安の翌月（lateYm）にも置ける（ゆうた指定 2026-09-26） */
+      return p.months.indexOf(ym) >= 0 || p.ym === ym || p.lateYm === ym || (p.overdue || p.slipped);
     });
   }
 

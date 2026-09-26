@@ -338,12 +338,8 @@ function fmtMD(s){                                   // 'YYYY-MM-DD' → 'M/D'
   const p = String(s).split('-');
   return (p.length >= 3) ? (+p[1] + '/' + +p[2]) : s;
 }
-function daysFromToday(s){                            // s - 今日（整数日・未来=+）
-  if (!s) return null;
-  const d = new Date(s + 'T00:00:00'); if (isNaN(d)) return null;
-  const t = new Date(); t.setHours(0,0,0,0);
-  return Math.round((d - t) / 86400000);
-}
+/* 🔴 2026-09-19 `daysFromToday` は **pit-share.js へ移した**（FlowDesk・MHS も借りるため）。
+   ここで書き直さないこと。pit-share.js は index.html でこれより先に読む。 */
 /* ===================================================================
    📏 v1.59.0（ゆうた指定）**日数の数え方をここ1か所に決める。**
    -------------------------------------------------------------------
@@ -366,19 +362,8 @@ function daysFromToday(s){                            // s - 今日（整数日�
         ホバー詳細だけカレンダーだった。**ここで揃えた。**
    🔴 **代車は別物**＝「使った日数」なので今までどおり両端を含める（ゆうた確認済み）。
    =================================================================== */
-/* 「◯日目」＝入れた日を1日目。ISO日付（YYYY-MM-DD）から。 */
-function pitDayNo(fromISO){
-  const n = daysFromToday(fromISO);
-  return (n == null) ? null : (1 - n);
-}
-/* 「◯日目」＝ミリ秒から（フローの記録・phaseAt 用）。時刻は切り捨ててカレンダーで数える。 */
-function pitDayNoMs(ms){
-  if (ms == null) return null;
-  const d = new Date(+ms); if (isNaN(d.getTime())) return null;
-  d.setHours(0,0,0,0);
-  const t = new Date(); t.setHours(0,0,0,0);
-  return Math.round((t - d) / 86400000) + 1;
-}
+/* 🔴 2026-09-19 `pitDayNo` / `pitDayNoMs` は **pit-share.js へ移した**（FlowDesk・MHS も借りるため）。
+   ＝ 上の決めごと（カレンダーで数える・当日返しは0泊）は変えていない。中身は pit-share.js にある。 */
 /* 「預かり日数」＝泊数（日をまたいだ数）。当日返車は 0。分からなければ null。 */
 function pitHoldDays(inISO, outISO){
   if (!inISO || !outISO) return null;
@@ -412,25 +397,9 @@ function pitHoldDaysText(inISO, outISO){
       *これから来る車の置き場*を見るためのものなので、**未来の日は今までどおり予約も数える**
       （外すと、予約で埋まっている置き場が見えなくなる）。境目は `dashOccupancy` の中に1か所だけ。
    =================================================================== */
-/* 予約・キャンセル・廃車＝まだ（もう）工場の預かりではない状態。 */
-var PIT_NOT_IN_SHOP = ['reserved', 'cancelled', 'scrap'];
-/* もう入庫したか。⚠ `actualInAt` が付いたのは v2.22.0 から。
-   それより前のカードには印が無いので、**ボードの列にいれば入庫済み**とみなす（昔のぶんを落とさない）。 */
-function pitInShop(c){
-  if (!c) return false;
-  if (c.actualInAt) return true;
-  return PIT_NOT_IN_SHOP.indexOf(c.status) < 0;
-}
-/* 預かりの起算日。**入庫していなければ null**（＝日数を出さない）。 */
-function pitHoldFrom(c){
-  if (!pitInShop(c)) return null;
-  return (c && (c.actualInAt || c.reserveDate)) || null;
-}
-window.pitInShop = pitInShop;
-window.pitHoldFrom = pitHoldFrom;
-
-window.pitDayNo = pitDayNo;
-window.pitDayNoMs = pitDayNoMs;
+/* 🔴 2026-09-19 `PIT_NOT_IN_SHOP` / `pitInShop` / `pitHoldFrom` も **pit-share.js へ移した**
+   （FlowDesk の「完TEL依頼」が預かり日数を出すのに要る。写しを作らないため）。
+   ⚠ ここで書き直さないこと。 */
 window.pitHoldDays = pitHoldDays;
 window.pitHoldDaysText = pitHoldDaysText;
 

@@ -11,6 +11,8 @@
         ・まとめて表示 … よその付箋は返信とチェックだけ（coreflow-note-all.js）
    🔴 「自分」＝ **ログインした人**（fb.currentMember.id）。名簿に見つからなくても**他人を自分にしない**。
       ⚠ ログインしない見本（デモ）だけ、今までどおり端末に覚えた人／先頭のフロント担当。
+   🔴 2026-09-26 付箋に「消去」は無い＝全部アーカイブ（部品が save で書く・戻せる）。state.boardNotes から付箋を抜かない。
+      3か月（添付）・1年（本文）で消すのはサーバー（note-retention.js）。開発全体メモ「付箋に『消去』は無い」
    ⚠ 付箋の決まり（自分用・済から3日で隠す・回覧・保存の形）は部品の1本。ここに書き写さない。
    ======================================== */
 (function () {
@@ -108,11 +110,6 @@
       },
       labels: () => _labels(),
       save: (note, info) => { if (info && info.isNew && !_foreign(note)) _notes().push(note); return _save(note); },
-      remove: note => {
-        const i = _notes().findIndex(x => x.id === note.id);
-        if (i >= 0) _notes().splice(i, 1);
-        return _save();
-      },
       reorder: list => { state.boardNotes = list; return _save(); },
       /* 🔴 v2.110.0 画像も PDF も付けられる（CarFlow と同じ）。置き場＝companies/{会社}/pitBoardNotes/。
          ⚠ 見本・デモ（クラウドなし）は置き場が無いので、画像だけ付箋に直接持つ（部品が判断する） */
@@ -146,7 +143,7 @@
   window.deleteBoardNoteFromCard = function (id) {
     const n = _all().find(x => x.id === id);
     if (n && _denyForeign(n)) return;
-    if (window.CFNoteBoard) CFNoteBoard.remove(id);
+    if (window.CFNoteBoard) CFNoteBoard.archive(id);   /* 🔴 2026-09-26 消去ではなくアーカイブ */
   };
   window.openBnImage = url => window.CFNoteBoard && CFNoteBoard.preview(url);
 

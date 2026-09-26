@@ -878,6 +878,10 @@
         /* 消えたもの */
         Object.keys(self._shadow.docs).forEach(function (key) {
           if (key.indexOf(col + '/') !== 0) return;
+          /* 🔴 2026-09-26 **付箋（pitBoardNotes）はこの画面から消さない。**付箋に「消去」は無い＝アーカイブ。
+             消すのはサーバーだけ（済から1年）。画面の手元から付箋が抜けても（読み込みのやり直し等）delete は送らない。
+             ⚠ ルールでも付箋の delete は管理者だけ＝ここで送ると、同じまとめ書きのカードの保存まで失敗する */
+          if (col === 'pitBoardNotes') return;
           const id = key.slice(col.length + 1);
           if (alive[id]) return;
           if (self._pending[key]) { 後回し = true; return; }

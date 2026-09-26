@@ -19,7 +19,9 @@
      ⚠ 並びは**確からしい順**。画面はこの表の順に出す（表を並べ替えれば画面もそろって変わる）。 */
   var TIERS = [
     { id:'actual',     label:'実績',   color:'#1db97a', note:'返車済み（実績カレンダーに入った・確定売上）' },
-    { id:'actualWait', label:'実績待', color:'#14b8a6', note:'作業完了・返車待ち（実績カレンダーにはまだ入っていない）' },
+    /* 🎨 v2.124.0（ゆうた指定 2026-09-26「実績と実績待の色の差が少なくて非常に見にくい」）
+       青緑（#14b8a6）→ 黄緑。実績の緑と並べても一目で分かれ、確定の青とも混ざらない。 */
+    { id:'actualWait', label:'実績待', color:'#84cc16', note:'作業完了・返車待ち（実績カレンダーにはまだ入っていない）' },
     { id:'confirmed',  label:'確定',   color:'#2563eb', note:'受注済・これから作業する（返車予定日がこの月）' },
     { id:'planned',    label:'予定',   color:'#38bdf8', note:'連絡中・見積提示済（返車予定日がこの月）' },
     { id:'prospect',   label:'見込',   color:'#f59e0b', note:'入庫済・受注前（返車予定日がこの月・概算）' },
@@ -78,6 +80,15 @@
   }
 
   function target(){ var t=(state.settings&&state.settings.target)||{}; return { min: num(t.monthMin)||15000000, max: num(t.monthMax)||20000000 }; }
+  /* 🆕 v2.124.0（ゆうた指定 2026-09-26「課の均等分配750万と1000万に縦線」）
+     課ごとの目標＝月目標を**国産の％（ルール画面の ratioD・既定50）**で割ったもの。輸入＝全体−国産。
+     ⚠ 割り方は rules.js の「部門に分ける」と同じ。app-summary.js（FlowDesk の売上ボード）もこれを借りる＝写しを作らない。 */
+  function ratioD(){ var s=(state.settings&&state.settings.target)||{}; var r = s.ratioD!=null ? +s.ratioD : 50; return isFinite(r) ? r : 50; }
+  function divTarget(k){
+    var tg = target(), r = ratioD();
+    var d1 = { min: Math.round(tg.min*r/100), max: Math.round(tg.max*r/100) };
+    return k==='div1' ? d1 : { min: Math.round(tg.min)-d1.min, max: Math.round(tg.max)-d1.max };
+  }
 
   // ===== 当月の集計 =====
   function collectMonth(moS, moE){
@@ -116,6 +127,7 @@
      ⚠ ここは**呼び口だけ**。数え方を変える時は collectMonth / target の1本を直す。 */
   window.pitSalesMonthCollect = collectMonth;
   window.pitSalesTarget = target;
+  window.pitSalesDivTarget = divTarget;
 
   function sumTiers(t, ids){ var s=0; ids.forEach(function(id){ s += t[id].sum; }); return s; }
 
@@ -247,12 +259,80 @@
     return s;
   }
 
-  // ===== SVG：ミニ積み上げ（課別） =====
-  function miniStack(tiersC, scale){
-    var pw=100, h=12; var s='<svg class="sv-mini" viewBox="0 0 100 12" preserveAspectRatio="none">';
-    s+='<rect x="0" y="0" width="100" height="12" rx="3" class="sv-stack-bg"/>';
-    var x=0; TIERS.forEach(function(t){ var v=tiersC[t.id].sum; if(v<=0) return; var ww=pw*v/(scale||1); s+='<rect x="'+x.toFixed(1)+'" y="0" width="'+Math.max(0,ww).toFixed(1)+'" height="12" fill="'+t.color+'"/>'; x+=ww; });
-    s+='</svg>'; return s;
+  /* ===================================================================
+     🆕 v2.124.0（ゆうた指定 2026-09-26）**課別（1課/2課）＝積み上げの階段**
+     🗣「それぞれのエリアの金額だけでなく、足していった総額も見たい」
+        「実績に実績待ちでいくら → とりあえず黙っててもこれだけは確定ってるな、の判断に」
+        「バーのグラフに、課の均等分配 750万と1000万に縦線がほしい」
+     ◎形
+       ・上＝課の積み上げ帯（全区分）。**最低／最高の縦線**を引く（目標は divTarget＝国産の％で割った額）
+       ・下＝区分を確からしい順に1段ずつ足していく表。各段に**そこまでの合計**と**最低目標の何％か**を出し、
+         細い帯で「どこまで積めたか」を見せる（その段で足した分だけ濃く・それまでの分は薄く）
+       ・節目の段に名前＝実績待まで「ほぼ確実」／確定まで「確度高」／予測まで「着地」（上のヒーローと同じ言葉）
+     ⚠ 区分の並び・色・節目は TIERS / TIER_NEAR / TIER_HIGH の1本から引く（ここに並べ直さない）。
+     ⚠ 帯の物差しは**1課・2課で共通**（横に並べて長さで比べられるように）。
+     =================================================================== */
+  var COURSES = [
+    { id:'div1', label:'1課', team:'<i data-ic=car data-ics=16></i> 国産',  color:'#1db97a' },
+    { id:'div2', label:'2課', team:'<i data-ic=globe data-ics=16></i> 輸入', color:'#ec4899' }
+  ];
+  function courseStage(id){
+    if (id===TIER_NEAR[TIER_NEAR.length-1]) return 'ほぼ確実';
+    if (id===TIER_HIGH[TIER_HIGH.length-1]) return '確度高';
+    if (id===TIER_IDS[TIER_IDS.length-1])   return '着地';
+    return '';
+  }
+  /* 帯1本（upTo＝この区分までを描く／hi＝濃く描く区分。空なら全部濃く） */
+  function courseBar(cc, upTo, hi, scale, tg, cls){
+    var h = '<div class="sv-cbar '+(cls||'')+'"><div class="sv-cbar-tr">';
+    for (var i=0;i<=upTo;i++){
+      var t=TIERS[i], v=cc[t.id].sum; if (v<=0) continue;
+      h += '<i class="'+(hi && hi!==t.id ? 'dim' : '')+'" style="width:'+(v/scale*100).toFixed(2)+'%;background:'+t.color+'" title="'+t.label+' '+man(v)+'"></i>';
+    }
+    h += '</div>';
+    h += '<span class="sv-cbar-tk mn" style="left:'+(tg.min/scale*100).toFixed(2)+'%"></span>';
+    h += '<span class="sv-cbar-tk mx" style="left:'+(tg.max/scale*100).toFixed(2)+'%"></span>';
+    return h + '</div>';
+  }
+  function courseCards(byCourse){
+    var TG = {}; COURSES.forEach(function(d){ TG[d.id] = divTarget(d.id); });
+    var scale = Math.max.apply(null, COURSES.map(function(d){ return Math.max(TG[d.id].max, sumTiers(byCourse[d.id],TIER_IDS)); })) * 1.06 || 1;
+    var h = '<div class="sv-courses">';
+    COURSES.forEach(function(d){
+      var cc = byCourse[d.id], tg = TG[d.id];
+      var act = cc.actual.sum, land = sumTiers(cc,TIER_IDS), pAct = tg.min>0 ? Math.round(act/tg.min*100) : 0;
+      h += '<div class="sv-course" style="--cc:'+d.color+'">';
+      h += '<div class="sv-course-h"><span class="sv-course-pill" style="background:'+d.color+'">'+d.label+'</span><span class="sv-course-team">'+d.team+'</span>'
+         + '<span class="sv-course-goal">目標 <b>'+man(tg.min)+'</b>〜<b>'+man(tg.max)+'</b></span></div>';
+      h += '<div class="sv-course-sum">'
+         + '<div><em>実績</em><b style="color:'+TIER_BY.actual.color+'">'+man(act)+'</b><span>最低の '+pAct+'%</span></div>'
+         + '<div><em>ほぼ確実</em><b style="color:'+TIER_BY.actualWait.color+'">'+man(sumTiers(cc,TIER_NEAR))+'</b><span>実績＋実績待</span></div>'
+         + '<div><em>着地見込み</em><b class="'+(land>=tg.min?'sv-ok':'sv-warn')+'">'+man(land)+'</b><span>'+(land>=tg.max?'最高も超える':land>=tg.min?'最低を超える':'最低まで あと '+man(tg.min-land))+'</span></div>'
+         + '</div>';
+      /* 上の帯＋縦線のラベル */
+      h += '<div class="sv-cbar-lbs"><span class="mn" style="left:'+(tg.min/scale*100).toFixed(2)+'%">最低 '+man(tg.min)+'</span><span class="mx" style="left:'+(tg.max/scale*100).toFixed(2)+'%">最高 '+man(tg.max)+'</span></div>';
+      h += courseBar(cc, TIERS.length-1, '', scale, tg, 'big');
+      /* 積み上げの階段 */
+      h += '<div class="sv-course-grid"><div class="sv-cl sv-cl-h"><span>区分</span><span>この区分</span><span>足した合計</span><span>最低比</span></div>';
+      var cum = 0;
+      TIERS.forEach(function(tt, i){
+        var v = cc[tt.id].sum, n = cc[tt.id].count; cum += v;
+        var st = courseStage(tt.id), p = tg.min>0 ? Math.round(cum/tg.min*100) : 0;
+        var pc = cum>=tg.max ? 'sv-cl-max' : (cum>=tg.min ? 'sv-cl-ok' : '');
+        h += '<div class="sv-cl sv-cc'+(st?' is-stage':'')+(v<=0?' is-zero':'')+'">'
+           + '<span class="sv-cl-name"><span class="sv-cc-dot" style="background:'+tt.color+'"></span>'+(i?'<s>＋</s>':'')+'<span class="sv-cc-l">'+tt.label+'</span></span>'
+           + '<span class="sv-cl-v">'+man(v)+'<i>'+n+'台</i></span>'
+           + '<span class="sv-cl-cum">'+(st?'<em>'+st+'</em>':'')+man(cum)+'</span>'
+           + '<span class="sv-cl-p '+pc+'">'+p+'%</span>'
+           + courseBar(cc, i, tt.id, scale, tg, '')
+           + '</div>';
+      });
+      h += '</div></div>';
+    });
+    h += '</div>';
+    h += '<div class="sv-note sv-course-note">帯の縦線＝課の目標（<b>実線＝最低</b>・<b style="color:#d97706">点線＝最高</b>）。月目標を国産 '+ratioD()+'%：輸入 '+(100-ratioD())+'% で割った額です（ルール画面の「部門に分ける」）。'
+       + '「足した合計」＝上の段からその段までを足した額。<b>実績待まで＝作業は終わっていて、黙っていてもほぼ入る額</b>です。</div>';
+    return h;
   }
 
 
@@ -313,7 +393,7 @@
        ・**確度高**（＋確定）＝受注まで済んでいる分も入れた額 */
     h += '<div class="sv-hero-main"><div class="sv-hero-lb">着地見込み（実績＋パイプライン）</div><div class="sv-hero-num" style="color:'+(landing>=tg.min?'#1db97a':'#f59e0b')+'">'+man(landing)+'<span>円</span></div>'
        + '<div class="sv-hero-sub sv-hero-sub2">'
-       + '<span>実績見込み（実績＋実績待）<b style="color:#14b8a6">'+man(nearSure)+'</b></span>'
+       + '<span>実績見込み（実績＋実績待）<b style="color:'+TIER_BY.actualWait.color+'">'+man(nearSure)+'</b></span>'
        + '<span>確度高（＋確定）<b style="color:#2563eb">'+man(committed)+'</b></span>'
        + '</div></div>';
     if (isThis && todayIdx>0){
@@ -345,19 +425,7 @@
     h += '</div>';
 
     // 課別（1課/2課）
-    var scaleC = Math.max(tg.max/1, sumTiers(data.byCourse.div1,TIER_IDS), sumTiers(data.byCourse.div2,TIER_IDS),1);
-    h += '<div class="sv-courses">';
-    [{id:'div1',label:'1課',team:'<i data-ic=car data-ics=16></i> 国産',color:'#1db97a'},{id:'div2',label:'2課',team:'<i data-ic=globe data-ics=16></i> 輸入',color:'#ec4899'}].forEach(function(d){
-      var cc=data.byCourse[d.id];
-      var cLanding=sumTiers(cc,TIER_IDS);
-      h += '<div class="sv-course" style="--cc:'+d.color+'">';
-      h += '<div class="sv-course-h"><span class="sv-course-pill" style="background:'+d.color+'">'+d.label+'</span><span class="sv-course-team">'+d.team+'</span><span class="sv-course-land">着地 '+man(cLanding)+'</span></div>';
-      h += miniStack(cc, scaleC);
-      h += '<div class="sv-course-grid">';
-      TIERS.forEach(function(tt){ h += '<div class="sv-cc"><span class="sv-cc-dot" style="background:'+tt.color+'"></span><span class="sv-cc-l">'+tt.label+'</span><b>'+man(cc[tt.id].sum)+'</b><i>'+cc[tt.id].count+'台</i></div>'; });
-      h += '</div></div>';
-    });
-    h += '</div>';
+    h += courseCards(data.byCourse);
 
     // フロント別
     h += frontTable(data.fronts);
@@ -1009,10 +1077,7 @@
       var ym=window._svYM; var d=collectMonth(ymdL(new Date(ym.y,ym.m,1)),ymdL(new Date(ym.y,ym.m+1,0))); var t=d.tiers;
       var tierRows=[['目標',man(tg.min)+'〜'+man(tg.max),'']].concat(TIERS.map(function(x){return [x.label,man(t[x.id].sum),t[x.id].count+'台'];}));
       var courseRows=[]; [['div1','1課(国産)'],['div2','2課(輸入)']].forEach(function(c){ var cc=d.byCourse[c[0]]; courseRows.push([c[1]].concat(TIERS.map(function(x){return man(cc[x.id].sum);})).concat([man(_mAll(cc))])); });
-      /* 🔴 v1.167.0 紙も画面と同じ区分（TIER_FRONT）から作る。ここで列を書き並べない。 */
-      var frontRows=Object.keys(d.fronts).map(function(n){ var f=d.fronts[n];
-        return { n:n, a:(f.actual||0), cells:TIER_FRONT.map(function(id){ return man(f[id]||0); }) }; })
-        .sort(function(a,b){return b.a-a.a;}).map(function(r){ return [r.n].concat(r.cells); });
+      /* 🔴 v2.124.0 紙にフロント別は出さない（ゆうた指定 2026-09-26「PDFはフロントごと要らない」） */
       /* 🎨 v2.120.0（ゆうた指定 2026-09-15「サマリー画面のようなインフォグラフィックな感じがいい」）
          紙も画面と同じ並び（数字の帯・積み上げ帯・日次グラフ・確度カード・課別・フロント別）で描くための材料。
          🔴 数字は画面と**同じ集め方**（collectMonth・TIERS・TIER_NEAR/HIGH/FRONT・target）から取る。ここで数え直さない。 */
@@ -1026,14 +1091,14 @@
         min:tg.min, max:tg.max, isThis:_isThis0, todayIdx:_todayIdx0, lastDay:d.lastDay, cum:d.cum.slice(),
         paceTarget:_paceT0, pacePct:(_paceT0>0?Math.round(t.actual.sum/_paceT0*100):0),
         tiers:TIERS.map(function(x){ return { id:x.id, label:x.label, color:x.color, note:x.note, sum:t[x.id].sum, count:t[x.id].count }; }),
-        courses:[{id:'div1',label:'1課',team:'国産',color:'#1db97a'},{id:'div2',label:'2課',team:'輸入',color:'#ec4899'}].map(function(cd){
-          var cc=d.byCourse[cd.id];
-          return { label:cd.label, team:cd.team, color:cd.color, landing:sumTiers(cc,TIER_IDS),
-                   tiers:TIERS.map(function(x){ return { label:x.label, color:x.color, sum:cc[x.id].sum, count:cc[x.id].count }; }) }; }),
-        frontCols:TIER_FRONT.map(function(id){ return { label:TIER_BY[id].label, color:TIER_BY[id].color }; }),
-        fronts:Object.keys(d.fronts).map(function(n){ var f=d.fronts[n]; var vals=TIER_FRONT.map(function(id){ return f[id]||0; });
-          return { name:n, count:f.count, vals:vals, actual:vals[0], total:vals.reduce(function(a,b){return a+b;},0) }; })
-          .sort(function(a,b){ return b.actual-a.actual || b.total-a.total; }),
+        /* 🆕 v2.124.0（ゆうた指定 2026-09-26「PDFはフロントごと要らない。それぞれの課の数字をメインに」）
+           課ごとに 目標（divTarget）・節目（courseStage）も渡す＝紙も画面の「積み上げの階段」と同じ数字。フロント別は渡さない。 */
+        courses:COURSES.map(function(cd){
+          var cc=d.byCourse[cd.id], dt=divTarget(cd.id);
+          return { label:cd.label, team:(cd.id==='div1'?'国産':'輸入'), color:cd.color, landing:sumTiers(cc,TIER_IDS),
+                   min:dt.min, max:dt.max, actual:cc.actual.sum, nearSure:sumTiers(cc,TIER_NEAR),
+                   tiers:TIERS.map(function(x){ return { label:x.label, color:x.color, sum:cc[x.id].sum, count:cc[x.id].count, stage:courseStage(x.id) }; }) }; }),
+        ratioD:ratioD(),
         refNoCount:(window.pitInternCountText ? (pitInternCountText(_refNoCount(_moS0,_moE0))||'') : '')
       };
       return { title:'売上サマリー', period:ym.y+'年'+(ym.m+1)+'月', infographic:info,
@@ -1042,10 +1107,7 @@
           {type:'table',title:'確度別',head:['区分','金額','台数'],rows:tierRows,align:['l','r','r']},
           {type:'table',title:'課別（'+TIERS.map(function(x){return x.label;}).join('/')+'/着地）',
            head:['課'].concat(TIERS.map(function(x){return x.label;})).concat(['着地']),
-           rows:courseRows,align:['l'].concat(TIERS.map(function(){return 'r';})).concat(['r'])},
-          {type:'table',title:'フロント別（'+TIER_FRONT.map(function(id){return TIER_BY[id].label;}).join('/')+'）',
-           head:['フロント'].concat(TIER_FRONT.map(function(id){return TIER_BY[id].label;})),
-           rows:frontRows,align:['l'].concat(TIER_FRONT.map(function(){return 'r';}))}
+           rows:courseRows,align:['l'].concat(TIERS.map(function(){return 'r';})).concat(['r'])}
         ]};
     }
     if(tab==='sales' && yr){

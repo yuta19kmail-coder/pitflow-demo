@@ -524,10 +524,18 @@
       });
       var tk = (typeof pitTenkenFromShaken === 'function') ? pitTenkenFromShaken(v.shakenDate) : '';
       if (tk) {
-        var slip = tk < today;
+        /* 🔴 v2.125.0（ゆうた指定 2026-09-26）**12ヶ月点検は目安の月の「翌月」までやってよい。**
+           🗣「12ヵ月点検の実施日を車検満了付きの+1か月まではOKにしてほしい」
+              「11月満了の翌年の12ヵ月点検で12月に入れようとすると候補として入れられない」
+           ＝ `lateYm`（目安の月＋1）までは**候補・確定を置ける**し、**スライド（できませんでした）にもしない**。
+           ⚠ カレンダーの帯（months）は v2.71.0 の指定どおり2ヶ月のまま。置ける月の判定は lateYm を見る。 */
+        var lateYm = _ymAdd(_ym(tk), 1);
+        var slip = _ym(today) > lateYm;
+        var lp = lateYm.split('-');
         out.push({
           work: '12pt', label: '12ヶ月点検', vehicleId: v.id,
-          dueDate: tk, openFrom: _ym(tk) + '-01', openTo: tk,
+          dueDate: tk, openFrom: _ym(tk) + '-01', openTo: _ymd(new Date(+lp[0], +lp[1], 0)),
+          lateYm: lateYm,
           /* 🔴 v2.71.0（ゆうた指定 2026-09-05）**12ヶ月点検も帯にする＝目安の月＋その前1ヶ月の2ヶ月。**
              🗣「12点も車検のように2ヵ月分でバーで表示してほしい」
              ⚠ 車検は「満了月＋その前2ヶ月＝3ヶ月」。12点は**2ヶ月**（期限ではなく目安なので短い）。
@@ -536,7 +544,7 @@
           months: [_ymAdd(_ym(tk), -1), _ym(tk)],
           ym: slip ? _ym(today) : _ym(tk),       /* できなかったら今の月へスライド */
           overdue: false, slipped: slip,
-          inWindow: (_ym(today) === _ym(tk)) || slip
+          inWindow: (_ym(today) === _ym(tk)) || (_ym(today) === lateYm) || slip
         });
       }
     }

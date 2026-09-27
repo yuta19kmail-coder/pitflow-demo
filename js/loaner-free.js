@@ -278,10 +278,12 @@
   }
   function _collect(loanerId, from, to, opt) {
     var skip = opt && opt.ignoreAssignId;
+    var skipCard = opt && opt.ignoreCardId;   /* 🆕 v2.127.0 その予約カード自身の貸出は無いものとして見る */
     var out = [];
     arr(w.state && w.state.loanerAssigns).forEach(function (a) {
       if (!a || a.loanerId !== loanerId) return;
       if (skip && a.id === skip) return;
+      if (skipCard && a.cardId && a.cardId === skipCard) return;
       if (!(a.fromDate <= to && a.toDate >= from)) return;
       out.push(_assignItem(a));
     });
@@ -352,6 +354,44 @@
     };
   }
   function spanOf(loanerId, from, to, opt) { return _collect(loanerId, from, to, opt); }
+
+  /* ==================================================================
+     🆕🔴 v2.127.0（ゆうた確定 2026-09-27）**新規予約の右カラム＝「押せない」のは本物の貸出だけ。**
+     ------------------------------------------------------------------
+     🗣「仮押さえと整備の仮スケジュール部分も新規予約として貸し出せるようにしたい→触れるように」
+     🗣「ただし被ってる時は警告を出す…強行突破は出来るように」
+     🗣（代車自身の予定・リースアップ後も）「今回のに揃えちゃってほしい」
+     ◎2つに分ける
+       ・hard（押せない）… 貸出（lend）だけ
+       ・soft（押せる＋警告）… 🅿仮押さえ／🔧整備の枠（候補も確定も）／代車自身の予定／リースアップ後
+         ⚠ 完了済みの整備（done）は数えない（もう終わった作業で警告しない）
+     ⚠ **「空いているか（busyOn）」「案内（avoidOn）」の答えは変えていない。**
+        最短入庫日・空き台数は今までどおり。変わるのは**人が手で選ぶ時**だけ。
+     ================================================================== */
+  function _softItem(x) {
+    if (!x || x.kind === 'lend') return false;
+    if (x.kind === 'maint' && x.done) return false;
+    return true;
+  }
+  function hardOn(loanerId, ds, opt) {
+    return _collect(loanerId, ds, ds, opt).some(function (x) { return x.kind === 'lend'; });
+  }
+  function softOn(loanerId, ds, opt) {
+    return _collect(loanerId, ds, ds, opt).filter(_softItem);
+  }
+  function softHits(loanerId, from, to, opt) {
+    if (!loanerId || !from || !to) return [];
+    return _collect(loanerId, from, to, opt).filter(_softItem);
+  }
+  /* 言い方＝「仮押さえ 10/6〜10/9」「車検（確定）10/6〜10/7」 */
+  function softLabel(x) {
+    var md = function (s) { return s ? (+s.slice(5, 7)) + '/' + (+s.slice(8, 10)) : ''; };
+    var name = x.label || '予定';
+    if (x.kind === 'maint') name += (x.stage === 'fixed' ? '（整備・確定）' : '（整備・候補）');
+    if (x.kind === 'event') name += '（代車の予定）';
+    if (x.kind === 'leaseout') return name + ' ' + md(x.from) + '〜';
+    return name + ' ' + md(x.from) + (x.to && x.to !== x.from ? '〜' + md(x.to) : '');
+  }
 
   /* ------------------------------------------------------------------
      ③ 「N日連続で丸ごと空く代車」が1台でもあるか
@@ -524,7 +564,7 @@
       });
       var tk = (typeof pitTenkenFromShaken === 'function') ? pitTenkenFromShaken(v.shakenDate) : '';
       if (tk) {
-        /* 🔴 v2.125.0（ゆうた指定 2026-09-26）**12ヶ月点検は目安の月の「翌月」までやってよい。**
+        /* 🔴 v2.126.0（ゆうた指定 2026-09-26）**12ヶ月点検は目安の月の「翌月」までやってよい。**
            🗣「12ヵ月点検の実施日を車検満了付きの+1か月まではOKにしてほしい」
               「11月満了の翌年の12ヵ月点検で12月に入れようとすると候補として入れられない」
            ＝ `lateYm`（目安の月＋1）までは**候補・確定を置ける**し、**スライド（できませんでした）にもしない**。
@@ -710,6 +750,10 @@
   w.pitLoanerBusyWhy     = busyWhy;
   /* 🧩 v2.42.0 「その日／その期間に何が乗っているか」＝画面はこれを呼ぶ */
   w.pitLoanerDay         = dayOf;
+  w.pitLoanerHardOn      = hardOn;       /* 🆕 v2.127.0 手で選ぶ時に押せない＝本物の貸出だけ */
+  w.pitLoanerSoftOn      = softOn;       /* 🆕 v2.127.0 押せるが警告するもの（その日） */
+  w.pitLoanerSoftHits    = softHits;     /* 🆕 v2.127.0 押せるが警告するもの（その期間） */
+  w.pitLoanerSoftLabel   = softLabel;
   w.pitLoanerAvoidOn     = avoidOn;      /* 案内で避けるか（整備の候補も避ける） */
   w.pitLoanerMaintPlans  = maintPlans;   /* 🔧 月の目標（計算・保存しない） */
   w.PIT_MAINT_WORKS      = MAINT_WORKS;

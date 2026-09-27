@@ -165,7 +165,7 @@
     if (!c || c.maintVehId !== vehId || c.workType !== p.work) return false;
     var ym = String(c.maintYm || ''), from = arr(p.months)[0] || p.ym;
     if (from > p.ym) from = p.ym;
-    /* 🔴 v2.125.0 12点は目安の翌月（lateYm）までに置いたカードも同じ目標（別の行を生やさない） */
+    /* 🔴 v2.126.0 12点は目安の翌月（lateYm）までに置いたカードも同じ目標（別の行を生やさない） */
     var to = (p.lateYm && p.lateYm > p.ym) ? p.lateYm : p.ym;
     return !!ym && ym >= from && ym <= to;
   }
@@ -306,7 +306,8 @@
       if (p.slipped){
         /* ⚠ 言うのは**本来いつまでだったか**。`months` は帯を出す月の並びなので、ここで使わない
            （v2.71.0 で 12点の months を2ヶ月にした時、months[0] だと1ヶ月ずれた文が出るようになった）。 */
-        msg = '⚠ ' + ymText(p.dueDate ? ymOf(p.dueDate) : p.months[0]) + 'にできませんでした。' + ymText(p.ym) + 'へスライドしています';
+        /* v2.126.0 12点は翌月まで受けられるので「◯月までに」と言う */
+        msg = '⚠ ' + (p.lateYm ? ymText(p.lateYm) + 'まで' : ymText(p.dueDate ? ymOf(p.dueDate) : p.months[0])) + 'にできませんでした。' + ymText(p.ym) + 'へスライドしています';
       } else if (p.manualId){
         msg = p.urgent ? '🚨 急ぎです。まだ日が決まっていません。早めに枠を取ってください'
                        : '⚠ まだ日が決まっていません。早めに枠を取ってください';
@@ -845,7 +846,7 @@
       if (r.fixed) return false;                       /* もう確定しているものには置かない */
       var p = r.plan;
       if (p.openFrom && ds < p.openFrom) return false; /* 受けられる期間より前には置けない */
-      /* 🔴 v2.125.0 12点は目安の翌月（lateYm）にも置ける（ゆうた指定 2026-09-26） */
+      /* 🔴 v2.126.0 12点は目安の翌月（lateYm）にも置ける（ゆうた指定 2026-09-26） */
       return p.months.indexOf(ym) >= 0 || p.ym === ym || p.lateYm === ym || (p.overdue || p.slipped);
     });
   }

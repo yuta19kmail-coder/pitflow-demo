@@ -1314,27 +1314,44 @@ function _cfsLgRows(from, to, today, tStr, c, ro){
       /* 🔴 v1.80.0 ふさがっている理由は loaner-free.js に聞く
          ＝貸出だけでなく **代車自身の車検・点検（車両管理の予定）でも塞がる**。
          ⚠ 以前はここで貸出しか見ておらず、車検入庫中の代車が「空き」に見えていた。 */
-      const why = window.pitLoanerBusyWhy ? pitLoanerBusyWhy(l, ds) : null;
-      const a = why ? (why.kind === 'assign' ? why.assign : { _event: why.event })
-                    : assigns.find(function (x) { return x.loanerId === l.id && x.fromDate <= ds && x.toDate >= ds; });
+      /* 🔴🔴 v2.127.0（ゆうた確定 2026-09-27）**押せないのは本物の貸出だけ。**
+         🅿仮押さえ／🔧整備の枠（候補・確定）／代車自身の予定／リースアップ後 は
+         **色を付けたまま押せる**（重なったら帯とマスを赤＋窓で聞く＝強行はできる）。
+         ⚠ v2.126.0 までは整備の枠が**白い空きマスに見えていた**（v2.49.0 でカードに移した時の読み漏れ）。
+         ⚠ 判定は loaner-free.js（pitLoanerHardOn／pitLoanerSoftOn）1本。ここで綴らない。
+         ⚠ このカード自身の貸出は無いものとして見る（自分の貸出で自分が塞がらない）。 */
+      const _opt = (c && c.id) ? { ignoreCardId: c.id } : null;
+      const hard = window.pitLoanerHardOn ? pitLoanerHardOn(l.id, ds, _opt)
+                 : assigns.some(function (x) { return x.loanerId === l.id && x.fromDate <= ds && x.toDate >= ds; });
+      const soft = (!hard && window.pitLoanerSoftOn) ? pitLoanerSoftOn(l.id, ds, _opt) : [];
       /* 🔴 v1.35.0 どのマスにも「どの代車の列か」の目印を付ける（貸出中のマスも）。
          列まるごと点線で囲う（エクセルの列選択のような表示）ために要る。
-         ⚠ 選択やドラッグに使う data-lgl / data-lgd は**今までどおり空きマスだけ**＝挙動は変えない。 */
+         ⚠ 選択やドラッグに使う data-lgl / data-lgd は**空きマスと soft のマスだけ**。 */
       const col = ' data-lgcol="' + l.id + '"';
-      if (a){
+      /* soft のマスの色とことば（先頭＝いちばん決まっているもの） */
+      let sCls = '', sSty = '', sTtl = '';
+      if (soft.length){
+        const m = soft[0];
+        sCls = ' cfs-lg-soft ' + (m.kind === 'hold' ? 'cfs-lg-hold'
+             : m.kind === 'maint' ? (m.stage === 'fixed' ? 'cfs-lg-mfix' : 'cfs-lg-mcand')
+             : m.kind === 'leaseout' ? 'cfs-lg-lease' : 'cfs-lg-evt');
+        if (m.kind === 'event' && /^#[0-9a-f]{6}$/i.test(m.color || '')) sSty = ' style="background-color:' + m.color + '59"';
+        sTtl = ' title="' + soft.map(function (x) {
+          return (window.pitLoanerSoftLabel ? pitLoanerSoftLabel(x) : x.label) + (x.memo ? '：' + x.memo : '');
+        }).join('\n').replace(/"/g, '') + '"';
+      }
+      if (hard){
         /* 古いtitle（誰に・いつまで）は撤去＝情報はヘッダのホバー詳細カードへ */
-        /* 🅿 v2.40.0 仮押さえ＝**埋まり扱いは貸出と同じ**（ここは網掛けにするだけ）。
-           ゆうた指定「新規予約などからその部分は埋まっているのと同義で扱ってほしい」。 */
-        const _hd = !!(a && a.hold);
-        h += '<td class="cfs-lg-busy' + (_hd ? ' cfs-lg-hold' : '') + '"' + col
-           + (_hd ? ' title="仮押さえ' + (a.memo ? '：' + String(a.memo).replace(/"/g, '') : '') + '"' : '') + '></td>';
+        h += '<td class="cfs-lg-busy"' + col + '></td>';
       } else if (ro){
         /* 空きカレンダービュー＝読み取り専用（クリック選択なし） */
-        h += '<td class="cfs-lg-free cfs-lg-ro"' + col + '></td>';
+        h += '<td class="cfs-lg-free cfs-lg-ro' + sCls + '"' + col + sSty + sTtl + '></td>';
       } else {
-        /* このカードの貸出予定（使用代車＋から/まで）と一致するマスは緑＝双方向（ドラッグでもテキスト入力でも光る） */
+        /* このカードの貸出予定（使用代車＋から/まで）と一致するマスは緑＝双方向（ドラッグでもテキスト入力でも光る）
+           🆕 v2.127.0 soft のマスと重なったら赤（cfs-lg-clash） */
         const pick = c && c.loanerId === l.id && c.loanerFrom && c.loanerTo && ds >= c.loanerFrom && ds <= c.loanerTo;
-        h += '<td class="cfs-lg-free' + (pick ? ' cfs-lg-pick' : '') + '"' + col + ' data-lgl="' + l.id + '" data-lgd="' + ds + '"></td>';
+        h += '<td class="cfs-lg-free' + sCls + (pick ? ' cfs-lg-pick' : '') + (pick && soft.length ? ' cfs-lg-clash' : '') + '"'
+           + col + sSty + sTtl + (soft.length ? ' data-soft="1"' : '') + ' data-lgl="' + l.id + '" data-lgd="' + ds + '"></td>';
       }
     });
     h += '</tr>';
@@ -1425,6 +1442,85 @@ function _cfsPlanBand(c){
   return { from: w.from, to: w.to, ok: w.ok, why: w.why, base: base };
 }
 
+/* 🆕🔴 v2.127.0（ゆうた確定 2026-09-27）**決まった貸出が 仮押さえ・整備・代車の予定 と重なっているか。**
+   🗣「決まった貸出の幅：10/5〜10/8 決まった貸出 とでてるところを赤にして予定と被ってることを警告」
+   返すのは重なっている相手の一覧（無ければ空）。判定は loaner-free.js の pitLoanerSoftHits 1本。 */
+function _cfsLoanClash(c){
+  if (!c || !c.needLoaner || !c.loanerId || !c.loanerFrom || !c.loanerTo || !window.pitLoanerSoftHits) return [];
+  return pitLoanerSoftHits(c.loanerId, c.loanerFrom, c.loanerTo, { ignoreCardId: c.id });
+}
+function _cfsLoanClashText(c, hits){
+  const lo = (state.loaners || []).find(function (x) { return x.id === c.loanerId; });
+  const nm = lo ? (lo.name || ('代車' + (lo.number != null ? lo.number : ''))) + (lo.model ? '（' + lo.model + '）' : '') : '代車';
+  return { name: nm, list: hits.map(function (x) { return window.pitLoanerSoftLabel ? pitLoanerSoftLabel(x) : x.label; }) };
+}
+/* 🆕🔴 v2.127.0（ゆうた確定 2026-09-27）**重なったら窓で聞く。［取り直す］＝直前の貸出に戻す（1A）。**
+   🗣「クリックや日付ピッカーでの指定で貸し出し範囲が決定した場合にポップアップで別途警告
+   　　ただし あくまでいいですか？ 取り直す OK って感じで強行突破は出来るように」
+   ◎控え（_cfsLoanOk）… いちばん最近「これでいい」となった貸出。［取り直す］はここへ戻す。
+      同じ幅でもう一度聞かない（描き直しや日付欄の change が何度来ても1回だけ）。
+   ◎重なった仮押さえ・整備はそのまま残す（外す／ずらすは人が決める＝2）。 */
+let _cfsLoanOk = null;   /* { id, key, snap } */
+function _cfsLoanKey(c){ return [c.needLoaner ? 1 : 0, c.loanerId || '', c.loanerFrom || '', c.loanerTo || ''].join('|'); }
+function _cfsLoanSnap(c, withDrag){
+  const s = { needLoaner: c.needLoaner, loanerId: c.loanerId, loanerFrom: c.loanerFrom, loanerTo: c.loanerTo };
+  if (withDrag){ s.reserveDate = c.reserveDate; s.estHoldDays = c.estHoldDays; s.menu = c.menu; }   /* ドラッグは入庫日・預かり日数・メモも書き換える */
+  return s;
+}
+function _cfsLoanAccept(c){ _cfsLoanOk = { id: c.id, key: _cfsLoanKey(c), snap: _cfsLoanSnap(c) }; }
+/* 描いた時に1回＝開いた時点の貸出を「直前」とする（別のカードに移ったら取り直す） */
+function _cfsLoanInit(c){ if (c && (!_cfsLoanOk || _cfsLoanOk.id !== c.id)) _cfsLoanAccept(c); }
+function _cfsLoanClashAsk(c, before){
+  if (!c) return;
+  const hits = _cfsLoanClash(c);
+  if (!hits.length || (_cfsLoanOk && _cfsLoanOk.id === c.id && _cfsLoanOk.key === _cfsLoanKey(c))){ _cfsLoanAccept(c); return; }
+  const back = before || (_cfsLoanOk && _cfsLoanOk.id === c.id ? _cfsLoanOk.snap : null);
+  const t = _cfsLoanClashText(c, hits);
+  const md = window.pitLoanerMD || function (x) { return x; };
+  pitAsk('代車の予定と重なっています。このまま貸しますか？', { code: 'PF-1030',
+    detail: t.name + '　' + md(c.loanerFrom) + '〜' + md(c.loanerTo) + ' の貸出が、次の予定と重なっています。\n\n・' + t.list.join('\n・')
+          + '\n\n重なった予定は消えずに残ります（外す・ずらすは代車カレンダーで）。',
+    ok: 'このまま貸す', cancel: '取り直す'
+  }).then(function (yes) {
+    if (yes){ _cfsLoanAccept(c); return; }
+    if (back) Object.keys(back).forEach(function (k) { c[k] = back[k]; });
+    _cfsLoanAccept(c);
+    if (window.PitDB) PitDB.save();
+    renderCardForm(c);
+  });
+}
+/* 保存の前の念押し（5）。重なっていなければそのまま next */
+function _cfsLoanClashSaveAsk(c, actionLabel, next){
+  const hits = _cfsLoanClash(c);
+  if (!hits.length){ next(); return; }
+  const t = _cfsLoanClashText(c, hits);
+  pitAsk('代車の貸出が予定と重なったままです。このまま' + (actionLabel || '保存') + 'しますか？', { code: 'PF-1031',
+    detail: t.name + ' の貸出が、次の予定と重なっています。\n\n・' + t.list.join('\n・'),
+    ok: 'このまま' + (actionLabel || '保存') + 'する', cancel: '入力に戻る'
+  }).then(function (yes) {
+    if (yes) { next(); return; }
+    _pitLastSaveAt = 0;
+    const card = document.getElementById('cfs-lg-card');
+    if (card) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+}
+
+/* 帯の説明の中身（何の期間か・幅・取れるか・重なり）。組み立てはここ1本（描く時と打っている最中の両方が使う） */
+function _cfsBandNoteInner(c, band){
+  const md = window.pitLoanerMD || function (x) { return x; };
+  const hits = band.fixed ? _cfsLoanClash(c) : [];
+  return '<span class="cfs-lg-bandsw"></span>'
+    + (hits.length ? '⚠ ' : '')
+    + (band.fixed ? '決まった貸出の幅' : (c && c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅'))
+    + '：<b>' + md(band.from) + '〜' + md(band.to) + '</b>'
+    + '<span class="cfs-lg-bandwhy">' + band.why + '</span>'
+    + (band.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>')
+    + (hits.length ? '<span class="cfs-lg-bandclash">' + _cfsLoanClashText(c, hits).list.join('／') + ' と重なっています</span>' : '');
+}
+function _cfsBandNoteCls(c, band){
+  return 'cfs-lg-bandnote' + (band.fixed ? ' fixed' : '') + ((band.fixed && _cfsLoanClash(c).length) ? ' clash' : '');
+}
+
 function _cfsLoanerGanttHtml(today, tStr, c, ro){
   const loaners = _cfsLgLoaners(c);
   if (!window._cfsLgN) window._cfsLgN = 28;
@@ -1440,13 +1536,7 @@ function _cfsLoanerGanttHtml(today, tStr, c, ro){
   /* 🆕 v1.156.0 何の期間を緑にしているのかを、必ず言葉でも出す（色だけに頼らない） */
   const _bd = _cfsPlanBand(c);
   if (_bd){
-    const _md = window.pitLoanerMD || function(x){ return x; };
-    h += '<div class="cfs-lg-bandnote' + (_bd.fixed ? ' fixed' : '') + '"><span class="cfs-lg-bandsw"></span>'
-       + (_bd.fixed ? '決まった貸出の幅' : (c && c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅'))
-       + '：<b>' + _md(_bd.from) + '〜' + _md(_bd.to) + '</b>'
-       + '<span class="cfs-lg-bandwhy">' + _bd.why + '</span>'
-       + (_bd.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>')
-       + '</div>';
+    h += '<div class="' + _cfsBandNoteCls(c, _bd) + '">' + _cfsBandNoteInner(c, _bd) + '</div>';
   }
   h += '<div class="cfs-lg-scroll" id="cfs-lg-scroll" onscroll="cfsLgScroll(this)"><table class="cfs-lg">';
   h += '<thead><tr><th class="cfs-lg-d"></th>';
@@ -1464,7 +1554,9 @@ function _cfsLoanerGanttHtml(today, tStr, c, ro){
   h += '</table></div>';
   h += '<div class="cfs-hint">' + (ro
         ? '色付き＝貸出中（マウスで誰に・いつまでか）／空白＝空き。下にスクロールで先の日付まで見られます。'
-        : '色付き＝貸出中（マウスで誰に・いつまでか）／<b style="color:#1db97a">緑＝このカードの貸出予定</b>。空きマスを<b>クリック→そのままドラッグ</b>で「使用代車＋貸出から/まで」に自動で入ります（下の入力欄に日付を打っても緑が追従）。'
+        : '色付き＝貸出中（マウスで誰に・いつまでか）／<b style="color:#1db97a">緑＝このカードの貸出予定</b>。'
+          + '網掛け＝仮押さえ／<b style="color:#d6a846">黄</b>＝整備（点線＝候補・塗り＝確定）も選べます。<b style="color:#ef4444">重なると赤</b>になり、確認が出ます。<br>'
+          + '空きマスを<b>クリック→そのままドラッグ</b>で「使用代車＋貸出から/まで」に自動で入ります（下の入力欄に日付を打っても緑が追従）。'
           + '<br><b style="color:#378ADD">上の車種をクリック</b>＝その代車を使う（列が青い点線で囲まれ、使用代車の欄にも入ります。もう一度押すと解除）。<b style="color:#378ADD">左の日付をクリック</b>＝その日の行を目立たせる（見やすくするだけ）。') + '</div>';
   h += '</div>';
   return h;
@@ -1504,17 +1596,17 @@ window.pitCfPlanSync = function (c) {
   });
 
   /* ③ 帯の説明（何の期間か・幅・取れるか） */
-  const note = document.querySelector('.cfs-lg-bandnote');
-  if (note && band){
-    const md = window.pitLoanerMD || function (x) { return x; };
-    note.classList.toggle('fixed', !!band.fixed);
-    note.innerHTML = '<span class="cfs-lg-bandsw"></span>'
-      + (band.fixed ? '決まった貸出の幅' : (c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅'))
-      + '：<b>' + md(band.from) + '〜' + md(band.to) + '</b>'
-      + '<span class="cfs-lg-bandwhy">' + band.why + '</span>'
-      + (band.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>');
-  }
+  _cfsBandNoteSync(c, band);
 };
+/* 帯の説明を今の値で書き直す（クラスごと）。v2.127.0 から重なりの赤もここで付け外し */
+function _cfsBandNoteSync(c, band){
+  const note = document.querySelector('.cfs-lg-bandnote');
+  if (!note || !c) return;
+  band = band || _cfsPlanBand(c);
+  if (!band) return;
+  note.className = _cfsBandNoteCls(c, band);
+  note.innerHTML = _cfsBandNoteInner(c, band);
+}
 
 /* 代車ガント：行を継ぎ足す共通処理（スクロール位置はそのまま） */
 function _cfsLgAppend (count) {
@@ -1561,7 +1653,9 @@ window.pitLgSync = function (c) {
   table.querySelectorAll('td[data-lgd]').forEach(function (td) {
     const on = lid && from && to && td.dataset.lgl === lid && td.dataset.lgd >= from && td.dataset.lgd <= to;
     td.classList.toggle('cfs-lg-pick', !!on);
+    td.classList.toggle('cfs-lg-clash', !!on && td.hasAttribute('data-soft'));   /* 🆕 v2.127.0 予定と重なったマスは赤 */
   });
+  _cfsBandNoteSync(card);   /* 🆕 v2.127.0 代車を替えた・日付を打った時も、帯の赤をすぐ追従 */
   /* 青い点線の列 */
   table.querySelectorAll('[data-lgcol]').forEach(function (el) {
     el.classList.toggle('cfs-lg-colsel', !!lid && el.getAttribute('data-lgcol') === lid);
@@ -1648,18 +1742,20 @@ function _pitCardGuard(actionLabel, next){
     }).then(function(){ goTo('.cf-miss'); });
     return;
   }
+  /* 🆕 v2.127.0（ゆうた確定 2026-09-27）代車が予定と重なったままなら、保存の前にもう一度だけ念押し */
+  const go = function () { _cfsLoanClashSaveAsk(c, actionLabel, next); };
   if (r.yellow.length){
     pitAsk('このまま' + (actionLabel || '保存') + 'しますか？', { code:'PF-1003',
       detail: '次の項目が空です（あとから入れられます）。\n\n・' + r.yellow.join('\n・'),
       ok: 'このまま' + (actionLabel || '保存') + 'する', cancel: '入力に戻る'
     }).then(function (yes) {
-      if (yes) { next(); return; }
+      if (yes) { go(); return; }
       _pitLastSaveAt = 0;
       goTo('.cf-warn');
     });
     return;
   }
-  next();
+  go();
 }
 
 /* 再描画後に赤枠を貼り直す（チェックON中のみ）。bindCardFormEvents から呼ぶ。 */
@@ -3009,9 +3105,9 @@ function bindCardFormEvents(root){
   const lgBody = root.querySelector('#cfs-lg-body');
   if (lgBody){
     /* 🔴 v1.80.0 空きの判定は loaner-free.js の1本（代車自身の車検でも塞がる） */
+    /* 🔴 v2.127.0 ドラッグを止めるのは**本物の貸出だけ**（仮押さえ・整備・代車の予定は通り抜ける＝離した時に聞く） */
     const busyAt = (lid, ds) => {
-      const l = (state.loaners || []).find(x => x.id === lid);
-      return window.pitLoanerBusyOn ? pitLoanerBusyOn(l, ds)
+      return window.pitLoanerHardOn ? pitLoanerHardOn(lid, ds, { ignoreCardId: c.id })
            : (state.loanerAssigns || []).some(a => a.loanerId === lid && a.fromDate <= ds && a.toDate >= ds);
     };
     const nextDs = (ds) => { const p = ds.split('-'); const d = new Date(+p[0], +p[1]-1, +p[2]); d.setDate(d.getDate()+1); return ymd(d); };
@@ -3023,7 +3119,9 @@ function bindCardFormEvents(root){
     const paint = (drag) => {
       lgBody.querySelectorAll('td[data-lgd]').forEach(td => {
         const on = drag && td.dataset.lgl === drag.l && td.dataset.lgd >= drag.a && td.dataset.lgd <= drag.b;
-        td.classList.toggle('cfs-lg-pick', on || (!drag && c.loanerId === td.dataset.lgl && c.loanerFrom && c.loanerTo && td.dataset.lgd >= c.loanerFrom && td.dataset.lgd <= c.loanerTo));
+        const pk = on || (!drag && c.loanerId === td.dataset.lgl && c.loanerFrom && c.loanerTo && td.dataset.lgd >= c.loanerFrom && td.dataset.lgd <= c.loanerTo);
+        td.classList.toggle('cfs-lg-pick', !!pk);
+        td.classList.toggle('cfs-lg-clash', !!pk && td.hasAttribute('data-soft'));
       });
     };
     let drag = null;
@@ -3035,6 +3133,8 @@ function bindCardFormEvents(root){
       paint(drag);
       document.addEventListener('mouseup', () => {
         if (!drag) return;
+        /* 🆕 v2.127.0［取り直す］で丸ごと戻すための控え（ドラッグが書き換える所ぜんぶ） */
+        const _before = _cfsLoanSnap(c, true);
         c.needLoaner = true;
         c.loanerId = drag.l;
         c.loanerFrom = drag.a;
@@ -3065,6 +3165,7 @@ function bindCardFormEvents(root){
         drag = null;
         if (window.PitDB) PitDB.save();
         renderCardForm(c);   // 使用代車セレクト・日付欄・緑マスがすべて追従
+        _cfsLoanClashAsk(c, _before);   /* 🆕 v2.127.0 予定と重なったら聞く（帯とマスが赤くなった画面の上で） */
       }, { once: true });
     });
     lgBody.addEventListener('mouseover', (e) => {
@@ -3114,7 +3215,14 @@ function bindCardFormEvents(root){
     ['input', 'change'].forEach(function (ev){
       el.addEventListener(ev, function (){ setTimeout(function (){ pitLgSync(c); }, 0); });
     });
+    /* 🆕 v2.127.0 日付ピッカー・使用代車で幅が決まったら、重なりを聞く。
+       ⚠ 日付を手で打つと1桁ごとに change が来るので、少し待ってから1回だけ聞く */
+    el.addEventListener('change', function (){
+      clearTimeout(window._cfsLoanAskT);
+      window._cfsLoanAskT = setTimeout(function (){ _cfsLoanClashAsk(c); }, 450);
+    });
   });
+  _cfsLoanInit(c);
 
   // トグル
   root.querySelectorAll('.cf-toggle').forEach(group => {

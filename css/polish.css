@@ -2611,8 +2611,9 @@ th.cfs-lg-d{ z-index:3; }
 .lo-modal-note{ font-size:10.5px; color:var(--text3); line-height:1.5; margin:2px 2px 10px; }
 .lo-modal-note b{ color:var(--text2); }
 /* 新規予約の空きガント＝仮押さえのマスは薄い網掛け（貸出のオレンジ塗りより弱く） */
-td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(116,152,200,.42) 0 5px, rgba(116,152,200,.12) 5px 10px) !important; }
-.cfs-lg tr.cfs-lg-band > td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(196,140,150,.38) 0 5px, rgba(196,140,150,.12) 5px 10px) !important; }
+/* 🆕 v2.127.0 仮押さえは貸出ではなくなった（押せる）＝ .cfs-lg-busy を外して .cfs-lg-soft に */
+td.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(116,152,200,.42) 0 5px, rgba(116,152,200,.12) 5px 10px); }
+.cfs-lg tr.cfs-lg-band > td.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(196,140,150,.38) 0 5px, rgba(196,140,150,.12) 5px 10px); }
 /* 車両管理の利用カレンダー＝仮押さえは薄い網掛け */
 .fl-cal-cell.fl-use.fl-hold{ background:repeating-linear-gradient(135deg, rgba(116,152,200,.22) 0 6px, rgba(116,152,200,.06) 6px 12px) !important; }
 
@@ -2797,3 +2798,22 @@ td.cfs-lg-busy.cfs-lg-hold{ background:repeating-linear-gradient(135deg, rgba(11
 /* 🔧 v2.46.0 日ビューのなぞり（候補日をまとめて選ぶ）。画面の中だけ・1文字も保存しない */
 .fl-cal-cell.fl-day{ cursor:crosshair; user-select:none; }
 .fl-cal-cell.fl-pick{ box-shadow:inset 0 0 0 2px var(--brand); background:var(--brand-soft) !important; }
+
+
+/* ===== 🆕🔴 v2.127.0 新規予約の代車カレンダー＝押せるが予定のあるマス（ゆうた確定 2026-09-27） =====
+   🅿仮押さえ（網掛け・上）／🔧整備の候補（黄の点線）／🔧整備の確定（黄の塗り）／代車自身の予定（その色）／リースアップ後（グレー）
+   押して選んだ幅と重なったマスは赤（.cfs-lg-clash）。上の帯も赤（.cfs-lg-bandnote.clash）。 */
+td.cfs-lg-soft{ cursor:pointer; }
+td.cfs-lg-soft.cfs-lg-ro{ cursor:help; }
+td.cfs-lg-mcand{ background:rgba(214,168,70,.12); outline:2px dashed rgba(214,168,70,.85); outline-offset:-3px; }
+td.cfs-lg-mfix{ background:rgba(214,168,70,.55); }
+td.cfs-lg-evt{ background-color:rgba(59,130,246,.35); }
+td.cfs-lg-lease{ background:rgba(128,128,128,.35); }
+.cfs-lg td.cfs-lg-clash, .cfs-lg tr.cfs-lg-band > td.cfs-lg-clash{
+  background:repeating-linear-gradient(135deg, #ef4444 0 5px, #dc2626 5px 10px) !important; outline:none; }
+.cfs-lg-bandnote.clash{ background:rgba(239,68,68,.14) !important;
+  border-top-color:rgba(239,68,68,.6) !important; border-bottom-color:rgba(239,68,68,.6) !important; color:#ef4444; }
+.cfs-lg-bandnote.clash b{ color:#ef4444; }
+.cfs-lg-bandnote.clash .cfs-lg-bandsw{ background:rgba(239,68,68,.5); border-color:#ef4444; }
+.cfs-lg-bandnote.clash .cfs-lg-bandwhy{ color:#ef4444; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.55); }
+.cfs-lg-bandclash{ font-size:9.5px; font-weight:800; color:#fff; background:#ef4444; border-radius:5px; padding:1px 5px; }

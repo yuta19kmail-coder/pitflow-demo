@@ -200,12 +200,19 @@ function _pitAddYear(shakenYmd, diff) {
   if (d > last) d = last;
   return y + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
 }
+/* 🔴 v2.126.0（ゆうた指定 2026-09-26「12ヵ月点検は満了月の+1か月まではOK」）
+   ◎前まで … 目安の日を**1日でも過ぎたら次の周期へ跳んでいた**（11/20 目安なら 11/21 で翌々年へ）。
+     ＝12月に入れようとしても、その点検がもう画面に居なかった。
+   ◎いま  … **目安の月の翌月末まで**は、手前の点検のまま（翌月末を過ぎたら次の周期）。
+   ⚠ 受けられる月の判定（lateYm）は loaner-free.js の maintPlans。ここと「翌月まで」をそろえること。 */
 window.pitTenkenFromShaken = function (shakenYmd) {
   var before = _pitAddYear(shakenYmd, -1);
   if (!before) return '';
   var t = new Date(); t.setHours(0, 0, 0, 0);
   var today = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
-  if (before > today) return before;                // まだ先＝車検の手前に点検
+  var bm = before.split('-'), lateEnd = new Date(+bm[0], +bm[1] + 1, 0);   /* 目安の月の翌月末 */
+  var lateEndStr = lateEnd.getFullYear() + '-' + String(lateEnd.getMonth() + 1).padStart(2, '0') + '-' + String(lateEnd.getDate()).padStart(2, '0');
+  if (lateEndStr >= today) return before;           // まだ先 or 翌月末までの猶予中＝車検の手前の点検
   return _pitAddYear(shakenYmd, 1);                 // もう過ぎている＝車検の次の点検
 };
 /* 代車・自社車両の呼び名＝「1 タント」。番号が無ければ車種だけ、それも無ければ元の名前。

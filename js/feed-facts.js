@@ -27,7 +27,11 @@
        shakenCand:[{id}], shakenUnset:[{id}], … 車検の「行ける日候補が出た」／「店にいるのに予定なし」
        loaner:[{id,rem}],                  … 代車の残り日数（マイナス＝超過）
        dataCheck:{ n, red, amber },        … PitFlow のデータチェックで見つかっている数
-       sales:{ sum, goalMin, goalMax, today, byDiv:{div:金額}, byStaff:{メンバーid:{order, sales}} } }
+       sales:{ sum, goalMin, goalMax, today, byDiv:{div:金額}, byStaff:{メンバーid:{order, sales}} },
+       🆕 2026-09-28 front:{ メンバーid:{ todaySales, todayRet, hold, intake, ret } }
+                          … フロント向け「自分の数字」の通知のもと（今日返した金額・台数／預かり中／今日の入庫・返車予定の残り）
+                            🗣 ゆうた「全体の毎日数字報告のノリ、ちゃんとしたデータでフロント用を作って」
+                            担当＝taskStaff（フロント担当 → 作業担当）。byStaff の受注と同じ数え方 }
 
    🔴 本番（PIT_CLOUD）でログインしている時だけ置く。見本データを本番に混ぜない
    ⚠ 1分ごとに作り直して、中身が変わった時だけ書く（最低でも10分に1回は書く＝サーバーが「古い」と判断しないように）
@@ -85,6 +89,21 @@
       var open = P.pickOrder().filter(function (c) { return str(P.taskStaff(c)) === s.name; }).reduce(function (x, c) { return x + (+P.amt(c) || 0); }, 0);
       if (sales || open) byStaff[s.id] = { sales: sales, order: sales + open };
     });
+    /* 🆕 2026-09-28 フロント向け「自分の数字」（担当ごと・今日の分）。物差しは PIT_DASH_API から借りるだけ */
+    var front = {};
+    var intakeAll = P.pickIntake().filter(function (c) { return c.status === 'reserved'; });
+    var retAll = P.pickReturnOut().filter(function (c) { return c.status !== 'returned'; });
+    var holdAll = P.pickHold();
+    ((state.staff) || []).forEach(function (s) {
+      if (!s || !s.id || s.isSelf || !s.name) return;
+      var mine = function (c) { return str(P.taskStaff(c)) === s.name; };
+      var tS = P.pickPSales({ p: [s.name] }).filter(function (c) { return P.countDate(c) === C.tStr; });
+      var f = {
+        todaySales: tS.reduce(function (x, c) { return x + (+P.amt(c) || 0); }, 0), todayRet: tS.length,
+        hold: holdAll.filter(mine).length, intake: intakeAll.filter(mine).length, ret: retAll.filter(mine).length
+      };
+      if (f.todaySales || f.todayRet || f.hold || f.intake || f.ret) front[s.id] = f;
+    });
     /* =================================================================
        🆕 2026-09-19 受付まわりの8つの通知のもと（FlowDesk 画面 v1.18.0）
        🗣 ゆうた「通知の項目自体をふやすのもあり」→ 8つ選んでもらった物
@@ -124,7 +143,8 @@
       retTbd: retTbd, retTimeTbd: retTimeTbd, thanks: thanks, sameDay: sameDay,
       shakenCand: shakenCand, shakenUnset: shakenUnset, loaner: loaner,
       dataCheck: ins ? { n: ins.n || 0, red: ins.red || 0, amber: ins.amber || 0 } : null,
-      sales: { sum: sum, goalMin: +tg.monthMin || 0, goalMax: +tg.monthMax || 0, today: today, byDiv: byDiv, byStaff: byStaff }
+      sales: { sum: sum, goalMin: +tg.monthMin || 0, goalMax: +tg.monthMax || 0, today: today, byDiv: byDiv, byStaff: byStaff },
+      front: front
     };
   }
   window._pitFeedFactsBuild = build;   // 見張り・確認用（書き込みはしない）

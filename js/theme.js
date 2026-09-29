@@ -107,6 +107,13 @@
     return { name: name, initial: (name || '？').trim().slice(0, 2) || '？', photo: (m && m.photo) || '' };
   }
   window.pitRenderTopUser = function () {
+    /* 2026-09-29: 本番（ログイン後）は共通部品 coreflow-user.js で出す＝全アプリ同じ決まり
+       （フルネーム／写真が無ければ頭文字）。下はサンプル（ログイン前）の時だけ。 */
+    var me = window.fb && window.fb.currentMember;
+    if (me && window.CFUser) {
+      window.CFUser.paint({ av: 'tb-avatar', name: 'tb-username', member: me, user: window.fb.currentUser });
+      return;
+    }
     var u = currentUser();
     var av = document.getElementById('tb-avatar');
     if (av) {

@@ -820,12 +820,16 @@
 
   function closeHtml(U, mm, ym){
     var C = U.close, saved = !!(U.saved && U.saved.数字), past = isPast(ym);
-    var h = '<div class="air-close"><div><h3>';
+    /* 📐 v2.135.2（ゆうた「書き出すが上に上がってるのが変」）＝ボタンは見出しの行ではなく **Q の箱と同じ行・同じ高さ**。
+       上の行＝見出し（左）と書き出した日時（右）／下の行＝Q の箱4つ（左）とボタン（右・箱と同じ高さ） */
+    var sub = saved ? esc(s(U.saved.書き出した日時).slice(0, 16).replace('T', ' ')) + ' に書き出し済み'
+                    : (past ? '押すと締めを確かめてから書き出します' : '月が終わると押せます');
+    var h = '<div class="air-close"><div class="air-chead"><h3>';
     if (saved && C && C.証) h += mm + '月は締め済み（' + esc(s(U.saved.書き出した日時).slice(5, 10).replace('-', '/')) + ' に書き出した時点で Q1〜Q4 すべて済み）';
     else if (!U.loaded) h += '読み込んでいます…';
     else if (!past) h += mm + '月はまだ途中です（月が終わって締めたあとに書き出せます）';
     else h += mm + '月のレポートはまだありません';
-    h += '</h3>';
+    h += '</h3>' + (isAdmin() ? '<span class="air-go-sub">' + sub + '</span>' : '') + '</div><div class="air-crow">';
     /* Q の箱は「締めた証」か「押して確かめた結果」があるときだけ（開いただけでは確かめない） */
     var Q = (saved && C && C.qs && C.qs.length) ? C : (U.check && U.check.qs && U.check.qs.length ? U.check : null);
     /* 📐 v2.135.1（ゆうた「書き出すとボタンの位置が上がってきもちわるい」）
@@ -842,13 +846,11 @@
         return '<div class="air-q' + (q.done ? '' : ' ng') + '"><b>' + q.label + ' ' + (+s(q.from).slice(8)) + '〜' + (+s(q.to).slice(8)) + '日</b><span class="' + (q.done ? 'ok' : 'st') + '">' + (q.done ? '済み' : 'まだ') + '</span>　' + esc(st) + '</div>';
       }).join('') + '</div>';
     }
-    h += '</div>';
     if (isAdmin()){
       var can = U.loaded && !U.busy && past;
-      h += '<div><button class="air-go" ' + (can ? '' : 'disabled') + ' onclick="pitAiRepGo()">' + (saved ? '書き出し直す' : 'レポートを書き出す') + '</button>'
-         + '<div class="air-go-sub">' + (saved ? esc(s(U.saved.書き出した日時).slice(0, 16).replace('T', ' ')) + ' に書き出し済み' : (past ? '押すと締めを確かめてから書き出します' : '月が終わると押せます')) + '</div></div>';
+      h += '<button class="air-go" ' + (can ? '' : 'disabled') + ' onclick="pitAiRepGo()">' + (saved ? '書き出し直す' : 'レポートを書き出す') + '</button>';
     }
-    return h + '</div>';
+    return h + '</div></div>';
   }
 
   /* 書き出した時の締めの記録＝締めた証。古い記録に qs が無くても「締め済み」として出す */

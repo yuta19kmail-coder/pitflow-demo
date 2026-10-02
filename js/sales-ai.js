@@ -84,9 +84,13 @@
   function countDate(c){ return w.pitSalesCountDate ? s(w.pitSalesCountDate(c)) : s(c.completedAt); }
   function salesDate(c){ return w.pitSalesDate ? s(w.pitSalesDate(c)) : s(c.salesDate || c.completeCallAt); }
   function noSale(c){ return !!(w.pitCardNoSale && w.pitCardNoSale(c)); }
-  function wtLabel(k){
-    var a = (S().workTypes || []).filter(function (x) { return x && (x.id === k || x.key === k); })[0];
-    return a ? (a.label || a.name || k) : (k ? k : '未入力');
+  /* 🔴 v2.135.0（ゆうた「データチェックで0にしたはずなのに、作業タイプ不明と言われる」）
+     ◎正体＝ここが c.workType だけを見ていた。いまのカードは workTypes（配列）に入っている（B.P・3M など）。
+     🔴 作業タイプは pit-share.js の1本（pitCardWorkTypes）から読む。データチェックと同じ物差し。 */
+  function wtLabelOf(c){
+    var a = w.pitCardWorkTypes ? w.pitCardWorkTypes(c) : (c.workType ? [{ label: c.workType }] : []);
+    var l = a.map(function (x) { return t(x && (x.label || x.name || x.id)); }).filter(Boolean);
+    return l.length ? l.join('・') : '未入力';
   }
   function phaseLabel(k){ try { return w.statusLabel ? (w.statusLabel(k) || k) : k; } catch (e) { return k; } }
   function mechsOf(c){
@@ -95,6 +99,12 @@
     a.forEach(function (n) { n = t(n); if (n && !seen[n]){ seen[n] = 1; out.push(n); } });
     return out;
   }
+  /* 🔴 v2.135.0（ゆうた「メカ未記入と言われるのがなん箇所かある」）
+     ◎正体＝名前が空なら「未入力」と数えていた。でも空には2種類ある：
+       ・「なし」を押した（外注の板金・物販など）＝ **正しい状態**
+       ・本当に入れ忘れ ＝ データチェック T03 が言うもの
+     🔴 入れ忘れかどうかは mech-pick.js の1本（pitMechUnsettled）で決める。データチェックと同じ物差し。 */
+  function mechMissing(c){ try { return w.pitMechUnsettled ? w.pitMechUnsettled(c) : []; } catch (e) { return []; } }
   /* 状態を動かした記録から、工程ごとの日数（最後の工程は実績になった日まで） */
   function phasesOf(c, endDate){
     var log = (c.log || []).filter(function (l) { return l && l.type === 'phase' && l.at; })
@@ -156,7 +166,8 @@
       var ph = phasesOf(c, c.completedAt);
       reg(c);
       return { id: c.id, 課: r.course, 保険: insOf(c), 大物: r.amt >= bigLine, 金額: r.amt,
-               メーカー: makerOf(c), 作業: wtLabel(c.workType), フロント: shortFront(r.front), メカ: mechsOf(c).map(shortFront),
+               メーカー: makerOf(c), 作業: wtLabelOf(c), フロント: shortFront(r.front), メカ: mechsOf(c).map(shortFront),
+               担当の入れ忘れ: mechMissing(c),
                入庫: s(c.actualInAt), 完了: s(c.completedAt), 返車予定: s(c.returnDatePlan), 預かり: stay, 工程: ph,
                メモ: memoTrail(c) };
     });
@@ -189,7 +200,7 @@
       var wd = st.filter(function (r) { return r.工程.workDone != null; });
       var fr = {}; a.forEach(function (r) { var f = r.フロント; fr[f] = fr[f] || { 名前: f, 台数: 0, 売上: 0 }; fr[f].台数++; fr[f].売上 += r.金額; });
       var me = {}; a.forEach(function (r) {
-        var ms = r.メカ.length ? r.メカ : ['メカ未入力'];
+        var ms = r.メカ.length ? r.メカ : [r.担当の入れ忘れ.indexOf('整備担当') >= 0 ? '整備担当の入れ忘れ' : '整備担当なし（外注・物販など）'];
         ms.forEach(function (n) { me[n] = me[n] || { 名前: n, 台数: 0, 生産: 0 }; me[n].台数++; me[n].生産 += r.金額 / ms.length; });
       });
       var mk = {}; a.forEach(function (r) { var q = r.メーカー; mk[q] = mk[q] || { メーカー: q, 台数: 0, 金額: 0 }; mk[q].台数++; mk[q].金額 += r.金額; });
@@ -239,8 +250,10 @@
         未来: { 空く日数: freed, 内訳: { 作業完了から返車: Math.round(fWd), 中くらいの仕事: Math.round(fMid), 長期預かり: Math.round(fLong) },
                 伸ばせる売上: Math.round(freed * perDayNB), 空く置き場: Math.round(freed / 30 * 10) / 10,
                 見込み: sum - bigs.reduce(function (x, b) { return x + b.金額; }, 0) + Math.round(freed * perDayNB) },
+        /* 🔴 v2.135.0 データチェック（T03・作業タイプ）と同じ物差し。「なし」を押した車は抜けに数えない */
         入力の抜け: { 作業タイプ: a.filter(function (r) { return r.作業 === '未入力'; }).length,
-                    メカ: a.filter(function (r) { return !r.メカ.length; }).length }
+                    担当: a.filter(function (r) { return r.担当の入れ忘れ.length; }).map(function (r) { return { id: r.id, 入っていない役: r.担当の入れ忘れ }; }),
+                    整備担当なしを選んだ: a.filter(function (r) { return !r.メカ.length && r.担当の入れ忘れ.indexOf('整備担当') < 0; }).length }
       };
     });
 
@@ -310,6 +323,7 @@
       全体: {
         実績: total, 台数: acts.length, 台単価: acts.length ? Math.round(total / acts.length) : 0,
         前月: P.tiers.actual.sum, 前月台数: P.tiers.actual.count,
+        立ち上げ月: P.tiers.actual.count === 0,
         台単価_保険を除く: allNi.length ? Math.round(allNi.reduce(function (x, r) { return x + r.金額; }, 0) / allNi.length) : null,
         前月の台単価: prevStats.全体.台単価, 預かり中央値: allSt.length ? allSt[Math.floor(allSt.length / 2)] : null, 前月の預かり中央値: prevStats.全体.預かり中央値,
         作業完了から返車: { 台数: allWd.length, のべ日数: Math.round(allWd.reduce(function (x, r) { return x + r.工程.workDone; }, 0)) },
@@ -465,6 +479,8 @@
     '・このレポートは、チーフ（ゆうた）が自分で数字を見たら言うことの代わり。上の方針に立って書く。',
     '・資料の「通知表」（売上・単価・預かり・返車を ◎○△× で付けたもの。判定は PitFlow が決めた）を必ず踏まえる。△と×の項目は、課題の中で「どうすれば最低△、できれば○にできるか」を具体的に書く。評価を自分で付け直さない。',
     '・月締めの後に書くレポートなので、その月の作業は全部終わっている前提でよい。',
+    '・資料の「全体.立ち上げ月」が true の月は PitFlow を使い始めた月。入庫日やカードの登録日がばらばらなので、預かり日数（0日など）を断定の材料にしない。',
+    '・入力の抜けは資料の「入力の抜け」だけを使う（データチェックと同じ物差し）。整備担当に「なし」を選んだ車（外注・物販など）は抜けではない。',
     '',
     '【車の書き方】',
     '・車を指すときは必ず {{car:ID}} と書く（ID は資料の「車」の id）。画面で「苗字 車種｜課｜フロント」の1行と、カードを開くリンクに変わる。苗字や車種を自分で書き足さない。',
@@ -618,12 +634,12 @@
   function carChip(F, id){
     var c = F.車 && F.車[id];
     if (!c) return '<span class="air-car x">（車が見つかりません）</span>';
-    /* 🧾 v2.134.0（ゆうた「アンダーライン点線＋BOXで読みにくい。客名まで1BOXに入れて、リンクはそのBOX全体に」）
-       ＝「苗字 車種｜課｜フロント」を1つの枠に。枠のどこを押してもカードが開く。
-       ⚠ 中は inline（flex にしない）＝文をコピーした時に車の所で改行が入らない */
+    /* 🧾 v2.135.0（ゆうた「やっぱりガタガタして読みにくい。全部フォントを小さくして1行に溶け込ませたい。
+       BOX をやめて緑とピンクのアンダーラインでもいい」）
+       ＝ 枠をやめ、文の中に溶け込む1行（苗字 車種・課・フロント）。下線は課の色（設定の表の色）。どこを押してもカードが開く */
     return '<span class="air-car" role="button" tabindex="0"' + (c.課の色 ? ' style="--dc:' + esc(c.課の色) + '"' : '')
          + ' onclick="pitAiRepOpen(\'' + esc(id) + '\')"><span class="nm">' + esc(c.苗字 + ' ' + c.車種) + '</span>'
-         + (c.課 ? '<span class="dv">' + esc(c.課) + '</span>' : '') + '<span class="fr">' + esc(c.フロント) + '</span></span>';
+         + '<span class="mt">' + esc([c.課, c.フロント].filter(Boolean).join('・')) + '</span></span>';
   }
   function dvChip(label, color){ return '<span class="air-dv"' + (color ? ' style="--dc:' + esc(color) + '"' : '') + '>' + esc(label) + '</span>'; }
   /* AI の文 → HTML。{{car:ID}} を車の1行に、**…** を太字に */

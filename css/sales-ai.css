@@ -60,16 +60,13 @@
 .air-mini{ font-size:11.5px; color:var(--text2); margin-top:6px; }
 .air-two{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 
-/* 車の1行 v2.134.0 ＝「苗字 車種｜課｜フロント」を1つの枠に。枠全体がボタン（下線は引かない）
-   ⚠ 中は inline のまま（flex にすると文をコピーした時に改行が入る） */
-.air-car{ display:inline-block; white-space:nowrap; vertical-align:baseline; cursor:pointer; border:1px solid color-mix(in srgb, var(--dc, var(--blue)) 50%, transparent);
-  border-radius:6px; overflow:hidden; line-height:1.55; margin:0 2px; background:var(--bg3); }
-.air-car:hover, .air-car:focus{ background:color-mix(in srgb, var(--dc, var(--blue)) 14%, var(--bg3)); outline:none; }
-.air-car > span{ display:inline-block; padding:0 7px; }
-.air-car .nm{ color:var(--text); font-weight:700; }
-.air-car .dv{ font-size:11.5px; font-weight:700; color:var(--dc, var(--text2)); background:color-mix(in srgb, var(--dc, var(--text3)) 14%, transparent);
-  border-left:1px solid color-mix(in srgb, var(--dc, var(--text3)) 40%, transparent); }
-.air-car .fr{ font-size:11.5px; color:var(--text2); border-left:1px solid var(--border); }
+/* 車の1行 v2.135.0 ＝ 文の中に溶け込む形（枠なし）。少し小さい字＋課の色の下線。どこを押してもカードが開く
+   ⚠ display は inline のまま（行の高さを変えない・コピーした時に改行が入らない） */
+.air-car{ display:inline; white-space:nowrap; cursor:pointer; font-size:.92em;
+  border-bottom:2px solid color-mix(in srgb, var(--dc, var(--blue)) 75%, transparent); padding:0 1px; }
+.air-car:hover, .air-car:focus{ background:color-mix(in srgb, var(--dc, var(--blue)) 14%, transparent); outline:none; border-radius:3px 3px 0 0; }
+.air-car .nm{ color:var(--text); font-weight:600; }
+.air-car .mt{ font-size:.86em; color:var(--text2); margin-left:4px; }
 .air-car.x{ color:var(--text3); cursor:default; padding:0 7px; }
 .air-dv{ font-size:10.5px; font-weight:700; border-radius:4px; padding:0 6px; color:var(--dc, var(--text2));
   border:1px solid color-mix(in srgb, var(--dc, var(--text3)) 55%, transparent); background:color-mix(in srgb, var(--dc, var(--text3)) 12%, transparent); }

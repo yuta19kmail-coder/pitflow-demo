@@ -25,6 +25,8 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const AnthropicMod = require("@anthropic-ai/sdk");
+const Anthropic = AnthropicMod.default || AnthropicMod;
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -68,43 +70,42 @@ exports.pfAsk = onCall(
     if (!req.auth) throw new HttpsError("unauthenticated", "ログインが必要です。");
     await assertAdmin(req.auth.uid, req.auth.token && req.auth.token.email);
 
-    const { model, system, user, max_tokens } = req.data || {};
+    const { model, system, user, max_tokens, effort } = req.data || {};
     if (!system || !user) throw new HttpsError("invalid-argument", "system / user が必要です。");
     const useModel = ALLOWED_MODELS.has(model) ? model : "claude-sonnet-5";
-    const maxTokens = Math.min(Math.max(parseInt(max_tokens, 10) || 2048, 16), 16000);
+    /* 🤖 2026-10-02 Opus 5.5 は「考える」ぶんも出力に数える（止められない）。
+       16000 では考えるだけで使い切り、文が途中で切れた（AIレポートの試しで確かめた）＝上限を広げ、ストリーミングで受ける。 */
+    const maxTokens = Math.min(Math.max(parseInt(max_tokens, 10) || 2048, 16), 64000);
+    const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
     /* ⚠ 送る量に上限をかける（事故で巨大なものを送らないため）。
        ＝ 画面側でも絞っているが、**ここでも止める**（片方だけにしない）。 */
     const userText = String(user);
     if (userText.length > 400000) throw new HttpsError("invalid-argument", "送る中身が大きすぎます。期間を短くしてください。");
 
-    let res;
+    /* 公式 SDK のストリーミングで受けて、最後にまとめて返す（長い文でも途中で切れない） */
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY.value() });
+    const params = {
+      model: useModel,
+      max_tokens: maxTokens,
+      system: String(system),
+      messages: [{ role: "user", content: userText }],
+    };
+    if (EFFORTS.has(effort)) params.output_config = { effort };
+    let msg;
     try {
-      res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": ANTHROPIC_API_KEY.value(),
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          model: useModel,
-          max_tokens: maxTokens,
-          system: String(system),
-          messages: [{ role: "user", content: userText }],
-        }),
-      });
+      msg = await client.messages.stream(params).finalMessage();
     } catch (e) {
+      if (e instanceof Anthropic.APIError) {
+        throw new HttpsError("internal", "APIエラー " + (e.status || "") + " " + String(e.message || "").slice(0, 300));
+      }
       throw new HttpsError("unavailable", "AIサーバーに接続できませんでした。");
     }
-    if (!res.ok) {
-      let tx = "";
-      try { tx = await res.text(); } catch (e) { /* ignore */ }
-      throw new HttpsError("internal", "APIエラー " + res.status + " " + tx.slice(0, 300));
+    if (msg.stop_reason === "refusal") {
+      throw new HttpsError("failed-precondition", "AIがこの内容への回答を断りました。");
     }
-    const data = await res.json();
-    const text = (data.content || []).map((c) => c.text || "").join("");
-    const usage = data.usage || {};
-    return { text, usage: { in: usage.input_tokens || 0, out: usage.output_tokens || 0 }, model: useModel };
+    const text = (msg.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("");
+    const usage = msg.usage || {};
+    return { text, stop: msg.stop_reason, usage: { in: usage.input_tokens || 0, out: usage.output_tokens || 0 }, model: useModel };
   }
 );

@@ -34,7 +34,10 @@
   'use strict';
 
   var MODEL = 'claude-opus-5-5';
-  var MAX_TOKENS = 16000;
+  /* ⚠ Opus 5.5 は「考える」ぶんも出力に数える（止められない）。16000 では考えるだけで使い切り、文が途中で切れた。
+     40000＝9分（サーバーの待ち時間）に収まる目安。考える深さは medium（このモデルの標準）を明示。 */
+  var MAX_TOKENS = 40000;
+  var EFFORT = 'medium';
 
   function s(v){ return String(v == null ? '' : v); }
   function t(v){ return s(v).trim(); }
@@ -70,8 +73,9 @@
     var x = s(c.car) + ' ' + s(c.maker);
     return /ミニ|MINI|ﾐﾆ/i.test(x) && !/ミニカ|ミニキャブ|ミニバン/.test(s(c.car));
   }
-  function makerOf(c){ return isMini(c) ? 'MINI' : (t(c.maker) || '（未入力）'); }
-  function seiOf(c){ return t(c.sei) || t(s(c.customer).split(/[ 　]/)[0]) || t(c.customer); }
+  function makerOf(c){ return isMini(c) ? 'MINI' : (t(c.maker) || 'メーカー未入力'); }
+  /* お名前は pit-share.js の1本（pitCustSurname）から。ここで組み立てない（test_pit_rules ②） */
+  function seiOf(c){ return w.pitCustSurname ? t(w.pitCustSurname(c)) : t(c.sei); }
   function frontOf(c){ return t(c.frontStaff) || t(c.staff) || '（未割当）'; }
   function shortFront(n){ return s(n).split(/[ 　]/)[0]; }
   function courseOf(c){ if (c.division === 'div1' || c.division === 'div2') return c.division; return c.boardId === 'import' ? 'div2' : 'div1'; }
@@ -95,7 +99,8 @@
   function phasesOf(c, endDate){
     var log = (c.log || []).filter(function (l) { return l && l.type === 'phase' && l.at; })
                            .sort(function (a, b) { return a.at - b.at; });
-    var out = {}, end = endDate ? new Date(endDate + 'T23:59:59').getTime() : null;
+    /* 最後の工程は「実績になった日の0時」まで（返車の記録が無い車で、1日多く数えないため） */
+    var out = {}, end = endDate ? new Date(endDate + 'T00:00:00').getTime() : null;
     for (var i = 0; i < log.length; i++){
       var to = t(log[i].to); if (!to || to === 'returned') continue;
       var a = log[i].at, b = (i + 1 < log.length) ? log[i + 1].at : end;
@@ -174,7 +179,7 @@
       var wd = st.filter(function (r) { return r.工程.workDone != null; });
       var fr = {}; a.forEach(function (r) { var f = r.フロント; fr[f] = fr[f] || { 名前: f, 台数: 0, 売上: 0 }; fr[f].台数++; fr[f].売上 += r.金額; });
       var me = {}; a.forEach(function (r) {
-        var ms = r.メカ.length ? r.メカ : ['（未入力）'];
+        var ms = r.メカ.length ? r.メカ : ['メカ未入力'];
         ms.forEach(function (n) { me[n] = me[n] || { 名前: n, 台数: 0, 生産: 0 }; me[n].台数++; me[n].生産 += r.金額 / ms.length; });
       });
       var mk = {}; a.forEach(function (r) { var q = r.メーカー; mk[q] = mk[q] || { メーカー: q, 台数: 0, 金額: 0 }; mk[q].台数++; mk[q].金額 += r.金額; });
@@ -396,6 +401,8 @@
     '・日本語。です・ます調ではなく、だ・である調で短く言い切る（レポートの地の文）。',
     '・大事な所は **太字** にする（1段落に1〜2か所まで）。',
     '・1段落は2〜4文。箇条書きの記号は使わない（配列の要素が1段落になる）。',
+    '・金額は「万」で書く（例：1,569万、30.8万、7,648円のように1万円未満だけ円）。資料の円の値を四捨五入して万にするのはよい。「15,691,553円」のような円の細かい桁は書かない。',
+    '・人の名前は苗字に「さん」を付ける（例：椎名さん）。社長・専務・チーフは役職のまま。',
     '・「改善した未来」は、資料の「未来」の数字を使って、良い未来を具体的に描く（空く日数・いつも空く置き場・伸ばせる売上・人の動き）。伸ばせる売上は「空いた分だけ入庫がある前提」だと一言添える。',
     '',
     '【答えの形】次の JSON だけを返す（前後に説明を書かない）。',
@@ -443,11 +450,12 @@
       try { F = facts(ym0.y, ym0.m); } catch (e) { U.err = '数字をまとめる途中でつまずきました：' + s(e && e.message); rerender(); return; }
       U.busy = 'AI がレポートを書いています…（1〜3分）'; U.err = ''; rerender();
       var fn = w.firebase.app().functions('asia-northeast1').httpsCallable('pfAsk', { timeout: 540000 });
-      fn({ model: MODEL, system: SYSTEM, max_tokens: MAX_TOKENS,
+      fn({ model: MODEL, system: SYSTEM, max_tokens: MAX_TOKENS, effort: EFFORT,
            user: (ym0.y + '年' + (ym0.m + 1) + '月') + 'の資料です。決められた JSON の形だけで答えてください。\n\n```json\n'
                + JSON.stringify(slimForAi(F)) + '\n```' })
         .then(function (r) {
           var d = (r && r.data) || {};
+          if (d.stop === 'max_tokens'){ throw new Error('AIの文が長すぎて途中で切れました。もう一度書き出してください。'); }
           var got = parse(d.text);
           if (!got){ throw new Error('AIの返事を読み取れませんでした。もう一度書き出してください。'); }
           var me = (w.pitFlowMe && w.pitFlowMe()) || '';

@@ -430,6 +430,12 @@
     if (!w.PIT_CLOUD || !c) return Promise.resolve(null);
     return c.collection('pitSettings').doc(docId(ym)).get().then(function (sn) { return sn.exists ? sn.data() : null; });
   }
+  /* ⚡ v2.133.1 書き出したレポートは変わらない＝このパソコンに控えを置いて、開いた瞬間に出す。
+     ⚠ 控えは「速く出すため」だけ。本物は pitSettings の書類。開いたら裏で読み直し、書き出し直されていたら差し替える。
+     ⚠ 使えない時（プライベートウィンドウ等）は黙って本物だけを読む。 */
+  function ckey(ym){ var c = co(); return 'pitAiRep:' + ((c && c.id) || '') + ':' + ym; }
+  function cacheGet(ym){ try { var v = w.localStorage.getItem(ckey(ym)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function cachePut(ym, body){ try { if (body) w.localStorage.setItem(ckey(ym), JSON.stringify(body)); else w.localStorage.removeItem(ckey(ym)); } catch (e) {} }
   function save(ym, body){
     var c = co();
     if (!w.PIT_CLOUD || !c) return Promise.reject(new Error('練習用サイトでは残せません'));
@@ -534,7 +540,7 @@
           var me = (w.pitFlowMe && w.pitFlowMe()) || '';
           var body = { 月: ym, 書き出した日時: new Date().toISOString(), 書き出した人: me,
                        AI: { model: s(d.model || MODEL), usage: d.usage || null }, 数字: F, 文: got, 締め: U.close };
-          return save(ym, body).then(function () { return body; });
+          return save(ym, body).then(function () { cachePut(ym, body); return body; });
         })
         .then(function (body) {
           U.busy = ''; U.saved = body; U.close = markClosed(body.締め); U.fresh = false;
@@ -786,12 +792,23 @@
     if (U.loaded && !U.saved && !U.busy && Date.now() - (U.loadedAt || 0) > 120000) U.loaded = false;
     if (!U.loaded && !U.loading){
       U.loading = true;
-      loadSaved(ym).catch(function () { return null; }).then(function (sv) {
+      /* まず控え（あれば即表示）→ 裏で本物を読んで、違えば差し替え */
+      var cached = cacheGet(ym);
+      if (cached && cached.数字){
+        U.saved = cached; U.close = markClosed(cached.締め); U.fresh = false; U.loaded = true; U.loadedAt = Date.now();
+      }
+      loadSaved(ym).catch(function () { return undefined; }).then(function (sv) {
+        if (sv === undefined && cached){ U.loading = false; return; }   /* 読めなかった＝控えのまま */
         if (sv && sv.数字){
+          var changed = !cached || s(cached.書き出した日時) !== s(sv.書き出した日時);
+          cachePut(ym, sv);
           U.saved = sv; U.close = markClosed(sv.締め); U.fresh = false;
-          U.loaded = true; U.loadedAt = Date.now(); U.loading = false; rerender(); return;
+          U.loaded = true; U.loadedAt = Date.now(); U.loading = false;
+          if (changed) rerender();
+          return;
         }
-        U.saved = null; rerender();
+        if (cached) cachePut(ym, null);     /* 本物が無い（消された）＝控えも捨てる */
+        U.saved = null; U.loaded = false; rerender();
         return closeState(ym).catch(function (e) { return { qs: [], closed: false, err: '締めを確かめられませんでした：' + s(e && e.message) }; })
           .then(function (c) { U.close = c; U.fresh = true; U.loaded = true; U.loadedAt = Date.now(); U.loading = false; rerender(); });
       });
@@ -808,7 +825,10 @@
   w.pitAiRepOpen = function (id){ if (w.pitOpenCardDetail) w.pitOpenCardDetail(id); };
   w.pitAiRepJump = function (k){ var el = document.getElementById('air-' + k); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   /* 月を動かした・クォーターチェックで書き込んだ時に、締めを確かめ直す */
-  w.pitAiRepForget = function (ym){ if (ym) delete MEM[ym]; else MEM = {}; };
+  /* ⚡ v2.133.1 書き出し済みの月は忘れない（変わらないので読み直す意味が無い）。忘れるのは まだの月だけ */
+  w.pitAiRepForget = function (ym){
+    Object.keys(MEM).forEach(function (k) { if ((!ym || k === ym) && !(MEM[k].saved && MEM[k].saved.数字) && !MEM[k].busy) delete MEM[k]; });
+  };
 
   /* 🖨 PDF 出力の形（sales.js の svReportModel から）。紙には数字の表だけ出す（文は画面で読む） */
   w.pitAiRepModel = function (){

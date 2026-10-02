@@ -990,7 +990,8 @@
   function header(mode, ctx){
     var tab=window._svTab||'sales';
     /* 🔍 v2.59.0（ゆうた指定 2026-09-04）来店属性＝手で作っていた Excel「来店属性集計」を実データから出す */
-    var TABS=[['sales','売上'],['quarter','クォーター'],['work','作業内容'],['front','フロント'],['visit','来店属性']];
+    /* 🤖 v2.132.0（ゆうた指定 2026-10-02）来店属性の横に「AIレポート」＝月締めのあとに AI が書く月次レポート（sales-ai.js） */
+    var TABS=[['sales','売上'],['quarter','クォーター'],['work','作業内容'],['front','フロント'],['visit','来店属性'],['ai','AIレポート']];
     var h='<div class="sv-tabbar">'+TABS.map(function(t){ return '<button class="sv-topbtn'+(tab===t[0]?' on':'')+'" onclick="svSetTab(\''+t[0]+'\')">'+t[1]+'</button>'; }).join('')+'<div class="sv-tools"><button class="sv-toolbtn" onclick="svExportPdf()" title="A4のPDFで保存（ベクター）"><i data-ic=file data-ics=16></i> PDF出力</button></div></div>';
     h+='<div class="sv-head"><div class="sv-tabs"><button class="sv-tab'+(mode==='month'?' on':'')+'" onclick="svSetMode(\'month\')">当月</button><button class="sv-tab'+(mode==='year'?' on':'')+'" onclick="svSetMode(\'year\')">月間（年度）</button></div>';
     if (mode==='month'){ h+='<div class="sv-nav"><button onclick="svShiftMonth(-1)" title="前の月"><i data-ic=chevLeft data-ics=16></i></button><b>'+ctx.y+'年'+(ctx.m+1)+'月</b><button onclick="svShiftMonth(1)" title="次の月"><i data-ic=chevRight data-ics=16></i></button><button class="sv-now" onclick="svShiftMonth(0)">今月</button></div>'; }
@@ -1018,6 +1019,14 @@
       else   pitVisitMonth(wrap, vHead, window._svYM.y, window._svYM.m);
       return;
     }
+    /* 🤖 v2.132.0 AIレポートは別ファイル（sales-ai.js）。レポートは月ごと＝「月間（年度）」では月を選ぶよう言うだけ */
+    if(tab==='ai'){
+      var aHead = yr ? header('year',{y:window._svYear}) : header('month', window._svYM);
+      if(yr){ wrap.innerHTML=aHead+'<div class="sv-card"><div class="sv-empty">AIレポートは月ごとです。「当月」で月を選んでください。</div></div>'; return; }
+      if(!window.pitAiRepMonth){ wrap.innerHTML=aHead+'<div class="sv-card"><div class="sv-empty">AIレポートの部品を読み込み中です…</div></div>'; return; }
+      pitAiRepMonth(wrap, aHead, window._svYM.y, window._svYM.m);
+      return;
+    }
     if(tab==='quarter') yr?renderQuarterYear(wrap):renderQuarterMonth(wrap);
     else if(tab==='work') yr?renderWorkYear(wrap):renderWorkMonth(wrap);
     else if(tab==='front') yr?renderFrontYear(wrap):renderFrontMonth(wrap);
@@ -1033,6 +1042,8 @@
     var SLOT=[12,1,2,3,4,5,6,7,8,9,10,11];
     /* 🔍 v2.59.0 来店属性の紙。⚠ ここを足さないと、画面は来店属性なのに**売上の紙が出る**
        （知らない tab は一番下の売上へ落ちる作りのため）。数字は画面と同じ物差しから取る。 */
+    /* 🤖 v2.132.0 AIレポートの紙（数字の表だけ。文は画面で読む） */
+    if(tab==='ai' && window.pitAiRepModel) return pitAiRepModel();
     if(tab==='visit' && window.pitVisitCollect){
       var vRow=function(lb,f,cols,tt){ return [lb].concat(cols.map(function(c){return String(f(c.b));})).concat([String(f(tt))]); };
       var vPct=function(n,d){ return d>0 ? Math.round(n/d*100)+'%' : '—'; };
@@ -1167,7 +1178,8 @@
   window.svMan = man;
 
   window.renderSales = renderSales;
-  window.svSetTab = function(t){ window._svTab=t; renderSales(); };
+  /* 🤖 v2.132.0 AIレポートのタブを押した時は、締めを確かめ直す（その間にクォーターチェックで書き込んだかもしれない） */
+  window.svSetTab = function(t){ window._svTab=t; if(t==='ai' && window.pitAiRepForget) pitAiRepForget(); renderSales(); };
   window.svSetMode = function(m){ window._svMode=m; renderSales(); };
   window.svSetFrontView = function(v){ window._svFrontView=v; renderSales(); };
   window.svSetWorkView = function(v){ window._svWorkView=v; renderSales(); };

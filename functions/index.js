@@ -32,7 +32,10 @@ const db = admin.firestore();
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 const COMPANY_ID = "kobayashi_motors";
 const APP_KEY = "pitflow";
+/* 🤖 2026-10-02 AIレポート（売上ビュー）のために新しい世代を足した。古いものも残す（AIチェックが使っていた） */
 const ALLOWED_MODELS = new Set([
+  "claude-opus-5-5",
+  "claude-sonnet-5-5",
   "claude-sonnet-5",
   "claude-haiku-4-5-20251001",
   "claude-opus-4-8",
@@ -59,7 +62,8 @@ async function assertAdmin(uid, email) {
 }
 
 exports.pfAsk = onCall(
-  { region: "asia-northeast1", secrets: [ANTHROPIC_API_KEY], memory: "256MiB", timeoutSeconds: 120 },
+  /* 🤖 2026-10-02 AIレポートは1か月ぶんを読んで長い文を書く＝2分では足りない。9分まで待つ（画面側も同じだけ待つ） */
+  { region: "asia-northeast1", secrets: [ANTHROPIC_API_KEY], memory: "256MiB", timeoutSeconds: 540 },
   async (req) => {
     if (!req.auth) throw new HttpsError("unauthenticated", "ログインが必要です。");
     await assertAdmin(req.auth.uid, req.auth.token && req.auth.token.email);
@@ -67,7 +71,7 @@ exports.pfAsk = onCall(
     const { model, system, user, max_tokens } = req.data || {};
     if (!system || !user) throw new HttpsError("invalid-argument", "system / user が必要です。");
     const useModel = ALLOWED_MODELS.has(model) ? model : "claude-sonnet-5";
-    const maxTokens = Math.min(Math.max(parseInt(max_tokens, 10) || 2048, 16), 8192);
+    const maxTokens = Math.min(Math.max(parseInt(max_tokens, 10) || 2048, 16), 16000);
 
     /* ⚠ 送る量に上限をかける（事故で巨大なものを送らないため）。
        ＝ 画面側でも絞っているが、**ここでも止める**（片方だけにしない）。 */

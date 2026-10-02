@@ -1,0 +1,125 @@
+/* ========================================
+   sales-ai.css  -  売上ビュー「AIレポート」タブ / PitFlow v2.132.0
+   ⚠ 地の色は base.css の変数（--bg2 / --text2 …）を借りる＝ダーク・ライトどちらでも読める。
+   ⚠ クラスの頭は air-。
+   🔴 色はここで持つ。js（sales-ai.js）に色を書かない（test_pit_rules.mjs ③）。
+      課の色だけは設定の表（state.divisions）の色を js が --dc で渡す。
+   ======================================== */
+
+/* 月締めの帯 */
+.air-close{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r2,12px); padding:14px 16px; margin-bottom:14px;
+  display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+.air-close h3{ font-size:14px; margin-bottom:8px; }
+.air-qs{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.air-q{ background:var(--bg3); border:1px solid var(--border); border-radius:var(--r,8px); padding:8px 10px; font-size:12px; color:var(--text2); }
+.air-q b{ display:block; font-size:13px; color:var(--text); }
+.air-q .ok{ color:var(--green); font-weight:700; }
+.air-q.ng{ border-color:rgba(245,158,11,.55); }
+.air-q.ng .st{ color:var(--orange); font-weight:700; }
+.air-go{ background:var(--brand); color:#fff; border:0; border-radius:var(--r,8px); padding:12px 18px; font-weight:800; font-size:14px; white-space:nowrap; cursor:pointer; }
+.air-go:disabled{ background:var(--bg4); color:var(--text3); cursor:default; }
+.air-go-sub{ font-size:11px; color:var(--text2); text-align:center; margin-top:4px; }
+.air-busy{ display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r,8px); padding:12px 16px; margin-bottom:14px; font-size:13px; }
+.air-sp{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border2); border-top-color:var(--brand); animation:air-spin .9s linear infinite; }
+@keyframes air-spin{ to{ transform:rotate(360deg); } }
+.air-err{ background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.45); color:var(--red); border-radius:var(--r,8px); padding:10px 14px; margin-bottom:14px; font-size:13px; }
+
+/* レポート */
+.air-rep{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r2,12px); padding:22px 26px; line-height:1.65; }
+.air-rh{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:14px; }
+.air-rh h2{ font-size:20px; }
+.air-rh .meta{ font-size:11.5px; color:var(--text2); text-align:right; }
+.air-toc{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+.air-toc a{ font-size:12px; color:var(--text2); border:1px solid var(--border); border-radius:999px; padding:3px 12px; cursor:pointer; }
+.air-toc a:hover{ color:var(--text); border-color:var(--border2); }
+
+.air-part{ font-size:18px; margin:28px 0 12px; padding:8px 12px; border-radius:var(--r,8px); border-left:5px solid var(--brand); background:var(--brand-soft); }
+.air-part.dv{ border-left-color:var(--dc, var(--brand)); background:color-mix(in srgb, var(--dc, var(--brand)) 13%, transparent); }
+.air-rep section{ margin-bottom:22px; }
+.air-rep section h3{ font-size:15px; margin-bottom:8px; }
+.air-rep section h3 small{ font-size:11.5px; color:var(--text3); font-weight:400; margin-left:6px; }
+
+.air-kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+.air-kpi{ background:var(--bg3); border:1px solid var(--border); border-radius:var(--r,8px); padding:9px 12px; }
+.air-kpi span{ display:block; font-size:11.5px; color:var(--text2); }
+.air-kpi b{ font-size:18px; }
+.air-kpi i{ display:block; font-style:normal; font-size:11.5px; color:var(--text2); }
+.air-rep .up{ color:var(--green); }
+.air-rep .dn{ color:var(--red); }
+
+.air-ai{ margin:8px 0; }
+.air-ai::before{ content:"AI"; font-size:9.5px; font-weight:800; background:rgba(124,92,255,.22); color:#a78bfa; border-radius:4px; padding:0 5px; margin-right:6px; vertical-align:2px; }
+.air-sum{ background:var(--brand-soft); border-left:4px solid var(--brand); border-radius:6px; padding:8px 16px; margin:8px 0 14px; }
+
+.air-t{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+.air-t th{ color:var(--text2); font-weight:600; text-align:left; border-bottom:1px solid var(--border); padding:6px 8px; white-space:nowrap; }
+.air-t td{ border-bottom:1px solid var(--border); padding:6px 8px; vertical-align:top; }
+.air-t .n{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.air-t tr.air-muted td, .air-t td.air-muted{ color:var(--text3); }
+.air-memo{ font-size:11.5px; color:var(--text2); max-width:260px; }
+.air-mini{ font-size:11.5px; color:var(--text2); margin-top:6px; }
+.air-two{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+
+/* 車の1行（ふだんのカードを1行にした形）＝ 苗字 車種｜課｜フロント */
+.air-car{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap; vertical-align:middle; }
+.air-car .nm{ color:var(--blue); border-bottom:1px dotted currentColor; font-weight:600; }
+.air-car:hover .nm{ border-bottom-style:solid; }
+.air-car .fr{ font-size:11px; color:var(--text2); }
+.air-car.x{ color:var(--text3); cursor:default; }
+.air-dv{ font-size:10.5px; font-weight:700; border-radius:4px; padding:0 6px; color:var(--dc, var(--text2));
+  border:1px solid color-mix(in srgb, var(--dc, var(--text3)) 55%, transparent); background:color-mix(in srgb, var(--dc, var(--text3)) 12%, transparent); }
+.air-tag{ font-size:10.5px; border-radius:4px; padding:0 6px; border:1px solid var(--border2); color:var(--text2); white-space:nowrap; }
+.air-tag.r{ border-color:rgba(239,68,68,.5); color:var(--red); }
+.air-tag.o{ border-color:rgba(245,158,11,.5); color:var(--orange); }
+
+/* 工程のバー（色はここだけ） */
+.air-ph{ display:flex; height:16px; border-radius:4px; overflow:hidden; background:var(--bg4); }
+.air-ph i{ display:block; height:100%; }
+.air-legend{ display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--text2); margin-top:6px; }
+.air-legend span::before{ content:""; display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; background:var(--pc); }
+.air-pc-contact{ --pc:#64748b; background:var(--pc); }
+.air-pc-estim{ --pc:#f59e0b; background:var(--pc); }
+.air-pc-parts{ --pc:#ef4444; background:var(--pc); }
+.air-pc-work{ --pc:#38bdf8; background:var(--pc); }
+.air-pc-outsource{ --pc:#a78bfa; background:var(--pc); }
+.air-pc-check{ --pc:#94a3b8; background:var(--pc); }
+.air-pc-scrap{ --pc:#475569; background:var(--pc); }
+.air-pc-workDone{ --pc:var(--green); background:var(--pc); }
+.air-legend span{ background:none; }
+
+/* 積み上がりのグラフ */
+.air-chart{ background:var(--bg3); border:1px solid var(--border); border-radius:var(--r,8px); padding:8px; margin-top:10px; }
+.air-c-closed{ fill:var(--text3); opacity:.12; }
+.air-c-grid{ stroke:var(--border); stroke-width:.6; }
+.air-c-ax{ fill:var(--text3); font-size:11px; }
+.air-c-lo{ stroke:var(--orange); stroke-dasharray:5 4; stroke-width:1.5; }
+.air-c-hi{ stroke:var(--text3); stroke-dasharray:5 4; stroke-width:1.5; }
+.air-c-lot{ fill:var(--orange); font-size:11px; }
+.air-c-hit{ fill:var(--text3); font-size:11px; }
+.air-c-line{ fill:none; stroke:var(--green); stroke-width:2.5; }
+.air-c-end{ fill:var(--green); font-size:12px; font-weight:700; }
+
+/* 保険・課題・未来 */
+.air-bonus{ background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.4); border-radius:var(--r,8px); padding:12px 16px; margin-bottom:6px; }
+.air-bonus h3{ font-size:14.5px; color:var(--orange); margin-bottom:4px; }
+.air-bonus th{ width:44%; white-space:normal; }
+.air-issue{ background:rgba(239,68,68,.07); border:1px solid rgba(239,68,68,.35); border-radius:var(--r,8px); padding:12px 16px; margin-bottom:8px; }
+.air-issue h3{ font-size:14.5px; color:var(--red); margin-bottom:4px; }
+.air-issue ol{ margin-left:20px; }
+.air-issue li{ margin:8px 0; }
+.air-future{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.air-fut{ background:color-mix(in srgb, var(--green) 9%, transparent); border:1px solid color-mix(in srgb, var(--green) 45%, transparent); border-radius:var(--r,8px); padding:12px 16px; }
+.air-fut.all{ grid-column:1/-1; }
+.air-fut h3{ font-size:14.5px; color:var(--green); margin-bottom:6px; display:flex; gap:8px; align-items:center; }
+.air-fut .big{ display:flex; gap:18px; margin:6px 0 8px; flex-wrap:wrap; }
+.air-fut .big div{ font-size:11.5px; color:var(--text2); }
+.air-fut .big b{ display:block; font-size:20px; color:var(--text); }
+.air-fut .how{ font-size:11.5px; color:var(--text2); margin-top:6px; }
+.air-foot{ font-size:11.5px; color:var(--text2); border-top:1px solid var(--border); padding-top:12px; margin-top:24px; }
+.air-foot li{ margin-left:18px; }
+
+@media (max-width: 900px){
+  .air-close, .air-two, .air-future{ grid-template-columns:1fr; }
+  .air-kpis, .air-qs{ grid-template-columns:1fr 1fr; }
+  .air-rep{ padding:16px; }
+}

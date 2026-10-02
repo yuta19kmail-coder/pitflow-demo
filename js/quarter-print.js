@@ -314,6 +314,7 @@
   }
 
   w.pitQPrintCan  = can;
-  w.pitQPrintGo   = go;
+  /* ⏸ v2.131.0 AIチェック（③）を止めている間は刷り込みも動かさない（ボタンは③の中にしか無い） */
+  w.pitQPrintGo   = function (){ if (w.PIT_AI_OFF) return; return go.apply(this, arguments); };
   w.pitQPrintPlan = plan;      /* 🔴 見張り用＝刷らずに「何をどこに刷るか」だけ取り出せる */
 })(window);

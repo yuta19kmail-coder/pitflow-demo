@@ -67,7 +67,7 @@
   /* 🔴 v1.170.0 いちばん上の切り替え（ゆうた指定）。**言葉はこの表1本**。画面で綴らない。 */
   var MODES = [
     { id:'daily',   label:'日常チェック',      note:'PitFlow の中だけで分かる食い違いを、毎日ここで拾います' },
-    { id:'quarter', label:'クォーターチェック', note:'売上チェックリストPDFとの突合と、AIチェック（およそ週1）' }
+    { id:'quarter', label:'クォーターチェック', note:'売上チェックリストPDFとの突合（およそ週1）' }   /* ⏸ v2.131.0 AIチェックは止めている */
   ];
 
   /* 画面の覚え（絞り込みと、開いている規則）。⚠ データではないので保存しない */
@@ -482,8 +482,10 @@
             : '<div class="ins-q-soon">突き合わせの部品が読み込めていません。画面を開き直してください。</div>')
        + '</section>';
 
-    /* ③ AIチェック */
-    h += '<section class="ins-q-step ins-q-live">'
+    /* ③ AIチェック
+       ⏸ v2.131.0（ゆうた 2026-10-02「的外れだから一回使わないように」）止めている間は**枠ごと出さない**。
+       スイッチは ai-check.js の `PIT_AI_OFF` 1本。 */
+    if (!window.PIT_AI_OFF) h += '<section class="ins-q-step ins-q-live">'
        +   '<div class="ins-q-st"><span class="ins-q-no">③</span>AIチェック</div>'
        +   (window.pitAiHtml ? pitAiHtml()
             : '<div class="ins-q-soon">AIチェックの部品が読み込めていません。画面を開き直してください。</div>')
@@ -493,7 +495,7 @@
 
     h += '<div class="ins-q-foot">'
        +   '<div class="ins-q-fn">いまの日常チェックは <b>' + openN + '</b>件（片づけていないもの）。'
-       +     'この中身がそのまま②③へ渡ります。</div>'
+       +     'この中身がそのまま' + (window.PIT_AI_OFF ? '②' : '②③') + 'へ渡ります。</div>'
        +   '<div class="ins-actions">'
        +     '<button class="ins-btn" onclick="pitInspectMode(\'daily\')">日常チェックを見る</button>'
        +     '<button class="ins-btn" onclick="pitInspectDownload()">書き出し</button>'

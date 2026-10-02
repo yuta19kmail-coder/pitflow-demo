@@ -79,16 +79,36 @@
        ＝ 8月Q3・Q4の85枚が、誰にも気づかれないまま抜けかけていた（総点検で発覚）。
      🔴 数え方：その予約の車に **同じ予約番号＋同じ伝票番号** の伝票が入っていれば「書けた」。
      ⚠ ナンバーが無い（仮登録車両など）＝書く先の車が無い行は、分母に入れず別に数える。 */
+  /* ================================================================
+     🔁 v2.130.0（ゆうた 2026-10-02「一度書き込んだあと、PDF側で修正してもう一度UPしたら？」）
+     ----------------------------------------------------------------
+     ◎前は「同じ予約番号＋同じ伝票番号が入っている」だけで「書けた」と数えていた。
+       ＝ 整備ソフトで伝票を直して入れ直しても、履歴の**古い金額のまま「済」**に見えた。
+     🔴 書き込んだ伝票と、いま読んだ伝票の **金額・原価・消費税・伝票計** を比べる。
+        1つでも違えば「中身が変わった」（`変わった`）＝書けたに数えない。書き直しを促す。
+     ⚠ 書けた＋未＋変わった＝対象。
+     ================================================================ */
+  var 比べる = ['金額', '原価', '消費税', '伝票計'];
+  function changedFrom(d, S){
+    /* ⚠ 前の版で書き込んだ伝票には無い欄がある（消費税・伝票計は後から足した）。**持っている欄だけ**比べる
+       ＝ 欄が無いだけで「変わった」と言わない。読んだ側に無い欄（null）も比べない。 */
+    return 比べる.some(function (k) {
+      if (d[k] == null || S[k] == null) return false;
+      return num(d[k]) !== num(S[k]);
+    });
+  }
   function writeCount(R){
-    var out = { 書けた: 0, 対象: 0, 書く先なし: 0, 未: [] };
+    var out = { 書けた: 0, 対象: 0, 書く先なし: 0, 未: [], 変わった: [] };
     rows(R).forEach(function (p) {
       var plate = t(p.pit.ナンバー) || t(p.soft.ナンバー);
       var h = (plate && w.pitVehByPlate) ? w.pitVehByPlate(plate) : null;
       if (!h || !h.veh){ out.書く先なし++; return; }
       out.対象++;
       var res = t(p.pit.予約番号), no = t(p.soft.伝票);
-      var ok = (h.veh.伝票 || []).some(function (d) { return d && t(d.予約番号) === res && t(d.伝票番号) === no; });
-      if (ok) out.書けた++; else out.未.push(no);
+      var d = (h.veh.伝票 || []).filter(function (x) { return x && t(x.予約番号) === res && t(x.伝票番号) === no; })[0];
+      if (!d) out.未.push(no);
+      else if (changedFrom(d, p.soft)) out.変わった.push(no);
+      else out.書けた++;
     });
     return out;
   }
@@ -116,11 +136,29 @@
                     + '来店履歴にぶら下げるぶんは書けません（PDFを入れ直すと書けます）。</span>' : '';
     var wc = writeCount(R);
     var 状況 = '伝票の書き込み ' + wc.書けた + '/' + wc.対象
+             + (wc.変わった.length ? '・中身が変わった ' + wc.変わった.length + '枚' : '')
              + (wc.書く先なし ? '（ナンバーが無い ' + wc.書く先なし + '枚は書く先がありません）' : '');
+    /* 🔁 v2.130.0 書き込んだあとで伝票が直された＝書き直せる（明細が手元にある時だけ） */
+    if (wc.変わった.length && c.den){
+      return '<div class="q-wr warn">'
+        + '<div class="q-wr-l"><b>伝票が ' + wc.変わった.length + '枚、書き込んだあとで直されています</b>'
+        + '<span>' + esc(状況) + '</span>'
+        + '<span class="q-wr-n">伝票 ' + esc(wc.変わった.slice(0, 8).join('・') + (wc.変わった.length > 8 ? ' ほか' : '')) + '</span>'
+        + '</div>'
+        + '<button class="q-wr-b go" onclick="pitQWriteGo()">書き直す</button>'
+        + '</div>';
+    }
     if (!c.vin && !c.den){
+      /* 🔁 v2.130.0 中身が変わったのに明細が手元に無い（残してある伝票で組み直した画面） */
+      if (wc.変わった.length && !wc.未.length){
+        return '<div class="q-wr warn"><div class="q-wr-l"><b>伝票が ' + wc.変わった.length + '枚、書き込んだあとで直されています</b>'
+          + '<span>' + esc(状況) + '</span>'
+          + '<span class="q-wr-n">⚠ PDFを入れ直すと書き直せます（残した結果には伝票の中身が無いため）</span>'
+          + '</div></div>';
+      }
       /* 📒 v2.105.0 「書き込むものはありません」と言う前に、**本当に書き込まれているか**を車のデータで見る */
-      if (wc.未.length){
-        return '<div class="q-wr warn"><div class="q-wr-l"><b>伝票が ' + wc.未.length + '枚、まだ書き込まれていません</b>'
+      if (wc.未.length || wc.変わった.length){
+        return '<div class="q-wr warn"><div class="q-wr-l"><b>伝票が ' + (wc.未.length + wc.変わった.length) + '枚、まだ書き込まれていません</b>'
           + '<span>' + esc(状況) + '</span>'
           + '<span class="q-wr-n">' + (再生 ? '⚠ PDFを入れ直すと書けます（残した結果には伝票の中身が無いため）'
                                           : '⚠ 伝票の明細が額と合わないので書けません（PDFの読み取りを確かめてください）') + '</span>'

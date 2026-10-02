@@ -538,10 +538,14 @@
     if (!g || !g.res || !w.pitQWriteCount) return '';
     var wc = w.pitQWriteCount(g.res);
     if (!wc.対象) return '';
-    var left = wc.未.length;
+    /* 🔁 v2.130.0 書き込んだあとで直された伝票（中身が変わった）も「まだ」に数える */
+    var chg = (wc.変わった || []).length;
+    var left = wc.未.length + chg;
     var how = !left ? '' : (nok > 0 ? '・残りを0にすると書けます'
-                                    : (保存 ? '・PDFを入れ直すと書けます' : '・下の「書き込む」で書けます'));
-    return '<span class="q-pq-w' + (left ? ' ng' : '') + '">伝票の書き込み ' + wc.書けた + '/' + wc.対象 + esc(how) + '</span>';
+                                    : (保存 ? '・PDFを入れ直すと書けます'
+                                            : (chg ? '・下の「書き直す」で書けます' : '・下の「書き込む」で書けます')));
+    return '<span class="q-pq-w' + (left ? ' ng' : '') + '">伝票の書き込み ' + wc.書けた + '/' + wc.対象
+         + (chg ? '・中身が変わった ' + chg + '枚' : '') + esc(how) + '</span>';
   }
 
   function planRow(U){

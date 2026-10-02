@@ -7,8 +7,12 @@
    ======================================== */
 
 /* 月締めの帯 */
-.air-close{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r2,12px); padding:14px 16px; margin-bottom:14px;
-  display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+.air-close{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r2,12px); padding:14px 16px; margin-bottom:14px; }
+.air-chead{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.air-chead h3{ margin-bottom:0 !important; }
+/* 📐 v2.135.2 Q の箱とボタンは同じ行・同じ高さ（ボタンは箱の高さに伸ばす） */
+.air-crow{ display:grid; grid-template-columns:1fr auto; gap:12px; align-items:stretch; }
+.air-crow .air-go{ height:auto; min-width:150px; }
 .air-close h3{ font-size:14px; margin-bottom:8px; }
 .air-qs{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .air-q{ background:var(--bg3); border:1px solid var(--border); border-radius:var(--r,8px); padding:8px 10px; font-size:12px; color:var(--text2); }
@@ -18,7 +22,7 @@
 .air-q.ng .st{ color:var(--orange); font-weight:700; }
 .air-go{ background:var(--brand); color:#fff; border:0; border-radius:var(--r,8px); padding:12px 18px; font-weight:800; font-size:14px; white-space:nowrap; cursor:pointer; }
 .air-go:disabled{ background:var(--bg4); color:var(--text3); cursor:default; }
-.air-go-sub{ font-size:11px; color:var(--text2); text-align:center; margin-top:4px; }
+.air-go-sub{ font-size:11px; color:var(--text2); }
 .air-busy{ display:flex; align-items:center; gap:10px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r,8px); padding:12px 16px; margin-bottom:14px; font-size:13px; }
 .air-sp{ width:16px; height:16px; border-radius:50%; border:2px solid var(--border2); border-top-color:var(--brand); animation:air-spin .9s linear infinite; }
 @keyframes air-spin{ to{ transform:rotate(360deg); } }
@@ -121,7 +125,7 @@
 .air-foot li{ margin-left:18px; }
 
 @media (max-width: 900px){
-  .air-close, .air-two, .air-future{ grid-template-columns:1fr; }
+  .air-crow, .air-two, .air-future{ grid-template-columns:1fr; }
   .air-kpis, .air-qs{ grid-template-columns:1fr 1fr; }
   .air-rep{ padding:16px; }
 }
@@ -157,6 +161,5 @@
 .air-run-t{ margin-left:28px; font-size:11.5px; color:var(--text2); }
 
 /* 📐 v2.135.1 帯の高さを変えない：Q の箱はいつも4つ（未確認は灰色）。ボタンは帯の中で上下の真ん中 */
-.air-close > div:last-child{ align-self:center; }
 .air-q.un{ opacity:.7; }
 .air-q .st0{ color:var(--text3); font-weight:700; }

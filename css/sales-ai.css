@@ -60,12 +60,17 @@
 .air-mini{ font-size:11.5px; color:var(--text2); margin-top:6px; }
 .air-two{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
 
-/* 車の1行（ふだんのカードを1行にした形）＝ 苗字 車種｜課｜フロント */
-.air-car{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap; vertical-align:middle; }
-.air-car .nm{ color:var(--blue); border-bottom:1px dotted currentColor; font-weight:600; }
-.air-car:hover .nm{ border-bottom-style:solid; }
-.air-car .fr{ font-size:11px; color:var(--text2); }
-.air-car.x{ color:var(--text3); cursor:default; }
+/* 車の1行 v2.134.0 ＝「苗字 車種｜課｜フロント」を1つの枠に。枠全体がボタン（下線は引かない）
+   ⚠ 中は inline のまま（flex にすると文をコピーした時に改行が入る） */
+.air-car{ display:inline-block; white-space:nowrap; vertical-align:baseline; cursor:pointer; border:1px solid color-mix(in srgb, var(--dc, var(--blue)) 50%, transparent);
+  border-radius:6px; overflow:hidden; line-height:1.55; margin:0 2px; background:var(--bg3); }
+.air-car:hover, .air-car:focus{ background:color-mix(in srgb, var(--dc, var(--blue)) 14%, var(--bg3)); outline:none; }
+.air-car > span{ display:inline-block; padding:0 7px; }
+.air-car .nm{ color:var(--text); font-weight:700; }
+.air-car .dv{ font-size:11.5px; font-weight:700; color:var(--dc, var(--text2)); background:color-mix(in srgb, var(--dc, var(--text3)) 14%, transparent);
+  border-left:1px solid color-mix(in srgb, var(--dc, var(--text3)) 40%, transparent); }
+.air-car .fr{ font-size:11.5px; color:var(--text2); border-left:1px solid var(--border); }
+.air-car.x{ color:var(--text3); cursor:default; padding:0 7px; }
 .air-dv{ font-size:10.5px; font-weight:700; border-radius:4px; padding:0 6px; color:var(--dc, var(--text2));
   border:1px solid color-mix(in srgb, var(--dc, var(--text3)) 55%, transparent); background:color-mix(in srgb, var(--dc, var(--text3)) 12%, transparent); }
 .air-tag{ font-size:10.5px; border-radius:4px; padding:0 6px; border:1px solid var(--border2); color:var(--text2); white-space:nowrap; }
@@ -124,11 +129,6 @@
   .air-rep{ padding:16px; }
 }
 
-/* 🧾 v2.133.0 車の1行の「課｜フロント」を1つの枠に（ゆうた「小さく下にそろって読みにくい」） */
-.air-cb{ display:inline-flex; align-items:center; gap:0; border:1px solid color-mix(in srgb, var(--dc, var(--text3)) 55%, transparent);
-  border-radius:5px; overflow:hidden; font-size:11.5px; line-height:1.5; vertical-align:middle; }
-.air-cb b{ font-weight:700; padding:0 6px; color:var(--dc, var(--text2)); background:color-mix(in srgb, var(--dc, var(--text3)) 14%, transparent); }
-.air-cb i{ font-style:normal; padding:0 7px; color:var(--text); }
 
 /* 📋 v2.133.0 通知表（◎○△×）。判定は sales-ai.js の grades() 1本 */
 .air-card{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:6px 0 12px; }
@@ -142,3 +142,19 @@
 .air-g.g4{ border-color:color-mix(in srgb, var(--red) 55%, transparent); }   .air-g.g4 b{ color:var(--red); }
 .air-g.g0 b{ color:var(--text3); }
 @media (max-width: 900px){ .air-card{ grid-template-columns:1fr 1fr; } }
+
+/* ⏳ v2.134.0 書き出しの進み具合（インストールの進行表示のような形） */
+.air-run{ background:var(--bg2); border:1px solid var(--border); border-radius:var(--r2,12px); padding:14px 18px; margin-bottom:14px; }
+.air-run-h{ font-weight:700; margin-bottom:8px; }
+.air-run ol{ list-style:none; margin:0; padding:0; }
+.air-run li{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:6px 0; border-top:1px solid var(--border); font-size:13px; color:var(--text3); }
+.air-run li:first-child{ border-top:0; }
+.air-run li .ic{ width:18px; text-align:center; font-weight:800; }
+.air-run li b{ font-weight:600; }
+.air-run li i{ font-style:normal; font-size:12px; color:var(--text2); }
+.air-run li.run{ color:var(--text); }
+.air-run li.ok{ color:var(--text); } .air-run li.ok .ic{ color:var(--green); }
+.air-run li.ng{ color:var(--red); } .air-run li.ng .ic{ color:var(--red); } .air-run li.ng i{ color:var(--red); flex-basis:100%; padding-left:28px; }
+.air-bar{ flex-basis:100%; margin-left:28px; height:6px; border-radius:999px; background:var(--bg4); overflow:hidden; }
+.air-bar i{ display:block; height:100%; background:var(--brand); transition:width 1s linear; }
+.air-run-t{ margin-left:28px; font-size:11.5px; color:var(--text2); }

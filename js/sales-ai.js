@@ -503,56 +503,110 @@
   /* ================================================================
      ✍ 書き出す（管理者）
      ================================================================ */
+  /* ================================================================
+     ⏳ v2.134.0（ゆうた「月を開いただけで Q のチェックを始めないで。10月はライブだから AI は絶対ない。
+        10月の読み込みを待たないと月も戻れない。書き出すを押してから Q のチェック、NG ならはじく、
+        OK なら AI が書き出しています、みたいなインストール状況の進行表示に」）
+     ◎ 押す → 確かめの窓 → ①締めを確かめる → ②数字をまとめる → ③AI が書く（経過時間と目安のバー）→ ④保存
+     ◎ ①で締まっていなければ、そこで止める（どのQが何件残っているかを出す）。
+     ⚠ 進み具合は U.run に持つ（別の画面へ行って戻っても続きが見える）。
+     ================================================================ */
+  var STEPS = ['締めを確かめる', '数字をまとめる', 'AI が書く', '保存する'];
+  var AI_SEC = 210;     /* 目安（9月の試し書きで 211秒） */
+  var timer = 0;
+  function nowYm(){ var d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+  function isPast(ym){ return ym < nowYm(); }
+  function step(U, i, st, note){ if (U.run && U.run.steps[i]){ U.run.steps[i].state = st; if (note != null) U.run.steps[i].note = note; } }
+  function tick(){
+    var U = null; Object.keys(MEM).forEach(function (k) { if (MEM[k].run && MEM[k].run.t0 && MEM[k].busy) U = MEM[k]; });
+    if (!U){ clearInterval(timer); timer = 0; return; }
+    var sec = Math.round((Date.now() - U.run.t0) / 1000);
+    var el = document.getElementById('air-run-t'), bar = document.getElementById('air-run-bar');
+    if (el) el.textContent = Math.floor(sec / 60) + ':' + pad(sec % 60) + ' 経過（目安 3〜4分）';
+    if (bar) bar.style.width = Math.min(96, Math.round(sec / AI_SEC * 100)) + '%';
+  }
+  function ngNote(c){
+    if (!c || c.err) return s(c && c.err);
+    return (c.qs || []).filter(function (q) { return !q.done; }).map(function (q) {
+      return q.label + (!q.読んだ ? '（PDF未）' : (!q.全部 ? '（一部だけ）' : '（残り' + q.残り + '・書き込み ' + q.書けた + '/' + q.対象 + (q.変わった ? '・変わった ' + q.変わった : '') + '）'));
+    }).join('　');
+  }
+
   w.pitAiRepGo = function (){
     var ym0 = w._svYM; if (!ym0) return;
     var ym = ym0.y + '-' + pad(ym0.m + 1), U = M(ym);
     if (U.busy) return;
     if (!w.PIT_CLOUD){ U.err = '練習用サイトでは書き出せません（本番の PitFlow で使ってください）'; rerender(); return; }
     if (!isAdmin()){ if (w.UI && w.UI.alert) w.UI.alert('レポートを書き出せるのは、設定権限（管理）のある人だけです。', { title: '書き出せません', code: 'PF-0023' }); return; }
-    /* ⚡ v2.133.0 書き出し済みの月は締めを確かめていない（証を出しているだけ）＝押した時に確かめ直してから進む */
-    if (!U.fresh){
-      U.busy = 'この月が締まっているかを確かめています…'; U.err = ''; rerender();
-      closeState(ym).then(function (c) { U.close = c; U.fresh = true; U.busy = ''; rerender(); w.pitAiRepGo(); })
-        .catch(function (e) { U.busy = ''; U.err = '締めを確かめられませんでした：' + s(e && e.message); rerender(); });
-      return;
-    }
-    if (!(U.close && U.close.closed)){ U.err = 'この月はまだ締まっていません（書き出し直すには、Q1〜Q4 すべてで残り0・書き込み済みが要ります）'; rerender(); return; }
+    if (!isPast(ym)){ U.err = 'この月はまだ終わっていません。月が終わって締めたあとに書き出せます。'; rerender(); return; }
     if (!w.firebase || !w.firebase.app || !w.firebase.app().functions){ U.err = 'AIに聞く窓口が読み込めていません。画面を開き直してください。'; rerender(); return; }
-    var again = !!U.saved;
+    var again = !!(U.saved && U.saved.数字);
     var ask = w.pitAsk ? w.pitAsk(again ? (ym0.m + 1) + '月のレポートを書き出し直しますか？' : (ym0.m + 1) + '月のレポートを書き出しますか？',
       { detail: (again ? ['・いま残っているレポートは、新しく書き出したものに置きかわります'] : [])
-                .concat(['・AI が文章を書くので、3〜4分ほどかかります（1回ごとに料金がかかります）']),
+                .concat(['・先に Q1〜Q4 が締まっているかを確かめ、締まっていなければ書き出しません',
+                         '・AI が文章を書くので、3〜4分ほどかかります（1回ごとに料金がかかります）']),
         ok: again ? '書き出し直す' : '書き出す' }) : Promise.resolve(true);
     ask.then(function (yes) {
       if (!yes) return;
-      var F;
-      try { F = facts(ym0.y, ym0.m); } catch (e) { U.err = '数字をまとめる途中でつまずきました：' + s(e && e.message); rerender(); return; }
-      U.busy = 'AI がレポートを書いています…（3〜4分）'; U.err = ''; rerender();
-      var fn = w.firebase.app().functions('asia-northeast1').httpsCallable('pfAsk', { timeout: 540000 });
-      fn({ model: MODEL, system: SYSTEM, max_tokens: MAX_TOKENS, effort: EFFORT,
-           user: (ym0.y + '年' + (ym0.m + 1) + '月') + 'の資料です。決められた JSON の形だけで答えてください。\n\n```json\n'
-               + JSON.stringify(slimForAi(F)) + '\n```' })
-        .then(function (r) {
-          var d = (r && r.data) || {};
-          if (d.stop === 'max_tokens'){ throw new Error('AIの文が長すぎて途中で切れました。もう一度書き出してください。'); }
-          var got = parse(d.text);
-          if (!got){ throw new Error('AIの返事を読み取れませんでした。もう一度書き出してください。'); }
-          var me = (w.pitFlowMe && w.pitFlowMe()) || '';
-          var body = { 月: ym, 書き出した日時: new Date().toISOString(), 書き出した人: me,
-                       AI: { model: s(d.model || MODEL), usage: d.usage || null }, 数字: F, 文: got, 締め: U.close };
-          return save(ym, body).then(function () { cachePut(ym, body); return body; });
-        })
-        .then(function (body) {
-          U.busy = ''; U.saved = body; U.close = markClosed(body.締め); U.fresh = false;
-          if (w.pitLog) w.pitLog('AIレポートを書き出した', { kind: 'sales', label: ym + (again ? '（書き出し直し）' : '') });
-          if (w.pitToast) w.pitToast((ym0.m + 1) + '月のレポートを書き出しました');
-          rerender();
-        })
-        .catch(function (e) {
-          U.busy = ''; U.err = '書き出せませんでした：' + s(e && e.message ? e.message : e); rerender();
-        });
+      U.err = ''; U.busy = true; U.check = null;
+      U.run = { steps: STEPS.map(function (l) { return { label: l, state: 'wait', note: '' }; }), t0: 0, again: again };
+      step(U, 0, 'run'); rerender();
+      var cur = 0, F = null, c0 = null;
+      closeState(ym).then(function (c) {
+        c0 = c;
+        if (!c.closed){ U.check = c; throw { 止める: true, note: ngNote(c) }; }
+        step(U, 0, 'ok', 'Q1〜Q4 すべて残り0・書き込み済み');
+        cur = 1; step(U, 1, 'run'); rerender();
+        F = facts(ym0.y, ym0.m);
+        step(U, 1, 'ok', F.全体.台数 + '台・' + man(F.全体.実績));
+        cur = 2; step(U, 2, 'run'); U.run.t0 = Date.now(); rerender();
+        if (!timer) timer = setInterval(tick, 1000);
+        var fn = w.firebase.app().functions('asia-northeast1').httpsCallable('pfAsk', { timeout: 540000 });
+        return fn({ model: MODEL, system: SYSTEM, max_tokens: MAX_TOKENS, effort: EFFORT,
+                    user: (ym0.y + '年' + (ym0.m + 1) + '月') + 'の資料です。決められた JSON の形だけで答えてください。\n\n```json\n'
+                        + JSON.stringify(slimForAi(F)) + '\n```' });
+      }).then(function (r) {
+        var d = (r && r.data) || {};
+        if (d.stop === 'max_tokens') throw new Error('AIの文が長すぎて途中で切れました。もう一度書き出してください。');
+        var got = parse(d.text);
+        if (!got) throw new Error('AIの返事を読み取れませんでした。もう一度書き出してください。');
+        step(U, 2, 'ok', Math.round((Date.now() - U.run.t0) / 1000) + '秒');
+        cur = 3; step(U, 3, 'run'); rerender();
+        var me = (w.pitFlowMe && w.pitFlowMe()) || '';
+        var body = { 月: ym, 書き出した日時: new Date().toISOString(), 書き出した人: me,
+                     AI: { model: s(d.model || MODEL), usage: d.usage || null }, 数字: F, 文: got, 締め: c0 };
+        return save(ym, body).then(function () { cachePut(ym, body); return body; });
+      }).then(function (body) {
+        step(U, 3, 'ok');
+        U.busy = false; U.saved = body; U.close = markClosed(body.締め); U.loaded = true; U.run = null;
+        if (w.pitLog) w.pitLog('AIレポートを書き出した', { kind: 'sales', label: ym + (again ? '（書き出し直し）' : '') });
+        if (w.pitToast) w.pitToast((ym0.m + 1) + '月のレポートを書き出しました');
+        rerender();
+      }).catch(function (e) {
+        U.busy = false;
+        if (e && e.止める){ step(U, 0, 'ng', e.note); U.err = (ym0.m + 1) + '月はまだ締まっていないので、書き出しませんでした。'; }
+        else { step(U, cur, 'ng', s(e && e.message ? e.message : e)); U.err = '書き出せませんでした：' + s(e && e.message ? e.message : e); }
+        rerender();
+      });
     });
   };
+
+  function runHtml(U){
+    var R = U.run; if (!R) return '';
+    var ic = { ok: '✓', ng: '✕', wait: '・' };
+    var h = '<div class="air-run' + (U.busy ? '' : ' end') + '"><div class="air-run-h">' + (U.busy ? 'レポートを書き出しています' : '書き出しを止めました') + '</div><ol>';
+    R.steps.forEach(function (x, i) {
+      h += '<li class="' + x.state + '"><span class="ic">' + (x.state === 'run' ? '<span class="air-sp"></span>' : (ic[x.state] || '')) + '</span>'
+         + '<b>' + esc(x.label) + '</b>' + (x.note ? '<i>' + esc(x.note) + '</i>' : '');
+      if (i === 2 && x.state === 'run'){
+        var sec = R.t0 ? Math.round((Date.now() - R.t0) / 1000) : 0;
+        h += '<div class="air-bar"><i id="air-run-bar" style="width:' + Math.min(96, Math.round(sec / AI_SEC * 100)) + '%"></i></div>'
+           + '<span class="air-run-t" id="air-run-t">' + Math.floor(sec / 60) + ':' + pad(sec % 60) + ' 経過（目安 3〜4分）</span>';
+      }
+      h += '</li>';
+    });
+    return h + '</ol></div>';
+  }
 
   function rerender(){ if (w._svTab === 'ai' && w.renderSales) w.renderSales(); }
 
@@ -564,10 +618,12 @@
   function carChip(F, id){
     var c = F.車 && F.車[id];
     if (!c) return '<span class="air-car x">（車が見つかりません）</span>';
-    /* 🧾 v2.133.0（ゆうた「課と名前が小さく下にそろって読みにくい。BOXに囲んで内包しちゃっていい」）＝課｜フロントを1つの枠に */
-    return '<span class="air-car" onclick="pitAiRepOpen(\'' + esc(id) + '\')"><span class="nm">' + esc(c.苗字 + ' ' + c.車種) + '</span>'
-         + '<span class="air-cb"' + (c.課の色 ? ' style="--dc:' + esc(c.課の色) + '"' : '') + '>'
-         + (c.課 ? '<b>' + esc(c.課) + '</b>' : '') + '<i>' + esc(c.フロント) + '</i></span></span>';
+    /* 🧾 v2.134.0（ゆうた「アンダーライン点線＋BOXで読みにくい。客名まで1BOXに入れて、リンクはそのBOX全体に」）
+       ＝「苗字 車種｜課｜フロント」を1つの枠に。枠のどこを押してもカードが開く。
+       ⚠ 中は inline（flex にしない）＝文をコピーした時に車の所で改行が入らない */
+    return '<span class="air-car" role="button" tabindex="0"' + (c.課の色 ? ' style="--dc:' + esc(c.課の色) + '"' : '')
+         + ' onclick="pitAiRepOpen(\'' + esc(id) + '\')"><span class="nm">' + esc(c.苗字 + ' ' + c.車種) + '</span>'
+         + (c.課 ? '<span class="dv">' + esc(c.課) + '</span>' : '') + '<span class="fr">' + esc(c.フロント) + '</span></span>';
   }
   function dvChip(label, color){ return '<span class="air-dv"' + (color ? ' style="--dc:' + esc(color) + '"' : '') + '>' + esc(label) + '</span>'; }
   /* AI の文 → HTML。{{car:ID}} を車の1行に、**…** を太字に */
@@ -746,26 +802,27 @@
     return h + '</div>';
   }
 
-  function closeHtml(U, mm){
-    var C = U.close;
+  function closeHtml(U, mm, ym){
+    var C = U.close, saved = !!(U.saved && U.saved.数字), past = isPast(ym);
     var h = '<div class="air-close"><div><h3>';
-    if (!C) h += (U.saved === undefined) ? '読み込んでいます…' : 'この月が締まっているかを確かめています…';
-    else if (C.証) h += mm + '月は締め済み（' + esc(s(U.saved && U.saved.書き出した日時).slice(5, 10).replace('-', '/')) + ' に書き出した時点で Q1〜Q4 すべて済み）';
-    else if (C.err) h += esc(C.err);
-    else h += C.closed ? mm + '月は締まっています（Q1〜Q4 の伝票の書き込みが全部済み）'
-                       : mm + '月はまだ締まっていません（4つのQすべてで、残り0・伝票の書き込みが済むと締まります）';
+    if (saved && C && C.証) h += mm + '月は締め済み（' + esc(s(U.saved.書き出した日時).slice(5, 10).replace('-', '/')) + ' に書き出した時点で Q1〜Q4 すべて済み）';
+    else if (!U.loaded) h += '読み込んでいます…';
+    else if (!past) h += mm + '月はまだ途中です（月が終わって締めたあとに書き出せます）';
+    else h += mm + '月のレポートはまだありません';
     h += '</h3>';
-    if (C && C.qs && C.qs.length){
-      h += '<div class="air-qs">' + C.qs.map(function (q) {
+    /* Q の箱は「締めた証」か「押して確かめた結果」があるときだけ（開いただけでは確かめない） */
+    var Q = (saved && C && C.qs && C.qs.length) ? C : (U.check && U.check.qs && U.check.qs.length ? U.check : null);
+    if (Q){
+      h += '<div class="air-qs">' + Q.qs.map(function (q) {
         var st = !q.読んだ ? 'PDF未' : (!q.全部 ? '一部だけ' : '残り' + q.残り + '・書き込み ' + q.書けた + '/' + q.対象 + (q.変わった ? '・変わった ' + q.変わった : ''));
         return '<div class="air-q' + (q.done ? '' : ' ng') + '"><b>' + q.label + ' ' + (+s(q.from).slice(8)) + '〜' + (+s(q.to).slice(8)) + '日</b><span class="' + (q.done ? 'ok' : 'st') + '">' + (q.done ? '済み' : 'まだ') + '</span>　' + esc(st) + '</div>';
       }).join('') + '</div>';
     }
     h += '</div>';
     if (isAdmin()){
-      var can = !!(C && C.closed) && !U.busy;
-      h += '<div><button class="air-go" ' + (can ? '' : 'disabled') + ' onclick="pitAiRepGo()">' + (U.saved ? '書き出し直す' : 'レポートを書き出す') + '</button>'
-         + '<div class="air-go-sub">' + (U.saved ? esc(s(U.saved.書き出した日時).slice(0, 16).replace('T', ' ')) + ' に書き出し済み' : (C && C.closed ? '管理者だけ押せます' : '締まると押せます')) + '</div></div>';
+      var can = U.loaded && !U.busy && past;
+      h += '<div><button class="air-go" ' + (can ? '' : 'disabled') + ' onclick="pitAiRepGo()">' + (saved ? '書き出し直す' : 'レポートを書き出す') + '</button>'
+         + '<div class="air-go-sub">' + (saved ? esc(s(U.saved.書き出した日時).slice(0, 16).replace('T', ' ')) + ' に書き出し済み' : (past ? '押すと締めを確かめてから書き出します' : '月が終わると押せます')) + '</div></div>';
     }
     return h + '</div>';
   }
@@ -777,49 +834,46 @@
     return o;
   }
 
-  /* タブの中身（sales.js から）。読み込みは月ごとに1回、終わったら描き直す */
+  /* タブの中身（sales.js から）
+     ⚡ v2.133.0 書き出し済みの月は、残したレポート1つを読むだけ（控えがあれば即表示・裏で本物を確かめる）
+     ⏳ v2.134.0 **開いただけでは締め（Q1〜Q4）を確かめない。** 確かめるのは「書き出す」を押した時だけ
+        （いまの月や未来の月はそもそも書き出せない＝読み込みを待たせて月を動かせなくしない） */
   w.pitAiRepMonth = function (wrap, head, y, m0){
     var ym = y + '-' + pad(m0 + 1), U = M(ym), mm = m0 + 1;
     if (!w.PIT_CLOUD){
       wrap.innerHTML = head + '<div class="sv-card"><div class="sv-empty">AIレポートは本番の PitFlow でだけ使えます（練習用サイトでは書き出せません）。</div></div>';
       return;
     }
-    /* ⚡ v2.133.0（ゆうた「再読み込みすると再表示にすごい時間がかかる。1回やったやつはOKに印をつけて、それを出来てる証に」）
-       ◎前 … 開くたびに Q1〜Q4 の伝票を全部読み直して突き合わせ（締めの確認）＝重い。
-       ◎いま … **書き出し済みの月は、残したレポート1つを読むだけ**。締めは書き出した時の記録（＝締めた証）をそのまま出す。
-       　 締めを確かめ直すのは「まだ書き出していない月」と「書き出し直す」を押した時だけ。
-       ⚠ まだ書き出していない月は、2分たった覚えを使わない（別の画面で書き込んで戻ってきた時に古いままにならないように）。 */
-    if (U.loaded && !U.saved && !U.busy && Date.now() - (U.loadedAt || 0) > 120000) U.loaded = false;
     if (!U.loaded && !U.loading){
-      U.loading = true;
-      /* まず控え（あれば即表示）→ 裏で本物を読んで、違えば差し替え */
-      var cached = cacheGet(ym);
-      if (cached && cached.数字){
-        U.saved = cached; U.close = markClosed(cached.締め); U.fresh = false; U.loaded = true; U.loadedAt = Date.now();
+      if (!isPast(ym)){ U.saved = null; U.loaded = true; }      /* いまの月・未来の月＝レポートは無い。読みにも行かない */
+      else {
+        U.loading = true;
+        var cached = cacheGet(ym);
+        if (cached && cached.数字){ U.saved = cached; U.close = markClosed(cached.締め); U.loaded = true; }
+        loadSaved(ym).catch(function () { return undefined; }).then(function (sv) {
+          U.loading = false;
+          if (sv === undefined && cached) return;                 /* 読めなかった＝控えのまま */
+          if (sv && sv.数字){
+            var changed = !cached || s(cached.書き出した日時) !== s(sv.書き出した日時);
+            cachePut(ym, sv);
+            U.saved = sv; U.close = markClosed(sv.締め); U.loaded = true;
+            if (changed) rerender();
+            return;
+          }
+          if (cached) cachePut(ym, null);                         /* 本物が無い（消された）＝控えも捨てる */
+          U.saved = null; U.close = null; U.loaded = true; rerender();
+        });
       }
-      loadSaved(ym).catch(function () { return undefined; }).then(function (sv) {
-        if (sv === undefined && cached){ U.loading = false; return; }   /* 読めなかった＝控えのまま */
-        if (sv && sv.数字){
-          var changed = !cached || s(cached.書き出した日時) !== s(sv.書き出した日時);
-          cachePut(ym, sv);
-          U.saved = sv; U.close = markClosed(sv.締め); U.fresh = false;
-          U.loaded = true; U.loadedAt = Date.now(); U.loading = false;
-          if (changed) rerender();
-          return;
-        }
-        if (cached) cachePut(ym, null);     /* 本物が無い（消された）＝控えも捨てる */
-        U.saved = null; U.loaded = false; rerender();
-        return closeState(ym).catch(function (e) { return { qs: [], closed: false, err: '締めを確かめられませんでした：' + s(e && e.message) }; })
-          .then(function (c) { U.close = c; U.fresh = true; U.loaded = true; U.loadedAt = Date.now(); U.loading = false; rerender(); });
-      });
     }
-    var h = head + closeHtml(U, mm);
-    if (U.busy) h += '<div class="air-busy"><span class="air-sp"></span>' + esc(U.busy) + '</div>';
-    if (U.err) h += '<div class="air-err">' + esc(U.err) + '</div>';
+    var h = head + closeHtml(U, mm, ym) + runHtml(U);
+    if (U.err && !U.run) h += '<div class="air-err">' + esc(U.err) + '</div>';
     if (U.saved && U.saved.数字) h += reportHtml(U.saved);
-    else if (U.loaded && !U.busy) h += '<div class="sv-card"><div class="sv-empty">' + mm + '月のレポートはまだありません。'
-      + (U.close && U.close.closed ? (isAdmin() ? '上の「レポートを書き出す」で作れます。' : '管理者が書き出すと、ここに出ます。') : '月が締まると書き出せます。') + '</div></div>';
+    else if (U.loaded && !U.run) h += '<div class="sv-card"><div class="sv-empty">'
+      + (!isPast(ym) ? mm + '月はまだ途中です。月が終わって Q1〜Q4 を締めたあとに書き出せます。'
+                     : mm + '月のレポートはまだありません。' + (isAdmin() ? '上の「レポートを書き出す」で作れます（押すと締めを確かめます）。' : '管理者が書き出すと、ここに出ます。'))
+      + '</div></div>';
     wrap.innerHTML = h;
+    if (U.busy && U.run && U.run.t0 && !timer) timer = setInterval(tick, 1000);
   };
 
   w.pitAiRepOpen = function (id){ if (w.pitOpenCardDetail) w.pitOpenCardDetail(id); };

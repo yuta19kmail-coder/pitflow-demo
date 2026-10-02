@@ -137,6 +137,16 @@
     function reg(c){ cars[c.id] = { id: c.id, 苗字: seiOf(c), 車種: t(c.car), 課: divName(courseOf(c)), 課の色: divColor(courseOf(c)), フロント: shortFront(frontOf(c)) }; return c.id; }
 
     var acts = C.rows.filter(function (r) { return r.tier === 'actual'; });
+    /* 📋 通知表のための前月（保険は外す・課ごと／全体）＝台単価と預かりの中央値 */
+    function statsOf(list){
+      var a = list.filter(function (r) { return r.tier === 'actual' && !insOf(r.c); });
+      var sum = a.reduce(function (x, r) { return x + r.amt; }, 0);
+      var st = a.map(function (r) { return days(r.c.actualInAt, r.c.completedAt); }).filter(function (v) { return v != null; }).sort(function (p, q) { return p - q; });
+      return { 台単価: a.length ? Math.round(sum / a.length) : null, 預かり中央値: st.length ? st[Math.floor(st.length / 2)] : null };
+    }
+    var prevStats = { 全体: statsOf(P.rows),
+                      div1: statsOf(P.rows.filter(function (r) { return r.course === 'div1'; })),
+                      div2: statsOf(P.rows.filter(function (r) { return r.course === 'div2'; })) };
     var total = acts.reduce(function (a, r) { return a + r.amt; }, 0);
     /* 大物＝1台で月の実績の10%以上（「大物が無ければ」の地力を言うため） */
     var bigLine = total * 0.10;
@@ -209,6 +219,7 @@
       div[k] = {
         名前: divName(k) + '（' + D[1] + '）', 短い名前: divName(k), 色: divColor(k),
         実績: sum, 台数: a.length, 台単価: a.length ? Math.round(sum / a.length) : 0,
+        前月の台単価: prevStats[k].台単価, 前月の預かり中央値: prevStats[k].預かり中央値,
         目標: dt[k], 前月: (P.rows.filter(function (r) { return r.tier === 'actual' && r.course === k && !insOf(r.c); })
                          .reduce(function (x, r) { return x + r.amt; }, 0)),
         大物を除く: { 実績: sum - bigs.reduce(function (x, b) { return x + b.金額; }, 0), 一日あたり: perDayNB },
@@ -277,6 +288,9 @@
 
     /* ---- 全体 ---- */
     var bigAll = rows.filter(function (r) { return r.大物; });
+    var allSt = rows.filter(function (r) { return !r.保険 && r.預かり != null; }).map(function (r) { return r.預かり; }).sort(function (p, q) { return p - q; });
+    var allNi = rows.filter(function (r) { return !r.保険; });
+    var allWd = rows.filter(function (r) { return !r.保険 && r.工程.workDone != null; });
     var insSum = insAct.reduce(function (x, r) { return x + r.金額; }, 0);
     var bigSum = bigAll.reduce(function (x, r) { return x + r.金額; }, 0);
     var zeroRuns = [], run = null;
@@ -290,12 +304,15 @@
     bestDays.sort(function (a, b) { return b.実績 - a.実績; });
     var half = Math.min(15, C.lastDay);
 
-    return {
-      版: 1, 月: ym, 期間: { from: moS, to: moE },
+    var OUT = {
+      版: 2, 月: ym, 期間: { from: moS, to: moE },
       目標: { 下限: tg.min, 上限: tg.max, 国産の割合: ratioD, 課: dt },
       全体: {
         実績: total, 台数: acts.length, 台単価: acts.length ? Math.round(total / acts.length) : 0,
         前月: P.tiers.actual.sum, 前月台数: P.tiers.actual.count,
+        台単価_保険を除く: allNi.length ? Math.round(allNi.reduce(function (x, r) { return x + r.金額; }, 0) / allNi.length) : null,
+        前月の台単価: prevStats.全体.台単価, 預かり中央値: allSt.length ? allSt[Math.floor(allSt.length / 2)] : null, 前月の預かり中央値: prevStats.全体.預かり中央値,
+        作業完了から返車: { 台数: allWd.length, のべ日数: Math.round(allWd.reduce(function (x, r) { return x + r.工程.workDone; }, 0)) },
         営業日: biz ? biz.total : null, 前月営業日: bizP ? bizP.total : null,
         一日あたり: (biz && biz.total) ? Math.round(total / biz.total) : null,
         前月一日あたり: (bizP && bizP.total) ? Math.round(P.tiers.actual.sum / bizP.total) : null,
@@ -316,6 +333,52 @@
               見込み: total - bigSum - insSum + div.div1.未来.伸ばせる売上 + div.div2.未来.伸ばせる売上 },
       車: cars
     };
+    OUT.通知表 = grades(OUT);
+    return OUT;
+  }
+
+  /* ================================================================
+     📋 通知表（◎○△×）── ゆうた 2026-10-02「テキストはあまり読まない。最低△にしていきたい、と話がしやすい」
+     🔴 判定はコードが決める（AI に決めさせない）。物差しはここ1本。
+       売上＝目標（上限以上◎／下限以上○／下限の90%以上△／それ未満×）
+       単価＝前月比（+5%以上◎／±5%○／-15%まで△／それ未満×）
+       預かり＝日数の中央値の前月比（短いほど良い：10%以上短い◎／10%増まで○／30%増まで△／それ以上×）
+       返車＝作業完了→返車の1台あたり日数（1日以内◎／1.5日○／2.5日△／それ以上×）
+     ⚠ 前月が無い（PitFlow を使い始めた月など）は「—」。
+     ================================================================ */
+  var GRADE_RULE = { 売上: '目標の上限以上◎・下限以上○・下限の90%以上△', 単価: '前月比 +5%以上◎・±5%以内○・-15%まで△',
+                     預かり: '日数の中央値が前月より10%以上短い◎・10%増まで○・30%増まで△', 返車: '作業完了→返車 1台あたり 1日以内◎・1.5日以内○・2.5日以内△' };
+  function g4(v, a, b, c){ return v == null ? '—' : (v >= a ? '◎' : (v >= b ? '○' : (v >= c ? '△' : '×'))); }
+  function gLow(v, a, b, c){ return v == null ? '—' : (v <= a ? '◎' : (v <= b ? '○' : (v <= c ? '△' : '×'))); }
+  function gradeOne(sales, lo, hi, unit, unitP, med, medP, wdDays, wdN){
+    var r = {};
+    r.売上 = { 評価: (lo ? (sales >= hi ? '◎' : (sales >= lo ? '○' : (sales >= lo * 0.9 ? '△' : '×'))) : '—'), 値: lo ? '下限の' + pct(sales, lo) + '%' : '' };
+    var ur = (unit && unitP) ? unit / unitP : null;
+    r.単価 = { 評価: g4(ur, 1.05, 0.95, 0.85), 値: (ur == null ? '前月なし' : man(unit) + '（前月 ' + man(unitP) + '）') };
+    var mr = (med != null && medP) ? med / medP : null;
+    r.預かり = { 評価: gLow(mr, 0.9, 1.1, 1.3), 値: (mr == null ? '前月なし' : '中央値 ' + med + '日（前月 ' + medP + '日）') };
+    var wd = wdN ? Math.round(wdDays / wdN * 10) / 10 : null;
+    r.返車 = { 評価: gLow(wd, 1.0, 1.5, 2.5), 値: (wd == null ? '記録なし' : '完了→返車 ' + wd + '日') };
+    return r;
+  }
+  function grades(F){
+    var G = F.全体, o = {};
+    o.全体 = gradeOne(G.実績, F.目標.下限, F.目標.上限, G.台単価_保険を除く, G.前月の台単価, G.預かり中央値, G.前月の預かり中央値,
+                      G.作業完了から返車 ? G.作業完了から返車.のべ日数 : 0, G.作業完了から返車 ? G.作業完了から返車.台数 : 0);
+    ['div1', 'div2'].forEach(function (k) {
+      var D = F.課[k]; if (!D) return;
+      o[k] = gradeOne(D.実績, D.目標 && D.目標.min, D.目標 && D.目標.max, D.台単価, D.前月の台単価, D.預かり && D.預かり.中央値, D.前月の預かり中央値,
+                      D.作業完了から返車 ? D.作業完了から返車.のべ日数 : 0, D.作業完了から返車 ? D.作業完了から返車.台数 : 0);
+    });
+    return o;
+  }
+  function gradeHtml(r){
+    if (!r) return '';
+    return '<div class="air-card">' + ['売上', '単価', '預かり', '返車'].map(function (k) {
+      var x = r[k] || { 評価: '—', 値: '' };
+      var c = { '◎': 'g1', '○': 'g2', '△': 'g3', '×': 'g4' }[x.評価] || 'g0';
+      return '<div class="air-g ' + c + '" title="' + esc(GRADE_RULE[k]) + '"><span>' + k + '</span><b>' + esc(x.評価) + '</b><i>' + esc(x.値) + '</i></div>';
+    }).join('') + '</div>';
   }
 
   /* ================================================================
@@ -392,6 +455,9 @@
     '・止まった理由が引継ぎメモ（メモ.いま／メモ.書き換え）に書いてある車は「理由のある止まり」（例：ドイツからのBO）として分けて書く。書いていない車は「理由の無い止まり」。理由のある止まりを責めない。',
     '・工程ごとの日数は、PitFlow でカードの状態を動かした記録から数えている。PitFlow を使い始める前の期間は記録に無いので、長く預かった車ほど工程の合計が預かり日数より短い。そこを断定に使わない。',
     '・フロント＝売上をつくる人、メカ＝生産する人。受付と作業が同じ人に集まっていないかを見る。',
+    '・会社の方針：社長・専務は年齢もあり、現場（メカ）とフロントから手を放していく。2課のチーフと蓮沼さんも、もっとクリエイティブな仕事に注力するため現場から手を放していく。この4人の割合が下がるのは前進で、その分ほかの人に仕事が偏るのは許容されている。**この4人に仕事を戻す提案はしない。** 偏りは残りのフロント・メカの中で見る。',
+    '・このレポートは、チーフ（ゆうた）が自分で数字を見たら言うことの代わり。上の方針に立って書く。',
+    '・資料の「通知表」（売上・単価・預かり・返車を ◎○△× で付けたもの。判定は PitFlow が決めた）を必ず踏まえる。△と×の項目は、課題の中で「どうすれば最低△、できれば○にできるか」を具体的に書く。評価を自分で付け直さない。',
     '・月締めの後に書くレポートなので、その月の作業は全部終わっている前提でよい。',
     '',
     '【車の書き方】',
@@ -437,18 +503,25 @@
     if (U.busy) return;
     if (!w.PIT_CLOUD){ U.err = '練習用サイトでは書き出せません（本番の PitFlow で使ってください）'; rerender(); return; }
     if (!isAdmin()){ if (w.UI && w.UI.alert) w.UI.alert('レポートを書き出せるのは、設定権限（管理）のある人だけです。', { title: '書き出せません', code: 'PF-0023' }); return; }
-    if (!(U.close && U.close.closed)){ U.err = 'この月はまだ締まっていません'; rerender(); return; }
+    /* ⚡ v2.133.0 書き出し済みの月は締めを確かめていない（証を出しているだけ）＝押した時に確かめ直してから進む */
+    if (!U.fresh){
+      U.busy = 'この月が締まっているかを確かめています…'; U.err = ''; rerender();
+      closeState(ym).then(function (c) { U.close = c; U.fresh = true; U.busy = ''; rerender(); w.pitAiRepGo(); })
+        .catch(function (e) { U.busy = ''; U.err = '締めを確かめられませんでした：' + s(e && e.message); rerender(); });
+      return;
+    }
+    if (!(U.close && U.close.closed)){ U.err = 'この月はまだ締まっていません（書き出し直すには、Q1〜Q4 すべてで残り0・書き込み済みが要ります）'; rerender(); return; }
     if (!w.firebase || !w.firebase.app || !w.firebase.app().functions){ U.err = 'AIに聞く窓口が読み込めていません。画面を開き直してください。'; rerender(); return; }
     var again = !!U.saved;
     var ask = w.pitAsk ? w.pitAsk(again ? (ym0.m + 1) + '月のレポートを書き出し直しますか？' : (ym0.m + 1) + '月のレポートを書き出しますか？',
       { detail: (again ? ['・いま残っているレポートは、新しく書き出したものに置きかわります'] : [])
-                .concat(['・AI が文章を書くので、1〜3分ほどかかります（1回ごとに料金がかかります）']),
+                .concat(['・AI が文章を書くので、3〜4分ほどかかります（1回ごとに料金がかかります）']),
         ok: again ? '書き出し直す' : '書き出す' }) : Promise.resolve(true);
     ask.then(function (yes) {
       if (!yes) return;
       var F;
       try { F = facts(ym0.y, ym0.m); } catch (e) { U.err = '数字をまとめる途中でつまずきました：' + s(e && e.message); rerender(); return; }
-      U.busy = 'AI がレポートを書いています…（1〜3分）'; U.err = ''; rerender();
+      U.busy = 'AI がレポートを書いています…（3〜4分）'; U.err = ''; rerender();
       var fn = w.firebase.app().functions('asia-northeast1').httpsCallable('pfAsk', { timeout: 540000 });
       fn({ model: MODEL, system: SYSTEM, max_tokens: MAX_TOKENS, effort: EFFORT,
            user: (ym0.y + '年' + (ym0.m + 1) + '月') + 'の資料です。決められた JSON の形だけで答えてください。\n\n```json\n'
@@ -464,7 +537,7 @@
           return save(ym, body).then(function () { return body; });
         })
         .then(function (body) {
-          U.busy = ''; U.saved = body;
+          U.busy = ''; U.saved = body; U.close = markClosed(body.締め); U.fresh = false;
           if (w.pitLog) w.pitLog('AIレポートを書き出した', { kind: 'sales', label: ym + (again ? '（書き出し直し）' : '') });
           if (w.pitToast) w.pitToast((ym0.m + 1) + '月のレポートを書き出しました');
           rerender();
@@ -485,8 +558,10 @@
   function carChip(F, id){
     var c = F.車 && F.車[id];
     if (!c) return '<span class="air-car x">（車が見つかりません）</span>';
+    /* 🧾 v2.133.0（ゆうた「課と名前が小さく下にそろって読みにくい。BOXに囲んで内包しちゃっていい」）＝課｜フロントを1つの枠に */
     return '<span class="air-car" onclick="pitAiRepOpen(\'' + esc(id) + '\')"><span class="nm">' + esc(c.苗字 + ' ' + c.車種) + '</span>'
-         + (c.課 ? dvChip(c.課, c.課の色) : '') + '<span class="fr">' + esc(c.フロント) + '</span></span>';
+         + '<span class="air-cb"' + (c.課の色 ? ' style="--dc:' + esc(c.課の色) + '"' : '') + '>'
+         + (c.課 ? '<b>' + esc(c.課) + '</b>' : '') + '<i>' + esc(c.フロント) + '</i></span></span>';
   }
   function dvChip(label, color){ return '<span class="air-dv"' + (color ? ' style="--dc:' + esc(color) + '"' : '') + '>' + esc(label) + '</span>'; }
   /* AI の文 → HTML。{{car:ID}} を車の1行に、**…** を太字に */
@@ -534,7 +609,7 @@
        + kpi('台数・台単価', D.台数 + '台・' + man(D.台単価), D.大物.length ? '大物を除くと ' + man(D.大物を除く.実績) : '')
        + kpi('預かり日数', '中央値 ' + (D.預かり.中央値 == null ? '—' : D.預かり.中央値 + '日'), '平均 ' + (D.預かり.平均 == null ? '—' : D.預かり.平均 + '日') + '／のべ ' + D.預かり.のべ + '日')
        + kpi('預かり1日あたりの稼ぎ', yen(D.預かり.一日あたり), D.大物.length ? '大物を除くと ' + yen(D.大物を除く.一日あたり) : '')
-       + '</div>';
+       + '</div>' + gradeHtml((F.通知表 || grades(F))[k]);
 
     h += '<section><h3>預かり日数ごとの稼ぎ方' + (D.大物.length ? '<small>（大物は別の行）</small>' : '') + '</h3><table class="air-t"><tr><th>預かり</th><th class="n">台数</th><th class="n">金額</th><th class="n">のべ日数</th><th class="n">1日あたり</th><th class="n">台単価</th></tr>';
     var best = Math.max.apply(null, D.日数帯.map(function (b) { return b.台数 ? b.一日あたり : 0; }));
@@ -614,6 +689,8 @@
        + kpi('前月', man(G.前月), diffTxt(G.実績, G.前月) + '（' + (G.前月 ? Math.round((G.実績 - G.前月) / G.前月 * 1000) / 10 : 0) + '%）', G.実績 >= G.前月 ? 'up' : 'dn')
        + kpi('営業日', (G.営業日 == null ? '—' : G.営業日 + '日'), '前月 ' + (G.前月営業日 == null ? '—' : G.前月営業日 + '日') + '／1日あたり ' + (G.一日あたり ? man(G.一日あたり) : '—') + '（前月 ' + (G.前月一日あたり ? man(G.前月一日あたり) : '—') + '）')
        + '</div>';
+    var GR = F.通知表 || grades(F);
+    h += gradeHtml(GR.全体);
     h += '<table class="air-t"><tr><th></th><th class="n">実績</th><th class="n">目標（下限〜上限）</th><th class="n">下限に対して</th><th class="n">前月</th><th class="n">台数</th><th class="n">台単価</th><th class="n">預かり（中央値）</th></tr>';
     DIVS.forEach(function (D) {
       var x = F.課[D[0]];
@@ -666,7 +743,8 @@
   function closeHtml(U, mm){
     var C = U.close;
     var h = '<div class="air-close"><div><h3>';
-    if (!C) h += 'この月が締まっているかを確かめています…';
+    if (!C) h += (U.saved === undefined) ? '読み込んでいます…' : 'この月が締まっているかを確かめています…';
+    else if (C.証) h += mm + '月は締め済み（' + esc(s(U.saved && U.saved.書き出した日時).slice(5, 10).replace('-', '/')) + ' に書き出した時点で Q1〜Q4 すべて済み）';
     else if (C.err) h += esc(C.err);
     else h += C.closed ? mm + '月は締まっています（Q1〜Q4 の伝票の書き込みが全部済み）'
                        : mm + '月はまだ締まっていません（4つのQすべてで、残り0・伝票の書き込みが済むと締まります）';
@@ -686,6 +764,13 @@
     return h + '</div>';
   }
 
+  /* 書き出した時の締めの記録＝締めた証。古い記録に qs が無くても「締め済み」として出す */
+  function markClosed(c){
+    var o = c && c.qs ? JSON.parse(JSON.stringify(c)) : { qs: [] };
+    o.closed = true; o.証 = true;
+    return o;
+  }
+
   /* タブの中身（sales.js から）。読み込みは月ごとに1回、終わったら描き直す */
   w.pitAiRepMonth = function (wrap, head, y, m0){
     var ym = y + '-' + pad(m0 + 1), U = M(ym), mm = m0 + 1;
@@ -693,13 +778,23 @@
       wrap.innerHTML = head + '<div class="sv-card"><div class="sv-empty">AIレポートは本番の PitFlow でだけ使えます（練習用サイトでは書き出せません）。</div></div>';
       return;
     }
-    /* 2分たった覚えは使わない（別の画面でクォーターチェックを書き込んで戻ってきた時に、締めが古いままにならないように） */
-    if (U.loaded && !U.busy && Date.now() - (U.loadedAt || 0) > 120000) U.loaded = false;
+    /* ⚡ v2.133.0（ゆうた「再読み込みすると再表示にすごい時間がかかる。1回やったやつはOKに印をつけて、それを出来てる証に」）
+       ◎前 … 開くたびに Q1〜Q4 の伝票を全部読み直して突き合わせ（締めの確認）＝重い。
+       ◎いま … **書き出し済みの月は、残したレポート1つを読むだけ**。締めは書き出した時の記録（＝締めた証）をそのまま出す。
+       　 締めを確かめ直すのは「まだ書き出していない月」と「書き出し直す」を押した時だけ。
+       ⚠ まだ書き出していない月は、2分たった覚えを使わない（別の画面で書き込んで戻ってきた時に古いままにならないように）。 */
+    if (U.loaded && !U.saved && !U.busy && Date.now() - (U.loadedAt || 0) > 120000) U.loaded = false;
     if (!U.loaded && !U.loading){
       U.loading = true;
-      Promise.all([ loadSaved(ym).catch(function () { return null; }),
-                    closeState(ym).catch(function (e) { return { qs: [], closed: false, err: '締めを確かめられませんでした：' + s(e && e.message) }; }) ])
-        .then(function (r) { U.saved = r[0]; U.close = r[1]; U.loaded = true; U.loadedAt = Date.now(); U.loading = false; rerender(); });
+      loadSaved(ym).catch(function () { return null; }).then(function (sv) {
+        if (sv && sv.数字){
+          U.saved = sv; U.close = markClosed(sv.締め); U.fresh = false;
+          U.loaded = true; U.loadedAt = Date.now(); U.loading = false; rerender(); return;
+        }
+        U.saved = null; rerender();
+        return closeState(ym).catch(function (e) { return { qs: [], closed: false, err: '締めを確かめられませんでした：' + s(e && e.message) }; })
+          .then(function (c) { U.close = c; U.fresh = true; U.loaded = true; U.loadedAt = Date.now(); U.loading = false; rerender(); });
+      });
     }
     var h = head + closeHtml(U, mm);
     if (U.busy) h += '<div class="air-busy"><span class="air-sp"></span>' + esc(U.busy) + '</div>';

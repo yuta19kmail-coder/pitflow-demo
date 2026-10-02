@@ -1345,9 +1345,14 @@
         /* ⏳ v2.104.0 前の版で残した伝票には読んだ時刻が無い。**その回を走らせた日時**で補う
            （開き直しただけでは走らせた日時は変わらない＝v2.10.0 の決めごと） */
         den.forEach(function (d) { if (d && !d.読んだ) d.読んだ = s(r.走らせた日時); });
-        var pit = w.pitQCollect({ from: x.from, to: x.to }).明細;
-        return { no: x.no, label: x.label, from: x.from, to: x.to, 全部: true,
-                 soft: den, res: w.pitQMatch(den, pit, { from: x.from, to: x.to }),
+        /* 🧩 v2.129.0 Qの一部しか読んでいない書類は、**読んだ日の範囲だけ**で突き合わせる
+           （窓をQまるごとにすると、読んでいない日の実績が「PitFlowだけ」に化ける） */
+        var part = (r.全部 === false) && w.pitQReadRange ? w.pitQReadRange(r) : null;
+        var gf = part ? part.from : x.from, gt = part ? part.to : x.to;
+        var pit = w.pitQCollect({ from: gf, to: gt }).明細;
+        return { no: x.no, label: x.label, from: gf, to: gt, 全部: !part,
+                 q: { s: x.from, e: x.to },
+                 soft: den, res: w.pitQMatch(den, pit, { from: gf, to: gt }),
                  出どころ: '保存',
                  保存: { at: s(r.走らせた日時), by: s(r.走らせた人), pdf: s(r.PDF) } };
       }).catch(function () { return null; });
@@ -1601,8 +1606,47 @@
       U.term = sp.期間; U.termSrc = sp.期間の出どころ;
       U.groups = (sp.組 || []).map(function (g) {
         return { no:g.no, label:g.label, from:g.from, to:g.to, 全部:g.全部,
+                 q: g.q ? { s: g.q.s, e: g.q.e } : null,   /* 🧩 v2.129.0 そのQの窓（書類の名前に使う） */
                  soft: g.伝票, res: null, 出どころ: 'PDF' };   /* 🗓 v2.10.0 どこから来た組か */
       });
+      U.busy = '前に読んだ伝票と合わせています…';
+      if (w.renderInspect) renderInspect();
+      return mergePartial(U.groups).then(function () { afterRead(U, r); });
+    }).catch(function (e) {
+      U.busy = '';
+      U.err = s(e && e.message ? e.message : e);
+      if (w.renderInspect) renderInspect();
+    });
+  }
+
+  /* ================================================================
+     🧩 v2.129.0（ゆうた 2026-10-02「入れるPDFの日付はバラバラ」）
+     **Qの一部しか入っていないPDFは、前に残した同じQの伝票と1つにまとめる。**
+     ----------------------------------------------------------------
+     🔴 PDFに入っている日 … 新しい伝票だけ（前の伝票は捨てる）
+     🔴 その外の日       … 前に残した伝票をそのまま
+     ⚠ まとめ方は quarter-store.js の `pitQMergeSaved` 1本。
+     ⚠ 前の範囲と離れている時はまとめず、前の書類も上書きしない（`保存しない`）。
+     ================================================================ */
+  function mergePartial(groups){
+    if (!w.pitQLoadRun || !w.pitQMergeSaved || !w.pitQRunId) return Promise.resolve();
+    return Promise.all((groups || []).map(function (g) {
+      if (g.全部 || !g.q) return null;
+      return w.pitQLoadRun(w.pitQRunId(g.q.s, g.q.e)).then(function (doc) {
+        if (!doc) return;
+        var m = w.pitQMergeSaved(g, g.q, doc);
+        if (!m) return;
+        if (m.離れている){ g.保存しない = true; return; }
+        g.from = m.from; g.to = m.to; g.全部 = m.全部; g.soft = m.soft;
+        g.前の伝票 = m.前の伝票; g.前の範囲 = m.前の範囲; g.前の日時 = m.前の日時;
+      }).catch(function () {
+        /* 読めなかった＝前の書類があるかも分からない。上書きして消さないよう、残さない */
+        g.保存しない = true;
+      });
+    }));
+  }
+
+  function afterRead(U, r){
       /* 全部の組を先に数えておく（PDFはもう読み終わっているので安い）。
          ＝ どのQに何件あるかが**押す前に**見える。 */
       U.groups.forEach(function (g) {
@@ -1640,8 +1684,11 @@
         if (w.renderInspect) renderInspect();
         if (w.pitToast){
           var g0 = U.groups[U.gi];
+          var mg = U.groups.filter(function (x) { return x.出どころ === 'PDF' && x.前の伝票; })
+                           .reduce(function (a, x) { return a + x.前の伝票; }, 0);
           pitToast(r.伝票.length + '枚を読みました'
                  + (g0 ? '／' + g0.label + (g0.全部 ? '' : ' の一部') : '')
+                 + (mg ? '（前に読んだ伝票 ' + mg + '枚と合わせました）' : '')
                  + (U.groups.filter(function (x) { return x.出どころ === 'PDF'; }).length > 1
                     ? '（' + U.groups.filter(function (x) { return x.出どころ === 'PDF'; }).length
                       + 'クォーターに分かれています）' : ''));
@@ -1652,11 +1699,6 @@
            ⚠ 残せなかった時も黙らない（練習用サイト・通信できない時など）。 */
         saveAllGroups(U);
       });
-    }).catch(function (e) {
-      U.busy = '';
-      U.err = s(e && e.message ? e.message : e);
-      if (w.renderInspect) renderInspect();
-    });
   }
 
   /* ================================================================
@@ -1753,9 +1795,13 @@
     var items = (U.groups || []).filter(function (g) {
       /* 🔴 v2.10.0 **保存から借りてきた組は、保存し直さない。**
          読んだだけで「走らせた日時」が今に書き換わると、いつ実施したか分からなくなる。 */
-      return g.出どころ !== '保存' && g.全部 && g.res && (!w.pitQCanSave || w.pitQCanSave(g.res));
+      /* 🧩 v2.129.0 **一部の組も残す**（Qの窓の書類に、読んだ範囲つきで）。
+         ＝ 次に同じQの続きのPDFを入れた時に、ここへ足していける。
+         ⚠ 前の書類とまとめられなかった組（`保存しない`）は残さない＝前の書類を消さない。 */
+      return g.出どころ !== '保存' && !g.保存しない && (g.全部 || g.q) && g.res
+          && (!w.pitQCanSave || w.pitQCanSave(g.res));
     })
-      .map(function (g) { return { res: g.res, opt: { pdf: U.pdf, soft: g.soft } }; });
+      .map(function (g) { return { res: g.res, opt: { pdf: U.pdf, soft: g.soft, q: g.q, 全部: !!g.全部 } }; });
     if (!items.length) return;
     if (!w.pitQSaveRuns){
       items.forEach(function (it) { saveRun({ res: it.res, pdf: U.pdf, soft: it.opt.soft }); });
@@ -1832,7 +1878,12 @@
     if (!w.pitQSaveRun || !U.res) return;
     if (!w.PIT_CLOUD) return;                     /* 練習用サイトでは残さない（画面にもそう書いてある） */
     /* 🧾 v2.9.8 伝票の行も一緒に残す（次に開いた時、また突き合わせられるように） */
-    w.pitQSaveRun(U.res, { pdf: U.pdf, soft: U.soft }).then(function (d) {
+    /* 🧩 v2.129.0 書類の名前はQの窓で。一部の組も「一部」と書いて残す（前は一部の期間の名前で別の書類ができていた） */
+    var g = (U.groups || [])[U.gi] || null;
+    if (g && g.保存しない) return;
+    var q = (g && g.q) || null;
+    w.pitQSaveRun(U.res, { pdf: (g && g.出どころ === '保存' && g.保存) ? g.保存.pdf : U.pdf, soft: U.soft,
+                           q: q, 全部: g ? !!g.全部 : true }).then(function (d) {
       /* ⚠ 組ごとに呼ばれる時は、画面の覚えを触るのは呼んだ側（_apply）に任せる */
       if (U._apply){ U._apply(d); }
       else {

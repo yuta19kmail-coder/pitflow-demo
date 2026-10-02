@@ -163,3 +163,26 @@
 /* 📐 v2.135.1 帯の高さを変えない：Q の箱はいつも4つ（未確認は灰色）。ボタンは帯の中で上下の真ん中 */
 .air-q.un{ opacity:.7; }
 .air-q .st0{ color:var(--text3); font-weight:700; }
+
+/* 🔒 v2.136.0 MTGで話すこと（社長・専務・チーフだけ）。レポートのいちばん下のさらに下 */
+.air-ura{ margin-top:16px; border:2px dashed rgba(201,162,39,.55); border-radius:var(--r2,12px); padding:16px 20px;
+  background:color-mix(in srgb, #c9a227 6%, var(--bg2)); }
+.air-ura-h{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.air-ura-h h2{ font-size:18px; }
+.air-lock{ font-size:11px; color:#b8901c; border:1px solid rgba(201,162,39,.55); border-radius:999px; padding:1px 10px; }
+:root:not([data-theme="light"]) .air-lock{ color:#ffe7a3; }
+.air-ura-none{ font-size:13px; color:var(--text2); }
+.air-mcols{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.air-mc{ background:var(--bg2); border:1px solid var(--border); border-top:3px solid var(--dc, #c9a227); border-radius:var(--r,8px); padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.air-mc h3{ font-size:15px; display:flex; align-items:center; gap:8px; }
+.air-mc h3 i{ font-style:normal; font-size:10.5px; font-weight:700; color:var(--text2); border:1px solid var(--border2); border-radius:4px; padding:0 6px; }
+.air-mone{ border-left:3px solid #c9a227; background:color-mix(in srgb, #c9a227 12%, transparent); border-radius:5px; padding:7px 10px; font-size:14px; font-weight:700; }
+.air-mnums{ display:flex; gap:6px; flex-wrap:wrap; }
+.air-mnums span{ background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:3px 8px; font-size:12.5px; font-weight:600; }
+.air-mb .lab{ font-size:11px; font-weight:700; margin-bottom:2px; }
+.air-mb.good .lab{ color:var(--green); } .air-mb.fix .lab{ color:var(--orange); } .air-mb.do .lab{ color:var(--blue); } .air-mb.qa .lab{ color:var(--text2); }
+.air-mb ul{ list-style:none; margin:0; padding:0; }
+.air-mb li{ font-size:13px; padding-left:14px; position:relative; margin:2px 0; }
+.air-mb li::before{ content:"・"; position:absolute; left:0; color:var(--text3); }
+.air-mb.do li{ font-weight:700; }
+@media (max-width: 900px){ .air-mcols{ grid-template-columns:1fr; } }

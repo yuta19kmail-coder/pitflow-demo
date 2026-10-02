@@ -175,9 +175,12 @@
   /* 一覧に載せる要約（🔴 ここは軽くする。Q1〜4 の済み／未を出すだけの情報） */
   function digest(res, opt){
     opt = opt || {};
+    /* 🧩 v2.129.0 書類の名前は **Qの窓** で付ける（一部しか読んでいなくても同じQは同じ書類） */
+    var qf = (opt.q && opt.q.s) || res.期間.from, qt = (opt.q && opt.q.e) || res.期間.to;
     return {
-      id: runId(res.期間.from, res.期間.to),
-      from: s(res.期間.from), to: s(res.期間.to),
+      id: runId(qf, qt),
+      from: s(qf), to: s(qt),
+      全部: (opt.全部 !== false),
       at: (new Date()).toISOString(), by: me(),
       pdf: s(opt.pdf),
       枚数: res.整備ソフト.枚数, 台数: res.PitFlow.台数,
@@ -210,6 +213,57 @@
     return !!(res && res.整備ソフト && (res.整備ソフト.枚数 || 0) > 0);
   }
 
+  /* ================================================================
+     🧩 v2.129.0（ゆうた 2026-10-02「入れるPDFの日付はバラバラ。2回目は増えた分しか読んでない？
+     　　1件金額が合わないと言われたが、渡したPDFではもう直っている」）
+     ----------------------------------------------------------------
+     ◎何が起きていたか
+       PDF が Q の途中から（途中まで）しか無いと、その Q は「一部」＝**保存しなかった**。
+       そのあと月を開き直すと、その Q は**前に残した古い伝票**で組み直される。
+       ＝ 新しいPDFで直っている伝票が、古い金額のまま「合わない」と出る。
+     🔴 直し方 ── **Q 1つに書類1つ。PDFに入っている日だけ新しい伝票に差し替え、外の日は前の伝票を生かす。**
+       ・新しいPDFの日の範囲 … 新しい伝票だけ（前の伝票は捨てる＝PDFが最優先）
+       ・その外の日         … 前に残した伝票をそのまま
+       ・読んだ範囲がQの窓を全部覆ったら「まるごと」（済にしてよい）
+     ⚠ 前の範囲と新しい範囲が**離れている**（間に読んでいない日がある）時はまとめない。
+        まとめると、間の日の PitFlow の実績が「PitFlowだけ」に化けるため。
+        その時は新しいPDFの数字を見せるだけで、前の書類は上書きしない（`保存しない`）。
+     ================================================================ */
+  function dshift(v, n){
+    var p = t(v).split('-'); if (p.length !== 3) return '';
+    var d = new Date(+p[0], +p[1] - 1, +p[2] + n);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  /* 残した書類が「どの日を読んだか」。前の版の書類は Q まるごと読んだもの（一部は残していなかった） */
+  function readRange(doc){
+    if (!doc) return null;
+    var r = doc.読んだ範囲;
+    if (r && r.from && r.to) return { from: s(r.from), to: s(r.to) };
+    return (doc.期間 && doc.期間.from) ? { from: s(doc.期間.from), to: s(doc.期間.to) } : null;
+  }
+  function mergeSaved(g, q, doc){
+    var den = (doc && Array.isArray(doc.伝票)) ? doc.伝票 : [];
+    var r = readRange(doc);
+    if (!den.length || !r || !q) return null;
+    /* 重なる or 隣り合う時だけ */
+    if (!(r.from <= dshift(g.to, 1) && r.to >= dshift(g.from, -1))) return { 離れている: true };
+    var keep = den.filter(function (d) {
+      var x = t(d && d.売上日);
+      return x && (x < g.from || x > g.to);
+    }).map(function (d) {
+      var o = {}; Object.keys(d).forEach(function (k) { o[k] = d[k]; });
+      if (!o.読んだ) o.読んだ = s(doc.走らせた日時);
+      return o;
+    });
+    var from = r.from < g.from ? r.from : g.from;
+    var to   = r.to   > g.to   ? r.to   : g.to;
+    if (from < q.s) from = q.s;
+    if (to > q.e) to = q.e;
+    return { from: from, to: to, 全部: (from === q.s && to === q.e),
+             soft: keep.concat(g.soft || []), 前の伝票: keep.length,
+             前の範囲: r, 前の日時: s(doc.走らせた日時) };
+  }
+
   function saveRun(res, opt){
     opt = opt || {};
     if (!res || !res.期間 || !res.期間.from) return Promise.reject(new Error('期間がありません'));
@@ -232,6 +286,9 @@
 
     var body = {
       期間: { from: d.from, to: d.to },
+      /* 🧩 v2.129.0 実際に伝票を読んだ日の範囲と、Qまるごとか（一部なら「済」にしない） */
+      読んだ範囲: { from: s(res.期間.from), to: s(res.期間.to) },
+      全部: d.全部,
       走らせた日時: d.at, 走らせた人: d.by, PDF: d.pdf,
       /* 🃏 v2.7.0 残した行の作り。2 以上＝カードで出せる（quarter.js の savedHtml が見る）。
          🧾 v2.9.8 **3 ＝ 伝票の行を持っている**＝開き直したら**もう一度突き合わせる**（写しを見ない）。
@@ -359,6 +416,7 @@
       整備ソフト金額: (doc.整備ソフト || {}).金額 || 0, PitFlow金額: (doc.PitFlow || {}).金額 || 0,
       差台数: (doc.差 || {}).台数 || 0, 差金額: (doc.差 || {}).金額 || 0,
       検算: !!((doc.検算 || {}).合う),
+      全部: (doc.全部 !== false),
       直す件数: n,
       売上日ちがい件数: (d.売上日ちがい || []).length,
       /* 🩹 索引を作り直したものだと分かるようにしておく（あとで追いかけられるように） */
@@ -460,4 +518,6 @@
   w.pitQLoadRun   = loadRun;
   w.pitQDeleteRun = deleteRun;   /* 🧹 v2.0.0 その期間の結果を消す（印は消さない） */
   w.pitQMonthPlan = monthPlan;
+  w.pitQMergeSaved = mergeSaved; /* 🧩 v2.129.0 一部のPDFを、前に残した同じQの伝票と1つにまとめる */
+  w.pitQReadRange  = readRange;  /* 🧩 v2.129.0 残した書類が読んだ日の範囲 */
 })(window);

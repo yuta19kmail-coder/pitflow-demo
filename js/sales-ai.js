@@ -828,6 +828,14 @@
     h += '</h3>';
     /* Q の箱は「締めた証」か「押して確かめた結果」があるときだけ（開いただけでは確かめない） */
     var Q = (saved && C && C.qs && C.qs.length) ? C : (U.check && U.check.qs && U.check.qs.length ? U.check : null);
+    /* 📐 v2.135.1（ゆうた「書き出すとボタンの位置が上がってきもちわるい」）
+       ＝ Q の箱が出たり消えたりして帯の高さが変わっていた。**箱はいつも4つ出す**（まだ確かめていない時は「未確認」）。
+       区切りは pitQMonthPlan の1本（ここで日付を書かない）。 */
+    if (!Q && w.pitQMonthPlan){
+      h += '<div class="air-qs">' + w.pitQMonthPlan(ym, []).map(function (x) {
+        return '<div class="air-q un"><b>Q' + x.no + ' ' + (+s(x.from).slice(8)) + '〜' + (+s(x.to).slice(8)) + '日</b><span class="st0">未確認</span></div>';
+      }).join('') + '</div>';
+    }
     if (Q){
       h += '<div class="air-qs">' + Q.qs.map(function (q) {
         var st = !q.読んだ ? 'PDF未' : (!q.全部 ? '一部だけ' : '残り' + q.残り + '・書き込み ' + q.書けた + '/' + q.対象 + (q.変わった ? '・変わった ' + q.変わった : ''));

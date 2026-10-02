@@ -322,7 +322,9 @@
     var st = PitCal.status();
     var hrs = PitCal.hours(_todayDs());
     var dow = PitCal.closedDow();
-    var brs = PitCal.breaks().slice(0, 6);
+    /* 🗓 2026-10-02 MHS が去年の1月から配るようになった＝過ぎた休みも入る。ここは「これからの休み」だけ並べる */
+    var _td = _todayDs();
+    var brs = PitCal.breaks().filter(function (b) { return b && b.to >= _td; }).slice(0, 6);
     var h = '';
     h += '<div class="ps-card">';
     h += '<div class="ps-h" style="display:flex;align-items:center;gap:10px"><i data-ic=clock data-ics=16></i> 営業日・営業時間'

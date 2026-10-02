@@ -501,8 +501,23 @@
     '  "div1": { "日数帯": ["段落"], "工程": ["段落"], "引っぱった車": ["段落"], "時間がかかった車": ["段落"], "スライド": ["段落"], "人": ["段落"], "課題": ["1つの課題＝1段落", ...] },',
     '  "div2": { 同じ形 },',
     '  "全体の課題": ["1つの課題＝1段落", ...],   // 3〜5個',
-    '  "未来": { "div1": ["段落", ...], "div2": ["段落", ...], "全体": ["段落", ...] }',
-    '}'
+    '  "未来": { "div1": ["段落", ...], "div2": ["段落", ...], "全体": ["段落", ...] },',
+    '  "MTG": {',
+    '    "div1": { "ひとこと": "1行", "数字": ["短い数字の札", ...], "良かった": ["要点", ...], "足りない": ["要点", ...], "来月やること": ["要点", ...], "聞かれたら": [{ "問": "…", "答": "…" }] },',
+    '    "div2": { "ひとこと": "1行", "数字": [...], "ほめる": [...], "次の一歩": [...], "来月やること": [...] },',
+    '    "全体": { "ひとこと": "1行", "数字": [...], "良かった": [...], "これから": [...], "伝えたいこと": [...] }',
+    '  }',
+    '}',
+    '',
+    '【MTG（社長・専務・チーフだけが見る、MTGで話す要点）】',
+    '・社長・専務は従業員を雇ってこなかったこともあり、MTGで話す・数字を見るのに慣れていない。社長は1課長でもある。社長がMTGでそのまま使える**要点**を書く（台本ではない）。',
+    '・div1＝社長が1課長として話す（1課をどう直すか）。div2＝2課をほめる場で使う（名前と数字を出してほめる）。全体＝MTGの最初か最後に。',
+    '・ひとことで言うと、を1行（20〜35字）。ツボを押さえた言い方にする（例：「早く返す力はある。あとは長い車を早く片づけて回す」）。',
+    '・数字は2〜3個。覚えやすく言い換えた短い札にする（例：「あと106万＝1台あたり +1.4万」「返車1日 ◎」）。資料の数字だけを使う。',
+    '・各項目は1〜3個の要点。1つ35字くらいまで。です・ますは付けない体言止めでよい。人は「◯◯さん」。',
+    '・来月やることは、やることがはっきり見える言い方で2つまで（例：「長くなりそうな車は毎週、片づける日を決める」）。',
+    '・聞かれたらは1つだけ。社長が答えに詰まりそうな問いと、その短い答え。',
+    '・本文と同じ方針を守る（4人に仕事を戻さない・予約を取る話はしない・早く回して台数を増やす話と1台の中身の話はよい・保険はボーナス）。車の {{car:ID}} はここでは使わない。'
   ].join('\n');
 
   function slimForAi(F){
@@ -819,6 +834,49 @@
     return h + '</div>';
   }
 
+  /* ================================================================
+     🔒 v2.136.0（ゆうた指定 2026-10-03）**MTGで話すこと**＝レポートのいちばん下のさらに下。
+     🗣「特定アカウントからしか表示できない裏表示。俺と社長と専務のアカウントのみ」
+     🗣「社長・専務は MTG・発表が下手。数字を見る・管理するのもやったことがない。何を言えばいいか、
+        社長は1課長でもあるから1課をどう直すか、を比較的簡単に、ツボを押さえてる感で。2課（ほめる時にも）と全体も。台本ではなく要点で」
+     🔴 見える人＝PitFlow のログインの名前が「チーフ」「社長」「専務」の3人だけ。ほかの人には枠そのものを出さない。
+     ⚠ これは**画面に出さないだけ**。書類（pitSettings）は社内の人なら読める作り（Firestore のルールは触っていない）。
+     ================================================================ */
+  var MTG_VIEWERS = ['チーフ', '社長', '専務'];
+  function canSeeMtg(){
+    try { var me = t(w.pitFlowMe ? w.pitFlowMe() : ''); return MTG_VIEWERS.indexOf(me) >= 0; } catch (e) { return false; }
+  }
+  function mtgList(label, arr, cls){
+    arr = (Array.isArray(arr) ? arr : (arr ? [arr] : [])).filter(Boolean);
+    if (!arr.length) return '';
+    return '<div class="air-mb ' + (cls || '') + '"><div class="lab">' + esc(label) + '</div><ul>'
+         + arr.map(function (x) { return '<li>' + esc(x).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>') + '</li>'; }).join('') + '</ul></div>';
+  }
+  function mtgCol(F, k, M2){
+    if (!M2) return '';
+    var title = k === '全体' ? '全体' : (F.課[k] ? F.課[k].短い名前 : k);
+    var tag = k === 'div1' ? '1課長＝社長' : (k === 'div2' ? 'ほめる' : '最初か最後に');
+    var color = (k !== '全体' && F.課[k] && F.課[k].色) ? ' style="--dc:' + esc(F.課[k].色) + '"' : '';
+    var h = '<div class="air-mc"' + color + '><h3>' + esc(title) + '<i>' + esc(tag) + '</i></h3>';
+    if (M2.ひとこと) h += '<div class="air-mone">' + esc(M2.ひとこと) + '</div>';
+    var nums = (Array.isArray(M2.数字) ? M2.数字 : []).filter(Boolean);
+    if (nums.length) h += '<div class="air-mnums">' + nums.map(function (n) { return '<span>' + esc(n) + '</span>'; }).join('') + '</div>';
+    h += mtgList(k === 'div2' ? 'ほめる' : '良かった', k === 'div2' ? M2.ほめる : M2.良かった, 'good');
+    h += mtgList(k === 'div2' ? '次の一歩' : (k === '全体' ? 'これから' : '足りない'), k === 'div2' ? M2.次の一歩 : (k === '全体' ? M2.これから : M2.足りない), 'fix');
+    h += mtgList(k === '全体' ? '伝えたいこと' : '来月やること', k === '全体' ? M2.伝えたいこと : M2.来月やること, 'do');
+    var qa = (Array.isArray(M2.聞かれたら) ? M2.聞かれたら : []).filter(function (x) { return x && (x.問 || x.答); });
+    if (qa.length) h += '<div class="air-mb qa"><div class="lab">聞かれたら</div><ul>' + qa.map(function (x) {
+      return '<li>「' + esc(x.問 || '') + '」→ ' + esc(x.答 || '') + '</li>'; }).join('') + '</ul></div>';
+    return h + '</div>';
+  }
+  function mtgHtml(R){
+    if (!canSeeMtg() || !R || !R.数字) return '';
+    var M2 = R.文 && R.文.MTG;
+    var h = '<div class="air-ura"><div class="air-ura-h"><h2>MTGで話すこと</h2><span class="air-lock">🔒 社長・専務・チーフだけに見えています</span></div>';
+    if (!M2) return h + '<div class="air-ura-none">このレポートは「MTGで話すこと」を作る前に書き出したものです。「書き出し直す」を押すと出ます。</div></div>';
+    return h + '<div class="air-mcols">' + mtgCol(R.数字, 'div1', M2.div1) + mtgCol(R.数字, 'div2', M2.div2) + mtgCol(R.数字, '全体', M2.全体) + '</div></div>';
+  }
+
   function closeHtml(U, mm, ym){
     var C = U.close, saved = !!(U.saved && U.saved.数字), past = isPast(ym);
     /* 📐 v2.135.2（ゆうた「書き出すが上に上がってるのが変」）＝ボタンは見出しの行ではなく **Q の箱と同じ行・同じ高さ**。
@@ -894,7 +952,7 @@
     }
     var h = head + closeHtml(U, mm, ym) + runHtml(U);
     if (U.err && !U.run) h += '<div class="air-err">' + esc(U.err) + '</div>';
-    if (U.saved && U.saved.数字) h += reportHtml(U.saved);
+    if (U.saved && U.saved.数字) h += reportHtml(U.saved) + mtgHtml(U.saved);
     else if (U.loaded && !U.run) h += '<div class="sv-card"><div class="sv-empty">'
       + (!isPast(ym) ? mm + '月はまだ途中です。月が終わって Q1〜Q4 を締めたあとに書き出せます。'
                      : mm + '月のレポートはまだありません。' + (isAdmin() ? '上の「レポートを書き出す」で作れます（押すと締めを確かめます）。' : '管理者が書き出すと、ここに出ます。'))
@@ -927,7 +985,8 @@
   };
 
   w.pitAiRepFacts = facts;
-  w.pitAiRepHtml  = reportHtml;   /* 見張り用：残したレポート（数字＋文）から画面を作る */
+  w.pitAiRepHtml  = reportHtml;
+  w.pitAiRepMtgHtml = mtgHtml;    /* 見張り用：MTGで話すこと（見える人だけ） */   /* 見張り用：残したレポート（数字＋文）から画面を作る */
   w.pitAiRepSystem = SYSTEM;      /* 見張り用：AI への決めごと */
   w.pitAiRepClose = closeState;
 })(window);

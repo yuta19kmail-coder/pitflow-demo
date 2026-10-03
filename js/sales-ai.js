@@ -294,7 +294,15 @@
     function nkey(v){ return t(v).replace(/[\s　]/g, ''); }
     var people = [], byKey = {};
     (S().staff || []).forEach(function (p) {
-      if (!p || p.isSelf) return;
+      if (!p) return;
+      /* 会社そのもの（「小林モータース」＝担当を人にしなかった分）は人と分けて、名前の後ろに（会社）と付ける */
+      if (p.isSelf){
+        var so = { 名前: t(p.name || p.dispName) + '（会社）', 本名: '', 部署: '担当を人にしなかった分', 入社: '', 役割: [], 会社: true,
+                   予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
+        people.push(so);
+        [p.name, p.dispName].concat(Array.isArray(p.aliases) ? p.aliases : []).forEach(function (n) { var k = nkey(n); if (k && !byKey[k]) byKey[k] = so; });
+        return;
+      }
       var o = { 名前: t(p.name || p.realName), 本名: t(p.realName), 部署: (Array.isArray(p.deptNames) ? p.deptNames.join('・') : t(p.deptNames)) || divName(p.division) || '',
                 入社: s(p.joinedAt), 役割: [p.reception ? '受付' : '', p.front ? 'フロント' : '', p.mech ? 'メカ' : ''].filter(Boolean),
                 予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
@@ -318,7 +326,7 @@
       ms.forEach(function (n) { var o = who(n); if (o){ o.メカ台数++; o.メカ生産 += r.amt / ms.length; } });
     });
     people.forEach(function (o) { o.フロント売上 = Math.round(o.フロント売上); o.メカ生産 = Math.round(o.メカ生産); });
-    var roster = people.filter(function (o) { return !o.名簿にない || o.予約件数 || o.車検ライン || o.フロント台数 || o.メカ台数; });
+    var roster = people.filter(function (o) { return (!o.名簿にない && !o.会社) || o.予約件数 || o.車検ライン || o.フロント台数 || o.メカ台数; });
 
     /* ---- 休み ---- */
     var closed = [], openHol = [];

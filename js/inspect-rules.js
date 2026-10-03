@@ -580,8 +580,13 @@
       title:'外注の戻り予定日を過ぎている',
       why:'外注先から戻る予定の日を過ぎています。催促が要るかもしれません。',
       fix:'外注先に確認して、戻り予定日を直してください。',
+      /* 🔴 v2.140.3（ゆうた報告 2026-10-03・F10-879283）**外注から戻ってきた車は言わない。**
+         ◎前は「戻り予定日を過ぎた」だけを見ていた。戻ってきてタスクで外注から外しても、
+           カードに戻り予定日が残っているので**ずっと出続けた**（ミニF56：8/18 外注 → 9/18 戻り → 10/2 作業完了でも出ていた）。
+         🔴 いま＝**いま外注の列にいる車だけ**（status が outsource）。 */
       each: function(c, ctx){
         if (!isLive(c) || !t(c.outsourceDue)) return '';
+        if (c.status !== 'outsource') return '';
         return (s(c.outsourceDue) < ctx.today)
           ? ('戻り予定 ' + c.outsourceDue + '（' + days(c.outsourceDue, ctx.today) + '日前）'
              + (t(c.outsourceTo) ? '／' + t(c.outsourceTo) : '')) : '';

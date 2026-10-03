@@ -141,6 +141,14 @@
       return o;
     } catch (e) { return null; }
   }
+  /* ================================================================
+     🔧 v2.140.0（ゆうた 2026-10-03「板金系は自社に数日置いて、板金屋さんが取りに来てあと放置、戻ってきたら返車。
+        丸ごと抜いていい。車検＋コーティングなどで全体で1週間なら入れていい」）
+     ＝ 作業タイプに B.P（板金）がある車は、**預かり日数を使う数字（中央値・1日あたり・日数帯・工程・時間がかかった車・
+        作業完了→返車・改善した未来）から丸ごと外す**。売上・粗利・台数の合計には入れたまま。
+     🔴 板金かどうかは pit-share.js の作業タイプの1本（pitCardWorkIds）に 'bp' があるか。
+     ================================================================ */
+  function isBodyShop(c){ try { return (w.pitCardWorkIds ? w.pitCardWorkIds(c) : []).indexOf('bp') >= 0; } catch (e) { return false; } }
   function r1(a, b){ return b ? Math.round(a / b * 1000) / 10 : null; }   /* 率（小数1桁・%） */
 
   /* ⑩ 止まった理由を読むための材料：いまの引継ぎメモと、その書き換えの記録（日付つき） */
@@ -174,7 +182,7 @@
     function statsOf(list){
       var a = list.filter(function (r) { return r.tier === 'actual' && !insOf(r.c); });
       var sum = a.reduce(function (x, r) { return x + r.amt; }, 0);
-      var st = a.map(function (r) { return days(r.c.actualInAt, r.c.completedAt); }).filter(function (v) { return v != null; }).sort(function (p, q) { return p - q; });
+      var st = a.filter(function (r) { return !isBodyShop(r.c); }).map(function (r) { return days(r.c.actualInAt, r.c.completedAt); }).filter(function (v) { return v != null; }).sort(function (p, q) { return p - q; });
       var gu = 0, ga = 0;
       a.forEach(function (r) { var co = costOf(r.c); if (co){ gu += r.amt; ga += r.amt - co.原価; } });
       return { 台単価: a.length ? Math.round(sum / a.length) : null, 預かり中央値: st.length ? st[Math.floor(st.length / 2)] : null, 粗利率: r1(ga, gu) };
@@ -192,7 +200,7 @@
       var co = costOf(c);
       reg(c);
       return { id: c.id, 課: r.course, 保険: insOf(c), 大物: r.amt >= bigLine, 金額: r.amt,
-               原価: co ? co.原価 : null, 粗利: co ? r.amt - co.原価 : null, 内訳: co,
+               原価: co ? co.原価 : null, 粗利: co ? r.amt - co.原価 : null, 内訳: co, 板金: isBodyShop(c),
                メーカー: makerOf(c), 作業: wtLabelOf(c), フロント: shortFront(r.front), メカ: mechsOf(c).map(shortFront),
                担当の入れ忘れ: mechMissing(c),
                入庫: s(c.actualInAt), 完了: s(c.completedAt), 返車予定: s(c.returnDatePlan), 預かり: stay, 工程: ph,
@@ -205,7 +213,7 @@
       var k = D[0];
       var a = rows.filter(function (r) { return r.課 === k && !r.保険; });
       var sum = a.reduce(function (x, r) { return x + r.金額; }, 0);
-      var st = a.filter(function (r) { return r.預かり != null; });
+      var st = a.filter(function (r) { return r.預かり != null && !r.板金; });   /* 🔧 v2.140.0 板金は預かりの数字から外す */
       var stays = st.map(function (r) { return r.預かり; }).sort(function (p, q) { return p - q; });
       var dsum = st.reduce(function (x, r) { return x + Math.max(1, r.預かり); }, 0);
       var nb = st.filter(function (r) { return !r.大物; });
@@ -214,7 +222,7 @@
       function araOf(list){
         var x = list.filter(function (r) { return r.粗利 != null; });
         var u = x.reduce(function (q, r) { return q + r.金額; }, 0), g = x.reduce(function (q, r) { return q + r.粗利; }, 0);
-        var xs = x.filter(function (r) { return r.預かり != null; });
+        var xs = x.filter(function (r) { return r.預かり != null && !r.板金; });
         var dd = xs.reduce(function (q, r) { return q + Math.max(1, r.預かり); }, 0), gs = xs.reduce(function (q, r) { return q + r.粗利; }, 0);
         return { 粗利: g, 粗利率: r1(g, u), 台あたり: x.length ? Math.round(g / x.length) : 0, 一日あたり: dd ? Math.round(gs / dd) : 0, 台数: x.length };
       }
@@ -280,7 +288,8 @@
         大物: bigs,
         預かり: { 中央値: stays.length ? stays[Math.floor(stays.length / 2)] : null,
                  平均: stays.length ? Math.round(stays.reduce(function (x, v) { return x + v; }, 0) / stays.length * 10) / 10 : null,
-                 のべ: dsum, 一日あたり: dsum ? Math.round(sum / dsum) : 0, 平均在庫台数: Math.round(dsum / 30 * 10) / 10 },
+                 のべ: dsum, 一日あたり: dsum ? Math.round(st.reduce(function (x, r) { return x + r.金額; }, 0) / dsum) : 0, 平均在庫台数: Math.round(dsum / 30 * 10) / 10,
+                 板金で外した台数: a.filter(function (r) { return r.板金; }).length },
         日数帯: bk, 工程: phases,
         粗利: { 粗利: AG.粗利, 粗利率: AG.粗利率, 台あたり: AG.台あたり, 一日あたり: AG.一日あたり, 原価のある台数: AG.台数, 原価の無い台数: a.length - AG.台数,
                 工賃: { 売上: Math.round(wU), 粗利: Math.round(wA), 粗利率: r1(wA, wU) }, 部品: { 売上: Math.round(pU), 粗利: Math.round(pA), 粗利率: r1(pA, pU) },
@@ -411,9 +420,9 @@
 
     /* ---- 全体 ---- */
     var bigAll = rows.filter(function (r) { return r.大物; });
-    var allSt = rows.filter(function (r) { return !r.保険 && r.預かり != null; }).map(function (r) { return r.預かり; }).sort(function (p, q) { return p - q; });
+    var allSt = rows.filter(function (r) { return !r.保険 && !r.板金 && r.預かり != null; }).map(function (r) { return r.預かり; }).sort(function (p, q) { return p - q; });
     var allNi = rows.filter(function (r) { return !r.保険; });
-    var allWd = rows.filter(function (r) { return !r.保険 && r.工程.workDone != null; });
+    var allWd = rows.filter(function (r) { return !r.保険 && !r.板金 && r.工程.workDone != null; });
     var insSum = insAct.reduce(function (x, r) { return x + r.金額; }, 0);
     var bigSum = bigAll.reduce(function (x, r) { return x + r.金額; }, 0);
     var zeroRuns = [], run = null;
@@ -439,7 +448,7 @@
         作業完了から返車: { 台数: allWd.length, のべ日数: Math.round(allWd.reduce(function (x, r) { return x + r.工程.workDone; }, 0)) },
         粗利: (function () {
           var x = allNi.filter(function (r) { return r.粗利 != null; }), u = x.reduce(function (q, r) { return q + r.金額; }, 0), g = x.reduce(function (q, r) { return q + r.粗利; }, 0);
-          var xs = x.filter(function (r) { return r.預かり != null; }), dd = xs.reduce(function (q, r) { return q + Math.max(1, r.預かり); }, 0), gs = xs.reduce(function (q, r) { return q + r.粗利; }, 0);
+          var xs = x.filter(function (r) { return r.預かり != null && !r.板金; }), dd = xs.reduce(function (q, r) { return q + Math.max(1, r.預かり); }, 0), gs = xs.reduce(function (q, r) { return q + r.粗利; }, 0);
           var ins = rows.filter(function (r) { return r.保険 && r.粗利 != null; }), iu = ins.reduce(function (q, r) { return q + r.金額; }, 0), ig = ins.reduce(function (q, r) { return q + r.粗利; }, 0);
           return { 粗利: g, 粗利率: r1(g, u), 台あたり: x.length ? Math.round(g / x.length) : 0, 一日あたり: dd ? Math.round(gs / dd) : 0,
                    原価のある台数: x.length, 前月の粗利率: prevStats.全体.粗利率, 保険の粗利: ig, 保険の粗利率: r1(ig, iu) };
@@ -597,6 +606,7 @@
     '・1課と2課は性格が違う（1課＝台数で回す、2課＝単価で稼ぐ）。預かり日数や台単価を混ぜて語らない。総評だけ全体でまとめる。',
     '・保険の車は入金日で実績になるので、作業した月と実績の月がずれる。頑張りの評価には入れず「ボーナス」として扱う。',
     '・外注に出している日数は、自社の場所も手も使わないので課題に数えない。',
+    '・板金（作業タイプ B.P）の車は、板金屋さんが取りに来て戻るまで待つだけなので、**預かり日数を使う数字（1日あたり・日数帯・時間がかかった車・作業完了→返車・空く日数）から丸ごと外してある**（資料の「預かり.板金で外した台数」）。売上・粗利の合計には入っている。板金の車を「長く預かった」「1日あたりが低い」と書かない。',
     '・「大物」（1台で月の10%以上）は月の数字を大きく動かす。大物を除いた「地力」でも必ず語る。',
     '・メーカーは BMW のMINI と MINI をまとめて「MINI」として扱っている（資料もそうなっている）。',
     '・止まった理由が引継ぎメモ（メモ.いま／メモ.書き換え）に書いてある車は「理由のある止まり」（例：ドイツからのBO）として分けて書く。書いていない車は「理由の無い止まり」。理由のある止まりを責めない。',
@@ -971,6 +981,7 @@
     h += '<div class="air-foot"><b>このレポートが使ったもの</b>（書き出した時点の PitFlow のデータ）<ul>'
        + '<li>実績＝売上ビューと同じ数え方。課＝カードの課。メーカーは BMW の MINI と MINI をまとめて「MINI」</li>'
        + '<li>目標＝書き出した時点の月目標（下限 ' + man(F.目標.下限) + '・上限 ' + man(F.目標.上限) + '・国産 ' + F.目標.国産の割合 + '%）</li>'
+       + '<li>板金（作業タイプ B.P）の車は、預かり日数を使う数字（1日あたり・日数帯・時間がかかった車・作業完了→返車・空く日数）から外した（売上・粗利の合計には入れている）</li>'
        + '<li>預かり日数＝入庫日〜実績カウント日。工程ごとの日数＝カードの状態を動かした記録（PitFlow を使い始める前の期間は含まない）</li>'
        + '<li>大物＝1台で月の実績の10%以上。保険は課の分析に入れず、ボーナス枠に分けた</li>'
        + '<li>人＝メンバーで「フロント」「メカ」のチェックがある人。メカの生産は複数担当なら均等割り</li>'

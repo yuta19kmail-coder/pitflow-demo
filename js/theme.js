@@ -80,7 +80,7 @@
     var theme = DEFAULT_THEME, font = DEFAULT_FONT;
     try {
       var t = localStorage.getItem(THEME_KEY); if (VALID_THEMES.indexOf(t) >= 0) theme = t;
-      var f = localStorage.getItem(FONT_KEY); if (FONT_ORDER.indexOf(f) >= 0) font = f;
+      /* 🔴 2026-10-03 文字サイズ（AAA）は無くした＝いつも標準で開く。大きくしたい人は「見やすさ」（coreflow-a11y.js） */
     } catch (e) {}
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-fontsize', font);

@@ -276,7 +276,7 @@
       }
       if (ins && c.status === 'workDone'){ reg(c); insWd.push({ id: c.id, 金額: amtOf(c), 状態: phaseLabel(c.status) }); }
     });
-    var insAct = rows.filter(function (r) { return r.保険; }).map(function (r) { return { id: r.id, 金額: r.金額 }; });
+    var insAct = rows.filter(function (r) { return r.保険; }).map(function (r) { return { id: r.id, 金額: r.金額, 課: r.課 }; });
 
     /* ---- 人（⑪） ---- */
     var staff = (S().staff || []).filter(function (p) { return p && !p.isSelf && (p.front || p.mech); }).map(function (p) {
@@ -287,6 +287,39 @@
     var left = Object.keys(w.PIT_FORMER || {}).map(function (k) { return w.PIT_FORMER[k]; })
                  .filter(function (f) { return f && s(f.leftAt).slice(0, 7) === ym; }).map(function (f) { return { 名前: t(f.name), 退職: f.leftAt }; });
 
+    /* ---- 👥 名簿（v2.137.0 ゆうた「数年たつと退職者も出て誰が誰だか分からなくなる。メンバー一覧（回送スタッフも）と、それぞれの結果」）
+       受付＝予約件数（予約を受けた日がこの月・受付担当）／回送＝車検ライン（陸運局へ行った回数・1人目）／
+       フロント＝売上台数（実績・フロント担当）／メカ＝売上台数（実績・整備担当に名前がある）
+       ⚠ 名前は名簿の別名（本名・フルネーム・空白なし）でも当てる。名簿に居ない名前（辞めた人など）は「名簿にない人」として残す */
+    function nkey(v){ return t(v).replace(/[\s　]/g, ''); }
+    var people = [], byKey = {};
+    (S().staff || []).forEach(function (p) {
+      if (!p || p.isSelf) return;
+      var o = { 名前: t(p.name || p.realName), 本名: t(p.realName), 部署: (Array.isArray(p.deptNames) ? p.deptNames.join('・') : t(p.deptNames)) || divName(p.division) || '',
+                入社: s(p.joinedAt), 役割: [p.reception ? '受付' : '', p.front ? 'フロント' : '', p.mech ? 'メカ' : ''].filter(Boolean),
+                予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
+      people.push(o);
+      [p.name, p.realName, p.dispName, p.lastName].concat(Array.isArray(p.aliases) ? p.aliases : []).forEach(function (n) { var k = nkey(n); if (k && !byKey[k]) byKey[k] = o; });
+    });
+    function who(n){
+      var k = nkey(n); if (!k) return null;
+      if (byKey[k]) return byKey[k];
+      var o = { 名前: t(n), 本名: '', 部署: '', 入社: '', 役割: [], 名簿にない: true, 予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
+      people.push(o); byKey[k] = o; return o;
+    }
+    (S().cards || []).forEach(function (c) {
+      if (!c || !c.bookedAt || s(c.bookedAt).slice(0, 7) !== ym) return;
+      var o = who(c.reserveStaff); if (o) o.予約件数++;
+    });
+    try { (w.pitShakenLineTrips ? w.pitShakenLineTrips(moS, moE) : []).forEach(function (tr) { var o = who(tr.staff); if (o) o.車検ライン++; }); } catch (e) {}
+    acts.forEach(function (r) {
+      var f = who(r.c.frontStaff || r.c.staff); if (f){ f.フロント台数++; f.フロント売上 += r.amt; }
+      var ms = mechsOf(r.c);
+      ms.forEach(function (n) { var o = who(n); if (o){ o.メカ台数++; o.メカ生産 += r.amt / ms.length; } });
+    });
+    people.forEach(function (o) { o.フロント売上 = Math.round(o.フロント売上); o.メカ生産 = Math.round(o.メカ生産); });
+    var roster = people.filter(function (o) { return !o.名簿にない || o.予約件数 || o.車検ライン || o.フロント台数 || o.メカ台数; });
+
     /* ---- 休み ---- */
     var closed = [], openHol = [];
     for (var d = 1; d <= C.lastDay; d++){
@@ -296,7 +329,7 @@
       var hol = (w.Holidays && w.Holidays.name) ? s(w.Holidays.name(ds)) : '';
       var dow = '日月火水木金土'.charAt(new Date(y, m0, d).getDay());
       if (isC) closed.push({ 日: ds, 曜日: dow, 理由: lb || hol || '休み' });
-      else if (hol || dow === '土' || dow === '日') openHol.push({ 日: ds, 曜日: dow, 祝日: hol });
+      else if (hol) openHol.push({ 日: ds, 曜日: dow, 祝日: hol });   /* 🗓 v2.137.0 土日の営業はふつう＝載せない（定休は水曜） */
     }
 
     /* ---- 全体 ---- */
@@ -338,9 +371,13 @@
       },
       課: div,
       スライド: slides, 予定から次の月にずれた車: slid,
-      保険: { 実績に入った: insAct, 入金待ち: insWait, 作業完了のまま: insWd },
-      人: { フロントとメカ: staff, 入った人: joined, 辞めた人: left },
-      休み: { 休んだ日: closed, 営業した土日祝: openHol },
+      保険: { 実績に入った: insAct, 入金待ち: insWait, 作業完了のまま: insWd,
+              /* 🛡 v2.137.0（ゆうた「保険の枠が浅い。保険を抜いた各課の数字＝本当の意味で自分たちで仕上げた数字に着目」） */
+              課ごと: { div1: rows.filter(function (r) { return r.保険 && r.課 === 'div1'; }).reduce(function (x, r) { return x + r.金額; }, 0),
+                        div2: rows.filter(function (r) { return r.保険 && r.課 === 'div2'; }).reduce(function (x, r) { return x + r.金額; }, 0) } },
+      人: { フロントとメカ: staff, 入った人: joined, 辞めた人: left, 名簿: roster },
+      休み: { 定休曜日: (w.PitCal && w.PitCal.closedDow ? w.PitCal.closedDow() : []).map(function (n) { return '日月火水木金土'.charAt(n) + '曜'; }),
+              休んだ日: closed, 営業した祝日: openHol },
       未来: { 空く日数: div.div1.未来.空く日数 + div.div2.未来.空く日数,
               伸ばせる売上: div.div1.未来.伸ばせる売上 + div.div2.未来.伸ばせる売上,
               空く置き場: Math.round((div.div1.未来.空く日数 + div.div2.未来.空く日数) / 30 * 10) / 10,
@@ -475,7 +512,8 @@
     '・止まった理由が引継ぎメモ（メモ.いま／メモ.書き換え）に書いてある車は「理由のある止まり」（例：ドイツからのBO）として分けて書く。書いていない車は「理由の無い止まり」。理由のある止まりを責めない。',
     '・工程ごとの日数は、PitFlow でカードの状態を動かした記録から数えている。PitFlow を使い始める前の期間は記録に無いので、長く預かった車ほど工程の合計が預かり日数より短い。そこを断定に使わない。',
     '・フロント＝売上をつくる人、メカ＝生産する人。受付と作業が同じ人に集まっていないかを見る。',
-    '・会社の方針：社長・専務は年齢もあり、現場（メカ）とフロントから手を放していく。2課のチーフと蓮沼さんも、もっとクリエイティブな仕事に注力するため現場から手を放していく。この4人の割合が下がるのは前進で、その分ほかの人に仕事が偏るのは許容されている。**この4人に仕事を戻す提案はしない。** 偏りは残りのフロント・メカの中で見る。',
+    '・定休は資料の「休み.定休曜日」（水曜）。土日・祝日の営業はふつうのこと。「土日も営業した」のような当たり前のことは書かない。休みに触れるのは長期休み（お盆など）と臨時の休みだけ。',
+    '・会社の方針（前提として守るだけ。**本文で方針そのものに触れない**＝「4人が現場から手を放していく中」などと書かない）：社長・専務は年齢もあり、現場（メカ）とフロントから手を放していく。2課のチーフと蓮沼さんも、もっとクリエイティブな仕事に注力するため現場から手を放していく。この4人の割合が下がるのは前進で、その分ほかの人に仕事が偏るのは許容されている。**この4人に仕事を戻す提案はしない。** 偏りは残りのフロント・メカの中で見る。',
     '・このレポートは、チーフ（ゆうた）が自分で数字を見たら言うことの代わり。上の方針に立って書く。',
     '・予約は基本いっぱいで、フロントは予約の獲得にほとんど関わっていない。**予約を取る話は避ける**（次の予約につなげる・予約を増やす・お客さんを呼び込む、などを課題や打ち手にしない）。**早く回して台数を増やす話はよい**（返す速さ・作業の順番・判断待ちを詰めて、同じ予約の枠でより多くの車をこなす）。1台の中身（提案・見積り）を上げる話もよい。',
     '・資料の「通知表」（売上・単価・預かり・返車を ◎○△× で付けたもの。判定は PitFlow が決めた）を必ず踏まえる。△と×の項目は、課題の中で「どうすれば最低△、できれば○にできるか」を具体的に書く。評価を自分で付け直さない。',
@@ -497,7 +535,7 @@
     '【答えの形】次の JSON だけを返す（前後に説明を書かない）。',
     '{',
     '  "総評": ["段落", ...],            // 3〜5段落。1課2課まとめて。地力・大物・営業日・前月比・月の流れ',
-    '  "保険": "段落",                   // ボーナス枠の一言（無ければ空文字）',
+    '  "保険": "段落",                   // 保険を除いた各課の数字（自分たちで仕上げた数字）に着目した1段落。車の名前は並べない（表にある）。当たり前の説明（入金の月がずれる 等）はしない',
     '  "div1": { "日数帯": ["段落"], "工程": ["段落"], "引っぱった車": ["段落"], "時間がかかった車": ["段落"], "スライド": ["段落"], "人": ["段落"], "課題": ["1つの課題＝1段落", ...] },',
     '  "div2": { 同じ形 },',
     '  "全体の課題": ["1つの課題＝1段落", ...],   // 3〜5個',
@@ -774,7 +812,7 @@
     h += '<div class="air-rh"><h2>' + esc(F.月.replace('-', '年').replace(/^(\d+年)0?/, '$1')) + '月 月次レポート</h2>'
        + '<div class="meta">書き出し ' + esc(s(R.書き出した日時).slice(0, 16).replace('T', ' ')) + (R.書き出した人 ? '・' + esc(R.書き出した人) : '')
        + '<br>この時点のデータと目標で固定（あとでカードや目標を変えても、この中は変わりません）</div></div>';
-    h += '<div class="air-toc"><a onclick="pitAiRepJump(\'all\')">全体</a>' + DIVS.map(function (D) { return '<a onclick="pitAiRepJump(\'' + D[0] + '\')">' + esc(F.課[D[0]].名前) + '</a>'; }).join('') + '<a onclick="pitAiRepJump(\'issues\')">全体の課題</a><a onclick="pitAiRepJump(\'future\')">改善した未来</a></div>';
+    h += '<div class="air-toc"><a onclick="pitAiRepJump(\'all\')">全体</a>' + DIVS.map(function (D) { return '<a onclick="pitAiRepJump(\'' + D[0] + '\')">' + esc(F.課[D[0]].名前) + '</a>'; }).join('') + '<a onclick="pitAiRepJump(\'issues\')">全体の課題</a><a onclick="pitAiRepJump(\'future\')">改善した未来</a><a onclick="pitAiRepJump(\'roster\')">スタッフ名簿</a></div>';
 
     /* 全体 */
     h += '<h2 class="air-part all" id="air-all">全体の総評</h2><div class="air-kpis">'
@@ -794,7 +832,13 @@
     h += '<div class="air-sum">' + paras(F, A.総評) + '</div>';
 
     var I = F.保険;
-    h += '<div class="air-bonus"><h3>保険（ボーナス枠）</h3><table class="air-t">'
+    /* 🛡 v2.137.0 保険を除いた「自分たちで仕上げた数字」を先頭に */
+    var own = DIVS.map(function (D) {
+      var x = F.課[D[0]], ins = (I.課ごと && I.課ごと[D[0]]) || 0;
+      return '<div class="air-own">' + dvChip(x.短い名前, x.色) + ' <b>' + man(x.実績) + '</b><span>目標の下限の ' + pct(x.実績, x.目標.min) + '%'
+           + (ins ? '・保険 ' + man(ins) + ' は別' : '') + '</span></div>';
+    }).join('');
+    h += '<div class="air-bonus"><h3>保険（ボーナス枠）</h3><div class="air-own-h">保険を除いた、自分たちで仕上げた数字</div><div class="air-owns">' + own + '</div><table class="air-t">'
        + '<tr><th>この月の実績に入った保険</th><td>' + (I.実績に入った.length ? I.実績に入った.map(function (x) { return carChip(F, x.id) + ' ' + man(x.金額); }).join('　') : '0台') + '</td></tr>'
        + '<tr><th>この月に売上日・入金待ち（次の月以降のボーナス候補）</th><td>' + (I.入金待ち.length ? I.入金待ち.map(function (x) { return carChip(F, x.id) + ' ' + (x.金額 ? man(x.金額) : '金額未入力'); }).join('　') : '0台') + '</td></tr>'
        + '<tr><th>作業完了・返車待ちの保険</th><td>' + (I.作業完了のまま.length ? I.作業完了のまま.map(function (x) { return carChip(F, x.id) + ' ' + man(x.金額); }).join('　') : '0台') + '</td></tr>'
@@ -824,6 +868,7 @@
        + paras(F, Fu.全体)
        + '<div class="how">⚠ 伸ばせる売上は、予約は基本いっぱい＝空いた枠はそのまま次の車に回せる、という前提で数えています。月をまたいだ車の分は月の入れ替わりで相殺されるので足していません。</div></div></div>';
 
+    h += rosterHtml(F);
     h += '<div class="air-foot"><b>このレポートが使ったもの</b>（書き出した時点の PitFlow のデータ）<ul>'
        + '<li>実績＝売上ビューと同じ数え方。課＝カードの課。メーカーは BMW の MINI と MINI をまとめて「MINI」</li>'
        + '<li>目標＝書き出した時点の月目標（下限 ' + man(F.目標.下限) + '・上限 ' + man(F.目標.上限) + '・国産 ' + F.目標.国産の割合 + '%）</li>'
@@ -875,6 +920,24 @@
     var h = '<div class="air-ura"><div class="air-ura-h"><h2>MTGで話すこと</h2><span class="air-lock">🔒 社長・専務・チーフだけに見えています</span></div>';
     if (!M2) return h + '<div class="air-ura-none">このレポートは「MTGで話すこと」を作る前に書き出したものです。「書き出し直す」を押すと出ます。</div></div>';
     return h + '<div class="air-mcols">' + mtgCol(R.数字, 'div1', M2.div1) + mtgCol(R.数字, 'div2', M2.div2) + mtgCol(R.数字, '全体', M2.全体) + '</div></div>';
+  }
+
+  /* 👥 v2.137.0 スタッフ名簿（この月の結果）。数字は PitFlow が数えたまま（AI は書かない） */
+  function rosterHtml(F){
+    var L = (F.人 && F.人.名簿) || [];
+    if (!L.length) return '';
+    function c(n){ return n ? String(n) : '<span class="air-muted">—</span>'; }
+    var h = '<h2 class="air-part all" id="air-roster">スタッフ名簿（この月の結果）</h2><table class="air-t air-roster"><tr>'
+          + '<th>名前</th><th>本名</th><th>部署</th><th>入社</th><th>役割</th><th class="n">予約件数<small>受付</small></th><th class="n">車検ライン<small>回送</small></th>'
+          + '<th class="n">フロント<small>売上台数</small></th><th class="n">メカ<small>売上台数</small></th></tr>';
+    L.forEach(function (o) {
+      h += '<tr><td><b>' + esc(o.名前) + '</b>' + (o.名簿にない ? ' <span class="air-tag">名簿にない</span>' : '') + '</td><td>' + esc(o.本名 || '') + '</td><td>' + esc(o.部署 || '') + '</td>'
+         + '<td>' + esc(s(o.入社).slice(0, 7).replace('-', '/')) + '</td><td>' + esc((o.役割 || []).join('・')) + '</td>'
+         + '<td class="n">' + c(o.予約件数) + '</td><td class="n">' + c(o.車検ライン) + '</td>'
+         + '<td class="n">' + (o.フロント台数 ? o.フロント台数 + '台<i>' + man(o.フロント売上) + '</i>' : c(0)) + '</td>'
+         + '<td class="n">' + (o.メカ台数 ? o.メカ台数 + '台<i>' + man(o.メカ生産) + '</i>' : c(0)) + '</td></tr>';
+    });
+    return h + '</table><div class="air-mini">予約件数＝この月に予約を受けた件数／車検ライン＝陸運局へ行った回数（1人目）／フロント・メカ＝この月の実績の台数（メカの金額は複数担当なら均等割り）</div>';
   }
 
   function closeHtml(U, mm, ym){

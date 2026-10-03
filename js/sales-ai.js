@@ -120,6 +120,29 @@
     Object.keys(out).forEach(function (k) { out[k] = Math.round(out[k] * 10) / 10; });
     return out;
   }
+  /* ================================================================
+     💰 v2.139.0（ゆうた 2026-10-03「原価が PDF から入力されてるんだから、原価・粗利もガンガン触れていい。
+        この資料を見るメンバーには開示してる」「粗利ベースの話は OK。最終的な着地は売上を目指す感じで（社員の理解がそっちの方がいい）」）
+     ◎原価の出どころ＝クォーターチェックで車に書き込んだ伝票（予約番号でカードと結ぶ）。月締め＝全部書き込み済み、なので締めた月はそろう
+     ⚠ 工賃（作業）の原価は伝票上ほぼ0＝粗利は「部品の利益＋工賃」。人件費は入っていない
+     ⚠ 伝票が無い車（業販など）は粗利の計算から外す（売上の数字はそのまま）
+     ================================================================ */
+  function costOf(c){
+    try {
+      var h = w.pitVehByPlate ? w.pitVehByPlate(c.plate) : null;
+      var d = h && h.veh && (h.veh.伝票 || []).filter(function (x) { return x && t(x.予約番号) && t(x.予約番号) === t(c.resNo); })[0];
+      if (!d) return null;
+      var o = { 原価: num(d.原価), 工賃: 0, 工賃原価: 0, 部品: 0, 部品原価: 0 };
+      (d.明細 || []).forEach(function (m) {
+        if (!m) return;
+        if (m.種 === '部品'){ o.部品 += num(m.金額); o.部品原価 += num(m.原価); }
+        else if (m.種 === '作業'){ o.工賃 += num(m.金額); o.工賃原価 += num(m.原価); }
+      });
+      return o;
+    } catch (e) { return null; }
+  }
+  function r1(a, b){ return b ? Math.round(a / b * 1000) / 10 : null; }   /* 率（小数1桁・%） */
+
   /* ⑩ 止まった理由を読むための材料：いまの引継ぎメモと、その書き換えの記録（日付つき） */
   function memoTrail(c){
     var a = [];
@@ -152,7 +175,9 @@
       var a = list.filter(function (r) { return r.tier === 'actual' && !insOf(r.c); });
       var sum = a.reduce(function (x, r) { return x + r.amt; }, 0);
       var st = a.map(function (r) { return days(r.c.actualInAt, r.c.completedAt); }).filter(function (v) { return v != null; }).sort(function (p, q) { return p - q; });
-      return { 台単価: a.length ? Math.round(sum / a.length) : null, 預かり中央値: st.length ? st[Math.floor(st.length / 2)] : null };
+      var gu = 0, ga = 0;
+      a.forEach(function (r) { var co = costOf(r.c); if (co){ gu += r.amt; ga += r.amt - co.原価; } });
+      return { 台単価: a.length ? Math.round(sum / a.length) : null, 預かり中央値: st.length ? st[Math.floor(st.length / 2)] : null, 粗利率: r1(ga, gu) };
     }
     var prevStats = { 全体: statsOf(P.rows),
                       div1: statsOf(P.rows.filter(function (r) { return r.course === 'div1'; })),
@@ -164,8 +189,10 @@
     var rows = acts.map(function (r) {
       var c = r.c, stay = days(c.actualInAt, c.completedAt);
       var ph = phasesOf(c, c.completedAt);
+      var co = costOf(c);
       reg(c);
       return { id: c.id, 課: r.course, 保険: insOf(c), 大物: r.amt >= bigLine, 金額: r.amt,
+               原価: co ? co.原価 : null, 粗利: co ? r.amt - co.原価 : null, 内訳: co,
                メーカー: makerOf(c), 作業: wtLabelOf(c), フロント: shortFront(r.front), メカ: mechsOf(c).map(shortFront),
                担当の入れ忘れ: mechMissing(c),
                入庫: s(c.actualInAt), 完了: s(c.completedAt), 返車予定: s(c.returnDatePlan), 預かり: stay, 工程: ph,
@@ -183,11 +210,24 @@
       var dsum = st.reduce(function (x, r) { return x + Math.max(1, r.預かり); }, 0);
       var nb = st.filter(function (r) { return !r.大物; });
       var nbSum = nb.reduce(function (x, r) { return x + r.金額; }, 0), nbDays = nb.reduce(function (x, r) { return x + Math.max(1, r.預かり); }, 0);
+      /* 💰 粗利（原価のある車だけで数える） */
+      function araOf(list){
+        var x = list.filter(function (r) { return r.粗利 != null; });
+        var u = x.reduce(function (q, r) { return q + r.金額; }, 0), g = x.reduce(function (q, r) { return q + r.粗利; }, 0);
+        var xs = x.filter(function (r) { return r.預かり != null; });
+        var dd = xs.reduce(function (q, r) { return q + Math.max(1, r.預かり); }, 0), gs = xs.reduce(function (q, r) { return q + r.粗利; }, 0);
+        return { 粗利: g, 粗利率: r1(g, u), 台あたり: x.length ? Math.round(g / x.length) : 0, 一日あたり: dd ? Math.round(gs / dd) : 0, 台数: x.length };
+      }
       var bk = [['〜3日', 0, 3], ['4〜7日', 4, 7], ['8〜14日', 8, 14], ['15〜30日', 15, 30], ['31日〜', 31, 99999]].map(function (b) {
         var x = st.filter(function (r) { return r.預かり >= b[1] && r.預かり <= b[2] && !r.大物; });
         var sm = x.reduce(function (q, r) { return q + r.金額; }, 0), dd = x.reduce(function (q, r) { return q + Math.max(1, r.預かり); }, 0);
-        return { 帯: b[0], 台数: x.length, 金額: sm, のべ日数: dd, 一日あたり: dd ? Math.round(sm / dd) : 0, 台単価: x.length ? Math.round(sm / x.length) : 0 };
+        var ag = araOf(x);
+        return { 帯: b[0], 台数: x.length, 金額: sm, のべ日数: dd, 一日あたり: dd ? Math.round(sm / dd) : 0, 台単価: x.length ? Math.round(sm / x.length) : 0,
+                 粗利: ag.粗利, 粗利率: ag.粗利率, 一日あたり粗利: ag.一日あたり };
       });
+      var AG = araOf(a);
+      var wU = 0, wA = 0, pU = 0, pA = 0;
+      a.forEach(function (r) { if (!r.内訳) return; wU += r.内訳.工賃; wA += r.内訳.工賃 - r.内訳.工賃原価; pU += r.内訳.部品; pA += r.内訳.部品 - r.内訳.部品原価; });
       var bigs = st.filter(function (r) { return r.大物; }).map(function (r) {
         return { id: r.id, 金額: r.金額, 預かり: r.預かり, 一日あたり: Math.round(r.金額 / Math.max(1, r.預かり)) };
       });
@@ -204,15 +244,18 @@
         ms.forEach(function (n) { me[n] = me[n] || { 名前: n, 台数: 0, 生産: 0 }; me[n].台数++; me[n].生産 += r.金額 / ms.length; });
       });
       var mk = {}; a.forEach(function (r) { var q = r.メーカー; mk[q] = mk[q] || { メーカー: q, 台数: 0, 金額: 0 }; mk[q].台数++; mk[q].金額 += r.金額; });
-      var wt = {}; a.forEach(function (r) { var q = r.作業; wt[q] = wt[q] || { 作業: q, 台数: 0, 金額: 0 }; wt[q].台数++; wt[q].金額 += r.金額; });
+      var wt = {}; a.forEach(function (r) { var q = r.作業; wt[q] = wt[q] || { 作業: q, 台数: 0, 金額: 0, _l: [] }; wt[q].台数++; wt[q].金額 += r.金額; wt[q]._l.push(r); });
+      Object.keys(wt).forEach(function (q) { var g = araOf(wt[q]._l); wt[q].粗利 = g.粗利; wt[q].粗利率 = g.粗利率; wt[q].一日あたり粗利 = g.一日あたり; delete wt[q]._l; });
       var late = a.filter(function (r) { return r.返車予定 && r.完了 && r.完了 > r.返車予定; })
                   .map(function (r) { return { id: r.id, 返車予定: r.返車予定, 完了: r.完了, 遅れ: days(r.返車予定, r.完了), 金額: r.金額 }; })
                   .sort(function (p, q) { return q.遅れ - p.遅れ; });
       var top = a.slice().sort(function (p, q) { return q.金額 - p.金額; }).slice(0, 6).map(function (r) {
-        return { id: r.id, 作業: r.作業, 金額: r.金額, 預かり: r.預かり, 一日あたり: r.預かり != null ? Math.round(r.金額 / Math.max(1, r.預かり)) : null, 症状: r.メモ.症状 };
+        return { id: r.id, 作業: r.作業, 金額: r.金額, 預かり: r.預かり, 一日あたり: r.預かり != null ? Math.round(r.金額 / Math.max(1, r.預かり)) : null, 症状: r.メモ.症状,
+                 粗利: r.粗利, 粗利率: r.粗利 != null ? r1(r.粗利, r.金額) : null };
       });
       var slow = st.slice().sort(function (p, q) { return q.預かり - p.預かり; }).slice(0, 6).map(function (r) {
         return { id: r.id, 預かり: r.預かり, 工程: r.工程, 金額: r.金額, 一日あたり: Math.round(r.金額 / Math.max(1, r.預かり)),
+                 粗利: r.粗利, 一日あたり粗利: r.粗利 != null ? Math.round(r.粗利 / Math.max(1, r.預かり)) : null,
                  入庫: r.入庫, 完了: r.完了, 返車予定: r.返車予定, メモ: r.メモ };
       });
       /* 改善した未来（モックの計算そのまま・車ごとに）
@@ -239,6 +282,9 @@
                  平均: stays.length ? Math.round(stays.reduce(function (x, v) { return x + v; }, 0) / stays.length * 10) / 10 : null,
                  のべ: dsum, 一日あたり: dsum ? Math.round(sum / dsum) : 0, 平均在庫台数: Math.round(dsum / 30 * 10) / 10 },
         日数帯: bk, 工程: phases,
+        粗利: { 粗利: AG.粗利, 粗利率: AG.粗利率, 台あたり: AG.台あたり, 一日あたり: AG.一日あたり, 原価のある台数: AG.台数, 原価の無い台数: a.length - AG.台数,
+                工賃: { 売上: Math.round(wU), 粗利: Math.round(wA), 粗利率: r1(wA, wU) }, 部品: { 売上: Math.round(pU), 粗利: Math.round(pA), 粗利率: r1(pA, pU) },
+                前月の粗利率: prevStats[k].粗利率 },
         作業完了から返車: { 台数: wd.length, のべ日数: Math.round(wd.reduce(function (x, r) { return x + r.工程.workDone; }, 0)),
                          三日以上: wd.filter(function (r) { return r.工程.workDone >= 3; }).length },
         フロント: Object.keys(fr).map(function (q) { return fr[q]; }).sort(function (p, q) { return q.売上 - p.売上; }),
@@ -248,7 +294,7 @@
         予定遅れ: { 台数: late.length, 上位: late.slice(0, 5) },
         引っぱった車: top, 時間がかかった車: slow,
         未来: { 空く日数: freed, 内訳: { 作業完了から返車: Math.round(fWd), 中くらいの仕事: Math.round(fMid), 長期預かり: Math.round(fLong) },
-                伸ばせる売上: Math.round(freed * perDayNB), 空く置き場: Math.round(freed / 30 * 10) / 10,
+                伸ばせる売上: Math.round(freed * perDayNB), 伸ばせる粗利: Math.round(freed * AG.一日あたり), 空く置き場: Math.round(freed / 30 * 10) / 10,
                 見込み: sum - bigs.reduce(function (x, b) { return x + b.金額; }, 0) + Math.round(freed * perDayNB) },
         /* 🔴 v2.135.0 データチェック（T03・作業タイプ）と同じ物差し。「なし」を押した車は抜けに数えない */
         入力の抜け: { 作業タイプ: a.filter(function (r) { return r.作業 === '未入力'; }).length,
@@ -391,6 +437,13 @@
         台単価_保険を除く: allNi.length ? Math.round(allNi.reduce(function (x, r) { return x + r.金額; }, 0) / allNi.length) : null,
         前月の台単価: prevStats.全体.台単価, 預かり中央値: allSt.length ? allSt[Math.floor(allSt.length / 2)] : null, 前月の預かり中央値: prevStats.全体.預かり中央値,
         作業完了から返車: { 台数: allWd.length, のべ日数: Math.round(allWd.reduce(function (x, r) { return x + r.工程.workDone; }, 0)) },
+        粗利: (function () {
+          var x = allNi.filter(function (r) { return r.粗利 != null; }), u = x.reduce(function (q, r) { return q + r.金額; }, 0), g = x.reduce(function (q, r) { return q + r.粗利; }, 0);
+          var xs = x.filter(function (r) { return r.預かり != null; }), dd = xs.reduce(function (q, r) { return q + Math.max(1, r.預かり); }, 0), gs = xs.reduce(function (q, r) { return q + r.粗利; }, 0);
+          var ins = rows.filter(function (r) { return r.保険 && r.粗利 != null; }), iu = ins.reduce(function (q, r) { return q + r.金額; }, 0), ig = ins.reduce(function (q, r) { return q + r.粗利; }, 0);
+          return { 粗利: g, 粗利率: r1(g, u), 台あたり: x.length ? Math.round(g / x.length) : 0, 一日あたり: dd ? Math.round(gs / dd) : 0,
+                   原価のある台数: x.length, 前月の粗利率: prevStats.全体.粗利率, 保険の粗利: ig, 保険の粗利率: r1(ig, iu) };
+        })(),
         営業日: biz ? biz.total : null, 前月営業日: bizP ? bizP.total : null,
         一日あたり: (biz && biz.total) ? Math.round(total / biz.total) : null,
         前月一日あたり: (bizP && bizP.total) ? Math.round(P.tiers.actual.sum / bizP.total) : null,
@@ -411,6 +464,7 @@
               休んだ日: closed },
       未来: { 空く日数: div.div1.未来.空く日数 + div.div2.未来.空く日数,
               伸ばせる売上: div.div1.未来.伸ばせる売上 + div.div2.未来.伸ばせる売上,
+              伸ばせる粗利: div.div1.未来.伸ばせる粗利 + div.div2.未来.伸ばせる粗利,
               空く置き場: Math.round((div.div1.未来.空く日数 + div.div2.未来.空く日数) / 30 * 10) / 10,
               見込み: total - bigSum - insSum + div.div1.未来.伸ばせる売上 + div.div2.未来.伸ばせる売上 },
       車: cars
@@ -429,11 +483,14 @@
      ⚠ 前月が無い（PitFlow を使い始めた月など）は「—」。
      ================================================================ */
   var GRADE_RULE = { 売上: '目標の上限以上◎・下限以上○・下限の90%以上△', 単価: '前月比 +5%以上◎・±5%以内○・-15%まで△',
-                     預かり: '日数の中央値が前月より10%以上短い◎・10%増まで○・30%増まで△', 返車: '作業完了→返車 1台あたり 1日以内◎・1.5日以内○・2.5日以内△' };
+                     預かり: '日数の中央値が前月より10%以上短い◎・10%増まで○・30%増まで△', 返車: '作業完了→返車 1台あたり 1日以内◎・1.5日以内○・2.5日以内△',
+                     粗利率: '前月比 +2ポイント以上◎・±2ポイント以内○・-5ポイントまで△' };
   function g4(v, a, b, c){ return v == null ? '—' : (v >= a ? '◎' : (v >= b ? '○' : (v >= c ? '△' : '×'))); }
   function gLow(v, a, b, c){ return v == null ? '—' : (v <= a ? '◎' : (v <= b ? '○' : (v <= c ? '△' : '×'))); }
-  function gradeOne(sales, lo, hi, unit, unitP, med, medP, wdDays, wdN){
+  function gradeOne(sales, lo, hi, unit, unitP, med, medP, wdDays, wdN, gr, grP){
     var r = {};
+    var gd = (gr != null && grP != null) ? Math.round((gr - grP) * 10) / 10 : null;
+    r.粗利率 = { 評価: g4(gd, 2, -2, -5), 値: (gr == null ? '原価なし' : gr + '%' + (grP == null ? '（前月なし）' : '（前月 ' + grP + '%）')) };
     r.売上 = { 評価: (lo ? (sales >= hi ? '◎' : (sales >= lo ? '○' : (sales >= lo * 0.9 ? '△' : '×'))) : '—'), 値: lo ? '下限の' + pct(sales, lo) + '%' : '' };
     var ur = (unit && unitP) ? unit / unitP : null;
     r.単価 = { 評価: g4(ur, 1.05, 0.95, 0.85), 値: (ur == null ? '前月なし' : man(unit) + '（前月 ' + man(unitP) + '）') };
@@ -446,17 +503,19 @@
   function grades(F){
     var G = F.全体, o = {};
     o.全体 = gradeOne(G.実績, F.目標.下限, F.目標.上限, G.台単価_保険を除く, G.前月の台単価, G.預かり中央値, G.前月の預かり中央値,
-                      G.作業完了から返車 ? G.作業完了から返車.のべ日数 : 0, G.作業完了から返車 ? G.作業完了から返車.台数 : 0);
+                      G.作業完了から返車 ? G.作業完了から返車.のべ日数 : 0, G.作業完了から返車 ? G.作業完了から返車.台数 : 0,
+                      G.粗利 ? G.粗利.粗利率 : null, G.粗利 ? G.粗利.前月の粗利率 : null);
     ['div1', 'div2'].forEach(function (k) {
       var D = F.課[k]; if (!D) return;
       o[k] = gradeOne(D.実績, D.目標 && D.目標.min, D.目標 && D.目標.max, D.台単価, D.前月の台単価, D.預かり && D.預かり.中央値, D.前月の預かり中央値,
-                      D.作業完了から返車 ? D.作業完了から返車.のべ日数 : 0, D.作業完了から返車 ? D.作業完了から返車.台数 : 0);
+                      D.作業完了から返車 ? D.作業完了から返車.のべ日数 : 0, D.作業完了から返車 ? D.作業完了から返車.台数 : 0,
+                      D.粗利 ? D.粗利.粗利率 : null, D.粗利 ? D.粗利.前月の粗利率 : null);
     });
     return o;
   }
   function gradeHtml(r){
     if (!r) return '';
-    return '<div class="air-card">' + ['売上', '単価', '預かり', '返車'].map(function (k) {
+    return '<div class="air-card">' + ['売上', '単価', '粗利率', '預かり', '返車'].map(function (k) {
       var x = r[k] || { 評価: '—', 値: '' };
       var c = { '◎': 'g1', '○': 'g2', '△': 'g3', '×': 'g4' }[x.評価] || 'g0';
       return '<div class="air-g ' + c + '" title="' + esc(GRADE_RULE[k]) + '"><span>' + k + '</span><b>' + esc(x.評価) + '</b><i>' + esc(x.値) + '</i></div>';
@@ -544,6 +603,9 @@
     '・工程ごとの日数は、PitFlow でカードの状態を動かした記録から数えている。PitFlow を使い始める前の期間は記録に無いので、長く預かった車ほど工程の合計が預かり日数より短い。そこを断定に使わない。',
     '・フロント＝売上をつくる人、メカ＝生産する人。受付と作業が同じ人に集まっていないかを見る。',
     '・休みは資料の「休み.休んだ日」（MHS で休みに決めた日）だけ。定休は水曜。土日・祝日の営業はふつうのことなので、「土日も営業した」「祝日も営業した」のような当たり前のことは書かない。休みに触れるのは長期休み（お盆など）と臨時の休みだけ。',
+    '・原価と粗利は、このレポートを読む人に開示している。粗利（売上−伝票の原価）・粗利率・1台あたり粗利・預かり1日あたり粗利・工賃と部品の内わけを**どんどん使って**、長く預かった車や作業の種類の良し悪しを一段深く語る（例：長い車は遅いだけでなく粗利も薄い／中身を上げる＝部品より作業を1つ足す）。',
+    '・ただし**最終的な着地（目標・見込み・改善した未来・MTG の来月やること）は売上で語る**。社員には売上のほうが分かりやすいため。粗利は「なぜそうするのか」の理由づけに使う。',
+    '・粗利の前提：工賃の原価は伝票上ほぼ0なので、粗利は「部品の利益＋工賃」で人件費は入っていない。粗利率が高く見えることを前提に読む。原価の無い車（業販など）は粗利から外してある。',
     '・会社の方針（前提として守るだけ。**本文で方針そのものに触れない**＝「4人が現場から手を放していく中」などと書かない）：社長・専務は年齢もあり、現場（メカ）とフロントから手を放していく。2課のチーフと蓮沼さんも、もっとクリエイティブな仕事に注力するため現場から手を放していく。この4人の割合が下がるのは前進で、その分ほかの人に仕事が偏るのは許容されている。**この4人に仕事を戻す提案はしない。** 偏りは残りのフロント・メカの中で見る。',
     '・このレポートは、チーフ（ゆうた）が自分で数字を見たら言うことの代わり。上の方針に立って書く。',
     '・予約は基本いっぱいで、フロントは予約の獲得にほとんど関わっていない。**予約を取る話は避ける**（次の予約につなげる・予約を増やす・お客さんを呼び込む、などを課題や打ち手にしない）。**早く回して台数を増やす話はよい**（返す速さ・作業の順番・判断待ちを詰めて、同じ予約の枠でより多くの車をこなす）。1台の中身（提案・見積り）を上げる話もよい。',
@@ -586,7 +648,8 @@
     '・各項目は1〜3個の要点。1つ35字くらいまで。です・ますは付けない体言止めでよい。人は「◯◯さん」。',
     '・来月やることは、やることがはっきり見える言い方で2つまで（例：「長くなりそうな車は毎週、片づける日を決める」）。',
     '・聞かれたらは1つだけ。社長が答えに詰まりそうな問いと、その短い答え。',
-    '・本文と同じ方針を守る（4人に仕事を戻さない・予約を取る話はしない・早く回して台数を増やす話と1台の中身の話はよい・保険はボーナス）。車の {{car:ID}} はここでは使わない。'
+    '・本文と同じ方針を守る（4人に仕事を戻さない・予約を取る話はしない・早く回して台数を増やす話と1台の中身の話はよい・保険はボーナス）。車の {{car:ID}} はここでは使わない。',
+    '・粗利の要点も入れてよい（例：「中身を上げる＝作業を1つ足す。工賃はほぼ粗利」）。ただし目標と来月やることは売上で言う。'
   ].join('\n');
 
   function slimForAi(F){
@@ -772,18 +835,21 @@
        + kpi('台数・台単価', D.台数 + '台・' + man(D.台単価), D.大物.length ? '大物を除くと ' + man(D.大物を除く.実績) : '')
        + kpi('預かり日数', '中央値 ' + (D.預かり.中央値 == null ? '—' : D.預かり.中央値 + '日'), '平均 ' + (D.預かり.平均 == null ? '—' : D.預かり.平均 + '日') + '／のべ ' + D.預かり.のべ + '日')
        + kpi('預かり1日あたりの稼ぎ', yen(D.預かり.一日あたり), D.大物.length ? '大物を除くと ' + yen(D.大物を除く.一日あたり) : '')
-       + '</div>' + gradeHtml((F.通知表 || grades(F))[k]);
+       + (D.粗利 ? kpi('粗利', man(D.粗利.粗利) + '・' + D.粗利.粗利率 + '%', '1台 ' + man(D.粗利.台あたり) + '／預かり1日 ' + yen(D.粗利.一日あたり)) : '')
+       + '</div>' + gradeHtml((F.通知表 || grades(F))[k])
+       + (D.粗利 && D.粗利.工賃 ? '<div class="air-mini">粗利の内わけ：工賃 ' + man(D.粗利.工賃.粗利) + '（工賃の ' + D.粗利.工賃.粗利率 + '%）／部品 ' + man(D.粗利.部品.粗利) + '（部品の ' + D.粗利.部品.粗利率 + '%）'
+          + (D.粗利.原価の無い台数 ? '／原価の無い ' + D.粗利.原価の無い台数 + '台は外した' : '') + '</div>' : '');
 
-    h += '<section><h3>預かり日数ごとの稼ぎ方' + (D.大物.length ? '<small>（大物は別の行）</small>' : '') + '</h3><table class="air-t"><tr><th>預かり</th><th class="n">台数</th><th class="n">金額</th><th class="n">のべ日数</th><th class="n">1日あたり</th><th class="n">台単価</th></tr>';
+    h += '<section><h3>預かり日数ごとの稼ぎ方' + (D.大物.length ? '<small>（大物は別の行）</small>' : '') + '</h3><table class="air-t"><tr><th>預かり</th><th class="n">台数</th><th class="n">金額</th><th class="n">のべ日数</th><th class="n">1日あたり</th><th class="n">台単価</th><th class="n">粗利率</th><th class="n">1日あたり粗利</th></tr>';
     var best = Math.max.apply(null, D.日数帯.map(function (b) { return b.台数 ? b.一日あたり : 0; }));
     var worst = Math.min.apply(null, D.日数帯.filter(function (b) { return b.台数; }).map(function (b) { return b.一日あたり; }).concat([Infinity]));
     D.日数帯.forEach(function (b) {
       if (!b.台数) return;
       var cls = b.一日あたり === best ? ' class="up"' : (b.一日あたり === worst ? ' class="dn"' : '');
-      h += '<tr><td>' + esc(b.帯) + '</td><td class="n">' + b.台数 + '台</td><td class="n">' + man(b.金額) + '</td><td class="n">' + b.のべ日数 + '日</td><td class="n"><b' + cls + '>' + yen(b.一日あたり) + '</b></td><td class="n">' + man(b.台単価) + '</td></tr>';
+      h += '<tr><td>' + esc(b.帯) + '</td><td class="n">' + b.台数 + '台</td><td class="n">' + man(b.金額) + '</td><td class="n">' + b.のべ日数 + '日</td><td class="n"><b' + cls + '>' + yen(b.一日あたり) + '</b></td><td class="n">' + man(b.台単価) + '</td><td class="n">' + (b.粗利率 == null ? '—' : b.粗利率 + '%') + '</td><td class="n">' + (b.一日あたり粗利 ? yen(b.一日あたり粗利) : '—') + '</td></tr>';
     });
     D.大物.forEach(function (b) {
-      h += '<tr class="air-muted"><td>大物 ' + carChip(F, b.id) + '</td><td class="n">1台</td><td class="n">' + man(b.金額) + '</td><td class="n">' + b.預かり + '日</td><td class="n">' + yen(b.一日あたり) + '</td><td class="n">' + man(b.金額) + '</td></tr>';
+      h += '<tr class="air-muted"><td>大物 ' + carChip(F, b.id) + '</td><td class="n">1台</td><td class="n">' + man(b.金額) + '</td><td class="n">' + b.預かり + '日</td><td class="n">' + yen(b.一日あたり) + '</td><td class="n">' + man(b.金額) + '</td><td class="n"></td><td class="n"></td></tr>';
     });
     h += '</table>' + paras(F, T.日数帯) + '</section>';
 
@@ -795,21 +861,21 @@
     }
     h += paras(F, T.工程) + '</section>';
 
-    h += '<section><h3>引っぱった車</h3><table class="air-t"><tr><th>車</th><th>作業</th><th class="n">金額</th><th class="n">預かり</th><th class="n">1日あたり</th></tr>';
+    h += '<section><h3>引っぱった車</h3><table class="air-t"><tr><th>車</th><th>作業</th><th class="n">金額</th><th class="n">粗利</th><th class="n">預かり</th><th class="n">1日あたり</th></tr>';
     D.引っぱった車.forEach(function (r) {
-      h += '<tr><td>' + carChip(F, r.id) + '</td><td>' + esc(r.作業) + '</td><td class="n">' + man(r.金額) + '</td><td class="n">' + (r.預かり == null ? '—' : r.預かり + '日') + '</td><td class="n">' + (r.一日あたり == null ? '—' : yen(r.一日あたり)) + '</td></tr>';
+      h += '<tr><td>' + carChip(F, r.id) + '</td><td>' + esc(r.作業) + '</td><td class="n">' + man(r.金額) + '</td><td class="n">' + (r.粗利 == null ? '—' : man(r.粗利) + '<i class="air-sub">' + r.粗利率 + '%</i>') + '</td><td class="n">' + (r.預かり == null ? '—' : r.預かり + '日') + '</td><td class="n">' + (r.一日あたり == null ? '—' : yen(r.一日あたり)) + '</td></tr>';
     });
     h += '</table>';
     h += '<div class="air-mini">' + D.メーカー.slice(0, 6).map(function (x) { return esc(x.メーカー) + ' ' + x.台数 + '台・' + man(x.金額); }).join('　／　') + '</div>';
-    h += '<div class="air-mini">' + D.作業.map(function (x) { return esc(x.作業) + ' ' + x.台数 + '台・' + man(x.金額); }).join('　／　') + '</div>';
+    h += '<div class="air-mini">' + D.作業.map(function (x) { return esc(x.作業) + ' ' + x.台数 + '台・' + man(x.金額) + (x.粗利率 != null ? '（粗利率 ' + x.粗利率 + '%）' : ''); }).join('　／　') + '</div>';
     h += paras(F, T.引っぱった車) + '</section>';
 
-    h += '<section><h3>時間がかかった車</h3><table class="air-t"><tr><th>車</th><th class="n">預かり</th><th>どこで止まったか（記録）</th><th>引継ぎメモ</th><th class="n">金額</th><th class="n">1日あたり</th></tr>';
+    h += '<section><h3>時間がかかった車</h3><table class="air-t"><tr><th>車</th><th class="n">預かり</th><th>どこで止まったか（記録）</th><th>引継ぎメモ</th><th class="n">金額</th><th class="n">1日あたり</th><th class="n">1日あたり粗利</th></tr>';
     D.時間がかかった車.forEach(function (r) {
       var ph = Object.keys(r.工程).sort(function (a, b) { return r.工程[b] - r.工程[a]; }).slice(0, 3)
                  .map(function (p) { return esc(phaseLabel(p)) + ' ' + r.工程[p] + '日'; }).join('・') || '（記録なし）';
       var late = (r.返車予定 && r.完了 > r.返車予定) ? '<br><span class="air-tag r">返車予定 ' + md(r.返車予定) + ' → 完了 ' + md(r.完了) + '</span>' : '';
-      h += '<tr><td>' + carChip(F, r.id) + '</td><td class="n"><span class="air-tag ' + (r.預かり >= 31 ? 'r' : 'o') + '">' + r.預かり + '日</span></td><td>' + ph + late + '</td><td class="air-memo">' + esc(r.メモ.いま || '—') + '</td><td class="n">' + man(r.金額) + '</td><td class="n">' + yen(r.一日あたり) + '</td></tr>';
+      h += '<tr><td>' + carChip(F, r.id) + '</td><td class="n"><span class="air-tag ' + (r.預かり >= 31 ? 'r' : 'o') + '">' + r.預かり + '日</span></td><td>' + ph + late + '</td><td class="air-memo">' + esc(r.メモ.いま || '—') + '</td><td class="n">' + man(r.金額) + '</td><td class="n">' + yen(r.一日あたり) + '</td><td class="n">' + (r.一日あたり粗利 == null ? '—' : yen(r.一日あたり粗利)) + '</td></tr>';
     });
     h += '</table><div class="air-mini">返車予定より遅れて完了 ' + D.予定遅れ.台数 + '台／作業完了→返車 ' + D.作業完了から返車.台数 + '台・のべ ' + D.作業完了から返車.のべ日数 + '日（3日以上 ' + D.作業完了から返車.三日以上 + '台）</div>';
     h += paras(F, T.時間がかかった車) + '</section>';
@@ -850,6 +916,7 @@
        + kpi('実行金額（実績）', man(G.実績), G.台数 + '台／目標 ' + man(F.目標.下限) + '〜' + man(F.目標.上限))
        + kpi('下限に対して', pct(G.実績, F.目標.下限) + '%', G.実績 >= F.目標.上限 ? '上限も達成' : '上限まで あと' + man(F.目標.上限 - G.実績), G.実績 >= F.目標.下限 ? 'up' : 'dn')
        + kpi('前月', man(G.前月), diffTxt(G.実績, G.前月) + '（' + (G.前月 ? Math.round((G.実績 - G.前月) / G.前月 * 1000) / 10 : 0) + '%）', G.実績 >= G.前月 ? 'up' : 'dn')
+       + (G.粗利 ? kpi('粗利（保険を除く）', man(G.粗利.粗利) + '・' + G.粗利.粗利率 + '%', '1台 ' + man(G.粗利.台あたり) + '／預かり1日 ' + yen(G.粗利.一日あたり)) : '')
        + kpi('営業日', (G.営業日 == null ? '—' : G.営業日 + '日'), '前月 ' + (G.前月営業日 == null ? '—' : G.前月営業日 + '日') + '／1日あたり ' + (G.一日あたり ? man(G.一日あたり) : '—') + '（前月 ' + (G.前月一日あたり ? man(G.前月一日あたり) : '—') + '）')
        + '</div>';
     var GR = F.通知表 || grades(F);
@@ -870,7 +937,8 @@
            + (ins ? '・保険 ' + man(ins) + ' は別' : '') + '</span></div>';
     }).join('');
     h += '<div class="air-bonus"><h3>保険（ボーナス枠）</h3><div class="air-own-h">保険を除いた、自分たちで仕上げた数字</div><div class="air-owns">' + own + '</div><table class="air-t">'
-       + '<tr><th>この月の実績に入った保険</th><td>' + (I.実績に入った.length ? I.実績に入った.map(function (x) { return carChip(F, x.id) + ' ' + man(x.金額); }).join('　') : '0台') + '</td></tr>'
+       + '<tr><th>この月の実績に入った保険</th><td>' + (I.実績に入った.length ? I.実績に入った.map(function (x) { return carChip(F, x.id) + ' ' + man(x.金額); }).join('　')
+           + (G.粗利 && G.粗利.保険の粗利率 != null ? '<div class="air-mini">粗利 ' + man(G.粗利.保険の粗利) + '（粗利率 ' + G.粗利.保険の粗利率 + '%）</div>' : '') : '0台') + '</td></tr>'
        + '<tr><th>この月に売上日・入金待ち（次の月以降のボーナス候補）</th><td>' + (I.入金待ち.length ? I.入金待ち.map(function (x) { return carChip(F, x.id) + ' ' + (x.金額 ? man(x.金額) : '金額未入力'); }).join('　') : '0台') + '</td></tr>'
        + '<tr><th>作業完了・返車待ちの保険</th><td>' + (I.作業完了のまま.length ? I.作業完了のまま.map(function (x) { return carChip(F, x.id) + ' ' + man(x.金額); }).join('　') : '0台') + '</td></tr>'
        + '</table>' + (A.保険 ? paras(F, [A.保険]) : '') + '</div>';
@@ -887,7 +955,7 @@
       h += '<div class="air-fut"><h3>' + dvChip(F.課[D[0]].短い名前, F.課[D[0]].色) + '改善した未来</h3><div class="big">'
          + '<div>空く預かり日数<b>約' + u.空く日数 + '日</b>のべ ' + F.課[D[0]].預かり.のべ + '日の ' + pct(u.空く日数, F.課[D[0]].預かり.のべ) + '%</div>'
          + '<div>いつも空いている置き場<b>約' + u.空く置き場 + '台分</b></div>'
-         + '<div>大物なしの実績の見込み<b>約' + man(u.見込み) + '</b>いまは ' + man(F.課[D[0]].大物を除く.実績) + '</div></div>'
+         + '<div>大物なしの実績の見込み<b>約' + man(u.見込み) + '</b>いまは ' + man(F.課[D[0]].大物を除く.実績) + (u.伸ばせる粗利 ? '／粗利では +約' + man(u.伸ばせる粗利) : '') + '</div></div>'
          + paras(F, Fu[D[0]])
          + '<div class="how">計算：作業完了→返車を1日まで（' + u.内訳.作業完了から返車 + '日）＋8〜14日の仕事を7日に（' + u.内訳.中くらいの仕事 + '日）＋31日以上（大物を除く）を30日で区切る（' + u.内訳.長期預かり + '日）。空いた日数 × この課の1日あたり（大物を除く）' + yen(F.課[D[0]].大物を除く.一日あたり) + '。</div></div>';
     });
@@ -895,7 +963,7 @@
     h += '<div class="air-fut all"><h3>全体の改善した未来</h3><div class="big">'
        + '<div>空く預かり日数<b>約' + Fa.空く日数 + '日</b></div>'
        + '<div>いつも空いている置き場<b>約' + Fa.空く置き場 + '台分</b></div>'
-       + '<div>大物なしの地力<b>' + man(G.地力) + ' → 約' + man(Fa.見込み) + '</b>下限 ' + man(F.目標.下限) + '</div></div>'
+       + '<div>大物なしの地力<b>' + man(G.地力) + ' → 約' + man(Fa.見込み) + '</b>下限 ' + man(F.目標.下限) + (Fa.伸ばせる粗利 ? '／粗利では +約' + man(Fa.伸ばせる粗利) : '') + '</div></div>'
        + paras(F, Fu.全体)
        + '<div class="how">⚠ 伸ばせる売上は、予約は基本いっぱい＝空いた枠はそのまま次の車に回せる、という前提で数えています。月をまたいだ車の分は月の入れ替わりで相殺されるので足していません。</div></div></div>';
 

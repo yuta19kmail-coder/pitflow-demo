@@ -217,3 +217,9 @@
 .air-top{ font-weight:800; color:var(--orange); }
 .air-top::after{ content:"★"; font-size:10px; margin-left:2px; }
 .air-roster tr.air-former td{ opacity:.75; }
+
+/* 💰 v2.139.0 通知表は5つ（売上・単価・粗利率・預かり・返車）。KPI は数に合わせて並ぶ */
+.air-card{ grid-template-columns:repeat(5,1fr); }
+.air-kpis{ grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); }
+.air-t i.air-sub{ display:block; font-style:normal; font-size:11px; color:var(--text2); }
+@media (max-width: 900px){ .air-card{ grid-template-columns:1fr 1fr; } }

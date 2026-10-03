@@ -943,6 +943,7 @@
       fix:'カードを開いて、赤い枠のところを入れてください。',
       each: function(c){
         if (!isLive(c)) return '';
+        if (isEmployee(c)) return '';   /* 👤 v2.140.4（ゆうた 2026-10-03・D02-637202）社員の車は「空」を言わない＝社員なので連絡先などは無くてよい */
         var r = misses(c).red;
         return r.length ? ('空：' + r.map(function(x){ return x.label; }).join('・')) : '';
       } },
@@ -980,6 +981,7 @@
       each: function(c){
         /* ⚠ これから来る車だけ。終わった車の「入れたほうがいい」は、もう入れようがない */
         if (!isLive(c)) return '';
+        if (isEmployee(c)) return '';   /* 👤 v2.140.4（ゆうた 2026-10-03・D02-637202）社員の車は「空」を言わない＝社員なので連絡先などは無くてよい */
         var y = misses(c).yellow;
         /* 🔴 v1.169.0（本番データで分かったこと）**まだ来ていない車の「漢字の名前」は言わない。**
            ◎なぜ
@@ -996,13 +998,13 @@
       title:'返車済みなのに、漢字のお名前が空',
       why:'カナだけで実績になっています。整備ソフトの伝票と突き合わせる時に名前で照合できません。',
       fix:'漢字のお名前を入れてください。',
-      each: function(c){ return (isDone(c) && !t(c.customer)) ? ('カナ「' + t(c.kana) + '」だけです') : ''; } },
+      each: function(c){ if (isEmployee(c)) return ''; return (isDone(c) && !t(c.customer)) ? ('カナ「' + t(c.kana) + '」だけです') : ''; } },   /* 👤 v2.140.4（ゆうた 2026-10-03・D02-637202）社員の車は「空」を言わない＝社員なので連絡先などは無くてよい */
 
     { id:'D04', cat:'data', level:'amber',
       title:'返車済みなのに、電話番号が空',
       why:'次に来た時にお客様を探せません。',
       fix:'電話番号を入れてください。',
-      each: function(c){ return (isDone(c) && !t(c.tel)) ? '電話番号が空のまま実績になっています' : ''; } },
+      each: function(c){ if (isEmployee(c)) return ''; return (isDone(c) && !t(c.tel)) ? '電話番号が空のまま実績になっています' : ''; } },   /* 👤 v2.140.4（ゆうた 2026-10-03・D02-637202）社員の車は「空」を言わない＝社員なので連絡先などは無くてよい */
 
     { id:'D05', cat:'data', level:'amber',
       title:'電話番号の形がおかしい',

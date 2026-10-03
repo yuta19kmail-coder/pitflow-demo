@@ -290,29 +290,50 @@
     /* ---- 👥 名簿（v2.137.0 ゆうた「数年たつと退職者も出て誰が誰だか分からなくなる。メンバー一覧（回送スタッフも）と、それぞれの結果」）
        受付＝予約件数（予約を受けた日がこの月・受付担当）／回送＝車検ライン（陸運局へ行った回数・1人目）／
        フロント＝売上台数（実績・フロント担当）／メカ＝売上台数（実績・整備担当に名前がある）
-       ⚠ 名前は名簿の別名（本名・フルネーム・空白なし）でも当てる。名簿に居ない名前（辞めた人など）は「名簿にない人」として残す */
+       👥 v2.138.0（ゆうた「コバモは外して OK。並びはいい。入社期間とかは要らない。共通のアバター。人ごとの部署表示もいらない」）
+         ・**その月に在籍していた人だけ**（入社日がその月の末日まで・辞めた人は退職日がその月の1日以降）
+         ・部署の無い共用アカウント（コバモ）は出さない
+         ・並び＝1課／2課／受付／車販・回送 の中で入社の古い順（入社日は並べるのに使うだけ・出さない）
+         ・アバターは共通部品（CFUser）で描く＝書類には写真を入れず、人の id だけ残す
+       ⚠ 名前は名簿の別名（本名・フルネーム・空白なし）でも当てる。名簿に居ない名前は「名簿にない」として残す */
     function nkey(v){ return t(v).replace(/[\s　]/g, ''); }
+    function grpOf(p){
+      var d = t(p.division) || t(Array.isArray(p.divisions) ? p.divisions[0] : '');
+      return d === 'div1' ? 'div1' : (d === 'div2' ? 'div2' : (d === 'recept' ? 'recept' : 'other'));
+    }
     var people = [], byKey = {};
+    function addPerson(p, former){
+      var o = { id: t(p.cmId || p.id), 名前: t(p.name || p.realName), 本名: t(p.realName), 組: grpOf(p), 入社: s(p.joinedAt),
+                退職: former ? s(p.leftAt) : '', 役割: [p.reception ? '受付' : '', p.front ? 'フロント' : '', p.mech ? 'メカ' : ''].filter(Boolean),
+                予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
+      people.push(o);
+      [p.name, p.realName, p.dispName, p.lastName].concat(Array.isArray(p.aliases) ? p.aliases : []).forEach(function (n) { var k = nkey(n); if (k && !byKey[k]) byKey[k] = o; });
+    }
     (S().staff || []).forEach(function (p) {
       if (!p) return;
-      /* 会社そのもの（「小林モータース」＝担当を人にしなかった分）は人と分けて、名前の後ろに（会社）と付ける */
+      /* 会社そのもの（「小林モータース」＝担当を人にしなかった分）は人と分ける */
       if (p.isSelf){
-        var so = { 名前: t(p.name || p.dispName) + '（会社）', 本名: '', 部署: '担当を人にしなかった分', 入社: '', 役割: [], 会社: true,
+        var so = { id: '', 名前: t(p.name || p.dispName), 本名: '', 組: 'self', 会社: true, 役割: [],
                    予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
         people.push(so);
         [p.name, p.dispName].concat(Array.isArray(p.aliases) ? p.aliases : []).forEach(function (n) { var k = nkey(n); if (k && !byKey[k]) byKey[k] = so; });
         return;
       }
-      var o = { 名前: t(p.name || p.realName), 本名: t(p.realName), 部署: (Array.isArray(p.deptNames) ? p.deptNames.join('・') : t(p.deptNames)) || divName(p.division) || '',
-                入社: s(p.joinedAt), 役割: [p.reception ? '受付' : '', p.front ? 'フロント' : '', p.mech ? 'メカ' : ''].filter(Boolean),
-                予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
-      people.push(o);
-      [p.name, p.realName, p.dispName, p.lastName].concat(Array.isArray(p.aliases) ? p.aliases : []).forEach(function (n) { var k = nkey(n); if (k && !byKey[k]) byKey[k] = o; });
+      if (s(p.joinedAt) && s(p.joinedAt) > moE) return;                                   /* この月にはまだ居ない */
+      var hasDept = t(p.division) || (Array.isArray(p.deptNames) ? p.deptNames.length : t(p.deptNames));
+      if (!hasDept) return;                                                                 /* 共用アカウント（コバモ） */
+      addPerson(p, false);
+    });
+    Object.keys(w.PIT_FORMER || {}).forEach(function (k) {
+      var f = w.PIT_FORMER[k];
+      if (!f || !s(f.leftAt) || s(f.leftAt) < moS) return;                                  /* この月より前に辞めた人は出さない */
+      if (s(f.joinedAt) && s(f.joinedAt) > moE) return;
+      addPerson(f, true);
     });
     function who(n){
       var k = nkey(n); if (!k) return null;
       if (byKey[k]) return byKey[k];
-      var o = { 名前: t(n), 本名: '', 部署: '', 入社: '', 役割: [], 名簿にない: true, 予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
+      var o = { id: '', 名前: t(n), 本名: '', 組: 'other', 名簿にない: true, 役割: [], 予約件数: 0, 車検ライン: 0, フロント台数: 0, フロント売上: 0, メカ台数: 0, メカ生産: 0 };
       people.push(o); byKey[k] = o; return o;
     }
     (S().cards || []).forEach(function (c) {
@@ -326,7 +347,9 @@
       ms.forEach(function (n) { var o = who(n); if (o){ o.メカ台数++; o.メカ生産 += r.amt / ms.length; } });
     });
     people.forEach(function (o) { o.フロント売上 = Math.round(o.フロント売上); o.メカ生産 = Math.round(o.メカ生産); });
-    var roster = people.filter(function (o) { return (!o.名簿にない && !o.会社) || o.予約件数 || o.車検ライン || o.フロント台数 || o.メカ台数; });
+    var GORD = { div1: 1, div2: 2, recept: 3, other: 4, self: 9 };
+    var roster = people.filter(function (o) { return (!o.名簿にない && !o.会社) || o.予約件数 || o.車検ライン || o.フロント台数 || o.メカ台数; })
+      .sort(function (p, q) { return (GORD[p.組] || 5) - (GORD[q.組] || 5) || (s(p.入社 || '9999') < s(q.入社 || '9999') ? -1 : (s(p.入社 || '9999') > s(q.入社 || '9999') ? 1 : 0)); });
 
     /* ---- 休み ---- */
     var closed = [], openHol = [];
@@ -930,22 +953,50 @@
     return h + '<div class="air-mcols">' + mtgCol(R.数字, 'div1', M2.div1) + mtgCol(R.数字, 'div2', M2.div2) + mtgCol(R.数字, '全体', M2.全体) + '</div></div>';
   }
 
-  /* 👥 v2.137.0 スタッフ名簿（この月の結果）。数字は PitFlow が数えたまま（AI は書かない） */
+  /* 👥 スタッフ名簿（この月の結果）。数字は PitFlow が数えたまま（AI は書かない）
+     👥 v2.138.0 共通のアバター（CFUser：写真が無ければ頭文字）・部署と入社は出さない・組ごとに見出し・列のいちばんに★ */
+  function avatarOf(o){
+    var m = null;
+    if (o.id){
+      m = (S().staff || []).filter(function (p) { return p && (t(p.cmId) === o.id || t(p.id) === o.id); })[0] || null;
+      if (!m) Object.keys(w.PIT_FORMER || {}).forEach(function (k) { var f = w.PIT_FORMER[k]; if (!m && f && (t(f.cmId) === o.id || t(f.id) === o.id)) m = f; });
+    }
+    var U2 = w.CFUser, ph = (U2 && m) ? U2.photo(m) : '', ini = U2 ? U2.initials(o.本名 || o.名前, m) : t(o.名前).slice(0, 2);
+    return '<span class="air-av">' + (ph ? '<img src="' + esc(ph) + '" alt="" onerror="this.remove()">' : '') + '<b>' + esc(ini) + '</b></span>';
+  }
   function rosterHtml(F){
     var L = (F.人 && F.人.名簿) || [];
     if (!L.length) return '';
-    function c(n){ return n ? String(n) : '<span class="air-muted">—</span>'; }
-    var h = '<h2 class="air-part all" id="air-roster">スタッフ名簿（この月の結果）</h2><table class="air-t air-roster"><tr>'
-          + '<th>名前</th><th>本名</th><th>部署</th><th>入社</th><th>役割</th><th class="n">予約件数<small>受付</small></th><th class="n">車検ライン<small>回送</small></th>'
+    var GNAME = { div1: divName('div1'), div2: divName('div2'), recept: '受付', other: '車販・回送', self: 'そのほか' };
+    var GCOL = { div1: divColor('div1'), div2: divColor('div2') };
+    var top = {}; ['予約件数', '車検ライン', 'フロント台数', 'メカ台数'].forEach(function (k) {
+      top[k] = Math.max.apply(null, L.filter(function (o) { return !o.会社; }).map(function (o) { return o[k] || 0; }).concat([0])); });
+    function c(o, k, sub){
+      var v = o[k] || 0;
+      if (!v) return '<td class="n"><span class="air-muted">—</span></td>';
+      return '<td class="n"><span' + (v === top[k] ? ' class="air-top"' : '') + '>' + v + (sub ? '台' : '') + '</span>' + (sub ? '<i>' + man(o[sub]) + '</i>' : '') + '</td>';
+    }
+    var ppl = L.filter(function (o) { return !o.会社 && !o.名簿にない; });
+    var sum = function (k) { return L.reduce(function (x, o) { return x + (o[k] || 0); }, 0); };
+    var h = '<h2 class="air-part all" id="air-roster">スタッフ名簿（この月の結果）</h2>'
+          + '<div class="air-rsum"><span><b>' + ppl.length + '人</b>在籍' + (ppl.filter(function (o) { return o.退職; }).length ? '（うち退職 ' + ppl.filter(function (o) { return o.退職; }).length + '人）' : '') + '</span>'
+          + '<span><b>' + sum('予約件数') + '件</b>予約を受けた</span><span><b>' + sum('車検ライン') + '回</b>車検ライン</span><span><b>' + (F.全体 ? F.全体.台数 : sum('フロント台数')) + '台</b>実績</span></div>'
+          + '<table class="air-t air-roster"><tr><th>名前</th><th>役割</th><th class="n">予約件数<small>受付</small></th><th class="n">車検ライン<small>回送</small></th>'
           + '<th class="n">フロント<small>売上台数</small></th><th class="n">メカ<small>売上台数</small></th></tr>';
+    var cur = '';
     L.forEach(function (o) {
-      h += '<tr><td><b>' + esc(o.名前) + '</b>' + (o.名簿にない ? ' <span class="air-tag">名簿にない</span>' : '') + '</td><td>' + esc(o.本名 || '') + '</td><td>' + esc(o.部署 || '') + '</td>'
-         + '<td>' + esc(s(o.入社).slice(0, 7).replace('-', '/')) + '</td><td>' + esc((o.役割 || []).join('・')) + '</td>'
-         + '<td class="n">' + c(o.予約件数) + '</td><td class="n">' + c(o.車検ライン) + '</td>'
-         + '<td class="n">' + (o.フロント台数 ? o.フロント台数 + '台<i>' + man(o.フロント売上) + '</i>' : c(0)) + '</td>'
-         + '<td class="n">' + (o.メカ台数 ? o.メカ台数 + '台<i>' + man(o.メカ生産) + '</i>' : c(0)) + '</td></tr>';
+      if (o.組 !== cur){
+        cur = o.組;
+        h += '<tr class="air-rg"><td colspan="6">' + (GCOL[cur] ? '<span class="dot" style="background:' + esc(GCOL[cur]) + '"></span>' : '') + esc(GNAME[cur] || '') + '</td></tr>';
+      }
+      var sub = o.会社 ? '担当を人にしなかった分' : (o.本名 && o.本名 !== o.名前 ? o.本名 : '');
+      h += '<tr' + (o.退職 ? ' class="air-former"' : '') + '><td><div class="air-who">' + (o.会社 ? '<span class="air-av co"><b>会社</b></span>' : avatarOf(o))
+         + '<div><b>' + esc(o.名前) + '</b>' + (o.退職 ? '<span class="air-tag r">' + esc(md(o.退職)) + ' 退職</span>' : '') + (o.名簿にない ? '<span class="air-tag">名簿にない</span>' : '')
+         + (sub ? '<span class="sub">' + esc(sub) + '</span>' : '') + '</div></div></td>'
+         + '<td><div class="air-roles">' + (o.役割 || []).map(function (r) { return '<i>' + esc(r) + '</i>'; }).join('') + '</div></td>'
+         + c(o, '予約件数') + c(o, '車検ライン') + c(o, 'フロント台数', 'フロント売上') + c(o, 'メカ台数', 'メカ生産') + '</tr>';
     });
-    return h + '</table><div class="air-mini">予約件数＝この月に予約を受けた件数／車検ライン＝陸運局へ行った回数（1人目）／フロント・メカ＝この月の実績の台数（メカの金額は複数担当なら均等割り）</div>';
+    return h + '</table><div class="air-mini">予約件数＝この月に予約を受けた件数（受付の担当）／車検ライン＝陸運局へ行った回数（1人目）／フロント・メカ＝この月の実績の台数と金額（メカの金額は複数担当なら均等割り）／★＝その列でいちばん多い人</div>';
   }
 
   function closeHtml(U, mm, ym){

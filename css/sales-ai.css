@@ -197,3 +197,23 @@
 /* 👥 v2.137.0 スタッフ名簿 */
 .air-roster th small{ display:block; font-size:10px; color:var(--text3); font-weight:400; }
 .air-roster td i{ display:block; font-style:normal; font-size:11px; color:var(--text2); }
+
+/* 👥 v2.138.0 スタッフ名簿：共通のアバター（CFUser＝写真が無ければ頭文字）・組ごとの見出し・列のいちばんに★ */
+.air-rsum{ display:flex; gap:10px; flex-wrap:wrap; margin:4px 0 10px; }
+.air-rsum span{ background:var(--bg3); border:1px solid var(--border); border-radius:var(--r,8px); padding:5px 12px; font-size:12px; color:var(--text2); }
+.air-rsum b{ font-size:16px; color:var(--text); margin-right:4px; }
+.air-roster tr.air-rg td{ background:var(--bg3); font-size:12px; font-weight:700; color:var(--text2); padding:5px 10px; }
+.air-roster tr.air-rg .dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:1px; }
+.air-who{ display:flex; align-items:center; gap:10px; }
+.air-who b{ font-size:13.5px; }
+.air-who .sub{ display:block; font-size:11px; color:var(--text2); }
+.air-who .air-tag{ margin-left:6px; }
+.air-av{ position:relative; width:30px; height:30px; flex:0 0 30px; border-radius:50%; overflow:hidden; background:var(--bg4); display:flex; align-items:center; justify-content:center; }
+.air-av b{ font-size:11px; font-weight:700; color:var(--text2); }
+.air-av img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.air-av.co{ background:var(--brand-soft); } .air-av.co b{ color:var(--brand); font-size:10px; }
+.air-roles{ display:flex; gap:4px; flex-wrap:wrap; }
+.air-roles i{ font-style:normal; font-size:10.5px; border:1px solid var(--border2); border-radius:4px; padding:0 5px; color:var(--text2); }
+.air-top{ font-weight:800; color:var(--orange); }
+.air-top::after{ content:"★"; font-size:10px; margin-left:2px; }
+.air-roster tr.air-former td{ opacity:.75; }

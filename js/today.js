@@ -546,26 +546,36 @@ function _todBuildRows(cards, isReturn){
         並び自体は最後尾なのに**休憩ブロックだけ入庫時刻の位置**に紛れていた。 */
   const tOf = c => isReturn ? (window.pitReturnSortMin ? pitReturnSortMin(c) : _todMin(c.returnTime))
                             : _todMin(c.reserveTime);
-  const blocks = [];
-  let ci = 0;
-  // 休憩の前→休憩→…→最後、の順にカードを割り振る
-  const cut = TODAY_BREAKS.map(b => _todMin(b.from));
-  for (let bi = 0; bi <= TODAY_BREAKS.length; bi++){
-    /* ⚠ 最後の区切りは Infinity。99999 にすると「時刻なし（_todMin が 99999 を返す）」のカードが
-       どの区切りにも入らず、当日ビューから丸ごと消える（v1.18.0 で修正） */
-    const limit = (bi < TODAY_BREAKS.length) ? cut[bi] : Infinity;
-    const seg = [];
-    while (ci < cards.length && tOf(cards[ci]) < limit){ seg.push(cards[ci]); ci++; }
-    blocks.push({ type: 'seg', cards: seg });
-    if (bi < TODAY_BREAKS.length){
-      // この休憩枠に被るカード（休憩開始〜終了の間に時刻があるもの）は枠内へ
-      const b = TODAY_BREAKS[bi];
-      const inBreak = [];
-      const bf = _todMin(b.from), bt = _todMin(b.to);
-      while (ci < cards.length && tOf(cards[ci]) >= bf && tOf(cards[ci]) < bt){ inBreak.push(cards[ci]); ci++; }
-      blocks.push({ type: 'break', label: b.label, from: b.from, to: b.to, cards: inBreak });
+  /* 🔴 v2.140.5（ゆうた報告 2026-10-04「返車 11:00〜12:00 が 12:00〜の昼休みの枠に入っている。
+        11〜12時に行くね、の言い方は結構ある」）
+     ◎正体＝並びの物差し（pitTimeMin）は範囲を**終わりの時刻**で並べる（「いちばん遅くなり得る時刻」）。
+       11:00〜12:00 は 12:00（＋幅の端数）として扱われ、12:00 から始まる休憩の枠に入っていた。
+       （AM が 09:00〜**11:59** になっているのも同じ理由）
+     🔴 **範囲が休憩の始まりちょうどで終わる車は、休憩の前に置く。**
+        ・範囲かどうか＝pitTimeMin の端数（幅×0.001）があるか。12:00 ちょうどの「点」の時刻は今までどおり休憩の中
+        ・昼の始まりを 12:01 にずらす案は取らない（休憩バーの字が 12:01〜 になり、12:00 ちょうどの車が休憩の外に出る）
+     ⚠ 並べ方の物差し（pitTimeMin）そのものは触らない（MHS の写しと食い違うため）。区切り方だけを直す。
+     ⚠ 前は「並んだ順に上から区切る」作りだったので、1台ずつ「どの区切りか」を決める形にした（並び順はそのまま）。 */
+  const BR = TODAY_BREAKS.map(b => ({ b: b, from: _todMin(b.from), to: _todMin(b.to) }));
+  function placeOf(c){
+    const v = tOf(c);
+    const end = Math.floor(v + 1e-9), isRange = (v - end) > 1e-6;
+    for (let i = 0; i < BR.length; i++){
+      if (v < BR[i].from || (isRange && end <= BR[i].from)) return { i: i, kind: 'seg' };   /* 休憩の前 */
+      if (v < BR[i].to) return { i: i, kind: 'break' };                                     /* 休憩の中 */
     }
+    /* ⚠ 最後の区切りは「その後ろ全部」。時刻なし（99999）もここ＝当日ビューから消さない（v1.18.0） */
+    return { i: BR.length, kind: 'seg' };
   }
+  const blocks = [];
+  for (let bi = 0; bi <= BR.length; bi++){
+    blocks.push({ type: 'seg', cards: [] });
+    if (bi < BR.length) blocks.push({ type: 'break', label: BR[bi].b.label, from: BR[bi].b.from, to: BR[bi].b.to, cards: [] });
+  }
+  cards.forEach(function (c) {
+    const p = placeOf(c);
+    blocks[p.i * 2 + (p.kind === 'break' ? 1 : 0)].cards.push(c);
+  });
   return blocks;
 }
 

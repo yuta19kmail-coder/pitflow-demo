@@ -88,7 +88,10 @@
   /* 顧客名。空白・法人の書き方のゆれを落として比べる。
      ⚠ 「(有)」「有限会社」「(株)」「株式会社」は落とす＝請求先名と呼び名がばらけるため。 */
   function normName(v){
-    return fixKanji(toHalf(v))
+    /* 🔴 v2.140.7（ゆうた 2026-10-04「逆に名前違いを出さないとだめじゃない？」）
+       見た目が同じでも別の字（「祐」U+FA4F と U+7950 など＝互換漢字）は NFKC でそろえる */
+    var x = s(v); try { x = x.normalize('NFKC'); } catch (e) {}
+    return fixKanji(toHalf(x))
       .replace(/[\s]/g, '')
       .replace(/\(有\)|（有）|有限会社|\(株\)|（株）|株式会社|\(合\)|合同会社/g, '')
       .toUpperCase();
@@ -442,6 +445,7 @@
     if (effect(pair) !== 0)                return 'money';  /* 1円でもちがえば金額の話 */
     if (salesGap(pair).kind !== 'same')    return 'date';
     if (!pair.担当一致)                    return 'data';
+    if (pair.客名一致 === false)           return 'data';   /* 👤 v2.140.7 お客様の名前がちがう */
     return 'ok';
   }
 
@@ -525,6 +529,9 @@
         差: diff,
         金額一致: Math.abs(diff) <= 1,          /* ②±1円は一致とみなす（表示の話） */
         担当一致: (staffName(sr.受付担当) === staffName(pr.フロント担当)),
+        /* 🔴 v2.140.7（ゆうた 2026-10-04「逆に名前違いを出さないとだめじゃない？」）
+           お客様の名前がちがう（片方が空なら言わない）。打ち間違い・会社名と運転する人 など */
+        客名一致: (function () { var a = normName(sr.顧客名), b = normName(pr.顧客名); return !a || !b || a === b; })(),
         期間の外: !pr.対象期間内,
         /* 💴 v1.185.0 カードが自分の売上日を持っていて、それが伝票の日とちがう。
            🔴 **お金は1円も動かない**（金額の話ではない）ので、**検算の足し算には入れない。**

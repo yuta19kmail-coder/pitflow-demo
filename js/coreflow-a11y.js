@@ -1,5 +1,20 @@
 /* ============================================================
-   coreflow-a11y.js ── 全アプリ共通「見やすさ」（くっきり／大きさ／拡大鏡）v1.2.0
+   coreflow-a11y.js ── 全アプリ共通「見やすさ」（くっきり／大きさ／拡大鏡）＋「個人設定を端末ごとに」（CFDev）v1.3.0
+   ------------------------------------------------------------
+   ◎🆕 v1.3.0（2026-10-05・ゆうた指定）**個人設定を端末ごとにする（CFDev）**
+     🗣「CoreFlow 管理画面のメンバーに、見やすさ OP を出す出さないと同じように、全アプリにかかる親設定として
+     　　『全ての個人設定をデバイスごとにする』を追加。表示のように各ウィンドカラーや色そのたもろもろを独立」
+     🗣 決まり（2026-10-05 確定）：①端末ごとにするのは**見た目と並び**だけ（フォルダ・お気に入りなどの整理はアカウント共通のまま）
+     　　②通知の受け取り設定は FlowDesk・FlowGo 共通のまま　③チェックを入れた時は**今のアカウントの設定から始まり**、
+     　　そこから端末ごとに変わる。チェックを外すとアカウントの設定に戻る
+     ・旗＝portalMembers の `devPrefs: true`（CoreFlow のメンバー管理でチェック。見やすさの旗と同じ読み方・同じ1回で読む）
+     ・端末の番号＝全アプリ共通のクッキー `cf_dev`（usage-log.js と同じ番号）。無ければここで作って同じクッキーに覚える
+     ・置き場＝同じ書類の中の `devs.<端末番号>.<欄>`（userPrefs も inboxPrefs も同じ形）
+       読む＝ `CFDev.pick(書類の中身, 欄)`：旗あり＆この端末の値がある → それ／無い → アカウントの値（＝③の「今の設定から始まる」）
+       書く＝ `ref.set(CFDev.data(欄, 値), { merge: true })`：旗ありなら devs.<端末>.<欄> に、無ければ今までどおり欄に
+     ・旗が決まるまで待つ＝ `CFDev.ready(user)`（Promise<bool>）。各アプリは個人設定を読む前にこれを待つ
+     ⚠ 旗を外しても devs の中身は消さない（もう一度付けた時に、その端末の設定が戻る）
+   ------------------------------------------------------------
    ------------------------------------------------------------
    ◎きっかけ（2026-10-03・ゆうた）
      🗣「車検予定のタイトル横『いつ行く／決定／完了・再検』が社長・専務（60代）に読めない。
@@ -56,6 +71,68 @@
   var MAG_ZOOM = 1.6, LENS_W = 460, LENS_H = 300;
   var CACHE_KEY = 'cf_a11y_cache_v1';      /* この端末の控え（開いた瞬間のチラつきを防ぐだけ。正本は Firestore） */
   var CID_FALLBACK = 'kobayashi_motors';
+
+  /* ============================================================
+     🆕 v1.3.0 CFDev ── 個人設定を端末ごとに（上の◎を参照）
+     ============================================================ */
+  var DEV_FLAG_KEY = 'cf_devprefs_v1';     /* 旗の控え（開いた瞬間用。正本は名簿） */
+  function devId() {
+    var v = '';
+    try { var m = d.cookie.match(/(?:^|;\s*)cf_dev=([^;]+)/); v = m ? decodeURIComponent(m[1]) : ''; } catch (e) {}
+    if (!/^d[\w-]+$/.test(v)) { try { v = localStorage.getItem('cf_dev') || ''; } catch (e) {} }
+    if (!/^d[\w-]+$/.test(v)) {
+      /* まだ番号が無い（usage-log を読まない画面で初めて開いた）＝作って、usage-log と同じクッキーに覚える */
+      v = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      try {
+        var h = location.hostname, dom = /(^|\.)kobayashi-motors\.com$/.test(h) ? '; Domain=.kobayashi-motors.com' : '';
+        d.cookie = 'cf_dev=' + encodeURIComponent(v) + dom + '; Path=/; Max-Age=' + (400 * 86400) + '; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+      } catch (e) {}
+      try { localStorage.setItem('cf_dev', v); } catch (e) {}
+    }
+    return v;
+  }
+  var CFDev = (function () {
+    var me = { on: false, uid: '', id: '' };
+    try { var c = JSON.parse(localStorage.getItem(DEV_FLAG_KEY) || 'null'); if (c && c.uid) { me.uid = c.uid; me.on = !!c.on; } } catch (e) {}
+    var waits = {};   /* uid → Promise<bool> */
+    function id() { if (!me.id) me.id = devId(); return me.id; }
+    function setFlag(uid, on) { me.uid = uid; me.on = !!on; try { localStorage.setItem(DEV_FLAG_KEY, JSON.stringify({ uid: uid, on: !!on })); } catch (e) {} }
+    return {
+      id: id,
+      on: function () { return !!me.on; },
+      /* 旗を決める（名簿を読む）。同じ人なら1回だけ読む */
+      ready: function (user) {
+        if (!user || !user.uid) return Promise.resolve(false);
+        if (waits[user.uid]) return waits[user.uid];
+        waits[user.uid] = readMember(user).then(function (m) {
+          if (m === null) return (me.uid === user.uid) ? me.on : false;   /* 読めなかった＝控え */
+          setFlag(user.uid, !!(m && m.devPrefs));
+          return me.on;
+        });
+        return waits[user.uid];
+      },
+      /* 読む：旗あり＆この端末の値がある → それ／無い → アカウントの値 */
+      pick: function (doc, field) {
+        doc = doc || {};
+        if (me.on) {
+          var dv = doc.devs && doc.devs[id()];
+          if (dv && Object.prototype.hasOwnProperty.call(dv, field)) return dv[field];
+        }
+        return doc[field];
+      },
+      /* 書く（set の merge 用）：旗ありなら devs.<端末>.<欄> に入れる形を返す */
+      data: function (field, value) {
+        var o = {};
+        if (me.on) { var dv = {}; dv[field] = value; dv._at = Date.now(); o.devs = {}; o.devs[id()] = dv; }
+        else o[field] = value;
+        return o;
+      },
+      /* 書く（update 用）：欄の道のり */
+      path: function (field) { return me.on ? ('devs.' + id() + '.' + field) : field; },
+      _set: setFlag   /* 見張り用 */
+    };
+  })();
+  w.CFDev = CFDev;
 
   /* ---------- 控え（前回この端末で開いた人の状態） ---------- */
   var cache = null;
@@ -510,7 +587,10 @@
   function db() { try { return (w.fb && w.fb.db) || (w.firebase && w.firebase.apps && w.firebase.apps.length && w.firebase.firestore()); } catch (e) { return null; } }
   function normEmail(s) { return String(s || '').normalize('NFKC').toLowerCase().trim(); }
 
-  function readMemberFlag(user) {
+  /* 名簿の1件（見やすさ・端末ごとの旗を同じ1回で読む）。読めなければ null */
+  var _memberWait = {};
+  function readMember(user) {
+    if (_memberWait[user.uid]) return _memberWait[user.uid];
     var D = db(); if (!D) return Promise.resolve(null);
     var col = D.collection('companies').doc(cid()).collection('portalMembers');
     /* 名簿の書類の名前は uid とは限らない（招待から作った人）＝メールで引く。ダメなら uid */
@@ -522,12 +602,16 @@
     var i = 0;
     function next() { if (i >= tries.length) return Promise.resolve(null);
       return tries[i++]().then(function (m) { return m || next(); }, function () { return next(); }); }
-    return next().then(function (m) { return m ? !!m.a11y : null; });
+    _memberWait[user.uid] = next().then(function (m) { return m || false; }, function () { delete _memberWait[user.uid]; return null; });
+    return _memberWait[user.uid];
+  }
+  function readMemberFlag(user) {
+    return readMember(user).then(function (m) { return m === null ? null : !!(m && m.a11y); });
   }
   function prefsDoc() { var D = db(); return D && uid ? D.collection('companies').doc(cid()).collection('userPrefs').doc(uid) : null; }
   function readPrefs() {
     var ref = prefsDoc(); if (!ref) return Promise.resolve(null);
-    return ref.get().then(function (s) { var v = s.exists ? (s.data() || {}).cfA11y : null; return v || {}; }, function () { return null; });
+    return ref.get().then(function (s) { var v = s.exists ? CFDev.pick(s.data() || {}, 'cfA11y') : null; return v || {}; }, function () { return null; });
   }
   var _saveT = 0;
   function savePrefs() {
@@ -536,7 +620,8 @@
     _saveT = setTimeout(function () {
       var ref = prefsDoc(); if (!ref) return;
       /* 🔴 merge 必須（同じ書類に memberId / memberEmail ＝ルールの橋渡しが入っている） */
-      ref.set({ cfA11y: { kukkiri: !!prefs.kukkiri, ookisa: !!prefs.ookisa, viewer: prefs.viewer !== false, at: Date.now() } }, { merge: true })
+      /* 🆕 v1.3.0 端末ごとの人は devs.<端末>.cfA11y に（CFDev） */
+      ref.set(CFDev.data('cfA11y', { kukkiri: !!prefs.kukkiri, ookisa: !!prefs.ookisa, viewer: prefs.viewer !== false, at: Date.now() }), { merge: true })
         .catch(function (e) { try { console.warn('[cf-a11y] 設定を保存できませんでした', e); } catch (_) {} });
     }, 400);
   }
@@ -544,7 +629,7 @@
   function onUser(user) {
     if (!user) { uid = ''; if (stopPrefs) { try { stopPrefs(); } catch (e) {} stopPrefs = null; } setState(false); return; }
     uid = user.uid;
-    readMemberFlag(user).then(function (flag) {
+    CFDev.ready(user).then(function () { return readMemberFlag(user); }).then(function (flag) {
       if (flag === null) {                      /* 読めなかった（通信など）＝控えがこの人なら控えのまま */
         if (cache && cache.uid === uid) setState(cache.on, cache);
         return;
@@ -564,7 +649,7 @@
     var ref = prefsDoc(); if (!ref || !ref.onSnapshot) return;
     try {
       stopPrefs = ref.onSnapshot(function (s) {
-        var v = s && s.exists ? (s.data() || {}).cfA11y : null;
+        var v = s && s.exists ? CFDev.pick(s.data() || {}, 'cfA11y') : null;
         if (!v || !enabled) return;
         var nx = { kukkiri: !!v.kukkiri, ookisa: !!v.ookisa, viewer: v.viewer !== false };
         if (nx.kukkiri === prefs.kukkiri && nx.ookisa === prefs.ookisa && nx.viewer === prefs.viewer) return;

@@ -126,6 +126,7 @@
         区分・金額・課・フロントの見分けを向こうで書き直すと、画面と FlowDesk の数字が食い違う（写しの罠）。
      ⚠ ここは**呼び口だけ**。数え方を変える時は collectMonth / target の1本を直す。 */
   window.pitSalesMonthCollect = collectMonth;
+  window.PIT_SALES_TIERS = TIERS;   /* 📊 v2.143.0 分析用の書き出し（analytics-pit.js）が区分の名前を引く。条件は持たない */
   window.pitSalesTarget = target;
   window.pitSalesDivTarget = divTarget;
 

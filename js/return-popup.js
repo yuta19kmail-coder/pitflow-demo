@@ -61,9 +61,15 @@
       + '  <div class="pp-field">'
       /* ⚠ 見た目は**この窓にもとからある部品を借りる**（`pp-lb` / `pp-date` / `pp-ref`）。
          新しい見た目を作らない＝金額の欄と1ミリもズレない。 */
-      + '    <label class="pp-lb">売上日 <small>（伝票の日付）</small></label>'
+      + '    <label class="pp-lb">売上日 <small id="rp-sales-sub">（伝票の日付）</small></label>'
+      /* 💳 v2.142.0 保証の車だけ＝「通常（売上日を入れる）」か「売掛」かをここで決める（下の openModal） */
+      + '    <div class="rp-chips" id="rp-pay-pick" style="display:none;margin-bottom:6px">'
+      + '      <button type="button" class="rp-chip" id="rp-pay-0" onclick="PitReturnPopup.onPay(0)">通常（売上日を入れる）</button>'
+      + '      <button type="button" class="rp-chip" id="rp-pay-1" onclick="PitReturnPopup.onPay(1)">売掛（入金日はあとで）</button></div>'
       + '    <input class="pp-date" id="rp-sales" type="date">'
       + '    <div class="pp-ref" id="rp-sales-note"></div>'
+      /* 🛡 v2.141.0 保険の車は日付を聞かず、この1行だけ（下の openModal） */
+      + '    <div class="rp-insnote" id="rp-sales-ins" style="display:none"></div>'
       + '  </div>'
       /* 🔴 v1.60.0（ゆうた指定）返車予定日の横に「返車日未定」のチェック。
          ⚠ 新しい項目は増やさない。**チェックが入っている＝日付が空**、それだけ。
@@ -106,6 +112,24 @@
     var a = el('rp-wash-1'), b = el('rp-wash-0');
     if (a) a.classList.toggle('on', !!on);
     if (b) b.classList.toggle('on', !on);
+  }
+  /* 💳 v2.142.0 保証の車の「通常／売掛」。null＝保証ではない（選ばせない） */
+  var _payPick = null;
+  function paintPay(){
+    var a = el('rp-pay-0'), b = el('rp-pay-1');
+    if (a) a.classList.toggle('on', _payPick === 0);
+    if (b) b.classList.toggle('on', _payPick === 1);
+    if (_payPick == null) return;
+    var off = (_payPick === 1);   /* 売掛＝売上日は聞かない */
+    if (el('rp-sales')) el('rp-sales').style.display = off ? 'none' : '';
+    if (el('rp-sales-note')) el('rp-sales-note').style.display = off ? 'none' : '';
+    if (el('rp-sales-sub')) el('rp-sales-sub').style.display = off ? 'none' : '';
+    if (el('rp-sales-ins')){
+      el('rp-sales-ins').style.display = off ? '' : 'none';
+      el('rp-sales-ins').innerHTML = off
+        ? '<b>保証：売掛にします</b><span>返車のあと「入金待ち」に並びます。保証会社から入金があったら、そこで入金日を入れてください。実績はいつもどおり返車日です。</span>'
+        : '';
+    }
   }
   var _lineWhy = '';      /* 💬 v2.13.3 押せない理由（空＝押せる） */
   function setLine(on){   // on=お礼LINE「要」
@@ -162,7 +186,37 @@
              人が入れた日を勝手に動かすことになり、そちらのほうが怖い。
           ＝ そのまま入っても、月がちがえば**データチェック（M11）が必ず拾う**。
             黙って辻褄を合わせず、**見つけて人が直す**形に寄せる。 */
+    /* 🛡 v2.141.0（ゆうた指定 2026-10-05・A案）**保険の車は売上日を聞かない。**
+       🗣「保険のチェックで売掛になる場合に、完TELなどにドラッグすると入金日を入れるように促されるが、
+       　　システムでみればわかる通り入金日わからないので、非表示に」
+       ◎保険は**入金日で実績**（insurance-pit.js）。完TELの時点では決まる日が無いのに、
+         今日の日付が勝手に入っていて、確かめずにOKを押されていた。
+       ◎欄ごと消すと「無い」のか分からないので、**なぜ無いか・どこで入れるか**を1行出す。
+       ⚠ 物差しは `pitCardInsurance`（保険バッジ）1本。売掛チェック（保証・手で付けた売掛）は今までどおり聞く。
+       ⚠ 書き込み側（apply）も同じ物差しで売上日を触らない。 */
+    var _ins = !!(window.pitCardInsurance && pitCardInsurance(card));
     if (el('rp-sales')){
+      el('rp-sales').style.display = _ins ? 'none' : '';
+      el('rp-sales-note').style.display = _ins ? 'none' : '';
+      el('rp-sales-sub').style.display = _ins ? 'none' : '';
+      el('rp-sales-ins').style.display = _ins ? '' : 'none';
+      el('rp-sales-ins').innerHTML = _ins
+        ? '<b>保険：入金日で実績になります</b><span>いまは入れません。返車のあと「入金待ち」に並ぶので、入金が分かった日にそこで入れてください。</span>'
+        : '';
+    }
+    /* 💳 v2.142.0（ゆうた指定 2026-10-05）**保険と保証をごっちゃにしない。**
+       🗣「保険→今の挙動でOK／保証→通常の流れ（売上日を入れる）か売掛にするかを決められるように」
+       ◎保証＝保証会社の整備保証。実績は今までどおり返車日（保険のように入金日では数えない）。
+         ちがうのは**その場でお金をもらうか、あとで保証会社から入るか**だけ＝この窓で選ぶ。
+         ・通常 … 売上日の欄を出して入れる。売掛チェック（`paymentSeparate`）は外す
+         ・売掛 … 売上日は聞かない。売掛チェックを入れる＝返車のあと「入金待ち」に並ぶ
+       ⚠ 初めの選び方＝カードの売掛チェックそのまま（予約詳細で付けていれば売掛）。
+       ⚠ 保険と保証が両方付いている車は**保険が勝つ**（上の1行だけ・選ばせない）。 */
+    var _war = !_ins && Array.isArray(card.workSpecials) && card.workSpecials.indexOf('warranty') >= 0;
+    _payPick = _war ? (card.paymentSeparate ? 1 : 0) : null;
+    if (el('rp-pay-pick')) el('rp-pay-pick').style.display = _war ? '' : 'none';
+    paintPay();
+    if (el('rp-sales') && !_ins){
       el('rp-sales').value = window.pitSalesDateSeed ? pitSalesDateSeed(card) : '';
       var _own = window.pitSalesDateOwn ? pitSalesDateOwn(card) : '';
       el('rp-sales-note').textContent = _own ? '入っている売上日です。ちがったら直してください'
@@ -283,6 +337,7 @@
     onDate: function(){ var cb = el('rp-datetbd'); if (cb && el('rp-date').value) cb.checked = false; syncDateTbd(); },
     onDateTbd: function(){ syncDateTbd(); },
     onWash: function(v){ setWash(v === '1'); },
+    onPay: function(v){ if (_payPick == null) return; _payPick = v ? 1 : 0; paintPay(); },
     onLine: function(v){ setLine(v === '1'); },
     close: function(ok){
       var p = pending;
@@ -351,7 +406,18 @@
          🔴 書き込みは sales-date.js の1本を通す。ここで `c.salesDate = …` と書かない。
          ⚠ 変わった時だけフローに残す（毎回書くとログが埋まって、本当の変更が見えなくなる）。 */
       var _sdBefore = window.pitSalesDate ? pitSalesDate(c) : '';
-      if (window.pitSetSalesDate && el('rp-sales')){
+      /* 🛡 v2.141.0 保険は聞いていない＝**触らない**（窓と同じ物差し） */
+      var _insNoDate = !!(window.pitCardInsurance && pitCardInsurance(c));
+      /* 💳 v2.142.0 保証の「通常／売掛」を書く。売掛を選んだら売上日は触らない（聞いていない）。
+         ⚠ 通常に戻した時の入金日の扱いは予約詳細のチェック（cvTogglePaySeparate）と同じ＝消す。 */
+      if (_payPick != null){
+        var _wasSep = !!c.paymentSeparate;
+        if (_payPick === 1){ c.paymentSeparate = true; _insNoDate = true; }
+        else { c.paymentSeparate = false; c.paymentDate = null; }
+        if (_wasSep !== !!c.paymentSeparate && window.logFlow)
+          logFlow(c, c.paymentSeparate ? '保証：売掛にした（入金日はあとで）' : '保証：通常にした（売掛を外した）');
+      }
+      if (!_insNoDate && window.pitSetSalesDate && el('rp-sales')){
         if (pitSetSalesDate(c, el('rp-sales').value) && window.logFlow){
           logFlow(c, '売上日を ' + (_sdBefore || '（なし）') + ' → ' + (c.salesDate || '（なし）') + ' にした');
         }

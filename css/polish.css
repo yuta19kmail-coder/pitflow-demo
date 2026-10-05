@@ -2254,6 +2254,16 @@ th.cfs-lg-d{ z-index:3; }
 .mg-warn i{ vertical-align:-3px; margin-right:5px; }
 [data-theme="light"] .ta-why{ color:#b45309 !important; }
 [data-theme="light"] .mg-warn{ color:#92400e; background:rgba(245,158,11,.12); }
+/* 🔒 v2.141.0 盤面の外へ出す関門＝決まるまで進むボタンは押せない */
+#mg-ok:disabled{ opacity:.4; cursor:not-allowed; }
+/* 🛡 v2.141.0 保険の完TEL＝売上日の代わりの1行 */
+.rp-insnote{
+  background:rgba(139,92,246,.10); border:1px solid rgba(139,92,246,.34);
+  border-radius:8px; padding:8px 10px; font-size:12.5px; line-height:1.55;
+}
+.rp-insnote b{ display:block; color:#c4b5fd; }
+.rp-insnote span{ color:var(--text2); font-size:11.5px; }
+[data-theme="light"] .rp-insnote b{ color:#6d28d9; }
 
 /* ========== v1.99.0 「売上なしでアーカイブ」 ==========
    🔴 ゆうた確定＝**¥0 とは書かず「売上なし」と言い切る**（0円だと「入れ忘れ」と見分けが付かない）。

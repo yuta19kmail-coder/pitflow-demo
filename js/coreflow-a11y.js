@@ -7,6 +7,7 @@
      🗣 決まり（2026-10-05 確定）：①端末ごとにするのは**見た目と並び**だけ（フォルダ・お気に入りなどの整理はアカウント共通のまま）
      　　②通知の受け取り設定は FlowDesk・FlowGo 共通のまま　③チェックを入れた時は**今のアカウントの設定から始まり**、
      　　そこから端末ごとに変わる。チェックを外すとアカウントの設定に戻る
+     ・⚠ **見やすさ（cfA11y）は端末ごとにしない**。その人の目に合わせる設定なので、どの端末でも同じ（ゆうた指摘 2026-10-05）
      ・旗＝portalMembers の `devPrefs: true`（CoreFlow のメンバー管理でチェック。見やすさの旗と同じ読み方・同じ1回で読む）
      ・端末の番号＝全アプリ共通のクッキー `cf_dev`（usage-log.js と同じ番号）。無ければここで作って同じクッキーに覚える
      ・置き場＝同じ書類の中の `devs.<端末番号>.<欄>`（userPrefs も inboxPrefs も同じ形）
@@ -611,7 +612,7 @@
   function prefsDoc() { var D = db(); return D && uid ? D.collection('companies').doc(cid()).collection('userPrefs').doc(uid) : null; }
   function readPrefs() {
     var ref = prefsDoc(); if (!ref) return Promise.resolve(null);
-    return ref.get().then(function (s) { var v = s.exists ? CFDev.pick(s.data() || {}, 'cfA11y') : null; return v || {}; }, function () { return null; });
+    return ref.get().then(function (s) { var v = s.exists ? (s.data() || {}).cfA11y : null; return v || {}; }, function () { return null; });
   }
   var _saveT = 0;
   function savePrefs() {
@@ -620,8 +621,8 @@
     _saveT = setTimeout(function () {
       var ref = prefsDoc(); if (!ref) return;
       /* 🔴 merge 必須（同じ書類に memberId / memberEmail ＝ルールの橋渡しが入っている） */
-      /* 🆕 v1.3.0 端末ごとの人は devs.<端末>.cfA11y に（CFDev） */
-      ref.set(CFDev.data('cfA11y', { kukkiri: !!prefs.kukkiri, ookisa: !!prefs.ookisa, viewer: prefs.viewer !== false, at: Date.now() }), { merge: true })
+      /* ⚠ 見やすさは端末ごとにしない（その人の目に合わせる設定＝どの端末でも同じ）。ゆうた指摘 2026-10-05 */
+      ref.set({ cfA11y: { kukkiri: !!prefs.kukkiri, ookisa: !!prefs.ookisa, viewer: prefs.viewer !== false, at: Date.now() } }, { merge: true })
         .catch(function (e) { try { console.warn('[cf-a11y] 設定を保存できませんでした', e); } catch (_) {} });
     }, 400);
   }
@@ -649,7 +650,7 @@
     var ref = prefsDoc(); if (!ref || !ref.onSnapshot) return;
     try {
       stopPrefs = ref.onSnapshot(function (s) {
-        var v = s && s.exists ? CFDev.pick(s.data() || {}, 'cfA11y') : null;
+        var v = s && s.exists ? (s.data() || {}).cfA11y : null;
         if (!v || !enabled) return;
         var nx = { kukkiri: !!v.kukkiri, ookisa: !!v.ookisa, viewer: v.viewer !== false };
         if (nx.kukkiri === prefs.kukkiri && nx.ookisa === prefs.ookisa && nx.viewer === prefs.viewer) return;

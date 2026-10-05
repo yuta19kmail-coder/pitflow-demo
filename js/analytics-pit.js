@@ -97,7 +97,9 @@
   }
   function surnameOf(c){
     var a = t(c.sei) || t(c.seiKana);
-    if (a) return a;
+    /* 🔴 v2.143.1 姓の欄にフルネームが空白区切りで丸ごと入っているカードがあった（本番で1件・2026-10-05）。
+       会社名でなければ、最初の区切りまでだけ使う＝下の名前を出さない */
+    if (a) return /[㈱㈲]|\(同\)|[（(][株有同][)）]|会社|組合|法人/.test(a) ? a : a.split(/[\s　]+/)[0];
     var full = w.pitCustName ? t(w.pitCustName(c)) : t(c.customer);
     var sur = surOfFull(full);
     if (sur) return sur;

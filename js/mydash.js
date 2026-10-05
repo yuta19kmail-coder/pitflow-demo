@@ -1,5 +1,5 @@
 /* ========================================
-   mydash.js  -  ダッシュボード（ビルダー）／PitFlow v0.126.0
+   mydash.js  -  ダッシュボード（ビルダー）／PitFlow v0.126.0（並びの保存先 v2.144.0）
    ----------------------------------------
    ◎これがTOPページ（旧「ダッシュボード」「整備ダッシュボード」を統合・置換）
      PitFlowの全要素を「BOX」化して、ユーザーが自分で組む。
@@ -8,7 +8,7 @@
      ・個人（担当者）フォーカスのBOX（自分／指定スタッフの 予約・タスク・返車・予約担当）。
      ・ビューやビュー内アンカー（例：予約の2ヶ月）へ飛ぶショートカットBOX。
      ・プリセット（用途別に複数レイアウトを保存・切替）。デフォルト雛形あり。
-     ・配置はアカウント単位で保存（state.settings.myDash）。
+     ・配置は1人ずつ保存（本番＝userPrefs/{uid}.pitMyDash・端末ごとの旗＝CFDev／練習＝state.settings.myDash）。v2.144.0
    ======================================== */
 (function () {
   'use strict';
@@ -1301,7 +1301,7 @@
   };
 
   // ---------------------------------------------------------
-  // プリセット・レイアウト（アカウント統一）
+  // プリセット・レイアウト（v2.144.0 から1人ずつ。保存先は md() の上を参照）
   // ---------------------------------------------------------
   function T(name) { return TEMPLATES[name] ? TEMPLATES[name]() : []; }
   var TEMPLATES = {
@@ -1320,19 +1320,71 @@
   };
   var TEMPLATE_NAMES = ['全体用', '代車特化型', '受付用', '整備士用', 'フロント用', '未定チェック用'];
 
-  function md() {
-    if (!state.settings) state.settings = {};
-    var m = state.settings.myDash;
+  /* 🔴 v2.144.0 マイダッシュの並びは**1人ずつ**（ゆうた「直して」2026-10-05）
+     それまでは state.settings.myDash ＝ pitSettings/main（会社で1枚）に入っていて、**誰かが並べ替えると全員の並びが変わっていた。**
+     ・本番＝ companies/{会社}/userPrefs/{uid}.pitMyDash（本人だけ読み書き）。書くのは set(…, {merge:true}) だけ（同じ書類に memberId 等がある）
+     ・「見た目と並びを端末ごとに」の旗（CFDev・coreflow-a11y.js）がある人＝ devs.<端末>.pitMyDash。読む前に CFDev.ready(user) を待つ
+     ・自分の欄がまだ無い人＝共通の並び（settings.myDash）を写して始まる＝今の見た目のまま。**自分で並べ替えた時から**自分の欄に入る
+     🔴 本番では共通の並び（settings.myDash）は**読むだけ**。消さない・書き換えない（state.settings に書くと pitSettings/main に乗って全員に配られる）
+     ・練習モード（PIT_CLOUD 無し）は今までどおり state.settings.myDash（端末保存） */
+  function mdNorm(m) {
     if (!m || typeof m !== 'object') m = {};
     if (Array.isArray(m.layout) && !m.presets) { m = { v: 2, active: 0, presets: [{ name: 'マイビュー', layout: m.layout }] }; }
     if (!Array.isArray(m.presets) || !m.presets.length) { m = { v: 2, active: 0, presets: [{ name: '全体用', layout: T('全体用') }] }; }
     if (typeof m.active !== 'number' || m.active < 0 || m.active >= m.presets.length) m.active = 0;
     m.presets.forEach(function (p) { if (!p.layout) p.layout = []; if (!p.name) p.name = 'マイビュー'; });
-    state.settings.myDash = m; return m;
+    return m;
+  }
+  function mdClone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+  var _my = { uid: '', val: null, base: null, baseJs: '', dirty: false, p: null, q: null };
+  function mdUser() { return (window.PIT_CLOUD && window.fb && window.fb.currentUser && window.fb.currentUser.uid && typeof window.fb.company === 'function') ? window.fb.currentUser : null; }
+  function mdRef(u) { try { return window.fb.company().collection('userPrefs').doc(u.uid); } catch (e) { return null; } }
+  function mdReady(u) { var D = window.CFDev; if (!D) return Promise.resolve(false); return Promise.resolve().then(function () { return D.ready(u); }).catch(function () { return D.on(); }); }   /* 旗が決まるまで待つ（CFDev が無い時はすぐ） */
+  function mdLoadMine(u) {
+    var me = _my = { uid: u.uid, val: null, base: null, baseJs: '', dirty: false, p: null, q: null };
+    var ref = mdRef(u); if (!ref) return;
+    me.p = mdReady(u).then(function () { return ref.get(); }).then(function (s) {
+      if (_my !== me) return;
+      var d = (s && s.exists) ? (s.data() || {}) : {};
+      var v = window.CFDev ? window.CFDev.pick(d, 'pitMyDash') : d.pitMyDash;   /* 旗あり＆この端末の値 → それ／無い → アカウントの値 */
+      if (v && typeof v === 'object' && !me.dirty) { me.val = mdNorm(mdClone(v)); renderPresets(); renderFlow(); }
+    }).catch(function (e) { console.warn('[mydash] 自分の並びを読めませんでした（共通の並びで続けます）', e); });
+  }
+  function mdShared() { return state.settings ? state.settings.myDash : null; }
+  function md() {
+    if (!window.PIT_CLOUD) {   /* 練習モード＝今までどおり */
+      if (!state.settings) state.settings = {};
+      var m = mdNorm(state.settings.myDash);
+      state.settings.myDash = m; return m;
+    }
+    var u = mdUser();
+    if (u && _my.uid !== u.uid) mdLoadMine(u);
+    if (u && _my.val) return _my.val;
+    /* 自分の欄がまだ無い＝共通の並びの写し（共通の方は触らない） */
+    var js = JSON.stringify(mdShared() || null);
+    if (!_my.base || _my.baseJs !== js) { _my.base = mdNorm(mdClone(mdShared())); _my.baseJs = js; }
+    return _my.base;
   }
   function curLayout() { var m = md(); return (m.presets[m.active].layout || []).filter(function (it) { return it && (it.e === 'sc' || EL[it.e]); }); }
   function setCurLayout(arr) { var m = md(); m.presets[m.active].layout = arr; }
-  function save(msg) { if (window.PitDB && PitDB.save) PitDB.save(true); if (msg) toast(msg); }
+  function save(msg) {
+    if (!window.PIT_CLOUD) { if (window.PitDB && PitDB.save) PitDB.save(true); if (msg) toast(msg); return; }
+    var u = mdUser();
+    if (u && _my.uid === u.uid) {
+      var me = _my;
+      if (!me.val) {
+        /* 何も変えていない（カスタマイズを開いて閉じただけ）なら、自分の欄は作らない＝共通の並びのまま */
+        if (!me.base || JSON.stringify(me.base) === JSON.stringify(mdNorm(mdClone(mdShared())))) { if (msg) toast(msg); return; }
+        me.val = me.base; me.base = null; me.baseJs = '';
+      }
+      me.dirty = true;
+      var v = mdClone(me.val), ref = mdRef(u);
+      if (ref) me.q = Promise.resolve(me.q || me.p).then(function () { return mdReady(u); }).then(function () {
+        return ref.set(window.CFDev ? window.CFDev.data('pitMyDash', v) : { pitMyDash: v }, { merge: true });
+      }).catch(function (e) { console.warn('[mydash] 並びの保存に失敗', e); });
+    }
+    if (msg) toast(msg);
+  }
 
   // ---------------------------------------------------------
   // 描画
@@ -1365,6 +1417,8 @@
      ・**BOXカタログ**（全部盛りの見本ページ）を、本物のBOXから作れるようにする
      ⚠ 中身は**読むだけ**。外から書き換えないこと（BOXを足すのは必ずこのファイルの中）。 */
   window.PIT_DASH_EL = EL;
+  /* 🔴 v2.144.0 いま出している並び（写し）。見張り（test_mydash_personal）が「誰の並びが出ているか」を見るためだけ。読むだけ */
+  window.PIT_MYDASH_NOW = function () { return mdClone(md()); };
   /* 📡 v2.108.0 CoreFlow のダッシュボードへ概況を配る（js/app-summary.js）ための入口。
      🔴 **どの車を数えるかは、ここの物差しを借りるだけ。** app-summary.js に条件を書き写さない
         （書き写すと、PitFlow のBOXと CoreFlow の数字が食い違う）。中身は読むだけ。 */

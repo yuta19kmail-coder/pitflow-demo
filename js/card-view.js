@@ -2506,6 +2506,9 @@
   window.cvAskNoSale = function(){
     if (!_c) return; closeAllPop();
     const c = _c;
+    /* 🔒 v2.141.0（ゆうた指定）アーカイブも**タスクボードの外へ出す**道。作業担当が決まるまで通さない。
+       作業していない車は3役とも「なし」で通る。判定も窓も mech-guard.js の1本。 */
+    if (window.PitMechGuard && PitMechGuard.gate && PitMechGuard.gate(c, '売上なしアーカイブ', function(){ _c = c; cvAskNoSale(); })) return;
     const det = ['・フロー（進捗ログ）・作業内容・担当者は、いつもどおり残ります',
                  '・お客様の来店履歴には「売上なし」で残ります',
                  '🔴 実績カレンダー・売上・台数には一切入りません',

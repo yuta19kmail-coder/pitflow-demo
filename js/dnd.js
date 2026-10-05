@@ -99,8 +99,15 @@
       /* 🏢🏢 v2.6.0（ゆうた指定）社内車両（中古・代車・内部）は、完TELも金額も無い。
          「この車両は◯◯なので、そのまま実績化します」の窓を1枚だけ出して実績にする。
          ⚠ 中身は intern-pit.js の `pitInternReturn` 1本。ここに書き写さない。 */
-      if (window.pitInternReturn && pitInternReturn(c)) return;
-      if (window.PitReturnPopup) PitReturnPopup.open(c, kind === 'callDone' ? 'callDone' : 'callReq');
+      /* 🔒 v2.141.0（ゆうた指定）**盤面の外へ出す前に、作業担当（点検・整備・チェック）が決まっているか。**
+         決まっていなければ窓を出し、決まるまで通さない。判定も窓も mech-guard.js の1本。
+         ⚠ 社内車両の実績化もこの先なので、ここで一緒に止まる。 */
+      var _goCall = function () {
+        if (window.pitInternReturn && pitInternReturn(c)) return;
+        if (window.PitReturnPopup) PitReturnPopup.open(c, kind === 'callDone' ? 'callDone' : 'callReq');
+      };
+      if (window.PitMechGuard && PitMechGuard.gate && PitMechGuard.gate(c, kind === 'callDone' ? '完TEL済' : '完TEL依頼', _goCall)) return;
+      _goCall();
       return;
     }
 

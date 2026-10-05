@@ -25,6 +25,20 @@
      🔴 「作業完了」の列は会社ごとに変えられるので、**列の `terminal` の印**で見分ける
         （id を 'workDone' と決め打ちしない）。見つからない時だけ 'workDone' を使う。
 
+   ◎🔒 v2.141.0（ゆうた指定 2026-10-05）**タスクボードの外へ出す時は、決まるまで通さない。**
+     🗣「作業者、点検者、チェック者の入力がない場合には、アーカイブ含めた全てのタスクボード以外への
+     　　アウトプットを抑制してほしい。POPUPを出して、促す」
+     🗣「整備待ちから整備完了に流した時に整備、点検を出す仕様と被らないように」
+     ◎2つの窓は**同じ1枚**。開き方だけ2通り（中身・判定は1本のまま）。
+       ・作業完了に入れる（盤面の中）… `open`  ＝今までどおり「このまま進める」で素通りできる
+       ・盤面の外へ出す　　　　　　　… `gate`  ＝3役が決まるまで**進むボタンが押せない**
+     ◎外へ出す所＝完TEL済／完TEL依頼へのドラッグ（dnd.js）・売上なしでアーカイブ（card-view.js）。
+       ⚠ 外注・廃車・乗替の列は**盤面の中**なので止めない（ゆうた確認済み）。
+     ◎被らないように
+       ・作業完了で入れておけば、外へ出す時は**何も出ない**（決まっている＝素通り）。
+       ・素通りした車だけが、外へ出す時に止まる＝**同じ車に同じ窓が続けて2回出ることは無い**。
+       ・物販は今までどおり聞かない（担当者の欄が無い）。
+
    ◎どこから呼ばれるか
      phase-popup.js の maybeIntercept 1本。
      ＝ドラッグ・並び替え・◀▶ボタン、**どの動かし方でも同じように出る**。
@@ -72,7 +86,7 @@
     bd.id = 'mg-backdrop';
     bd.innerHTML =
       '<div class="modal-box pp-box mg-box">'
-      + '<div class="modal-head"><div class="modal-title">作業担当（点検・整備・チェック）を入れてください</div>'
+      + '<div class="modal-head"><div class="modal-title" id="mg-title">作業担当（点検・整備・チェック）を入れてください</div>'
       + '<button class="modal-close" onclick="PitMechGuard.close(0)"><i data-ic=close data-ics=16></i></button></div>'
       + '<div class="modal-body">'
       + '  <div class="pp-move" id="mg-move"></div>'
@@ -101,33 +115,65 @@
     /* 🔴 v1.174.0 **どちらが決まっていないか**を名指しで言う（「どちらも空」と決め打ちしない）。
        ＋ 居ない時の逃げ道（「なし」）をその場で案内する＝空のまま通す理由を無くす。 */
     var un = (window.PitMechPick ? PitMechPick.unsettled(c) : []);
+    var gate = pending && pending.gate;   /* 🔒 v2.141.0 盤面の外へ出す時＝決まるまで通さない */
     var w = el('mg-warn');
     if (w){
       w.innerHTML = un.length
         ? '<i data-ic=warn data-ics=16></i> <b>' + esc(un.join('・')) + '</b>が入っていません。'
+          + (gate ? '決まるまで<b>' + esc(gate) + '</b>へは進めません。' : '')
           + 'この車に<b>居ないなら、いちばん左の「なし」</b>を押してください（忘れではない、と記録します）。'
         : '<i data-ic=check data-ics=16></i> 決まりました。作業サマリーの取り分にそのまま反映されます。';
       if (window.icHydrate) { try { icHydrate(w); } catch(e){} }
     }
     var ok = el('mg-ok');
-    if (ok) ok.textContent = un.length ? 'このまま進める' : '入れて作業完了へ';
+    if (ok){
+      if (gate){
+        ok.textContent = '入れて' + gate + 'へ';
+        ok.disabled = !!un.length;
+      } else {
+        ok.disabled = false;
+        ok.textContent = un.length ? 'このまま進める' : '入れて作業完了へ';
+      }
+    }
+  }
+
+  /* 🔒 v2.141.0 盤面の外へ出す時に止めるか。判定は `unsettled` 1本（物販は聞かない＝needed と同じ）。 */
+  function exitNeeded(c){
+    if (!c) return false;
+    if (window.pitCardGoods && pitCardGoods(c)) return false;
+    return window.PitMechPick ? (PitMechPick.unsettled(c).length > 0) : false;
+  }
+  function show(card, go, gate){
+    build();
+    pending = { card: card, go: go, gate: gate || '' };
+    el('mg-title').textContent = gate
+      ? '先に作業担当を入れてください（' + gate + 'の前に）'
+      : '作業担当（点検・整備・チェック）を入れてください';
+    el('mg-move').innerHTML =
+      '<span class="pp-to">' + esc(((window.pitCustName ? pitCustName(card) : card.customer) || '（未入力）') + ' 様') + '</span>'
+      + (card.car ? '<span class="pp-who">' + esc(card.car) + '</span>' : '');
+    paint(card);
+    el('mg-backdrop').classList.add('show');
+    if (window.icHydrate) { try { icHydrate(el('mg-backdrop')); } catch(e){} }
   }
 
   window.PitMechGuard = {
     needed: needed,
     doneColId: doneColId,
     /* go＝OKだった時に続ける処理（＝カードを実際に動かす） */
-    open: function (card, go){
-      build();
-      pending = { card: card, go: go };
-      el('mg-move').innerHTML =
-        '<span class="pp-to">' + esc(((window.pitCustName ? pitCustName(card) : card.customer) || '（未入力）') + ' 様') + '</span>'
-        + (card.car ? '<span class="pp-who">' + esc(card.car) + '</span>' : '');
-      paint(card);
-      el('mg-backdrop').classList.add('show');
-      if (window.icHydrate) { try { icHydrate(el('mg-backdrop')); } catch(e){} }
+    open: function (card, go){ show(card, go, ''); },
+    /* 🔒 v2.141.0 盤面の外へ出す前の関門。label＝行き先（「完TEL済」など）。
+       戻り true ＝止めた（決まったら go を呼ぶ）／false ＝決まっている＝呼び側がそのまま進める。 */
+    exitNeeded: exitNeeded,
+    gate: function (card, label, go){
+      if (!exitNeeded(card)) return false;
+      show(card, go, label || 'タスクボードの外');
+      return true;
     },
     close: function (ok){
+      var p0 = pending;
+      /* 🔒 関門の時は、決まるまで「進む」は効かない（ボタンを押せなくしてあるが、念のためここでも見る） */
+      if (ok && p0 && p0.gate && exitNeeded(p0.card)){ paint(p0.card); return; }
       var bd = el('mg-backdrop'); if (bd) bd.classList.remove('show');
       var p = pending; pending = null;
       if (!p) return;

@@ -24,6 +24,7 @@
        retTbd:[{id}], retTimeTbd:[{id}],   … 返車日未定／返車時間未定（受付が決めに行く車）
        thanks:[{id}],                      … その日のお礼LINEで、まだ送っていない人
        sameDay:[{id,time}],                … その日の 待ち・当返 で、まだ返していない車
+       🆕 2026-10-04 ahead:{ 'YYYY-MM-DD':[{id,time,k}] } … 明日から先10日の 待ち・当返（k＝wait／sameDay）
        shakenCand:[{id}], shakenUnset:[{id}], … 車検の「行ける日候補が出た」／「店にいるのに予定なし」
        loaner:[{id,rem}],                  … 代車の残り日数（マイナス＝超過）
        dataCheck:{ n, red, amber },        … PitFlow のデータチェックで見つかっている数
@@ -121,6 +122,17 @@
     var sameDay = (C.cards || []).filter(function (c) {
       return c.reserveDate === C.tStr && (c.dropType === 'wait' || c.dropType === 'sameDay') && c.status !== 'returned' && c.status !== 'scrap' && c.status !== 'cancelled';
     }).map(function (c) { keep(c); return { id: c.id, time: hm(c.reserveTime) }; });
+    /* 🆕 2026-10-04 明日から先10日の 待ち・当返（日付ごと）。どの日が営業日かはサーバーが会社カレンダーで決める
+       🗣 ゆうた「明日、明後日のとうへん待ち作業のタイトルで・定休日を挟む場合は翌営業日に振り替える」 */
+    var ahead = {}, aDays = [];
+    for (var i = 1; i <= 10; i++) { var dd = new Date(C.tStr + 'T00:00:00'); dd.setDate(dd.getDate() + i); aDays.push(dd.getFullYear() + '-' + ('0' + (dd.getMonth() + 1)).slice(-2) + '-' + ('0' + dd.getDate()).slice(-2)); }
+    aDays.forEach(function (d) { ahead[d] = []; });
+    (C.cards || []).forEach(function (c) {
+      if (!c || !ahead[c.reserveDate] || (c.dropType !== 'wait' && c.dropType !== 'sameDay')) return;
+      if (c.status === 'returned' || c.status === 'scrap' || c.status === 'cancelled') return;
+      keep(c); ahead[c.reserveDate].push({ id: c.id, time: hm(c.reserveTime), k: c.dropType });
+    });
+    aDays.forEach(function (d) { ahead[d].sort(function (a, b) { return (a.time || '99') < (b.time || '99') ? -1 : 1; }); });
     /* 車検＝行ける日候補が出た物／店にいるのに予定が無い物（shakenStat が物差し） */
     var sk = P.shakenStat ? P.shakenStat() : { candList: [], unsetList: [] };
     var shakenCand = idsOf(sk.candList), shakenUnset = idsOf(sk.unsetList);
@@ -140,7 +152,7 @@
       v: 1, day: C.tStr, month: C.tStr.slice(0, 7),
       staff: staff, names: names, memberDivs: memberDivs, divLabels: divLabels,
       cards: cards, intake: intake, ret: ret, hold: hold,
-      retTbd: retTbd, retTimeTbd: retTimeTbd, thanks: thanks, sameDay: sameDay,
+      retTbd: retTbd, retTimeTbd: retTimeTbd, thanks: thanks, sameDay: sameDay, ahead: ahead,
       shakenCand: shakenCand, shakenUnset: shakenUnset, loaner: loaner,
       dataCheck: ins ? { n: ins.n || 0, red: ins.red || 0, amber: ins.amber || 0 } : null,
       sales: { sum: sum, goalMin: +tg.monthMin || 0, goalMax: +tg.monthMax || 0, today: today, byDiv: byDiv, byStaff: byStaff },

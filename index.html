@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.140.7"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.142.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=12">
 <link rel="stylesheet" href="css/views.css?v=59">
-<link rel="stylesheet" href="css/polish.css?v=237">
+<link rel="stylesheet" href="css/polish.css?v=238">
 <link rel="stylesheet" href="css/fleet-cal.css?v=8"><!-- 🗓 v2.70.0 車両カレンダー・代車カレンダーの整備予定。polish.css より **後ろ**（ここが上書きする側） -->
 <link rel="stylesheet" href="css/floor.css?v=24">
 <link rel="stylesheet" href="css/coreflow-note-board.css?v=87c1247a"><!-- 📌 付箋ボードの見た目（全アプリ共通・_shared から配布）。v2.109.0 で前の付箋専用の見た目から置き換え -->
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.140.7</div>
+    <div class="login-ver">v2.142.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.140.7</span>
+    <span class="ver">v2.142.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -780,7 +780,7 @@
 <!-- ===== JS ===== -->
 <script src="js/coreflow-icons.js?v=9ae48aea"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
-<script src="js/pit-share.js?v=34"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
+<script src="js/pit-share.js?v=35"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=8d7c4b2d"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
 <script src="js/errcode-pit.js?v=25"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
@@ -813,7 +813,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-detail.js?v=155"></script>
 <script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=79"></script>
+<script src="js/card-view.js?v=80"></script>
 <script src="js/cover-print.js?v=16"></script>
 <script src="js/avail.js?v=8"></script>
 <script src="js/card-tabs.js?v=15"></script>
@@ -878,26 +878,26 @@ window.PIT_DEMO = true;</script>
 <script src="js/auth-pit.js?v=17"></script>
 <script src="js/members-pit.js?v=18"></script>
 <script src="js/oplog-pit.js?v=6"></script>
-<script src="js/news-pit.js?v=46"></script>
+<script src="js/news-pit.js?v=48"></script>
 <script src="js/launcher.js?v=35ec9343"></script>
 <script src="js/holidays.js?v=1c79064f"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>
-<script src="js/cal-pit.js?v=091e190a"></script><!-- 🚫 会社の営業日カレンダー（MHSが基準）。state.js より後ろ。営業日判定はすべて PitCal を通す -->
-<script src="js/dnd.js?v=25"></script>
+<script src="js/cal-pit.js?v=7cb1d078"></script><!-- 🚫 会社の営業日カレンダー（MHSが基準）。state.js より後ろ。営業日判定はすべて PitCal を通す -->
+<script src="js/dnd.js?v=26"></script>
 <script src="js/board-order.js?v=4"></script><!-- 🔴 v1.140.0 タスクボードのマスター並び（task.js / dnd.js から呼ばれる） -->
 <script src="js/board-sort.js?v=3"></script><!-- 🔴 v1.140.0 タスクボードの一時並び替え（task.js / board-line.js / dnd.js から呼ばれる） -->
 <script src="js/board-line.js?v=11"></script><!-- タスクボードの区切りライン（task.js / ctxmenu-pit.js から呼ばれる） -->
 <script src="js/myonly-pit.js?v=8"></script><!-- タスクボードの「担当車両」スイッチ（task.js から呼ばれる・views.js より後ろ） -->
 <script src="js/pit-pip.js?v=9"></script>
 <script src="js/card-hover.js?v=47"></script>
-<script src="js/mech-guard.js?v=6"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
+<script src="js/mech-guard.js?v=7"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
 <script src="js/phase-popup.js?v=20"></script>
-<script src="js/return-popup.js?v=14"></script>
+<script src="js/return-popup.js?v=16"></script>
 <script src="js/help-content.js?v=67"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=29"></script>
 <script src="js/app-summary.js?v=5"></script><!-- v2.124.0 課の目標は pitSalesDivTarget を借りる／📡 v2.108.0 CoreFlow のダッシュボードへ概況を配る（mydash.js の物差しを借りる＝mydash.js より後ろ）／v2.121.0 最短入庫日の日付と3週間の空き（FlowDesk 用）／v2.123.0 売上ボード（salesBoard・自分のフロント成績） -->
-<script src="js/feed-facts.js?v=3"></script><!-- 🔔 v2.111.0 FlowDesk の通知のもと（入庫・返車の時間過ぎ・長期預かり・売上）をサーバーだけが読む所へ置く（mydash.js の物差しを借りる＝mydash.js より後ろ） -->
+<script src="js/feed-facts.js?v=4"></script><!-- 🔔 v2.111.0 FlowDesk の通知のもと（入庫・返車の時間過ぎ・長期預かり・売上）をサーバーだけが読む所へ置く（mydash.js の物差しを借りる＝mydash.js より後ろ） -->
 <script src="js/main.js?v=12"></script>
 <script src="js/auto-update.js?v=ffed3e38"></script>
   <script src="js/coreflow-user.js?v=4e5e1ce2"></script><!-- 👤 ヘッダー右の自分（写真＋フルネーム・全アプリ共通・_shared が本体） -->

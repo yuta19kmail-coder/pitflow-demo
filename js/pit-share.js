@@ -666,8 +666,12 @@ w.pitDivisionColor = pitDivisionColor;
     dropType2:'受付タイプ2', workTypes:'作業タイプ（複数）',
     workAddons:'追加の作業', workSpecials:'特別な作業', chipGroups:'作業内容の組',
     division:'課', taskStaff:'作業担当', callStaff:'完TEL担当', resvStaff:'予約担当',
-    pic:'担当', picId:'担当ID', staff:'担当（旧）', mechanics:'メカニック',
-    inspectors:'検査員', consult:'相談', memo:'メモ', todayNote:'当日メモ',
+    pic:'担当', picId:'担当ID', staff:'担当（旧）',
+    /* 👥 v2.141.0（ゆうた指摘 2026-10-05）担当者の3役は**画面と同じ言葉**（mech-pick.js の見出し）。
+       ⚠ 前は inspectors＝「検査員」・checkers は表に無く**英語のまま記録に出ていた**。 */
+    mechanics:'整備担当', inspectors:'点検担当', checkers:'チェック担当',
+    mechanicsNone:'整備担当 なし', inspectorsNone:'点検担当 なし', checkersNone:'チェック担当 なし',
+    consult:'相談', memo:'メモ', todayNote:'当日メモ',
     tentative:'仮予約', urgent:'急ぎ', codeRed:'クレーム', intakeTbd:'入庫日 未定',
     approvalPending:'承認待ち', internKind:'社内車両の区分',
     /* 作業・整備 */
@@ -699,7 +703,9 @@ w.pitDivisionColor = pitDivisionColor;
     /* 状態・置き場所＝フェーズ移動やドラッグが**すでに記録している** */
     status:1, returnStage:1, bayId:1, baySlot:1,
     archived:1, cancelled:1, cancelledAt:1, cancelledBy:1, cancelReason:1,
-    noShow:1, noShowAt:1, actualInAt:1
+    noShow:1, noShowAt:1, actualInAt:1,
+    /* 👥 v2.141.0 担当者の番号＝名前の欄（mechanics など）と**同じことの裏**。名前の行だけ出す */
+    mechanicIds:1, inspectorIds:1, checkerIds:1
   };
   /* 入れ子の中の項目名（整備チェックの7項目・バックオフィスの締め・完TELの印 …）。
      ⚠ 名前が引けないものは**生の名前のまま出す**（黙って落とさない）。 */

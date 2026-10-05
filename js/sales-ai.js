@@ -68,12 +68,9 @@
   /* ================================================================
      🚗 車の見分け
      ================================================================ */
-  /* ⑧ BMW の MINI と MINI は「MINI」。メーカー欄だけでなく車種名で見る（いまのカードは BMW のミニが多い） */
-  function isMini(c){
-    var x = s(c.car) + ' ' + s(c.maker);
-    return /ミニ|MINI|ﾐﾆ/i.test(x) && !/ミニカ|ミニキャブ|ミニバン/.test(s(c.car));
-  }
-  function makerOf(c){ return isMini(c) ? 'MINI' : (t(c.maker) || 'メーカー未入力'); }
+  /* ⑧ BMW の MINI と MINI は「MINI」。
+     📊 v2.143.0 物差しは analytics-pit.js の `pitCardMaker` 1本に移した（分析用の書き出しと同じ数え方にするため） */
+  function makerOf(c){ return w.pitCardMaker(c); }
   /* お名前は pit-share.js の1本（pitCustSurname）から。ここで組み立てない（test_pit_rules ②） */
   function seiOf(c){ return w.pitCustSurname ? t(w.pitCustSurname(c)) : t(c.sei); }
   function frontOf(c){ return t(c.frontStaff) || t(c.staff) || '（未割当）'; }
@@ -127,20 +124,8 @@
      ⚠ 工賃（作業）の原価は伝票上ほぼ0＝粗利は「部品の利益＋工賃」。人件費は入っていない
      ⚠ 伝票が無い車（業販など）は粗利の計算から外す（売上の数字はそのまま）
      ================================================================ */
-  function costOf(c){
-    try {
-      var h = w.pitVehByPlate ? w.pitVehByPlate(c.plate) : null;
-      var d = h && h.veh && (h.veh.伝票 || []).filter(function (x) { return x && t(x.予約番号) && t(x.予約番号) === t(c.resNo); })[0];
-      if (!d) return null;
-      var o = { 原価: num(d.原価), 工賃: 0, 工賃原価: 0, 部品: 0, 部品原価: 0 };
-      (d.明細 || []).forEach(function (m) {
-        if (!m) return;
-        if (m.種 === '部品'){ o.部品 += num(m.金額); o.部品原価 += num(m.原価); }
-        else if (m.種 === '作業'){ o.工賃 += num(m.金額); o.工賃原価 += num(m.原価); }
-      });
-      return o;
-    } catch (e) { return null; }
-  }
+  /* 📊 v2.143.0 物差しは analytics-pit.js の `pitCardCost` 1本に移した（分析用の書き出しと同じ引き方にするため） */
+  function costOf(c){ return w.pitCardCost(c); }
   /* ================================================================
      🔧 v2.140.0（ゆうた 2026-10-03「板金系は自社に数日置いて、板金屋さんが取りに来てあと放置、戻ってきたら返車。
         丸ごと抜いていい。車検＋コーティングなどで全体で1週間なら入れていい」）

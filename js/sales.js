@@ -78,6 +78,26 @@
     if (tier==='planned')   return num(c.amountQuote)||estA(c);
     return estA(c);   // prospect / forecast ＝概算
   }
+  /* 🆕 v2.146.0（ゆうた指定 2026-10-06「確定金額、見積金額、概算金額みたいな感じでどの状態かはっきりさせたい」）
+     amtOf が**どの欄から拾ったか**＝'確定'／'受注'／'見積'／'概算'。
+     🔴 拾う順は amtOf（実績・実績待は pitFinalAmountOf）と同じ。amtOf の順を変えたらここも一緒に変える。 */
+  function amtKindOf(c, tier){
+    function has(v){ return v != null && v !== ''; }
+    if (tier==='actual' || tier==='actualWait'){
+      if (has(c.amountFinal)) return '確定';
+      if (has(c.amountOrder)) return '受注';
+      if (has(c.amountQuote)) return '見積';
+      return '概算';
+    }
+    if (tier==='confirmed'){
+      if (num(c.amountOrder)) return '受注';
+      if (num(c.amountFinal)) return '確定';
+      if (num(c.amountQuote)) return '見積';
+      return '概算';
+    }
+    if (tier==='planned') return num(c.amountQuote) ? '見積' : '概算';
+    return '概算';
+  }
 
   function target(){ var t=(state.settings&&state.settings.target)||{}; return { min: num(t.monthMin)||15000000, max: num(t.monthMax)||20000000 }; }
   /* 🆕 v2.124.0（ゆうた指定 2026-09-26「課の均等分配750万と1000万に縦線」）
@@ -423,12 +443,27 @@
   var TIER_LIST = TIER_IDS.filter(function(id){ return id!=='forecast'; });
   function md(s){ var p=String(s||'').split('-'); return p.length===3 ? (+p[1])+'/'+(+p[2]) : ''; }
   /* 返車日：返した車＝返車日／まだの車＝返車予定日（＝この月に数える日。未定は空） */
-  function retRaw(c){ return String((c.status==='returned') ? (c.returnDateFinal || c.returnDate || '') : countDate(c)); }
+  /* 🆕 v2.146.0（ゆうた指定 2026-10-06「返車日なのか返車予定日ははっきり記載して」）
+     返車の日付に**どの日か**の札を付ける。
+       済＝返した日／確定＝確定返車日（C）／約束＝受注時にお客様と約束した日（B）／概算＝入庫日＋預かり日数の目安（A）／未定
+     🔴 日付の拾い方は return-slot.js の pitReturnDates 1本（C→B→A＝この月に数える日と同じ順）。 */
+  function retOf(c){
+    if (c.status==='returned') return { d:String(c.returnDateFinal || c.returnDate || ''), k:'済' };
+    if (window.pitReturnDates){
+      var r = pitReturnDates(c);
+      if (r.c) return { d:String(r.c), k:'確定' };
+      if (r.b) return { d:String(r.b), k:'約束' };
+      if (r.a) return { d:String(r.a), k:'概算' };
+      return { d:'', k:'未定' };
+    }
+    var d = String(countDate(c)||''); return { d:d, k: d ? '予定' : '未定' };
+  }
   function listRow(r){
-    var c = r.c, ret = retRaw(c);
+    var c = r.c, ro = retOf(c), ret = ro.d;
     return { tier:r.tier,
              when: r.tier==='actual' ? md(countDate(c)) : (window.pitCardStatusText ? pitCardStatusText(c) : c.status),
-             ret: md(ret) || '未定',
+             ret: ret ? ro.k + ' ' + md(ret) : '未定', retKind: ro.k,
+             amtKind: amtKindOf(c, r.tier),
              key: (r.tier==='actual' ? String(countDate(c)) : '') + '|' + (ret || '9999'),   /* 並び＝実績日→返車日（未定は最後） */
              name: custCar(c), work: workText(c), front: r.front, amt: r.amt, ref: r.ref||'' };
   }

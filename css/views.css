@@ -1151,12 +1151,15 @@ select.cf-input{
   background:rgba(37,99,235,.10); border:1px solid rgba(37,99,235,.32);
   border-radius:8px; padding:5px 10px; line-height:1.7; }
 
-/* 🔗 v2.160.0 付箋の「カードへのリンク」（board-notes.js の _linkHtml） */
-.bn-link{ display:inline-flex; align-items:center; gap:4px; max-width:100%; font-size:11px; font-weight:700;
-  color:var(--text,#111); background:rgba(255,255,255,.55); border:1px solid rgba(0,0,0,.15); border-radius:999px;
-  padding:1px 8px; cursor:pointer; white-space:nowrap; overflow:hidden; }
+/* 🔗 v2.160.0 付箋の「カードへのリンク」（board-notes.js の _linkHtml）
+   🔴 v2.162.0（ゆうた「黄色に白背景・グレー字で読みにくい」）付箋の地の色はいつも明るい（黄・赤・緑・青のパステル）。
+      画面の文字色（--text）はダークテーマだと白っぽくなるので使わない＝付箋の本文と同じ濃い字＋うすい影の地にする */
+.bn-link{ display:inline-flex; align-items:center; gap:4px; max-width:100%; font-size:11.5px; font-weight:700;
+  color:#1f2937; background:rgba(0,0,0,.08); border:1px solid rgba(0,0,0,.22); border-radius:999px;
+  padding:2px 9px; cursor:pointer; white-space:nowrap; overflow:hidden; }
 .bn-link span{ overflow:hidden; text-overflow:ellipsis; }
-.bn-link:hover{ background:#fff; border-color:rgba(0,0,0,.35); }
+.bn-link svg, .bn-link i{ color:#1f2937; }
+.bn-link:hover{ background:rgba(0,0,0,.15); border-color:rgba(0,0,0,.4); }
 /* 🔗 v2.161.0 カード詳細から開いた付箋の編集画面に「この車にリンク」の1行 */
 .pit-ed-link{ display:flex; align-items:center; gap:6px; margin:0 16px 4px; padding:6px 10px; font-size:12px;
   color:var(--text2,#444); background:var(--bg3,#f3f4f6); border:1px dashed var(--border2,#ccc); border-radius:8px; }

@@ -381,6 +381,38 @@
       return Promise.resolve(true);
     }
 
+    /* 🆕 v2.158.0 お客様の名前をフロントマン（伝票）の名前にそろえる
+       🔴 カードの customer を書き換える。お客様の控え（名簿）も**同じ間違った名前だった時だけ**一緒に直す
+          （次の予約からも同じ名前で出るように）。控えが別の名前なら触らない＝人が名簿で決めた名前を勝手に変えない。
+       ⚠ カナ（kana）は触らない（伝票は漢字の名前しか持っていない）。 */
+    if (kind === '客名'){
+      var to5 = t(p.soft && p.soft.顧客名), b5 = t(w.pitCustName ? w.pitCustName(c) : c.customer);
+      if (!to5 || to5 === b5) return Promise.resolve(false);
+      var cu = (c.customerId && w.state && Array.isArray(w.state.customers))
+        ? w.state.customers.filter(function (x) { return x && x.id === c.customerId; })[0] : null;
+      var nm = w.pitQNormName || function (v) { return t(v); };
+      var alsoCust = !!(cu && nm(cu.name) === nm(b5));
+      return pitAsk('お客様の名前を「' + to5 + '」にしますか？',
+                    { detail: ['・カード：' + (b5 || '（なし）') + ' → ' + to5,
+                               alsoCust ? '・お客様の控え（名簿）も同じ名前だったので、一緒に直します（次の予約からこの名前）'
+                                        : (cu ? '・お客様の控えは「' + t(cu.name) + '」のまま（触りません）' : '・お客様の控えにはつながっていません'),
+                               '・伝票 ' + t(p.soft.伝票) + '（フロントマン）の名前に合わせます。売上の数字は動きません'].join('\n'),
+                      ok: 'そろえる' })
+        .then(function (yes) {
+          if (!yes) return false;
+          c.customer = to5;
+          if (alsoCust) cu.name = to5;
+          if (w.logFlow) logFlow(c, 'お客様名を ' + (b5 || '（なし）') + ' → ' + to5 + ' に変更（フロントマンの伝票 ' + t(p.soft.伝票)
+                                  + ' に合わせた' + (alsoCust ? '・控えも' : '') + '／突き合わせの画面から）');
+          if (w.pitLog) pitLog('突き合わせ：お客様名をそろえた', { cardId: c.id, kind: 'inspect',
+            label: (b5 || '（なし）') + ' → ' + to5 + (alsoCust ? '（控えも）' : '') });
+          if (w.PitDB) PitDB.save();
+          if (w.pitToast) pitToast('お客様名を「' + to5 + '」にしました' + (alsoCust ? '（控えも）' : ''));
+          did('客名', p, 'お客様名を ' + (b5 || '（なし）') + ' → ' + to5 + ' にした' + (alsoCust ? '（控えも）' : ''));
+          return true;
+        });
+    }
+
     if (kind === '金額'){
       if (!canFinal()){
         if (w.pitAlert) pitAlert('確定金額を直せるのは、設定権限（管理）のある人だけです。', { title:'変更できません' });
@@ -445,7 +477,13 @@
     /* 👤 v2.140.7 お客様の名前がちがう。どちらが正しいかは人が見る
        ＝打ち間違いならカード（または伝票）を直せば次から消える。会社名と運転する人のように両方正しい時はこの札 */
     if (p && p.客名一致 === false) {
+      /* 🆕 v2.158.0（ゆうた指定 2026-10-07・Q-482582「名前が違って、フロントマンの名前に揃えるっていう選択肢がほしい」）
+         同じ「客名」の行に**直すボタン（go）**も付ける。⚠ 種類（kind）は1つのまま＝残りの数え方（rowLeft）が二重にならない。
+         押すとカードのお客様名を伝票（フロントマン）の名前にする → 名前がそろうのでこの行は消える。 */
+      var softName = t(p.soft && p.soft.顧客名);
       out.push({ kind: '客名', label: '確かめた（このままでよい）', 保つ: true,
+        go: softName ? { label: 'フロントマンの名前（' + softName + '）にそろえる',
+                         why: 'PitFlow のカードのお客様名を「' + t(p.pit && p.pit.顧客名) + '」→「' + softName + '」にします' } : null,
         why: 'お客様の名前が伝票とカードでちがいます。打ち間違いならカードか伝票を直してください。会社名と運転する人のように、両方正しい時に押してください' });
     }
     return out;

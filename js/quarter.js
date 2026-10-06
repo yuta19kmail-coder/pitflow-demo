@@ -1229,6 +1229,9 @@
       } else if (k.保つ){
         /* 🗓 v2.2.0 実績日＝返車日。ふだんの答えは**これ1つだけ**（直すボタンは出さない） */
         /* ⚠ v2.9.3 文言は物差し（quarter-fix.js の `keepKinds`）が決める。ここで決め打ちしない */
+        /* 🆕 v2.158.0 「このままでよい」の行にも直すボタンがある時（客名＝フロントマンの名前にそろえる） */
+        if (k.go) h += '<button class="q-fx-go" title="' + esc(k.go.why || '') + '"'
+           + ' onclick="pitQDo(\'' + esc(k.kind) + '\',' + i + ')">' + esc(k.go.label) + '</button>';
         h += '<button class="q-fx-mk q-fx-keep"'
            + ' title="' + esc(k.why || '') + '"'
            + ' onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">' + esc(k.label || 'このままでよい') + '</button>';

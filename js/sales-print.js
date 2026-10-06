@@ -56,7 +56,10 @@
     var PW=210,PH=297,mL=12,mT=12,mR=12,mB=12, W=PW-mL-mR, availH=PH-mT-mB;
     var m={ titleH:10, kpiH:16, secTitleH:7, rowH:5.4, headH:5.8, gap:4.5, barsH:44 };
     function secH(sec){ if(sec.type==='table') return m.secTitleH + m.headH + sec.rows.length*m.rowH + m.gap; if(sec.type==='bars') return m.secTitleH + m.barsH + m.gap; return m.secTitleH+m.gap; }
-    var reqH=m.titleH + ((model.kpis&&model.kpis.length)?m.kpiH:0) + model.sections.reduce(function(a,s){return a+secH(s);},0);
+    /* 🆕 v2.148.0 添え書き（model.note）も紙に出す。行数は幅で折り返して数える */
+    pdf.setFont('JP','normal'); pdf.setFontSize(7.2);
+    var noteLines = model.note ? pdf.splitTextToSize(String(model.note), W) : [];
+    var reqH=m.titleH + ((model.kpis&&model.kpis.length)?m.kpiH:0) + model.sections.reduce(function(a,s){return a+secH(s);},0) + (noteLines.length ? noteLines.length*3.4+2 : 0);
     var sc=Math.min(1, availH/reqH);
     var y=mT;
     pdf.setFont('JP','normal');
@@ -77,6 +80,7 @@
       else if(sec.type==='bars') y=drawBars(pdf,sec,mL,y,W,sc,m);
       y+=m.gap*sc;
     });
+    if (noteLines.length){ pdf.setFontSize(7.2*sc); pdf.setTextColor(90,90,90); noteLines.forEach(function(L2,ix){ pdf.text(L2, mL, y+3*sc+ix*3.4*sc); }); }
   }
   function drawTable(pdf,sec,x,y,W,sc,m){
     var wts=sec.align.map(function(a,i){ return i===0?2.4:1; }); var tw=wts.reduce(function(a,b){return a+b;},0); var ws=wts.map(function(w){return w/tw*W;});

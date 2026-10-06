@@ -317,3 +317,16 @@ td.sv-num.sv-dm-early{ color:#1db97a; }
 .sv-ref .sv-table + .sv-table{ margin-top:10px; }
 .sv-ref .sv-table small{ color:var(--text3); font-size:10px; }
 .sv-ref-list td:nth-child(-n+5), .sv-ref-list th:nth-child(-n+5){ text-align:left; }
+
+/* 🆕 v2.148.0 クォーター＝MTG用（選んだQ・次Q・次Qの中身） */
+.sv-qcards .sv-qcard{ cursor:pointer; }
+.sv-qcard.sel{ border-color:#1db97a; box-shadow:0 0 0 2px #1db97a inset; }
+.sv-qcard-h em + em{ margin-left:0; }
+.sv-qcard-h em.sel{ background:#1db97a; }
+.sv-qcard-h em.nx{ background:#2563eb; }
+.sv-qnext{ display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-size:11.5px; color:var(--text2); }
+.sv-qnext span{ display:inline-flex; align-items:baseline; gap:4px; white-space:nowrap; }
+.sv-qnext i{ width:8px; height:8px; border-radius:2px; background:var(--tc); align-self:center; }
+.sv-qnext b{ color:var(--text); font-variant-numeric:tabular-nums; }
+.sv-qnext small{ color:var(--text3); font-size:10px; }
+.sv-qnext-none{ color:var(--text3); }

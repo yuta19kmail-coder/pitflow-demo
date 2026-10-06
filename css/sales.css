@@ -329,3 +329,16 @@ td.sv-num.sv-dm-early{ color:#1db97a; }
 .sv-qnext b{ color:var(--text); font-variant-numeric:tabular-nums; }
 .sv-qnext small{ color:var(--text3); font-size:10px; }
 .sv-qnext-none{ color:var(--text3); }
+
+/* 🆕 v2.150.0 単純割の目標（月目標を4等分）を達成しているか */
+.sv-qgoal{ display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:stretch; margin:2px 0 10px; }
+.sv-qgoal > div{ background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:7px 10px; }
+.sv-qgoal em{ display:block; font-style:normal; font-size:10.5px; font-weight:700; color:var(--text3); }
+.sv-qgoal b{ display:block; font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.25; }
+.sv-qgoal span{ display:block; font-size:10.5px; color:var(--text3); }
+.sv-qgoal .sv-qgoal-v{ display:flex; flex-direction:column; justify-content:center; align-items:center; min-width:96px; }
+.sv-qgoal.is-ok .sv-qgoal-v{ border-color:#1db97a; background:color-mix(in srgb,#1db97a 14%,transparent); }
+.sv-qgoal.is-ok .sv-qgoal-v b{ color:#1db97a; }
+.sv-qgoal.is-ng .sv-qgoal-v{ border-color:#ef4444; background:color-mix(in srgb,#ef4444 12%,transparent); }
+.sv-qgoal.is-ng .sv-qgoal-v b{ color:#ef4444; }
+@media (max-width:520px){ .sv-qgoal{ grid-template-columns:1fr 1fr; } .sv-qgoal .sv-qgoal-v{ grid-column:1 / -1; } }

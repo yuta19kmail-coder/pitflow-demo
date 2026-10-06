@@ -118,17 +118,11 @@
   function MAN(n){ return window.svMan ? svMan(n) : (Math.round(n/1000)/10)+'万'; }
   var INK=[28,34,31], MUTED=[98,108,103], FAINT=[150,158,154], RULE=[222,228,224], PANEL=[247,249,248], GREEN=hexRgb('#1db97a');
 
-  function drawInfographic(pdf, model){
-    var I=model.infographic, PW=210, L=12, R=198, W=R-L;
-    pdf.setFont('JP','normal');
-
-    /* ── 見出し ── */
-    T(pdf,INK); pdf.setFontSize(17); pdf.text(String(model.title||'売上サマリー'), L, 19);
-    T(pdf,MUTED); pdf.setFontSize(8.5); pdf.text((model.period||'')+' ／ 小林モータース ／ 出力 '+nowTxt(), R, 19, {align:'right'});
-    D(pdf,GREEN); pdf.setLineWidth(0.6); pdf.line(L, 22.5, R, 22.5);
-
+  /* 🆕 v2.152.0 ①数字の帯＋積み上げ帯 ②日次の進捗 を切り出した（売上の紙とクォーターの紙が同じ物を描く）。返り＝次の y */
+  function drawMonthHead(pdf, I, y0, chH0){
+    var L=12, R=198, W=R-L;
     /* ── ① 数字の帯 ── */
-    var y=26, heroH=47;
+    var y=y0, heroH=47;
     F(pdf,PANEL); D(pdf,RULE); pdf.setLineWidth(0.25); pdf.roundedRect(L, y, W, heroH, 2, 2, 'FD');
     var c1=L+5, c2=L+66;
     T(pdf,MUTED); pdf.setFontSize(7.5); pdf.text('実績（返車済み）', c1, y+6.5);
@@ -165,7 +159,7 @@
     if (_refLine){ T(pdf,MUTED); pdf.setFontSize(6.8); pdf.text(_refLine, L+1, y+2.5); y += 5; }
 
     /* ── ② 日次の進捗 ── */
-    var chH=62;   /* v2.124.0 74→62：課別をメインにするため、その分を課別へ回した */
+    var chH=chH0;   /* 売上の紙＝62（v2.124.0）／クォーターの紙は低め */
     D(pdf,RULE); pdf.setLineWidth(0.25); pdf.roundedRect(L, y, W, chH, 2, 2, 'S');
     T(pdf,INK); pdf.setFontSize(9.5); pdf.text('日次の進捗（返車＝実績の累計）', L+4, y+6.5);
     /* 凡例 */
@@ -202,6 +196,146 @@
     for (var dd=1; dd<=N; dd+=step){ pdf.text(String(dd), X(dd), gy1+4.5, {align:'center'}); }
     if ((N-1)%step!==0) pdf.text(String(N), X(N), gy1+4.5, {align:'center'});
     y += chH + 4;
+
+    return y;
+  }
+
+
+  /* ===================================================================
+     🆕 v2.152.0（ゆうた指定 2026-10-06「MTG用も売上ビューと同じようにビューのビジュアルそのままの感じで出力」）
+     クォーターの紙（A4縦1枚）＝画面と同じ並び：
+       ① 月の数字の帯＋積み上げ帯 ② 日次の進捗（売上の紙と同じ drawMonthHead）
+       ③ 全体：Qnまでの目標（月目標を4等分）の達成 ④ 1課・2課＝前Qまで → 選んだQ → 翌Q の階段 ⑤ Q1〜Q4 の箱
+     🔴 数字は sales.js の qGraphicInfo（画面と同じ集め方）だけ。ここで数え直さない。
+     =================================================================== */
+  function drawQuarterGraphic(pdf, model){
+    var QI=model.qgraphic, I=QI.month, L=12, R=198, W=R-L, OKC=GREEN, NGC=hexRgb('#d9443a');
+    pdf.setFont('JP','normal');
+    T(pdf,INK); pdf.setFontSize(17); pdf.text(String(model.title||'クォーター'), L, 19);
+    T(pdf,MUTED); pdf.setFontSize(8.5); pdf.text((model.period||'')+' ／ 小林モータース ／ 出力 '+nowTxt(), R, 19, {align:'right'});
+    D(pdf,GREEN); pdf.setLineWidth(0.6); pdf.line(L, 22.5, R, 22.5);
+    var y = drawMonthHead(pdf, I, 26, 46);
+
+    /* 判定の箱（目標・実績・達成/未達）を1段で */
+    function goalRow(x0, w0, yy, G, label){
+      var gw=(w0-4)/3, hh=14;
+      [{lb:label+'までの目標（4等分）', v:G.minTxt, sub:'最高 '+G.maxTxt, c:INK},
+       {lb:(label==='Q1'?'Q1':'Q1〜'+label)+'の実績', v:MAN(G.act), sub:'目標の '+G.p+'%', c:INK}].forEach(function(k, j){
+        var kx=x0+j*(gw+2);
+        F(pdf,PANEL); D(pdf,RULE); pdf.setLineWidth(0.2); pdf.roundedRect(kx, yy, gw, hh, 1.3, 1.3, 'FD');
+        T(pdf,MUTED); pdf.setFontSize(6.2); pdf.text(k.lb, kx+2.2, yy+4);
+        T(pdf,k.c); pdf.setFontSize(12); pdf.text(k.v, kx+2.2, yy+9.8);
+        T(pdf,FAINT); pdf.setFontSize(5.8); pdf.text(k.sub, kx+2.2, yy+12.8);
+      });
+      var vx=x0+2*(gw+2), vc=G.ok?OKC:NGC;
+      F(pdf,tint(G.ok?'#1db97a':'#d9443a',0.12)); D(pdf,vc); pdf.setLineWidth(0.4); pdf.roundedRect(vx, yy, gw, hh, 1.3, 1.3, 'FD');
+      T(pdf,vc); pdf.setFontSize(12.5); pdf.text(G.ok?'達成':'未達', vx+gw/2, yy+7.2, {align:'center'});
+      pdf.setFontSize(7.2); pdf.text(G.ok ? '＋'+MAN(-G.gap) : 'あと '+MAN(G.gap), vx+gw/2, yy+11.6, {align:'center'});
+      return yy+hh;
+    }
+    var qLab='Q'+(QI.selQ+1);
+    /* ③ 全体 */
+    T(pdf,INK); pdf.setFontSize(9); pdf.text('全体：'+qLab+'までの目標（月目標 '+QI.monthTargetTxt+' を4等分）', L, y+3.5);
+    y = goalRow(L, W, y+5.5, QI.goalAll, qLab) + 4;
+
+    /* ④ 1課・2課 */
+    var bgap=4, bw2=(W-bgap)/2, bh2=95;
+    var cScale=Math.max.apply(null, QI.courses.map(function(co){ return Math.max(co.max, co.prev+co.sel+co.next); }).concat([1]))*1.06;
+    var MINC=[70,78,74], MAXC=hexRgb('#d99a06');
+    function qbar(x0, w0, yy, hh, co, upTo, hi){
+      F(pdf,[232,236,234]); pdf.roundedRect(x0, yy, w0, hh, Math.min(1.2,hh/2), Math.min(1.2,hh/2), 'F');
+      var segs=[['prev',co.prev,'#1db97a'],['sel',co.sel,'#1db97a']].concat(co.nextTiers.map(function(t){ return ['next',t.sum,t.color]; }));
+      var order={prev:0,sel:1,next:2}, xx=x0;
+      segs.forEach(function(sg){ if(!(sg[1]>0)) return; if(upTo!=null && order[sg[0]]>upTo) return;
+        var ww=w0*sg[1]/cScale, dim=(hi && hi!==sg[0]) || (!hi && sg[0]==='prev');
+        F(pdf, dim ? tint(sg[2],0.3) : hexRgb(sg[2])); pdf.rect(xx, yy, Math.max(0,ww), hh, 'F'); xx+=ww; });
+      var ext=Math.max(1, hh*0.35);
+      D(pdf,MINC); pdf.setLineWidth(0.45); var m1=x0+w0*co.min/cScale; pdf.line(m1, yy-ext, m1, yy+hh+ext);
+      D(pdf,MAXC); dashOn(pdf,[0.8,0.6]); var m2=x0+w0*co.max/cScale; pdf.line(m2, yy-ext, m2, yy+hh+ext); dashOn(pdf,[]);
+      return { m1:m1, m2:m2 };
+    }
+    QI.courses.forEach(function(co, i){
+      var bx2=L+i*(bw2+bgap), ix=bx2+4, iw=bw2-8, land=co.prev+co.sel+co.next;
+      F(pdf,[255,255,255]); D(pdf,RULE); pdf.setLineWidth(0.25); pdf.roundedRect(bx2, y, bw2, bh2, 1.8, 1.8, 'FD');
+      F(pdf,hexRgb(co.color)); pdf.rect(bx2, y+1.8, 1.2, bh2-3.6, 'F');
+      F(pdf,hexRgb(co.color)); pdf.roundedRect(ix, y+3.2, 12, 5.4, 1.2, 1.2, 'F');
+      T(pdf,[255,255,255]); pdf.setFontSize(8.5); pdf.text(co.label, ix+6, y+7.1, {align:'center'});
+      T(pdf,INK); pdf.setFontSize(9.5); pdf.text(co.team, ix+14.5, y+7.2);
+      T(pdf,MUTED); pdf.setFontSize(6.8); pdf.text(QI.nxName+'までの目標 '+MAN(co.min)+'〜'+MAN(co.max), ix+iw, y+7.2, {align:'right'});
+      var yy = goalRow(ix, iw, y+10.5, co.goal, qLab) + 2.5;
+      /* 大きい数字3つ */
+      var kw=(iw-4)/3;
+      [{lb:QI.selName+'の実績', v:co.sel, c:GREEN, sub:'Q目標の '+(co.selMin>0?Math.round(co.sel/co.selMin*100):0)+'%・'+co.selN+'台'},
+       {lb:QI.nextLabel, v:co.next, c:hexRgb('#2563eb'), sub:'Q目標の '+(co.nxMin>0?Math.round(co.next/co.nxMin*100):0)+'%・'+co.nextN+'台'},
+       {lb:QI.nxName+'までの着地', v:land, c:(land>=co.min?GREEN:NGC), sub:(land>=co.min?'最低を超える':'最低まで あと '+MAN(co.min-land))}
+      ].forEach(function(k, j){
+        var kx=ix+j*(kw+2);
+        F(pdf,PANEL); D(pdf,RULE); pdf.setLineWidth(0.2); pdf.roundedRect(kx, yy, kw, 14, 1.3, 1.3, 'FD');
+        T(pdf,MUTED); pdf.setFontSize(6); pdf.text(k.lb, kx+2.2, yy+4);
+        T(pdf,k.c); pdf.setFontSize(12.5); pdf.text(MAN(k.v), kx+2.2, yy+9.8);
+        T(pdf,FAINT); pdf.setFontSize(5.6); pdf.text(k.sub, kx+2.2, yy+12.6);
+      });
+      yy += 19;
+      var mk=qbar(ix, iw, yy, 5.5, co, null, '');
+      pdf.setFontSize(6); T(pdf,MINC); pdf.text('最低 '+MAN(co.min), mk.m1, yy-2, {align:'center'});
+      T(pdf,MAXC); pdf.text('最高 '+MAN(co.max), Math.min(mk.m2, ix+iw-8), yy-2, {align:'center'});
+      yy += 10;
+      /* 階段 */
+      var cN=ix, cV=ix+iw*0.55, cC=ix+iw*0.82, cP=ix+iw, lh=8.6;
+      T(pdf,FAINT); pdf.setFontSize(6); pdf.text('段', cN, yy); pdf.text('この段', cV, yy, {align:'right'}); pdf.text('足した合計', cC, yy, {align:'right'}); pdf.text('最低比', cP, yy, {align:'right'});
+      yy += 1.5;
+      var rows=[['prev','前Qまでの実績'+(QI.selQ?'（Q1〜Q'+QI.selQ+'）':''),co.prev,co.prevN,''],['sel',QI.selName+'の実績',co.sel,co.selN,'実績'],['next',QI.nextLabel,co.next,co.nextN,'着地']], cum=0;
+      rows.forEach(function(r, k){
+        cum+=r[2]; var ry=yy+k*lh, ty=ry+4, p=co.min>0?Math.round(cum/co.min*100):0;
+        if (r[4]){ F(pdf,tint(co.color,0.07)); pdf.rect(ix-1.5, ry, iw+3, lh, 'F'); }
+        D(pdf,RULE); pdf.setLineWidth(0.1); pdf.line(ix-1.5, ry, ix+iw+1.5, ry);
+        T(pdf,INK); pdf.setFontSize(7.5); pdf.text((k?'＋':'')+r[1], cN, ty);
+        T(pdf, r[2]>0 ? MUTED : FAINT); pdf.setFontSize(7.2); pdf.text(MAN(r[2]), cV-6, ty, {align:'right'});
+        pdf.setFontSize(5.6); pdf.text(r[3]+'台', cV, ty, {align:'right'});
+        T(pdf,INK); pdf.setFontSize(9.5); pdf.text(MAN(cum), cC, ty+0.2, {align:'right'});
+        if (r[4]){ T(pdf,hexRgb(co.color)); pdf.setFontSize(5.8); pdf.text(r[4], cC-pdf.getTextWidth(MAN(cum))*9.5/5.8-2, ty, {align:'right'}); }
+        T(pdf, cum>=co.max ? MAXC : (cum>=co.min ? GREEN : MUTED)); pdf.setFontSize(7.5); pdf.text(p+'%', cP, ty, {align:'right'});
+        qbar(ix, iw, ry+lh-3, 1.8, co, k, r[0]);
+      });
+      yy += rows.length*lh + 2.5;
+      /* 翌Qの中身（区分ごと） */
+      pdf.setFontSize(6.2); var tx=ix;
+      co.nextTiers.forEach(function(t){ if(!t.count) return;
+        var txt=t.label+' '+MAN(t.sum)+' '+t.count+'台', tw=pdf.getTextWidth(txt)+5;
+        if (tx+tw>ix+iw){ tx=ix; yy+=4; }
+        F(pdf,hexRgb(t.color)); pdf.rect(tx, yy-2, 2.2, 2.2, 'F'); T(pdf,MUTED); pdf.text(txt, tx+3, yy); tx+=tw+1.5; });
+    });
+    y += bh2 + 4;
+
+    /* ⑤ Q1〜Q4 の箱 */
+    T(pdf,INK); pdf.setFontSize(9); pdf.text((I.lastDay?'':'')+'クォーター実績（月4分割・営業日配分）', L, y+3.5); y+=5.5;
+    var qw=(W-3*2.5)/4, qh=19;
+    QI.qboxes.forEach(function(b, i){
+      var qx=L+i*(qw+2.5), p=b.min>0?Math.round(b.act/b.min*100):0, lv=p>=100?'#1db97a':(p>=85?'#e08a0b':'#d9443a');
+      F(pdf,[255,255,255]); D(pdf, b.sel?GREEN:RULE); pdf.setLineWidth(b.sel?0.7:0.25); pdf.roundedRect(qx, y, qw, qh, 1.4, 1.4, 'FD');
+      T(pdf,INK); pdf.setFontSize(8); pdf.text(b.label, qx+2.4, y+4.8);
+      T(pdf,FAINT); pdf.setFontSize(6); pdf.text(b.range, qx+8.5, y+4.8);
+      var tag=(b.sel?'選択中 ':'')+(b.nx?'次Q ':'')+(b.now?'進行中':'');
+      if (tag){ T(pdf, b.sel?GREEN:hexRgb('#2563eb')); pdf.setFontSize(5.8); pdf.text(tag.trim(), qx+qw-2, y+4.8, {align:'right'}); }
+      T(pdf,GREEN); pdf.setFontSize(12); pdf.text(MAN(b.act), qx+2.4, y+11);
+      F(pdf,[232,236,234]); pdf.rect(qx+2.4, y+12.6, qw-4.8, 1.6, 'F'); F(pdf,hexRgb(lv)); pdf.rect(qx+2.4, y+12.6, (qw-4.8)*Math.min(1,p/100), 1.6, 'F');
+      T(pdf,FAINT); pdf.setFontSize(5.6); pdf.text('目標 '+MAN(b.min)+'〜'+MAN(b.max)+' ／ '+p+'% ／ '+b.cnt+'台', qx+2.4, y+17.2);
+    });
+    y += qh + 3;
+    T(pdf,FAINT); pdf.setFontSize(5.8);
+    pdf.splitTextToSize(String(QI.note||''), W).forEach(function(ln, k){ pdf.text(ln, L, Math.min(291, y+2+k*3)); });
+  }
+
+  function drawInfographic(pdf, model){
+    var I=model.infographic, PW=210, L=12, R=198, W=R-L;
+    pdf.setFont('JP','normal');
+
+    /* ── 見出し ── */
+    T(pdf,INK); pdf.setFontSize(17); pdf.text(String(model.title||'売上サマリー'), L, 19);
+    T(pdf,MUTED); pdf.setFontSize(8.5); pdf.text((model.period||'')+' ／ 小林モータース ／ 出力 '+nowTxt(), R, 19, {align:'right'});
+    D(pdf,GREEN); pdf.setLineWidth(0.6); pdf.line(L, 22.5, R, 22.5);
+
+    var y = drawMonthHead(pdf, I, 26, 62);
 
     /* ── ③ 確度別カード（目標＋6区分） ── */
     var cards=[{label:'目標',color:'#d99a06',big:MAN(I.min)+'〜',big2:MAN(I.max),cnt:''}].concat(I.tiers.map(function(tt){ return {label:tt.label,color:tt.color,big:MAN(tt.sum),cnt:tt.count+'台'}; }));
@@ -340,7 +474,7 @@
       var co=curCourse;
       F(pdf,G(225)); pdf.rect(L, y, W, 8, 'F');
       T(pdf,G(0)); pdf.setFontSize(11); pdf.text(co.label+'（'+co.team+'）'+(cont?'　続き':''), L+2.5, y+5.6);
-      T(pdf,G(50)); pdf.setFontSize(8); pdf.text('課の目標 '+MAN(co.min)+'〜'+MAN(co.max), R-2.5, y+5.6, {align:'right'});
+      T(pdf,G(50)); pdf.setFontSize(8); pdf.text((model.goalLabel||'課の目標')+' '+MAN(co.min)+'〜'+MAN(co.max), R-2.5, y+5.6, {align:'right'});
       y += 11;
     }
     function need(h, redraw){ if (y+h > BOT){ newPage(true); if (redraw) redraw(); return true; } return false; }
@@ -364,10 +498,12 @@
       /* ── 区分の合計と「足した合計」 ── */
       var SC=[['区分',30,'l'],['台数',18,'r'],['この区分',34,'r'],['足した合計',44,'r'],['最低比',20,'r'],['',40,'l']];
       colHead(SC);
-      var cum=0, NEAR={actualWait:'ほぼ確実',confirmed:'確度高',prospect:'見込まで'};
-      co.groups.forEach(function(g, i){
+      /* 🆕 v2.152.0 合計に入れない箱（inSum:false＝クォーターの「それ以外」）は足さない。節目の札は g.stage が優先 */
+      var cum=0, NEAR={actualWait:'ほぼ確実',confirmed:'確度高',prospect:'見込まで'}, k0=0;
+      co.groups.forEach(function(g){
+        if (g.inSum===false) return;
         cum += g.sum;
-        row(SC, [(i?'＋':'')+g.label, g.count+'台', MAN(g.sum), MAN(cum), (co.min>0?Math.round(cum/co.min*100):0)+'%', NEAR[g.id]||'']);
+        row(SC, [(k0++?'＋':'')+g.label, g.count+'台', MAN(g.sum), MAN(cum), (co.min>0?Math.round(cum/co.min*100):0)+'%', g.stage||NEAR[g.id]||'']);
       });
       y += 2.5;
       /* 🆕 v2.146.0 札の読み方（課のページごとに1回） */
@@ -377,7 +513,15 @@
       pdf.text('金額：確定金額＝完TEL・返車のときに決めた額／受注金額＝受注時の額／見積金額＝見積の額／概算金額＝作業タイプの目安（まだ見積が無い）', L+2, y+8);
       y += 14;
       /* ── 区分ごとの1台ずつ ── */
+      var band='';
       co.groups.forEach(function(g){
+        /* 🆕 v2.152.0 帯（該当Q／翌Q／それ以外）が変わる所に太い見出し */
+        if (g.band && g.band!==band){
+          band=g.band; need(24);
+          D(pdf,G(0)); pdf.setLineWidth(0.8); pdf.line(L, y+7, R, y+7);
+          T(pdf,G(0)); pdf.setFontSize(11.5); pdf.text('■ '+band, L, y+5.2);
+          y += 10;
+        }
         need(16);
         F(pdf,G(238)); pdf.rect(L, y, W, 6.5, 'F');
         D(pdf,G(0)); pdf.setLineWidth(0.6); pdf.line(L, y, L, y+6.5);
@@ -398,8 +542,8 @@
         D(pdf,G(0)); pdf.setLineWidth(0.3); dashOn(pdf,[1.2,1]);
         pdf.rect(L, y, W, 6.5); dashOn(pdf,[]);
         var rt = co.refRows.reduce(function(a,r){ return a+(+r.amt||0); }, 0);
-        T(pdf,G(0)); pdf.setFontSize(9.5); pdf.text('参考（保険・社員の実績待〜見込）　'+co.refRows.length+'台　'+MAN(rt), L+2.5, y+4.6);
-        T(pdf,G(80)); pdf.setFontSize(6.8); pdf.text('実績になるまで売上の集計（上の合計）には入れていません', R-2, y+4.4, {align:'right'});
+        T(pdf,G(0)); pdf.setFontSize(9.5); pdf.text((model.refTitle||'参考（保険・社員の実績待〜見込）')+'　'+co.refRows.length+'台　'+MAN(rt), L+2.5, y+4.6);
+        T(pdf,G(80)); pdf.setFontSize(6.8); pdf.text(model.refNote||'実績になるまで売上の集計（上の合計）には入れていません', R-2, y+4.4, {align:'right'});
         y += 8;
         colHead(RCOLS);
         co.refRows.forEach(function(r){
@@ -417,9 +561,11 @@
     ensureJsPDF().then(loadJPFont).then(function(b64){
       var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF('p','mm','a4');
       pdf.addFileToVFS('svjp.ttf', b64); pdf.addFont('svjp.ttf','JP','normal'); pdf.setFont('JP','normal');
-      var model=window.svListModel();
+      /* 🆕 v2.152.0 クォーターのタブなら「該当Q・翌Q・それ以外」の一覧 */
+      var isQ = (window._svTab==='quarter' && window.svQListModel);
+      var model = isQ ? window.svQListModel() : window.svListModel();
       drawList(pdf, model);
-      pdf.save(('売上一覧_'+model.period).replace(/[\\\/:*?"<>|\s（）()〜]/g,'-')+'.pdf');
+      pdf.save(((isQ?'クォーター一覧_':'売上一覧_')+model.period+(isQ?'_'+model.title.replace(/^.*（|）$/g,''):'')).replace(/[\\\/:*?"<>|\s（）()〜→]/g,'-')+'.pdf');
     }).catch(function(e){ console.warn('[sales-print] 一覧PDF:', e && e.message); pitAlert('一覧PDFを作れませんでした（フォントかPDFの部品が読めません）。', { code:'PF-5003' }); });
   };
 
@@ -430,7 +576,8 @@
       pdf.addFileToVFS('svjp.ttf', b64); pdf.addFont('svjp.ttf','JP','normal');
       var model = window.svReportModel();
       /* 🎨 v2.120.0 材料がある（売上サマリー・当月）なら画面と同じインフォグラフィック。ほかは今までどおりの表 */
-      if (model && model.infographic) drawInfographic(pdf, model); else drawReport(pdf, model);
+      if (model && model.qgraphic) drawQuarterGraphic(pdf, model);       /* 🆕 v2.152.0 クォーター＝画面と同じ並び */
+      else if (model && model.infographic) drawInfographic(pdf, model); else drawReport(pdf, model);
       pdf.save(fileBase()+'.pdf');
     }).catch(function(e){ console.warn('[sales-print] ベクターPDF不可→ラスターに切替:', e && e.message); rasterPdf(); });
   };

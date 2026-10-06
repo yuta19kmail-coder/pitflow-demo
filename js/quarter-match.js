@@ -107,16 +107,38 @@
     '祐太': '小林裕太',
     '康起': '箱崎康起'
   };
+  /* 🔴🔴 v2.155.0（ゆうた報告 2026-10-07「Q-816429 がフロント違うで、なぜか関係ないチーフにすると書いてある」）
+     ◎正体＝「名寄せ表の名前が**末尾に含まれていたら**その人」の決まりが、**下の名前（裕太・祐太・康起）にも効いていた**。
+       ＝「椎名祐太」は末尾が「祐太」なので**チーフ（小林裕太）に化けた**。同じ下の名前の人が居ると必ず起きる。
+     🔴 これから
+       ① 表の言葉そのもの（専務・チーフ・裕太…）と**ぴったり**同じ → その人
+       ② 末尾の一致は **フルネーム**（名簿の名前／表の行き先の名前）と **役職（専務・社長・チーフ）** だけ
+          （「Agency株式会社箱﨑康起」は末尾がフルネーム「箱崎康起」なので今までどおり箱崎さん）
+       ③ **下の名前だけの末尾一致はしない**（「椎名祐太」は椎名祐太のまま） */
+  var STAFF_ROLE = { '専務': 1, '社長': 1, 'チーフ': 1 };
+  function plainName(v){ return fixKanji(toHalf(v)).replace(/\s/g, ''); }
+  function rosterFull(){
+    var out = {};
+    Object.keys(STAFF_ALIAS).forEach(function (k) { out[STAFF_ALIAS[k]] = 1; });
+    ((w.state && w.state.staff) || []).forEach(function (m) {
+      var n = plainName(m && m.name); if (!n) return;
+      out[STAFF_ALIAS[n] || n] = 1;
+    });
+    /* 長い名前から見る（短い名前が先に当たって別人になるのを防ぐ） */
+    return Object.keys(out).filter(function (n) { return n.length >= 3; }).sort(function (a, b) { return b.length - a.length; });
+  }
   function staffName(v){
-    var x = fixKanji(toHalf(v)).replace(/\s/g, '');
+    var x = plainName(v);
     if (!x) return '';
-    if (STAFF_ALIAS[x]) return STAFF_ALIAS[x];
-    /* 整備ソフト側は請求先名がくっついて出ることがある（例「Agency株式会社箱﨑康起」）。
-       ⚠ 名寄せ表の名前が**末尾に含まれていたら**その人とみなす。 */
-    for (var k in STAFF_ALIAS){
-      if (Object.prototype.hasOwnProperty.call(STAFF_ALIAS, k) && x.slice(-k.length) === k) return STAFF_ALIAS[k];
+    if (STAFF_ALIAS[x]) return STAFF_ALIAS[x];                                  /* ① */
+    var full = rosterFull();
+    for (var i = 0; i < full.length; i++){                                       /* ② フルネームの末尾 */
+      if (x === full[i] || x.slice(-full[i].length) === full[i]) return full[i];
     }
-    return x;
+    for (var k in STAFF_ROLE){                                                   /* ② 役職の末尾 */
+      if (Object.prototype.hasOwnProperty.call(STAFF_ROLE, k) && x.slice(-k.length) === k) return STAFF_ALIAS[k];
+    }
+    return x;                                                                    /* ③ 下の名前だけでは寄せない */
   }
 
   /* ================================================================

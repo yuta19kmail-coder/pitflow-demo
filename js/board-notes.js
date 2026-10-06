@@ -102,8 +102,33 @@
     if (!c) { _toast('つながっていたカードが見つかりません（消去された可能性があります）'); return; }
     if (window.openDetail) openDetail(c.id);
   };
-  /* 「自分」の1人目＝付箋を作った人（カード詳細の「付箋を発行」が使う） */
+  /* 「自分」の1人目＝付箋を作った人 */
   window.pitBnMe = function () { return _meIds()[0] || null; };
+
+  /* 🆕 v2.161.0（ゆうた指定 2026-10-07「メンバーとタイトルも入れられるように。普通の付箋とおなじ感じで入力できるようにして」）
+     カード詳細の「付箋を発行」＝**ふつうの付箋と同じ編集画面**（部品の openEditor）を開く。
+     その上に「🔗 どの車か」の1行（#pit-ed-link）を差し込み、**保存した時だけ**付箋にリンクを付ける（下の save）。
+     ⚠ 部品は触らない。印は編集画面の中にあるので、キャンセルすれば消える（次に開く時に部品が中身を描き直す）。 */
+  window.pitNewNoteForCard = function (c) {
+    if (!c || !window.CFNoteBoard) return;
+    const label = (c.resNo ? c.resNo + ' ・ ' : '') + ((window.pitCustName ? pitCustName(c) : c.customer) || '') + '様 ' + (c.car || '');
+    const el = CFNoteBoard.openEditor(null, { over: true });
+    const head = el && el.querySelector('.cfnb-head');
+    if (!head) return;
+    const ic = (typeof window.ic === 'function') ? window.ic('link', '🔗', 14) : '🔗';
+    const mk = document.createElement('div');
+    mk.id = 'pit-ed-link'; mk.className = 'pit-ed-link';
+    mk.dataset.link = JSON.stringify({ linkCardId: c.id, linkResNo: c.resNo || '', linkLabel: label });
+    mk.innerHTML = ic + '<span>この車にリンク：<b>' + _esc(label) + '</b></span>';
+    head.parentNode.insertBefore(mk, head.nextSibling);
+  };
+  /* 開いている編集画面に「どの車か」の印があれば、その中身（無ければ null） */
+  function _edLink() {
+    const mk = document.getElementById('pit-ed-link');
+    const ov = mk && mk.closest('.cfnb-ovl');
+    if (!mk || !ov || !ov.classList.contains('open')) return null;
+    try { return JSON.parse(mk.dataset.link || 'null'); } catch (e) { return null; }
+  }
 
   /* 「まとめて表示」のボタン（新規より控えめ）。⚠ 出すのは本番モードだけ（部品の available が決める） */
   function _allBtnHtml() {
@@ -136,7 +161,14 @@
         return g;
       },
       labels: () => _labels(),
-      save: (note, info) => { if (info && info.isNew && !_foreign(note)) _notes().push(note); return _save(note); },
+      save: (note, info) => {
+        if (info && info.isNew && !_foreign(note)) {
+          const lk = _edLink();                      /* 🔗 v2.161.0 カード詳細から開いた時だけリンクを付ける */
+          if (lk) Object.assign(note, lk);
+          _notes().push(note);
+        }
+        return _save(note);
+      },
       reorder: list => { state.boardNotes = list; return _save(); },
       /* 🔴 v2.110.0 画像も PDF も付けられる（CarFlow と同じ）。置き場＝companies/{会社}/pitBoardNotes/。
          ⚠ 見本・デモ（クラウドなし）は置き場が無いので、画像だけ付箋に直接持つ（部品が判断する） */

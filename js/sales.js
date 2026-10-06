@@ -746,7 +746,7 @@
   function qGoalHtml(Q, k){
     var G = qGoalOf(Q, k);
     return '<div class="sv-qgoal '+(G.ok?'is-ok':'is-ng')+'"><div><em>Q'+(Q.sel.q+1)+'までの目標（月目標を4等分）</em><b>'+man1(G.min)+'</b><span>最高 '+man1(G.max)+'</span></div>'
-      + '<div><em>Q'+(Q.sel.q+1)+'までの実績（Q1〜Q'+(Q.sel.q+1)+'）</em><b>'+man(G.act)+'</b><span>目標の '+G.p+'%</span></div>'
+      + '<div><em>'+(Q.sel.q ? 'Q1〜Q'+(Q.sel.q+1) : 'Q1')+'の実績</em><b>'+man(G.act)+'</b><span>目標の '+G.p+'%</span></div>'
       + '<div class="sv-qgoal-v">'+(G.ok ? '<b>達成</b><span>＋'+man(-G.gap)+'</span>' : '<b>未達</b><span>あと '+man(G.gap)+'</span>')   /* v2.151.0 ゆうた「最高も達成は分かりにくい。素直に達成＋〇〇に」 */+'</div></div>';
   }
 
@@ -755,7 +755,8 @@
     var nx=qNext(sel), sw=qWindow(sel.y,sel.m,sel.q), nw=qWindow(nx.y,nx.m,nx.q);
     var moS=ymdL(new Date(sel.y,sel.m,1)), moE=ymdL(new Date(sel.y,sel.m+1,0));
     var nextDone = nw.e < todayStr;
-    function blank(){ var o={ prev:0, prevN:0, sel:0, selN:0, next:{}, nextSum:0, nextN:0, rows:[] }; TIERS.forEach(function(t){ o.next[t.id]={sum:0,count:0}; }); return o; }
+    /* 🆕 v2.152.0 一覧PDF（該当Q・翌Q・それ以外）のために、どの箱に入ったかの車も残す */
+    function blank(){ var o={ prev:0, prevN:0, sel:0, selN:0, next:{}, nextSum:0, nextN:0, rows:[], selRows:[], prevRows:[], laterRows:[], refRows:[] }; TIERS.forEach(function(t){ o.next[t.id]={sum:0,count:0}; }); return o; }
     var D={ div1:blank(), div2:blank() }, qAct=[0,0,0,0], qCnt=[0,0,0,0];
     (state.cards||[]).forEach(function(c){
       var tier = window.pitSalesTier ? pitSalesTier(c) : null; if (!tier) return;
@@ -764,15 +765,16 @@
         if (!d) return;
         amt = amtOf(c,'actual');
         if (d>=moS && d<=moE){ var qi=qOfDay(pd(d).getDate()); qAct[qi]+=amt; qCnt[qi]++; }
-        if (d>=moS && d<sw.s){ o.prev+=amt; o.prevN++; }
-        else if (d>=sw.s && d<=sw.e){ o.sel+=amt; o.selN++; }
+        if (d>=moS && d<sw.s){ o.prev+=amt; o.prevN++; o.prevRows.push({ c:c, tier:tier, amt:amt }); }
+        else if (d>=sw.s && d<=sw.e){ o.sel+=amt; o.selN++; o.selRows.push({ c:c, tier:tier, amt:amt }); }
         else if (d>=nw.s && d<=nw.e){ o.next.actual.sum+=amt; o.next.actual.count++; o.nextSum+=amt; o.nextN++; o.rows.push({ c:c, tier:tier, amt:amt }); }
         return;
       }
       if (nextDone) return;                                              /* 次Qが終わっている＝見込みは出さない（答え合わせ） */
-      if (window.pitSalesRefKind && pitSalesRefKind(c)) return;           /* 保険・社員の見込みは外す */
-      if (d && d>nw.e) return;                                           /* 次Qより先 */
       amt = amtOf(c, tier);
+      var rk = window.pitSalesRefKind ? pitSalesRefKind(c) : '';
+      if (rk){ if (!d || d<=nw.e) o.refRows.push({ c:c, tier:tier, amt:amt, ref:rk }); return; }   /* 保険・社員の見込みは外す（一覧の参考には出す） */
+      if (d && d>nw.e){ o.laterRows.push({ c:c, tier:tier, amt:amt }); return; }                /* 次Qより先（一覧の「それ以外」） */
       o.next[tier].sum+=amt; o.next[tier].count++; o.nextSum+=amt; o.nextN++; o.rows.push({ c:c, tier:tier, amt:amt });
     });
     /* 目標＝月初〜選んだQの前／選んだQ／次Q */
@@ -791,6 +793,67 @@
     return o;
   }
   function qNextLabel(Q){ return Q.nextDone ? qName(Q.nx)+'の実績' : qName(Q.nx)+'に入る見込み'; }
+
+  /* ===================================================================
+     🆕 v2.152.0（ゆうた指定 2026-10-06「売上ビューと同じように該当Qと翌Qだけ・それ以外に分けてチェックPDFを出力できるように」）
+     クォーターの一覧（A4白黒）＝売上タブの一覧PDFと同じ紙（sales-print.js drawList）に、帯（該当Q／翌Q／それ以外）を付けて渡す。
+     🔴 中身は collectQuarter の箱そのまま（数え直さない）。1台の書き方は売上の一覧と同じ listRow。
+     ・該当Q＝選んだQの実績
+     ・翌Q＝翌Qの実績＋見込み（区分ごと）
+     ・それ以外＝前Qまでの実績／翌Qより先の見込み（集計の外）
+     ・参考＝保険・社員の見込み（翌Qまで）
+     =================================================================== */
+  function svQListModel(){
+    var Q = collectQuarter(qSel());
+    function grp(id, band, label, note, list, inSum, stage){
+      var rows = list.map(listRow).sort(byKey), sum = list.reduce(function(a,r){ return a + r.amt; }, 0);
+      return { id:id, band:band, label:label, note:note, sum:sum, count:list.length, rows:rows, inSum:inSum, stage:stage||'' };
+    }
+    return { title:'クォーター 区分別一覧（'+qName(Q.sel)+' → '+qName(Q.nx)+'）', period:Q.sel.y+'年'+(Q.sel.m+1)+'月',
+      sumTitle:'該当Q＋翌Q', goalLabel:'該当Q＋翌Qの目標（単純割）', refTitle:'参考（保険・社員の見込み）', refNote:'翌Qまでに返る予定。集計には入れていません',
+      courses: COURSES.map(function(cd){
+        var o = Q.D[cd.id], dt = divTarget(cd.id);
+        var groups = [ grp('sel', '該当Q：'+qName(Q.sel), qName(Q.sel)+'の実績', '選んだQに実績になった車（実績日）', o.selRows, true, '該当Q') ];
+        TIERS.forEach(function(t, i){
+          var list = o.rows.filter(function(r){ return r.tier===t.id; });
+          /* 区分の説明から「（返車予定日がこの月…）」は外す（クォーターでは「この月」ではないため） */
+          var nt = String(t.note||'').replace(/（[^）]*この月[^）]*）/g, '');
+          groups.push(grp('nx_'+t.id, (Q.nextDone?'翌Q（実績・答え合わせ）：':'翌Q：')+qName(Q.nx), '翌Q '+t.label, nt, list, true, i===TIERS.length-1 ? '翌Qまで' : ''));
+        });
+        groups.push(grp('prev', 'それ以外（上の合計には入れていない）', '前Qまでの実績（'+(Q.sel.m+1)+'月）', '選んだQより前に実績になった車', o.prevRows, false));
+        groups.push(grp('later', 'それ以外（上の合計には入れていない）', '翌Qより先の見込み', '返車予定日が翌Qの終わりより後', o.laterRows, false));
+        return { id:cd.id, label:cd.label, team:(cd.id==='div1'?'国産':'輸入'),
+                 min:dt.min/4*2, max:dt.max/4*2, groups:groups,
+                 refRows: o.refRows.map(listRow).sort(byKey) };
+      }) };
+  }
+  window.svQListModel = svQListModel;
+
+  /* 🆕 v2.152.0（ゆうた指定「MTG用も売上ビューと同じようにビューのビジュアルそのままの感じで出力」）
+     紙の材料＝画面の renderQuarter と同じ物（monthInfo・collectQuarter・qGoalOf）。sales-print.js drawQuarterGraphic が描く。 */
+  function qGraphicInfo(Q){
+    var A = qSum(Q), last = new Date(Q.sel.y, Q.sel.m+1, 0).getDate(), rr = [[1,7],[8,15],[16,23],[24,last]];
+    var today = new Date(), isThis = (today.getFullYear()===Q.sel.y && today.getMonth()===Q.sel.m), todayQ = isThis ? qOfDay(today.getDate()) : -1;
+    function goal(k){ var G=qGoalOf(Q,k); return { min:G.min, max:G.max, act:G.act, ok:G.ok, gap:G.gap, p:G.p, minTxt:man1(G.min), maxTxt:man1(G.max) }; }
+    return {
+      month: monthInfo({ y:Q.sel.y, m:Q.sel.m }),
+      selName:qName(Q.sel), nxName:qName(Q.nx), nextLabel:qNextLabel(Q), nextDone:Q.nextDone, selQ:Q.sel.q,
+      monthTargetTxt: man1(target().min),
+      goalAll: goal(null),
+      courses: COURSES.map(function(cd){
+        var o = Q.D[cd.id];
+        return { label:cd.label, team:(cd.id==='div1'?'国産':'輸入'), color:cd.color, goal:goal(cd.id),
+                 prev:o.prev, prevN:o.prevN, sel:o.sel, selN:o.selN, next:o.nextSum, nextN:o.nextN,
+                 min:qDiv(Q.tAll.min,cd.id), max:qDiv(Q.tAll.max,cd.id), selMin:qDiv(Q.tSel.min,cd.id), nxMin:qDiv(Q.tNext.min,cd.id),
+                 nextTiers: TIERS.map(function(t){ return { label:t.label, color:t.color, sum:o.next[t.id].sum, count:o.next[t.id].count }; }) };
+      }),
+      qboxes: [0,1,2,3].map(function(i){ return { label:'Q'+(i+1), range:rr[i][0]+'〜'+rr[i][1]+'日', act:Q.qAct[i], cnt:Q.qCnt[i], min:Q.tQ[i].min, max:Q.tQ[i].max,
+                 sel:i===Q.sel.q, nx:(Q.nx.y===Q.sel.y && Q.nx.m===Q.sel.m && Q.nx.q===i), now:i===todayQ }; }),
+      note: (Q.nextDone ? Q.nx.m+1+'月Q'+(Q.nx.q+1)+'はもう終わっているので、見込みではなく実績です（答え合わせ）。'
+                        : '翌Qの見込み＝翌Qにもう返した実績＋まだ返していない車で返車予定日が'+qName(Q.nx)+'の終わりまで（予定日を過ぎた・未定も含む）。保険・社員の見込みは入れていません。')
+            + '縦線＝月初から'+qName(Q.nx)+'の終わりまでの目標（営業日配分）。Qnまでの目標＝月目標を4等分した累計。'
+    };
+  }
 
   /* 1課・2課の階段 */
   function qCourseCards(Q){
@@ -1238,6 +1301,8 @@
     var h='<div class="sv-tabbar">'+TABS.map(function(t){ return '<button class="sv-topbtn'+(tab===t[0]?' on':'')+'" onclick="svSetTab(\''+t[0]+'\')">'+t[1]+'</button>'; }).join('')+'<div class="sv-tools">'
       /* 🆕 v2.145.0 売上タブの当月だけ＝区分別の一覧（A4白黒） */
       + (tab==='sales' && mode==='month' ? '<button class="sv-toolbtn" onclick="svExportListPdf()" title="課ごとの1台ずつの一覧（実績〜見込・返車日つき）をA4白黒のPDFで保存"><i data-ic=file data-ics=16></i> 一覧PDF</button>' : '')
+      /* 🆕 v2.152.0 クォーター＝該当Q・翌Q・それ以外に分けた一覧（A4白黒） */
+      + (tab==='quarter' ? '<button class="sv-toolbtn" onclick="svExportListPdf()" title="課ごとの1台ずつの一覧（該当Q・翌Q・それ以外）をA4白黒のPDFで保存"><i data-ic=file data-ics=16></i> 一覧PDF</button>' : '')
       + '<button class="sv-toolbtn" onclick="svExportPdf()" title="A4のPDFで保存（ベクター）"><i data-ic=file data-ics=16></i> PDF出力</button></div></div>';
     /* 🆕 v2.148.0 クォーター＝Q1〜Q4 の切り替え（当月／月間はやめた）。左右の矢印はQを1つずつ送る（月をまたぐ） */
     if (mode==='quarter'){
@@ -1287,6 +1352,35 @@
   }
 
 
+
+  /* 🆕 v2.152.0 売上サマリーの紙の材料（上の数字・積み上げ帯・日次グラフ・確度・課別）をここ1本に。
+     売上タブの紙とクォーターの紙（MTG用）が同じ物を借りる＝画面の monthTop と同じ数字。 */
+  function monthInfo(ym, d){
+    var tg=target(); d = d || collectMonth(ymdL(new Date(ym.y,ym.m,1)),ymdL(new Date(ym.y,ym.m+1,0))); var t=d.tiers;
+    var _td0=new Date(); _td0.setHours(0,0,0,0);
+    var _moS0=ymdL(new Date(ym.y,ym.m,1)), _moE0=ymdL(new Date(ym.y,ym.m+1,0));
+    var _isThis0=(_td0.getFullYear()===ym.y && _td0.getMonth()===ym.m);
+    var _todayIdx0=_isThis0 ? _td0.getDate() : (ymdL(_td0)>_moE0 ? d.lastDay : 0);
+    var _paceT0=tg.min*(_todayIdx0/d.lastDay);
+    var info={
+      actual:t.actual.sum, landing:_mAll(t), nearSure:sumTiers(t,TIER_NEAR), committed:sumTiers(t,TIER_HIGH),
+      min:tg.min, max:tg.max, isThis:_isThis0, todayIdx:_todayIdx0, lastDay:d.lastDay, cum:d.cum.slice(),
+      paceTarget:_paceT0, pacePct:(_paceT0>0?Math.round(t.actual.sum/_paceT0*100):0),
+      tiers:TIERS.map(function(x){ return { id:x.id, label:x.label, color:x.color, note:x.note, sum:t[x.id].sum, count:t[x.id].count }; }),
+      /* 🆕 v2.124.0（ゆうた指定 2026-09-26「PDFはフロントごと要らない。それぞれの課の数字をメインに」）
+         課ごとに 目標（divTarget）・節目（courseStage）も渡す＝紙も画面の「積み上げの階段」と同じ数字。フロント別は渡さない。 */
+      courses:COURSES.map(function(cd){
+        var cc=d.byCourse[cd.id], dt=divTarget(cd.id);
+        return { label:cd.label, team:(cd.id==='div1'?'国産':'輸入'), color:cd.color, landing:sumTiers(cc,TIER_IDS),
+                 min:dt.min, max:dt.max, actual:cc.actual.sum, nearSure:sumTiers(cc,TIER_NEAR),
+                 tiers:TIERS.map(function(x){ return { label:x.label, color:x.color, sum:cc[x.id].sum, count:cc[x.id].count, stage:courseStage(x.id) }; }) }; }),
+      ratioD:ratioD(),
+      refNoCount:(window.pitInternCountText ? (pitInternCountText(_refNoCount(_moS0,_moE0))||'') : ''),
+      /* 🆕 v2.145.0 参考（保険・社員）＝集計の外。紙にも1行で出す */
+      refText:(d.ref && d.ref.rows.length ? '参考（保険・社員の実績待〜予測）'+d.ref.rows.length+'台・'+man(sumTiers(d.ref.tiers,TIER_IDS))+'＝売上の集計には入れていません' : '')
+    };
+    return info;
+  }
 
   // ===== PDF用：現ビューのデータモデル（sales-print.js が A4ベクターPDFに描画） =====
   function _mAll(t){ return sumTiers(t,TIER_IDS); }
@@ -1345,28 +1439,7 @@
       /* 🎨 v2.120.0（ゆうた指定 2026-09-15「サマリー画面のようなインフォグラフィックな感じがいい」）
          紙も画面と同じ並び（数字の帯・積み上げ帯・日次グラフ・確度カード・課別・フロント別）で描くための材料。
          🔴 数字は画面と**同じ集め方**（collectMonth・TIERS・TIER_NEAR/HIGH/FRONT・target）から取る。ここで数え直さない。 */
-      var _td0=new Date(); _td0.setHours(0,0,0,0);
-      var _moS0=ymdL(new Date(ym.y,ym.m,1)), _moE0=ymdL(new Date(ym.y,ym.m+1,0));
-      var _isThis0=(_td0.getFullYear()===ym.y && _td0.getMonth()===ym.m);
-      var _todayIdx0=_isThis0 ? _td0.getDate() : (ymdL(_td0)>_moE0 ? d.lastDay : 0);
-      var _paceT0=tg.min*(_todayIdx0/d.lastDay);
-      var info={
-        actual:t.actual.sum, landing:_mAll(t), nearSure:sumTiers(t,TIER_NEAR), committed:sumTiers(t,TIER_HIGH),
-        min:tg.min, max:tg.max, isThis:_isThis0, todayIdx:_todayIdx0, lastDay:d.lastDay, cum:d.cum.slice(),
-        paceTarget:_paceT0, pacePct:(_paceT0>0?Math.round(t.actual.sum/_paceT0*100):0),
-        tiers:TIERS.map(function(x){ return { id:x.id, label:x.label, color:x.color, note:x.note, sum:t[x.id].sum, count:t[x.id].count }; }),
-        /* 🆕 v2.124.0（ゆうた指定 2026-09-26「PDFはフロントごと要らない。それぞれの課の数字をメインに」）
-           課ごとに 目標（divTarget）・節目（courseStage）も渡す＝紙も画面の「積み上げの階段」と同じ数字。フロント別は渡さない。 */
-        courses:COURSES.map(function(cd){
-          var cc=d.byCourse[cd.id], dt=divTarget(cd.id);
-          return { label:cd.label, team:(cd.id==='div1'?'国産':'輸入'), color:cd.color, landing:sumTiers(cc,TIER_IDS),
-                   min:dt.min, max:dt.max, actual:cc.actual.sum, nearSure:sumTiers(cc,TIER_NEAR),
-                   tiers:TIERS.map(function(x){ return { label:x.label, color:x.color, sum:cc[x.id].sum, count:cc[x.id].count, stage:courseStage(x.id) }; }) }; }),
-        ratioD:ratioD(),
-        refNoCount:(window.pitInternCountText ? (pitInternCountText(_refNoCount(_moS0,_moE0))||'') : ''),
-        /* 🆕 v2.145.0 参考（保険・社員）＝集計の外。紙にも1行で出す */
-        refText:(d.ref && d.ref.rows.length ? '参考（保険・社員の実績待〜予測）'+d.ref.rows.length+'台・'+man(sumTiers(d.ref.tiers,TIER_IDS))+'＝売上の集計には入れていません' : '')
-      };
+      var info=monthInfo(ym, d);   /* 🆕 v2.152.0 クォーターの紙も同じ材料を借りる */
       return { title:'売上サマリー', period:ym.y+'年'+(ym.m+1)+'月', infographic:info,
         kpis:[{label:'実績（返車済）',value:man(t.actual.sum)},{label:'実績見込み（＋実績待）',value:man(sumTiers(t,TIER_NEAR))},{label:'着地見込み',value:man(_mAll(t))},{label:'月目標',value:man(tg.min)+'〜'+man(tg.max)}],
         sections:[
@@ -1397,12 +1470,12 @@
       var crow=[lad('全体',A,Q.tAll.min,Q.tAll.max)].concat(COURSES.map(function(cd){ return lad(cd.label+'（'+(cd.id==='div1'?'国産':'輸入')+'）', Q.D[cd.id], qDiv(Q.tAll.min,cd.id), qDiv(Q.tAll.max,cd.id)); }));
       var nrow=COURSES.map(function(cd){ var o=Q.D[cd.id]; return [cd.label].concat(TIERS.map(function(t){ return o.next[t.id].count ? man(o.next[t.id].sum)+'（'+o.next[t.id].count+'）' : '—'; })).concat([man(o.nextSum)]); });
       nrow.push(['全体'].concat(TIERS.map(function(t){ return A.next[t.id].count ? man(A.next[t.id].sum)+'（'+A.next[t.id].count+'）' : '—'; })).concat([man(A.nextSum)]));
-      return { title:'クォーター '+qName(Q.sel)+' → '+qName(Q.nx), period:qy+'年'+(qm+1)+'月',
+      return { title:'クォーター '+qName(Q.sel)+' → '+qName(Q.nx), period:qy+'年'+(qm+1)+'月', qgraphic:qGraphicInfo(Q),
         kpis:[{label:qName(Q.sel)+'の実績',value:man(A.sel)},{label:qNextLabel(Q),value:man(A.nextSum)},{label:qName(Q.nx)+'までの着地',value:man(A.prev+A.sel+A.nextSum)},{label:(qm+1)+'月の実績（月目標 '+man(tg.min)+'〜）',value:man(MD.tiers.actual.sum)}],
         sections:[
           {type:'table',title:(qm+1)+'月のクォーター実績（営業日配分）',head:['Q','目標','実績','達成率','台数'],rows:qrows,align:['l','r','r','r','r']},
           {type:'table',title:'課別：前Qまで → '+qName(Q.sel)+'の実績 → '+qNextLabel(Q),head:['課','前Qまで',qName(Q.sel),qName(Q.nx),'着地','目標最低','目標最高','最低比'],rows:crow,align:['l','r','r','r','r','r','r','r']},
-          {type:'table',title:'Q'+(Q.sel.q+1)+'までの目標（月目標を4等分）の達成',head:['課','目標（最低）','目標（最高）','Q1〜Q'+(Q.sel.q+1)+'の実績','達成率','判定'],
+          {type:'table',title:'Q'+(Q.sel.q+1)+'までの目標（月目標を4等分）の達成',head:['課','目標（最低）','目標（最高）',(Q.sel.q ? 'Q1〜Q'+(Q.sel.q+1) : 'Q1')+'の実績','達成率','判定'],
            rows:[null,'div1','div2'].map(function(k){ var G=qGoalOf(Q,k); return [k?(k==='div1'?'1課（国産）':'2課（輸入）'):'全体', man1(G.min), man1(G.max), man(G.act), G.p+'%', G.ok?'達成（＋'+man(-G.gap)+'）':'未達（あと '+man(G.gap)+'）']; }),
            align:['l','r','r','r','r','l']},
           {type:'table',title:qNextLabel(Q)+'の中身（区分ごと・台数）',head:['課'].concat(TIERS.map(function(t){return t.label;})).concat(['計']),rows:nrow,align:['l'].concat(TIERS.map(function(){return 'r';})).concat(['r'])}

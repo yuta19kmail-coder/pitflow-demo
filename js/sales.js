@@ -777,6 +777,7 @@
         return;
       }
       if (nextDone) return;                                              /* 次Qが終わっている＝見込みは出さない（答え合わせ） */
+      if (tier==='forecast') return;                                     /* 🔴 v2.154.0 ゆうた「翌Q見込みでも予約は要らない」＝未入庫の予約（予測）は入れない */
       amt = amtOf(c, tier);
       var rk = window.pitSalesRefKind ? pitSalesRefKind(c) : '';
       if (rk){ if (!d || d<=nw.e) o.refRows.push({ c:c, tier:tier, amt:amt, ref:rk }); return; }   /* 保険・社員の見込みは外す（一覧の参考には出す） */
@@ -820,11 +821,12 @@
       courses: COURSES.map(function(cd){
         var o = Q.D[cd.id], dt = divTarget(cd.id);
         var groups = [ grp('sel', '該当Q：'+qName(Q.sel), qName(Q.sel)+'の実績', '選んだQに実績になった車（実績日）', o.selRows, true, '該当Q') ];
-        TIERS.forEach(function(t, i){
+        var NXT = TIERS.filter(function(t){ return t.id!=='forecast'; });   /* 🔴 v2.154.0 予測（未入庫の予約）は載せない */
+        NXT.forEach(function(t, i){
           var list = o.rows.filter(function(r){ return r.tier===t.id; });
           /* 区分の説明から「（返車予定日がこの月…）」は外す（クォーターでは「この月」ではないため） */
           var nt = String(t.note||'').replace(/（[^）]*この月[^）]*）/g, '');
-          groups.push(grp('nx_'+t.id, (Q.nextDone?'翌Q（実績・答え合わせ）：':'翌Q：')+qName(Q.nx), '翌Q '+t.label, nt, list, true, i===TIERS.length-1 ? '翌Qまで' : ''));
+          groups.push(grp('nx_'+t.id, (Q.nextDone?'翌Q（実績・答え合わせ）：':'翌Q：')+qName(Q.nx), '翌Q '+t.label, nt, list, true, i===NXT.length-1 ? '翌Qまで' : ''));
         });
         groups.push(grp('prev', 'それ以外（上の合計には入れていない）', '前Qまでの実績（'+(Q.sel.m+1)+'月）', '選んだQより前に実績になった車', o.prevRows, false));
         groups.push(grp('later', 'それ以外（上の合計には入れていない）', '翌Qより先の見込み', '返車予定日が翌Qの終わりより後', o.laterRows, false));
@@ -856,7 +858,7 @@
       qboxes: [0,1,2,3].map(function(i){ return { label:'Q'+(i+1), range:rr[i][0]+'〜'+rr[i][1]+'日', act:Q.qAct[i], cnt:Q.qCnt[i], min:Q.tQ[i].min, max:Q.tQ[i].max,
                  sel:i===Q.sel.q, nx:(Q.nx.y===Q.sel.y && Q.nx.m===Q.sel.m && Q.nx.q===i), now:i===todayQ }; }),
       note: (Q.nextDone ? Q.nx.m+1+'月Q'+(Q.nx.q+1)+'はもう終わっているので、見込みではなく実績です（答え合わせ）。'
-                        : '翌Qの見込み＝翌Qにもう返した実績＋まだ返していない車で返車予定日が'+qName(Q.nx)+'の終わりまで（予定日を過ぎた・未定も含む）。保険・社員の見込みは入れていません。')
+                        : '翌Qの見込み＝翌Qにもう返した実績＋まだ返していない車で返車予定日が'+qName(Q.nx)+'の終わりまで（予定日を過ぎた・未定も含む）。保険・社員の見込みと、未入庫の予約（予測）は入れていません。')
             + '縦線＝月初から'+qName(Q.nx)+'の終わりまでの目標（営業日配分）。Qnまでの目標＝月目標を4等分した累計。'
     };
   }
@@ -920,7 +922,7 @@
     h += '</div>';
     h += '<div class="sv-note sv-course-note">縦線＝<b>月初から'+qName(Q.nx)+'の終わりまでの目標</b>（営業日配分を国産 '+ratioD()+'%：輸入 '+(100-ratioD())+'% で割った額）。'
        + (Q.nextDone ? qName(Q.nx)+'はもう終わっているので、見込みではなく<b>実績</b>を出しています（答え合わせ）。'
-                     : '次Qの見込み＝次Qにもう返した実績＋まだ返していない車で<b>返車予定日が'+qName(Q.nx)+'の終わりまで</b>のもの（予定日を過ぎた・未定の車も入れる）。保険・社員の見込みは入れていません。')
+                     : '次Qの見込み＝次Qにもう返した実績＋まだ返していない車で<b>返車予定日が'+qName(Q.nx)+'の終わりまで</b>のもの（予定日を過ぎた・未定の車も入れる）。保険・社員の見込みと、未入庫の予約（予測）は入れていません。')
        + '</div>';
     return h;
   }
@@ -1487,7 +1489,7 @@
           {type:'table',title:qNextLabel(Q)+'の中身（区分ごと・台数）',head:['課'].concat(TIERS.map(function(t){return t.label;})).concat(['計']),rows:nrow,align:['l'].concat(TIERS.map(function(){return 'r';})).concat(['r'])}
         ],
         note:(Q.nextDone ? qName(Q.nx)+'はもう終わっているので、見込みではなく実績です（答え合わせ）。'
-                         : '次Qの見込み＝次Qにもう返した実績＋まだ返していない車で返車予定日が'+qName(Q.nx)+'の終わりまでのもの（予定日を過ぎた・未定も含む）。保険・社員の見込みは入れていません。')
+                         : '次Qの見込み＝次Qにもう返した実績＋まだ返していない車で返車予定日が'+qName(Q.nx)+'の終わりまでのもの（予定日を過ぎた・未定も含む）。保険・社員の見込みと、未入庫の予約（予測）は入れていません。')
              + '目標＝月初から'+qName(Q.nx)+'の終わりまで（営業日配分）を国産 '+ratioD()+'%：輸入 '+(100-ratioD())+'% で割った額。' };
     }
     if(tab==='work' && !yr){

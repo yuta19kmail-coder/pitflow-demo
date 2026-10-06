@@ -317,8 +317,9 @@
   function drawList(pdf, model){
     var L=12, R=198, W=R-L, BOT=282, y=0;
     var G=function(v){ return [v,v,v]; };
-    var COLS=[['状態／実績日',23,'l'],['返車日',15,'l'],['お客様・車種',64,'l'],['作業',34,'l'],['フロント',28,'l'],['金額（円）',22,'r']];
-    var RCOLS=[['区分',14,'l'],['付加',11,'l'],['返車日',15,'l'],['お客様・車種',66,'l'],['作業',30,'l'],['フロント',28,'l'],['金額（円）',22,'r']];
+    /* 🆕 v2.146.0 返車の札（済・確定・約束・概算）と金額の種類（確定・受注・見積・概算）を列に出す */
+    var COLS=[['状態／実績日',21,'l'],['返車（種類 日付）',24,'l'],['お客様・車種',55,'l'],['作業',26,'l'],['フロント',23,'l'],['金額の種類',17,'l'],['金額（円）',20,'r']];
+    var RCOLS=[['区分',12,'l'],['付加',9,'l'],['返車（種類 日付）',24,'l'],['お客様・車種',50,'l'],['作業',22,'l'],['フロント',20,'l'],['金額の種類',17,'l'],['金額（円）',20,'r']];
     var first=true, curCourse=null;
     function pageHead(){
       T(pdf,G(0)); pdf.setFontSize(13); pdf.text(String(model.title), L, 17);
@@ -364,7 +365,13 @@
         cum += g.sum;
         row(SC, [(i?'＋':'')+g.label, g.count+'台', MAN(g.sum), MAN(cum), (co.min>0?Math.round(cum/co.min*100):0)+'%', NEAR[g.id]||'']);
       });
-      y += 4;
+      y += 2.5;
+      /* 🆕 v2.146.0 札の読み方（課のページごとに1回） */
+      D(pdf,G(120)); pdf.setLineWidth(0.15); pdf.rect(L, y, W, 10);
+      T(pdf,G(40)); pdf.setFontSize(6.8);
+      pdf.text('返車：済＝返した日／確定＝確定返車日／約束＝受注時にお客様と約束した日／概算＝入庫日＋預かり日数の目安／未定＝まだ日付が無い', L+2, y+4);
+      pdf.text('金額：確定金額＝完TEL・返車のときに決めた額／受注金額＝受注時の額／見積金額＝見積の額／概算金額＝作業タイプの目安（まだ見積が無い）', L+2, y+8);
+      y += 14;
       /* ── 区分ごとの1台ずつ ── */
       co.groups.forEach(function(g){
         need(16);
@@ -377,7 +384,7 @@
         colHead(COLS);
         g.rows.forEach(function(r){
           need(5.2, function(){ T(pdf,G(60)); pdf.setFontSize(7.5); pdf.text(g.label+'（続き）', L+1, y+3); y+=5; colHead(COLS); });
-          row(COLS, [r.when, r.ret, r.name, r.work, r.front, yenTxt(r.amt)]);
+          row(COLS, [r.when, r.ret, r.name, r.work, r.front, r.amtKind+'金額', yenTxt(r.amt)]);
         });
         y += 4;
       });
@@ -393,13 +400,13 @@
         colHead(RCOLS);
         co.refRows.forEach(function(r){
           need(5.2, function(){ colHead(RCOLS); });
-          row(RCOLS, [({actual:'実績',actualWait:'実績待',confirmed:'確定',planned:'予定',prospect:'見込'})[r.tier]||'', r.ref, r.ret, r.name, r.work, r.front, yenTxt(r.amt)]);
+          row(RCOLS, [({actual:'実績',actualWait:'実績待',confirmed:'確定',planned:'予定',prospect:'見込'})[r.tier]||'', r.ref, r.ret, r.name, r.work, r.front, r.amtKind+'金額', yenTxt(r.amt)]);
         });
       }
     });
     /* ページ番号（全部描いてから） */
     var n = pdf.getNumberOfPages();
-    for (var i=1;i<=n;i++){ pdf.setPage(i); T(pdf,G(90)); pdf.setFontSize(7.5); pdf.text(i+' / '+n, R, 291, {align:'right'}); pdf.setFontSize(6.2); pdf.text(fitTxt(pdf,'金額は税抜・売上ビューと同じ拾い方（実績・実績待＝確定額／確定＝受注額／予定＝見積額／見込＝概算）。返車日＝返した車は返車日、まだの車は返車予定日。', W-14), L, 291); }
+    for (var i=1;i<=n;i++){ pdf.setPage(i); T(pdf,G(90)); pdf.setFontSize(7.5); pdf.text(i+' / '+n, R, 291, {align:'right'}); pdf.setFontSize(6.2); pdf.text(fitTxt(pdf,'金額は税抜。売上ビューと同じ拾い方（実績・実績待＝確定→受注→見積→概算／確定＝受注→確定→見積→概算／予定＝見積→概算／見込＝概算）。', W-14), L, 291); }
   }
   window.svExportListPdf=function(){
     if(!window.svListModel){ pitAlert('一覧の部品を読み込み中です。少し待ってからもう一度押してください。', { code:'PF-5002' }); return; }

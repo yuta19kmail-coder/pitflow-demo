@@ -465,7 +465,13 @@
              ret: ret ? ro.k + ' ' + md(ret) : '未定', retKind: ro.k,
              amtKind: amtKindOf(c, r.tier),
              key: (r.tier==='actual' ? String(countDate(c)) : '') + '|' + (ret || '9999'),   /* 並び＝実績日→返車日（未定は最後） */
-             name: custCar(c), work: workText(c), front: r.front, amt: r.amt, ref: r.ref||'' };
+             /* 🆕 v2.153.0（ゆうた指定 2026-10-06「法人で長いと車種が省略されちゃうから名前と車種で区切って。個人は苗字だけ。
+                フロントが表示されてない。苗字or通称で」）
+                お客様＝pitCustSurname（個人は苗字・法人は㈱などに略してフル）／車種は別の列／
+                フロント＝pitStaffCall（通称→姓→苗字・自社はコバモ）。クォーターの箱は front を持たないので車から引く */
+             name: custCar(c), cust: (window.pitCustSurname ? pitCustSurname(c) : String(c.customer||'')) || '—',
+             car: window.pitCarLabel ? pitCarLabel(c) : String(c.car||''),
+             work: workText(c), front: (function(f){ return window.pitStaffCall ? pitStaffCall(f) : f; })(r.front || c.frontStaff || c.staff || ''), amt: r.amt, ref: r.ref||'' };
   }
   function byKey(a,b){ return a.key<b.key ? -1 : a.key>b.key ? 1 : 0; }
   function svListModel(){

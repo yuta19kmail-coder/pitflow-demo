@@ -210,6 +210,7 @@
      =================================================================== */
   function drawQuarterGraphic(pdf, model){
     var QI=model.qgraphic, I=QI.month, L=12, R=198, W=R-L, OKC=GREEN, NGC=hexRgb('#d9443a');
+    var ACT=(I.tiers && I.tiers[0] && I.tiers[0].color) || '#888888';   /* 実績の色は区分の表から（緑を直書きしない） */
     pdf.setFont('JP','normal');
     T(pdf,INK); pdf.setFontSize(17); pdf.text(String(model.title||'クォーター'), L, 19);
     T(pdf,MUTED); pdf.setFontSize(8.5); pdf.text((model.period||'')+' ／ 小林モータース ／ 出力 '+nowTxt(), R, 19, {align:'right'});
@@ -228,7 +229,7 @@
         T(pdf,FAINT); pdf.setFontSize(5.8); pdf.text(k.sub, kx+2.2, yy+12.8);
       });
       var vx=x0+2*(gw+2), vc=G.ok?OKC:NGC;
-      F(pdf,tint(G.ok?'#1db97a':'#d9443a',0.12)); D(pdf,vc); pdf.setLineWidth(0.4); pdf.roundedRect(vx, yy, gw, hh, 1.3, 1.3, 'FD');
+      F(pdf,tint(G.ok?ACT:'#d9443a',0.12)); D(pdf,vc); pdf.setLineWidth(0.4); pdf.roundedRect(vx, yy, gw, hh, 1.3, 1.3, 'FD');
       T(pdf,vc); pdf.setFontSize(12.5); pdf.text(G.ok?'達成':'未達', vx+gw/2, yy+7.2, {align:'center'});
       pdf.setFontSize(7.2); pdf.text(G.ok ? '＋'+MAN(-G.gap) : 'あと '+MAN(G.gap), vx+gw/2, yy+11.6, {align:'center'});
       return yy+hh;
@@ -244,7 +245,7 @@
     var MINC=[70,78,74], MAXC=hexRgb('#d99a06');
     function qbar(x0, w0, yy, hh, co, upTo, hi){
       F(pdf,[232,236,234]); pdf.roundedRect(x0, yy, w0, hh, Math.min(1.2,hh/2), Math.min(1.2,hh/2), 'F');
-      var segs=[['prev',co.prev,'#1db97a'],['sel',co.sel,'#1db97a']].concat(co.nextTiers.map(function(t){ return ['next',t.sum,t.color]; }));
+      var segs=[['prev',co.prev,ACT],['sel',co.sel,ACT]].concat(co.nextTiers.map(function(t){ return ['next',t.sum,t.color]; }));
       var order={prev:0,sel:1,next:2}, xx=x0;
       segs.forEach(function(sg){ if(!(sg[1]>0)) return; if(upTo!=null && order[sg[0]]>upTo) return;
         var ww=w0*sg[1]/cScale, dim=(hi && hi!==sg[0]) || (!hi && sg[0]==='prev');
@@ -311,7 +312,7 @@
     T(pdf,INK); pdf.setFontSize(9); pdf.text((I.lastDay?'':'')+'クォーター実績（月4分割・営業日配分）', L, y+3.5); y+=5.5;
     var qw=(W-3*2.5)/4, qh=19;
     QI.qboxes.forEach(function(b, i){
-      var qx=L+i*(qw+2.5), p=b.min>0?Math.round(b.act/b.min*100):0, lv=p>=100?'#1db97a':(p>=85?'#e08a0b':'#d9443a');
+      var qx=L+i*(qw+2.5), p=b.min>0?Math.round(b.act/b.min*100):0, lv=p>=100?ACT:(p>=85?'#e08a0b':'#d9443a');
       F(pdf,[255,255,255]); D(pdf, b.sel?GREEN:RULE); pdf.setLineWidth(b.sel?0.7:0.25); pdf.roundedRect(qx, y, qw, qh, 1.4, 1.4, 'FD');
       T(pdf,INK); pdf.setFontSize(8); pdf.text(b.label, qx+2.4, y+4.8);
       T(pdf,FAINT); pdf.setFontSize(6); pdf.text(b.range, qx+8.5, y+4.8);
@@ -456,8 +457,9 @@
     var L=12, R=198, W=R-L, BOT=282, y=0;
     var G=function(v){ return [v,v,v]; };
     /* 🆕 v2.146.0 返車の札（済・確定・予定・概算）と金額の種類（確定・受注・見積・概算）を列に出す */
-    var COLS=[['状態／実績日',21,'l'],['返車（種類 日付）',24,'l'],['お客様・車種',55,'l'],['作業',26,'l'],['フロント',23,'l'],['金額の種類',17,'l'],['金額（円）',20,'r']];
-    var RCOLS=[['区分',12,'l'],['付加',9,'l'],['返車（種類 日付）',24,'l'],['お客様・車種',50,'l'],['作業',22,'l'],['フロント',20,'l'],['金額の種類',17,'l'],['金額（円）',20,'r']];
+    /* 🆕 v2.153.0 お客様と車種を別の列に（法人名が長いと車種が切れていた）。お客様＝個人は苗字・法人はフル／フロント＝通称か苗字 */
+    var COLS=[['状態／実績日',19,'l'],['返車（種類 日付）',22,'l'],['お客様',39,'l'],['車種',28,'l'],['作業',23,'l'],['フロント',18,'l'],['金額の種類',17,'l'],['金額（円）',20,'r']];
+    var RCOLS=[['区分',12,'l'],['付加',9,'l'],['返車（種類 日付）',22,'l'],['お客様',40,'l'],['車種',30,'l'],['作業',20,'l'],['フロント',16,'l'],['金額の種類',17,'l'],['金額（円）',20,'r']];
     var first=true, curCourse=null;
     function pageHead(){
       T(pdf,G(0)); pdf.setFontSize(13); pdf.text(String(model.title), L, 17);
@@ -532,7 +534,7 @@
         colHead(COLS);
         g.rows.forEach(function(r){
           need(5.2, function(){ T(pdf,G(60)); pdf.setFontSize(7.5); pdf.text(g.label+'（続き）', L+1, y+3); y+=5; colHead(COLS); });
-          row(COLS, [r.when, r.ret, r.name, r.work, r.front, r.amtKind+'金額', yenTxt(r.amt)]);
+          row(COLS, [r.when, r.ret, r.cust, r.car, r.work, r.front, r.amtKind+'金額', yenTxt(r.amt)]);
         });
         y += 4;
       });
@@ -548,7 +550,7 @@
         colHead(RCOLS);
         co.refRows.forEach(function(r){
           need(5.2, function(){ colHead(RCOLS); });
-          row(RCOLS, [({actual:'実績',actualWait:'実績待',confirmed:'確定',planned:'予定',prospect:'見込'})[r.tier]||'', r.ref, r.ret, r.name, r.work, r.front, r.amtKind+'金額', yenTxt(r.amt)]);
+          row(RCOLS, [({actual:'実績',actualWait:'実績待',confirmed:'確定',planned:'予定',prospect:'見込'})[r.tier]||'', r.ref, r.ret, r.cust, r.car, r.work, r.front, r.amtKind+'金額', yenTxt(r.amt)]);
         });
       }
     });

@@ -319,7 +319,6 @@ td.sv-num.sv-dm-early{ color:#1db97a; }
 .sv-ref-list td:nth-child(-n+5), .sv-ref-list th:nth-child(-n+5){ text-align:left; }
 
 /* 🆕 v2.148.0 クォーター＝MTG用（選んだQ・次Q・次Qの中身） */
-.sv-qcards .sv-qcard{ cursor:pointer; }
 .sv-qcard.sel{ border-color:#1db97a; box-shadow:0 0 0 2px #1db97a inset; }
 .sv-qcard-h em + em{ margin-left:0; }
 .sv-qcard-h em.sel{ background:#1db97a; }

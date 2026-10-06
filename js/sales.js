@@ -715,7 +715,7 @@
        ・Q1〜Q4 の箱はそのまま
        ・1課・2課＝**前Qまでの実績 → 選んだQの実績 → 次Qに入る見込み** の階段
      🔴 決めごと
-       ・最初に出るQ＝**開いた日の直前に終わったQ**（1〜7日なら前月のQ4）
+       ・最初に出るQ＝**いま進行中のQ**（v2.149.0 で「直前に終わったQ」から変更）
        ・次Q＝Q4 の次は**翌月の Q1**（月をまたぐMTGなので）
        ・次Qの見込み＝次Qにもう返した実績 ＋ まだ返していない車で**返車予定日が次Qの終わりまで**のもの
          （予定日を過ぎた・未定の車も入れる＝MTGの日から見て「これから入るお金」）
@@ -724,11 +724,8 @@
        ・金額の拾い方は売上ビューと同じ amtOf（前は実績を actAmt で拾っていて、タブで数字がずれることがあった）
        ・目標の縦線＝**月初から次Qの終わりまでの目標の合計**（営業日配分 qAlloc を課の％で割る）
      =================================================================== */
-  function qDefault(){
-    var t=new Date(), qi=qOfDay(t.getDate());
-    if (qi>0) return { y:t.getFullYear(), m:t.getMonth(), q:qi-1 };
-    var p=new Date(t.getFullYear(), t.getMonth()-1, 1); return { y:p.getFullYear(), m:p.getMonth(), q:3 };
-  }
+  /* 🔴 v2.149.0（ゆうた指定 2026-10-06「やっぱり前Qじゃなくて現Qに移動するように」）最初に出るQ＝**いま進行中のQ** */
+  function qDefault(){ var t=new Date(); return { y:t.getFullYear(), m:t.getMonth(), q:qOfDay(t.getDate()) }; }
   function qSel(){ if (!window._svQ) window._svQ = qDefault(); return window._svQ; }
   function qNext(o){ if (o.q<3) return { y:o.y, m:o.m, q:o.q+1 }; var d=new Date(o.y, o.m+1, 1); return { y:d.getFullYear(), m:d.getMonth(), q:0 }; }
   function qShift(o, dir){ var q=o.q+dir, d=new Date(o.y, o.m, 1); while(q<0){ q+=4; d=new Date(d.getFullYear(), d.getMonth()-1, 1); } while(q>3){ q-=4; d=new Date(d.getFullYear(), d.getMonth()+1, 1); } return { y:d.getFullYear(), m:d.getMonth(), q:q }; }
@@ -846,21 +843,23 @@
     var sel = qSel(), Q = collectQuarter(sel), ym = { y:sel.y, m:sel.m };
     var h = header('quarter', sel);
     h += monthTop(ym).h;                                     /* 売上ビューと同じ「その月まるごと」 */
-    /* Q1〜Q4 の箱（そのまま）。選んだQ・次Qに印。押すとそのQを選ぶ */
+    /* Q1〜Q4 の箱。選んだQ・次Qに印 */
     var last = new Date(sel.y, sel.m+1, 0).getDate(), qs = [{f:1,t:7},{f:8,t:15},{f:16,t:23},{f:24,t:last}];
     var today = new Date(), isThis = (today.getFullYear()===sel.y && today.getMonth()===sel.m);
     var todayQ = isThis ? qOfDay(today.getDate()) : -1;
-    h += '<div class="sv-card"><div class="sv-card-h"><span><i data-ic=calendar data-ics=16></i> '+(sel.m+1)+'月のクォーター実績（月4分割・営業日配分）</span></div><div class="sv-qcards">';
+    /* 🔴 v2.149.0（ゆうた指定）箱は**押せない**・**いちばん下**へ（Qの切り替えは上の Q1〜Q4 だけ） */
+    var qb = '<div class="sv-card"><div class="sv-card-h"><span><i data-ic=calendar data-ics=16></i> '+(sel.m+1)+'月のクォーター実績（月4分割・営業日配分）</span></div><div class="sv-qcards">';
     for (var i=0;i<4;i++){
       var p = pct(Q.qAct[i], Q.tQ[i].min), pc = p>=100?'ok':(p>=85?'near':'warn');
       var isSel = (i===sel.q), isNx = (Q.nx.y===sel.y && Q.nx.m===sel.m && Q.nx.q===i);
-      h += '<div class="sv-qcard'+((i===todayQ&&isThis)?' now':'')+(isSel?' sel':'')+'" onclick="svSetQ('+i+')"><div class="sv-qcard-h">Q'+(i+1)+' <span>'+qs[i].f+'〜'+qs[i].t+'日</span>'
+      qb += '<div class="sv-qcard'+((i===todayQ&&isThis)?' now':'')+(isSel?' sel':'')+'"><div class="sv-qcard-h">Q'+(i+1)+' <span>'+qs[i].f+'〜'+qs[i].t+'日</span>'
          + (isSel?'<em class="sel">選択中</em>':'')+(isNx?'<em class="nx">次Q</em>':'')+((i===todayQ&&isThis)?'<em>進行中</em>':'')+'</div>'
          + '<div class="sv-qcard-num" style="color:#1db97a">'+man(Q.qAct[i])+'</div><div class="sv-qbar"><i class="sv-'+pc+'" style="width:'+Math.min(100,p)+'%"></i></div>'
          + '<div class="sv-qcard-sub">目標 '+man(Q.tQ[i].min)+'〜'+man(Q.tQ[i].max)+' ／ <b class="sv-'+pc+'">'+p+'%</b> ／ '+Q.qCnt[i]+'台</div></div>';
     }
-    h += '</div></div>';
+    qb += '</div></div>';
     h += qCourseCards(Q);
+    h += qb;
     h += '<div class="sv-foot">クォーター＝1〜7 / 8〜15 / 16〜23 / 24〜末。Qが終わった日のMTG用＝<b>選んだQの実績</b>と<b>次のQに入る見込み</b>。いちばん上の数字と日次の進捗は「売上」と同じ（その月まるごと）。</div>';
     wrap.innerHTML = h;
   }
@@ -1225,7 +1224,7 @@
     if (mode==='quarter'){
       var qLast=new Date(ctx.y,ctx.m+1,0).getDate(), qRng=[[1,7],[8,15],[16,23],[24,qLast]][ctx.q];
       h+='<div class="sv-head"><div class="sv-tabs">'+[0,1,2,3].map(function(q){ return '<button class="sv-tab'+(ctx.q===q?' on':'')+'" onclick="svSetQ('+q+')">Q'+(q+1)+'</button>'; }).join('')+'</div>';
-      h+='<div class="sv-nav"><button onclick="svShiftQ(-1)" title="前のQ"><i data-ic=chevLeft data-ics=16></i></button><b>'+ctx.y+'年'+(ctx.m+1)+'月 Q'+(ctx.q+1)+'（'+qRng[0]+'〜'+qRng[1]+'日）</b><button onclick="svShiftQ(1)" title="次のQ"><i data-ic=chevRight data-ics=16></i></button><button class="sv-now" onclick="svShiftQ(0)">直前のQ</button></div>';
+      h+='<div class="sv-nav"><button onclick="svShiftQ(-1)" title="前のQ"><i data-ic=chevLeft data-ics=16></i></button><b>'+ctx.y+'年'+(ctx.m+1)+'月 Q'+(ctx.q+1)+'（'+qRng[0]+'〜'+qRng[1]+'日）</b><button onclick="svShiftQ(1)" title="次のQ"><i data-ic=chevRight data-ics=16></i></button><button class="sv-now" onclick="svShiftQ(0)">今のQ</button></div>';
       h+='</div>'; return h;
     }
     h+='<div class="sv-head"><div class="sv-tabs"><button class="sv-tab'+(mode==='month'?' on':'')+'" onclick="svSetMode(\'month\')">当月</button><button class="sv-tab'+(mode==='year'?' on':'')+'" onclick="svSetMode(\'year\')">月間（年度）</button></div>';

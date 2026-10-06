@@ -260,6 +260,28 @@
     if (!(w.pitCardActiveCust ? w.pitCardActiveCust(c) : true)) return false;
     return c.status !== 'returned';
   }
+  /* 🔴🔴 v2.156.0（ゆうた報告 2026-10-07「R01-881870 と R01-254013、探してもダブりではない」）
+     **同じ車かどうかの鍵。** 予約・代車の規則（R01・R02）はここ1本で比べる。
+     ◎正体＝R01 は**ナンバー欄の文字そのまま**で比べていた。新しい車はナンバーの代わりに
+       「新規車両」（予約の「新規車両」スイッチ）が入るので、**新規車両どうしが同じ車**になっていた
+       （10/10 のフォレスター〈有限会社〉とエスティマ〈ワタナベ〉）。
+     🔴 これから
+       ・車の控えの番号（vehId）が同じ → 同じ車
+       ・**本物のナンバー**（customers.js の pitIsRealPlate＝「新規車両」「未登録」「なし」などを外す）が同じ → 同じ車
+       ・どちらも無い時だけ、カナ＋車種で比べる（今までどおり）
+     ⚠ 本物のナンバーの見分けは customers.js の1本。ここで「新規車両」などを書き写さない。 */
+  function realPlate(c){
+    var p = t(c && c.plate); if (!p) return '';
+    if (w.pitIsRealPlate && !w.pitIsRealPlate(p)) return '';
+    return p;
+  }
+  function carKeys(c){
+    var ks = [];
+    if (t(c.vehId)) ks.push('v:' + t(c.vehId));
+    var p = realPlate(c); if (p) ks.push('p:' + p);
+    if (!ks.length && t(c.kana)) ks.push('k:' + t(c.kana) + '/' + t(c.car));
+    return ks;
+  }
   /* 実績になった車（売上なしは別扱い） */
   function isDone(c){ return !!c && c.status === 'returned' && !noSale(c); }
 
@@ -622,18 +644,19 @@
       why:'二重予約です。枠も代車も2台ぶん取られ、売上も2台ぶん数えます。',
       fix:'どちらかを消すか、日付を分けてください。',
       all: function(ctx){
-        var g = {}, out = [];
+        /* 🔴 v2.156.0 同じ車かどうかは carKeys（控えの番号／本物のナンバー／カナ＋車種）。「新規車両」どうしは同じ車にしない */
+        var g = {}, out = [], n = {};
         ctx.cards.forEach(function(c){
           if (!isLive(c) || !t(c.reserveDate)) return;
-          var k = (t(c.plate) || (t(c.kana) + '/' + t(c.car))) + '@' + c.reserveDate;
-          if (!t(c.plate) && !t(c.kana)) return;
-          (g[k] = g[k] || []).push(c);
+          carKeys(c).forEach(function(k){ k += '@' + c.reserveDate; (g[k] = g[k] || []).push(c); });
         });
         Object.keys(g).forEach(function(k){
           if (g[k].length < 2) return;
-          g[k].forEach(function(c){
-            out.push({ refId:c.id, text:'同じ車・同じ入庫日のカードが ' + g[k].length + '枚あります（' + c.reserveDate + '）' });
-          });
+          g[k].forEach(function(c){ n[c.id] = Math.max(n[c.id] || 0, g[k].length); });
+        });
+        ctx.cards.forEach(function(c){
+          if (!n[c.id]) return;
+          out.push({ refId:c.id, text:'同じ車・同じ入庫日のカードが ' + n[c.id] + '枚あります（' + c.reserveDate + '）' });
         });
         return out;
       } },
@@ -643,13 +666,14 @@
       why:'前の作業が終わる前に次の入庫が入っています。どちらかの日付が違うかもしれません。',
       fix:'入庫日か返車予定日を直してください。',
       all: function(ctx){
+        /* 🔴 v2.156.0 同じ車かどうかは carKeys（「新規車両」などはナンバーとして比べない） */
         var g = {}, out = [], seen = {};
         ctx.cards.forEach(function(c){
-          if (!isLive(c) || !t(c.plate) || !t(c.reserveDate)) return;
-          (g[t(c.plate)] = g[t(c.plate)] || []).push(c);
+          if (!isLive(c) || !t(c.reserveDate)) return;
+          carKeys(c).forEach(function(k){ if (k.charAt(0) === 'k') return; (g[k] = g[k] || []).push(c); });
         });
-        Object.keys(g).forEach(function(p){
-          var list = g[p];
+        Object.keys(g).forEach(function(key){
+          var list = g[key], p = realPlate(list[0]) || t(list[0].plate) || '（控えの車）';
           for (var i = 0; i < list.length; i++) for (var j = i + 1; j < list.length; j++){
             var a = list[i], b = list[j];
             if (a.reserveDate === b.reserveDate) continue;   /* R01 が拾う */

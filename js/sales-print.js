@@ -156,7 +156,9 @@
       T(pdf,mk.c); pdf.setFontSize(6.5); pdf.text(mk.lb, Math.min(mx, R-6), barY+barH+6, {align:'center'});
     });
     y += heroH + 3;
-    if (I.refNoCount){ T(pdf,MUTED); pdf.setFontSize(6.8); pdf.text('参考：'+I.refNoCount+'（売上には入っていません）', L+1, y+2.5); y += 5; }
+    /* 🆕 v2.145.0 保険・社員の参考を同じ行に並べる（行を増やさない＝下の課別を押し出さない） */
+    var _refLine = [I.refNoCount ? '参考：'+I.refNoCount+'（売上には入っていません）' : '', I.refText||''].filter(Boolean).join('　／　');
+    if (_refLine){ T(pdf,MUTED); pdf.setFontSize(6.8); pdf.text(_refLine, L+1, y+2.5); y += 5; }
 
     /* ── ② 日次の進捗 ── */
     var chH=62;   /* v2.124.0 74→62：課別をメインにするため、その分を課別へ回した */
@@ -297,6 +299,118 @@
       }).catch(function(){ document.body.removeChild(wrap); pitAlert('PDF出力に失敗しました。', { code:'PF-5002' }); });
     }).catch(function(){ pitAlert('PDFライブラリの読込に失敗しました（オフライン等）。', { code:'PF-5003' }); });
   }
+
+  /* ===================================================================
+     🆕 v2.145.0（ゆうた指定 2026-10-06）**区分別の一覧（実績〜見込）＝A4縦・白黒**
+     🗣「この感じに返車予定日を入れて、A4白黒印刷対応のPDFを自動で作成してDL出来るボタンを」
+     ・課ごとに改ページ（1課 → 2課）。1枚に入らなければ次のページへ続け、見出しを描き直す
+     ・🔴 **色を使わない**（黒・灰だけ）＝白黒で刷っても区分が読める。区分は見出しの文字で分ける
+     ・数字は sales.js の svListModel（＝売上ビューと同じ集め方）だけ。ここで数え直さない
+     =================================================================== */
+  function yenTxt(v){ return Math.round(+v||0).toLocaleString('ja-JP'); }
+  function fitTxt(pdf, s, w){
+    s = String(s==null?'':s);
+    if (pdf.getTextWidth(s) <= w) return s;
+    while (s.length > 1 && pdf.getTextWidth(s+'…') > w) s = s.slice(0, -1);
+    return s + '…';
+  }
+  function drawList(pdf, model){
+    var L=12, R=198, W=R-L, BOT=282, y=0;
+    var G=function(v){ return [v,v,v]; };
+    var COLS=[['状態／実績日',23,'l'],['返車日',15,'l'],['お客様・車種',64,'l'],['作業',34,'l'],['フロント',28,'l'],['金額（円）',22,'r']];
+    var RCOLS=[['区分',14,'l'],['付加',11,'l'],['返車日',15,'l'],['お客様・車種',66,'l'],['作業',30,'l'],['フロント',28,'l'],['金額（円）',22,'r']];
+    var first=true, curCourse=null;
+    function pageHead(){
+      T(pdf,G(0)); pdf.setFontSize(13); pdf.text(String(model.title), L, 17);
+      T(pdf,G(70)); pdf.setFontSize(8); pdf.text(model.period+' ／ 小林モータース ／ 出力 '+nowTxt(), R, 17, {align:'right'});
+      D(pdf,G(0)); pdf.setLineWidth(0.4); pdf.line(L, 19.5, R, 19.5);
+      y = 24;
+    }
+    function newPage(cont){
+      if (!first) pdf.addPage(); first=false;
+      pageHead();
+      if (curCourse) courseHead(cont);
+    }
+    function courseHead(cont){
+      var co=curCourse;
+      F(pdf,G(225)); pdf.rect(L, y, W, 8, 'F');
+      T(pdf,G(0)); pdf.setFontSize(11); pdf.text(co.label+'（'+co.team+'）'+(cont?'　続き':''), L+2.5, y+5.6);
+      T(pdf,G(50)); pdf.setFontSize(8); pdf.text('課の目標 '+MAN(co.min)+'〜'+MAN(co.max), R-2.5, y+5.6, {align:'right'});
+      y += 11;
+    }
+    function need(h, redraw){ if (y+h > BOT){ newPage(true); if (redraw) redraw(); return true; } return false; }
+    function colHead(cols){
+      D(pdf,G(0)); pdf.setLineWidth(0.25); pdf.line(L, y, R, y);
+      T(pdf,G(60)); pdf.setFontSize(7); var x=L;
+      cols.forEach(function(c){ pdf.text(c[0], c[2]==='r' ? x+c[1]-1.2 : x+1.2, y+3.6, {align:c[2]==='r'?'right':'left'}); x+=c[1]; });
+      y += 5; D(pdf,G(0)); pdf.setLineWidth(0.15); pdf.line(L, y, R, y);
+    }
+    function row(cols, vals){
+      T(pdf,G(0)); pdf.setFontSize(8); var x=L;
+      cols.forEach(function(c,i){
+        var s = fitTxt(pdf, vals[i], c[1]-2.4);
+        pdf.text(s, c[2]==='r' ? x+c[1]-1.2 : x+1.2, y+3.7, {align:c[2]==='r'?'right':'left'}); x+=c[1];
+      });
+      y += 5.2; D(pdf,G(190)); pdf.setLineWidth(0.1); pdf.line(L, y, R, y);
+    }
+
+    model.courses.forEach(function(co){
+      curCourse = co; newPage(false);
+      /* ── 区分の合計と「足した合計」 ── */
+      var SC=[['区分',30,'l'],['台数',18,'r'],['この区分',34,'r'],['足した合計',44,'r'],['最低比',20,'r'],['',40,'l']];
+      colHead(SC);
+      var cum=0, NEAR={actualWait:'ほぼ確実',confirmed:'確度高',prospect:'見込まで'};
+      co.groups.forEach(function(g, i){
+        cum += g.sum;
+        row(SC, [(i?'＋':'')+g.label, g.count+'台', MAN(g.sum), MAN(cum), (co.min>0?Math.round(cum/co.min*100):0)+'%', NEAR[g.id]||'']);
+      });
+      y += 4;
+      /* ── 区分ごとの1台ずつ ── */
+      co.groups.forEach(function(g){
+        need(16);
+        F(pdf,G(238)); pdf.rect(L, y, W, 6.5, 'F');
+        D(pdf,G(0)); pdf.setLineWidth(0.6); pdf.line(L, y, L, y+6.5);
+        T(pdf,G(0)); pdf.setFontSize(9.5); pdf.text(g.label+'　'+g.count+'台　'+MAN(g.sum), L+2.5, y+4.6);
+        T(pdf,G(80)); pdf.setFontSize(6.8); pdf.text(fitTxt(pdf, g.note, 100), R-2, y+4.4, {align:'right'});
+        y += 8;
+        if (!g.rows.length){ T(pdf,G(110)); pdf.setFontSize(8); pdf.text('なし', L+2, y+3); y += 7; return; }
+        colHead(COLS);
+        g.rows.forEach(function(r){
+          need(5.2, function(){ T(pdf,G(60)); pdf.setFontSize(7.5); pdf.text(g.label+'（続き）', L+1, y+3); y+=5; colHead(COLS); });
+          row(COLS, [r.when, r.ret, r.name, r.work, r.front, yenTxt(r.amt)]);
+        });
+        y += 4;
+      });
+      /* ── 参考（保険・社員）＝集計の外 ── */
+      if (co.refRows.length){
+        need(20);
+        D(pdf,G(0)); pdf.setLineWidth(0.3); dashOn(pdf,[1.2,1]);
+        pdf.rect(L, y, W, 6.5); dashOn(pdf,[]);
+        var rt = co.refRows.reduce(function(a,r){ return a+(+r.amt||0); }, 0);
+        T(pdf,G(0)); pdf.setFontSize(9.5); pdf.text('参考（保険・社員の実績待〜見込）　'+co.refRows.length+'台　'+MAN(rt), L+2.5, y+4.6);
+        T(pdf,G(80)); pdf.setFontSize(6.8); pdf.text('実績になるまで売上の集計（上の合計）には入れていません', R-2, y+4.4, {align:'right'});
+        y += 8;
+        colHead(RCOLS);
+        co.refRows.forEach(function(r){
+          need(5.2, function(){ colHead(RCOLS); });
+          row(RCOLS, [({actual:'実績',actualWait:'実績待',confirmed:'確定',planned:'予定',prospect:'見込'})[r.tier]||'', r.ref, r.ret, r.name, r.work, r.front, yenTxt(r.amt)]);
+        });
+      }
+    });
+    /* ページ番号（全部描いてから） */
+    var n = pdf.getNumberOfPages();
+    for (var i=1;i<=n;i++){ pdf.setPage(i); T(pdf,G(90)); pdf.setFontSize(7.5); pdf.text(i+' / '+n, R, 291, {align:'right'}); pdf.setFontSize(6.2); pdf.text(fitTxt(pdf,'金額は税抜・売上ビューと同じ拾い方（実績・実績待＝確定額／確定＝受注額／予定＝見積額／見込＝概算）。返車日＝返した車は返車日、まだの車は返車予定日。', W-14), L, 291); }
+  }
+  window.svExportListPdf=function(){
+    if(!window.svListModel){ pitAlert('一覧の部品を読み込み中です。少し待ってからもう一度押してください。', { code:'PF-5002' }); return; }
+    ensureJsPDF().then(loadJPFont).then(function(b64){
+      var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF('p','mm','a4');
+      pdf.addFileToVFS('svjp.ttf', b64); pdf.addFont('svjp.ttf','JP','normal'); pdf.setFont('JP','normal');
+      var model=window.svListModel();
+      drawList(pdf, model);
+      pdf.save(('売上一覧_'+model.period).replace(/[\\\/:*?"<>|\s（）()〜]/g,'-')+'.pdf');
+    }).catch(function(e){ console.warn('[sales-print] 一覧PDF:', e && e.message); pitAlert('一覧PDFを作れませんでした（フォントかPDFの部品が読めません）。', { code:'PF-5003' }); });
+  };
 
   window.svExportPdf=function(){
     if(!window.svReportModel){ rasterPdf(); return; }

@@ -32,6 +32,7 @@
          `planned`（予定）/ `prospect`（見込）/ `forecast`（予測）／対象外は null
        ⚠ **並びは確からしい順**。画面はこの順に出す。
      - `pitSalesInRange(c, fromStr, toStr, todayStr)` … その期間に数えるか（true/false）
+     - `pitSalesRefKind(c)` … 🆕 v2.145.0 売上の集計から外す車か（'保険' / '社員' / ''）
 
    🔴 **写しを作らないこと。** 期間で絞る集計は必ずこの3本を通す。
       （sales.js / mydash.js / mech-summary.js / maintdash.js が呼んでいる）
@@ -166,6 +167,23 @@
     return null;
   }
 
+  /* ===== ②' 売上の集計から外して「参考」の別枠に出す車か =====
+     🔴 v2.145.0（ゆうた指定 2026-10-06）🗣「**保険と社員は集計から抜いてほしい**。ビュー自体も参考値として別枠として表示して」
+        🗣「実績になった社員と保険（入金により実績化）は入れてOK。**抜いて欲しいのは実績待ちから下の予想値**」
+     ＝ 区分（pitSalesTier）はそのまま。**実績待〜予測の時だけ**売上ビューの合計・課別・フロント別に足さない（外すのは sales.js の collectMonth）。
+        ⚠ この関数は「保険・社員か」を答えるだけ。区分で分けるのは使う側。
+        画面と紙には「参考（保険・社員）」の別枠で同じ区分ごとに出す。
+     ◎なぜ
+        保険＝金額が大きく、入金も返車から大きくずれる（v2.9.0）。社員＝社割で金額が動く（v2.6.0）。
+        どちらも**課の売上の頑張り**とは別に見たい。
+     🔴 見分けはここ1本。画面ごとに `workSpecials` を見ないこと。返り＝'保険' / '社員' / ''（両方なら保険）。 */
+  function pitSalesRefKind(c){
+    if (!c) return '';
+    if (window.pitCardInsurance && pitCardInsurance(c)) return '保険';   /* 保険の見分けは insurance-pit.js の1本 */
+    if (Array.isArray(c.workSpecials) && c.workSpecials.indexOf('employee') >= 0) return '社員';
+    return '';
+  }
+
   /* ===== ③その期間（月・クォーター）に数えるか ===== */
   function pitSalesInRange(c, fromStr, toStr, todayStr){
     if (!c) return false;
@@ -191,6 +209,7 @@
   window.pitSalesCountDate = pitSalesCountDate;
   window.pitSalesTier      = pitSalesTier;
   window.pitSalesInRange   = pitSalesInRange;
+  window.pitSalesRefKind   = pitSalesRefKind;   /* 🆕 v2.145.0 参考の別枠（保険・社員） */
   window.pitSalesHoldOf    = holdOf;
   window.pitCardHoldDays   = planHoldOf;   /* 🆕 v1.156.0 案内用（未選択なら null） */
 })();

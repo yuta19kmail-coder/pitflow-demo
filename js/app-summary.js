@@ -113,8 +113,15 @@
     var staffBy = {};
     ((window.state && state.staff) || []).forEach(function (s) { if (s && s.id && !s.isSelf && s.name && !staffBy[s.name]) staffBy[s.name] = s.id; });
     var F = {}, order = [], all = { s: 0, n: 0 };
+    /* 🆕 v2.145.0 保険・社員（r.ref）は売上ボードの合計に入れない＝売上ビューと同じ。参考の別枠（o.ref）に分ける */
+    o.ref = { tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL), divs: { div1: { tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) }, div2: { tiers: zeroes(TK_ALL), counts: zeroes(TK_ALL) } } };
     D.rows.forEach(function (r) {
       var k = TK[r.tier]; if (!k) return;
+      if (r.ref) {
+        var ra = Math.round(+r.amt || 0), rd = o.ref.divs[r.course] || o.ref.divs.div1;
+        o.ref.tiers[k] += ra; o.ref.counts[k]++; rd.tiers[k] += ra; rd.counts[k]++;
+        return;
+      }
       var amt = Math.round(+r.amt || 0), dv = o.divs[r.course] || o.divs.div1;
       o.tiers[k] += amt; o.counts[k]++; dv.tiers[k] += amt; dv.counts[k]++;
       var stay = k === 'act' ? stayOf(r.c) : null;

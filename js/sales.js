@@ -100,9 +100,25 @@
     var dayActual = []; for (var i=0;i<=lastDay;i++) dayActual[i]=0;   // 1..lastDay
     var fronts = {};   // frontStaff -> { 区分ごとの金額 … , count }（区分は TIER_FRONT）
     var rows = [];     /* 🆕 v2.122.0 1台ずつの内訳（FlowDesk の売上ボード用・app-summary.js が読む）。画面は使わない */
+    /* 🆕 v2.145.0（ゆうた指定 2026-10-06）**保険・社員の「まだ実績でない分」は集計に足さず、参考の別枠へ。**
+       🗣「実績になった社員と保険（入金により実績化）は入れてOK。抜いて欲しいのは実績待ちから下の予想値」
+       ＝ 実績（actual）は今までどおり数える。実績待〜予測だけを ref に分ける。
+       ⚠ rows には残す（`ref` に '保険'/'社員'）＝分析用の書き出し・AIレポートは今までどおり全台を引ける。
+          **rows を足して合計を作る側は `r.ref` を飛ばすこと**（app-summary.js がそう）。 */
+    var ref = { tiers:{}, byCourse:{ div1:{}, div2:{} }, rows:[] };
+    TIERS.forEach(function(t){ ref.tiers[t.id]={sum:0,count:0}; ref.byCourse.div1[t.id]={sum:0,count:0}; ref.byCourse.div2[t.id]={sum:0,count:0}; });
     (state.cards||[]).forEach(function(c){
       var tier = tierOf(c, moS, moE, todayStr); if (!tier) return;
       var amt = amtOf(c, tier);
+      var rk = (tier!=='actual' && window.pitSalesRefKind) ? pitSalesRefKind(c) : '';
+      if (rk){
+        var rcs = course(c);
+        var rr = { c:c, tier:tier, amt:amt, course:rcs, front:(c.frontStaff||c.staff||'（未割当）'), ref:rk };
+        rows.push(rr); ref.rows.push(rr);
+        ref.tiers[tier].sum += amt; ref.tiers[tier].count++;
+        ref.byCourse[rcs][tier].sum += amt; ref.byCourse[rcs][tier].count++;
+        return;
+      }
       tiers[tier].sum += amt; tiers[tier].count++;
       var cs = course(c); byCourse[cs][tier].sum += amt; byCourse[cs][tier].count++;
       rows.push({ c:c, tier:tier, amt:amt, course:cs, front:(c.frontStaff||c.staff||'（未割当）') });
@@ -119,7 +135,7 @@
     });
     // 日次累計
     var cum = []; cum[0]=0; for (var k=1;k<=lastDay;k++) cum[k] = cum[k-1] + dayActual[k];
-    return { tiers:tiers, byCourse:byCourse, lastDay:lastDay, cum:cum, fronts:fronts, rows:rows };
+    return { tiers:tiers, byCourse:byCourse, lastDay:lastDay, cum:cum, fronts:fronts, rows:rows, ref:ref };
   }
   /* 🆕 v2.122.0（2026-09-17 ゆうた：FlowDesk のサイドバーに PitFlow の売上カード）
      🔴 **app-summary.js の売上ボード（sections.salesBoard）は、この画面と同じ集め方を借りる。**
@@ -361,6 +377,81 @@
          + '<span>売上には入っていません（実績ビューの「非カウント一覧」で見られます）</span></div>';
   }
 
+  /* ===================================================================
+     🆕 v2.145.0（ゆうた指定 2026-10-06）**参考（保険・社員）＝売上の集計に入れていない車の別枠**
+     🗣「保険と社員は集計から抜いてほしい。ビュー自体も参考値として別枠として表示して欲しい」
+     🔴 中身は collectMonth の `ref`（見分けは sales-count.js の pitSalesRefKind 1本）。ここで数え直さない。
+     =================================================================== */
+  function custCar(c){
+    var n = window.pitCustName ? pitCustName(c) : String(c.customer||'');
+    var car = window.pitCarLabel ? pitCarLabel(c) : String(c.car||'');
+    return [n, car].filter(Boolean).join(' ') || '—';   /* 空の言い方は持たない（名前の1本＝pitCustName） */
+  }
+  function workText(c){ return cardWorkIds(c).map(wtLabel).join('・'); }
+  function tierIdx(id){ return TIER_IDS.indexOf(id); }
+  function refBox(ref){
+    if (!ref || !ref.rows.length) return '';
+    var tot = sumTiers(ref.tiers, TIER_IDS);
+    var h = '<div class="sv-card sv-ref"><div class="sv-card-h"><span><i data-ic=info data-ics=16></i> 参考（保険・社員の実績待〜予測）＝売上の集計には入れていません</span>'
+          + '<span class="sv-ref-tot">'+ref.rows.length+'台・'+man(tot)+'</span></div>';
+    h += '<table class="sv-table"><thead><tr><th>課</th>'+TIERS.map(function(x){ return '<th>'+x.label+'</th>'; }).join('')+'<th>計</th></tr></thead><tbody>';
+    COURSES.forEach(function(cd){
+      var cc = ref.byCourse[cd.id];
+      h += '<tr><td class="sv-td-name">'+cd.label+'（'+cd.team+'）</td>'
+         + TIERS.map(function(x){ var o=cc[x.id]; return '<td class="sv-num">'+(o.count ? man(o.sum)+'<small> '+o.count+'台</small>' : '—')+'</td>'; }).join('')
+         + '<td class="sv-num"><b>'+man(sumTiers(cc,TIER_IDS))+'</b></td></tr>';
+    });
+    h += '</tbody></table>';
+    var list = ref.rows.slice().sort(function(a,b){ return a.course.localeCompare(b.course) || tierIdx(a.tier)-tierIdx(b.tier) || b.amt-a.amt; });
+    h += '<table class="sv-table sv-ref-list"><thead><tr><th>課</th><th>区分</th><th>付加</th><th>お客様・車種</th><th>フロント</th><th>金額</th></tr></thead><tbody>';
+    list.forEach(function(r){
+      var cd = COURSES.filter(function(x){ return x.id===r.course; })[0] || COURSES[0];
+      h += '<tr><td class="sv-td-name">'+cd.label+'</td><td>'+TIER_BY[r.tier].label+'</td><td>'+esc(r.ref)+'</td><td>'+esc(custCar(r.c))+'</td><td>'+esc(r.front)+'</td><td class="sv-num">'+man(r.amt)+'</td></tr>';
+    });
+    h += '</tbody></table>';
+    h += '<div class="sv-note">実績になった保険（入金日で実績）・社員は上の集計に入っています。ここは<b>まだ実績でない見込みの値</b>だけです（保険は返車済みでも入金待ちの間はどの月にも出ません）。</div></div>';
+    return h;
+  }
+
+  /* ===================================================================
+     🆕 v2.145.0（ゆうた指定 2026-10-06）**区分別の一覧（実績〜見込）を A4 白黒の紙に**
+     🗣「この感じに返車予定日を入れて、A4白黒印刷対応のPDFを自動で作成してDL出来るボタンを」
+     ・課ごと（1課→2課）に、区分の合計と「足した合計」→ 区分ごとの1台ずつ → 参考（保険・社員）
+     ・予測（未入庫の予約）は載せない（ゆうたの「実績から見込まで」）
+     🔴 数字は collectMonth と同じ（区分・金額・どの月か）。紙を描くのは sales-print.js の svExportListPdf。
+     =================================================================== */
+  var TIER_LIST = TIER_IDS.filter(function(id){ return id!=='forecast'; });
+  function md(s){ var p=String(s||'').split('-'); return p.length===3 ? (+p[1])+'/'+(+p[2]) : ''; }
+  /* 返車日：返した車＝返車日／まだの車＝返車予定日（＝この月に数える日。未定は空） */
+  function retRaw(c){ return String((c.status==='returned') ? (c.returnDateFinal || c.returnDate || '') : countDate(c)); }
+  function listRow(r){
+    var c = r.c, ret = retRaw(c);
+    return { tier:r.tier,
+             when: r.tier==='actual' ? md(countDate(c)) : (window.pitCardStatusText ? pitCardStatusText(c) : c.status),
+             ret: md(ret) || '未定',
+             key: (r.tier==='actual' ? String(countDate(c)) : '') + '|' + (ret || '9999'),   /* 並び＝実績日→返車日（未定は最後） */
+             name: custCar(c), work: workText(c), front: r.front, amt: r.amt, ref: r.ref||'' };
+  }
+  function byKey(a,b){ return a.key<b.key ? -1 : a.key>b.key ? 1 : 0; }
+  function svListModel(){
+    var ym = window._svYM;
+    var moS = ymdL(new Date(ym.y, ym.m, 1)), moE = ymdL(new Date(ym.y, ym.m+1, 0));
+    var d = collectMonth(moS, moE);
+    return { title:'売上 区分別一覧（実績〜見込）', period:ym.y+'年'+(ym.m+1)+'月',
+      courses: COURSES.map(function(cd){
+        var cc = d.byCourse[cd.id], tg = divTarget(cd.id);
+        var mine = d.rows.filter(function(r){ return !r.ref && r.course===cd.id && TIER_LIST.indexOf(r.tier)>=0; });
+        var groups = TIER_LIST.map(function(id){
+          var g = mine.filter(function(r){ return r.tier===id; }).map(listRow).sort(byKey);
+          return { id:id, label:TIER_BY[id].label, note:TIER_BY[id].note, sum:cc[id].sum, count:cc[id].count, rows:g };
+        });
+        var refRows = d.ref.rows.filter(function(r){ return r.course===cd.id && TIER_LIST.indexOf(r.tier)>=0; })
+          .map(listRow).sort(function(a,b){ return tierIdx(a.tier)-tierIdx(b.tier) || byKey(a,b); });
+        return { id:cd.id, label:cd.label, team:(cd.id==='div1'?'国産':'輸入'), min:tg.min, max:tg.max, groups:groups, refRows:refRows };
+      }) };
+  }
+  window.svListModel = svListModel;
+
   // ===== 当月ビュー =====
   function renderMonth(wrap){
     var ym = window._svYM;
@@ -431,7 +522,10 @@
     // フロント別
     h += frontTable(data.fronts);
 
-    h += '<div class="sv-foot">金額の取り方：実績＝確定額(amountFinal)／確定＝受注額／予定＝見積額／見込・予測＝概算（作業タイプ別平均）。数字はすべて円。<br>どの月に数えるか：実績＝実績カウント日／それ以外＝<b>返車予定日</b>（未定と予定日超過は当月）。</div>';
+    /* 🆕 v2.145.0 参考（保険・社員）＝集計の外。いちばん下の別枠 */
+    h += refBox(data.ref);
+
+    h += '<div class="sv-foot">金額の取り方：実績＝確定額(amountFinal)／確定＝受注額／予定＝見積額／見込・予測＝概算（作業タイプ別平均）。数字はすべて円。<br>どの月に数えるか：実績＝実績カウント日／それ以外＝<b>返車予定日</b>（未定と予定日超過は当月）。<br><b>保険・社員の車は、実績になるまで集計に入れていません</b>（下の「参考」の別枠。実績になったら数えます）。</div>';
     wrap.innerHTML = h;
   }
 
@@ -993,7 +1087,10 @@
     /* 🔍 v2.59.0（ゆうた指定 2026-09-04）来店属性＝手で作っていた Excel「来店属性集計」を実データから出す */
     /* 🤖 v2.132.0（ゆうた指定 2026-10-02）来店属性の横に「AIレポート」＝月締めのあとに AI が書く月次レポート（sales-ai.js） */
     var TABS=[['sales','売上'],['quarter','クォーター'],['work','作業内容'],['front','フロント'],['visit','来店属性'],['ai','AIレポート']];
-    var h='<div class="sv-tabbar">'+TABS.map(function(t){ return '<button class="sv-topbtn'+(tab===t[0]?' on':'')+'" onclick="svSetTab(\''+t[0]+'\')">'+t[1]+'</button>'; }).join('')+'<div class="sv-tools"><button class="sv-toolbtn" onclick="svExportPdf()" title="A4のPDFで保存（ベクター）"><i data-ic=file data-ics=16></i> PDF出力</button></div></div>';
+    var h='<div class="sv-tabbar">'+TABS.map(function(t){ return '<button class="sv-topbtn'+(tab===t[0]?' on':'')+'" onclick="svSetTab(\''+t[0]+'\')">'+t[1]+'</button>'; }).join('')+'<div class="sv-tools">'
+      /* 🆕 v2.145.0 売上タブの当月だけ＝区分別の一覧（A4白黒） */
+      + (tab==='sales' && mode==='month' ? '<button class="sv-toolbtn" onclick="svExportListPdf()" title="課ごとの1台ずつの一覧（実績〜見込・返車日つき）をA4白黒のPDFで保存"><i data-ic=file data-ics=16></i> 一覧PDF</button>' : '')
+      + '<button class="sv-toolbtn" onclick="svExportPdf()" title="A4のPDFで保存（ベクター）"><i data-ic=file data-ics=16></i> PDF出力</button></div></div>';
     h+='<div class="sv-head"><div class="sv-tabs"><button class="sv-tab'+(mode==='month'?' on':'')+'" onclick="svSetMode(\'month\')">当月</button><button class="sv-tab'+(mode==='year'?' on':'')+'" onclick="svSetMode(\'year\')">月間（年度）</button></div>';
     if (mode==='month'){ h+='<div class="sv-nav"><button onclick="svShiftMonth(-1)" title="前の月"><i data-ic=chevLeft data-ics=16></i></button><b>'+ctx.y+'年'+(ctx.m+1)+'月</b><button onclick="svShiftMonth(1)" title="次の月"><i data-ic=chevRight data-ics=16></i></button><button class="sv-now" onclick="svShiftMonth(0)">今月</button></div>'; }
     else { h+='<div class="sv-nav"><button onclick="svShiftYear(-1)" title="前の年度"><i data-ic=chevLeft data-ics=16></i></button><b>'+(ctx.y-1)+'/12〜'+ctx.y+'/11</b><button onclick="svShiftYear(1)" title="次の年度"><i data-ic=chevRight data-ics=16></i></button><button class="sv-now" onclick="svShiftYear(0)">今年度</button></div>'; }
@@ -1111,7 +1208,9 @@
                    min:dt.min, max:dt.max, actual:cc.actual.sum, nearSure:sumTiers(cc,TIER_NEAR),
                    tiers:TIERS.map(function(x){ return { label:x.label, color:x.color, sum:cc[x.id].sum, count:cc[x.id].count, stage:courseStage(x.id) }; }) }; }),
         ratioD:ratioD(),
-        refNoCount:(window.pitInternCountText ? (pitInternCountText(_refNoCount(_moS0,_moE0))||'') : '')
+        refNoCount:(window.pitInternCountText ? (pitInternCountText(_refNoCount(_moS0,_moE0))||'') : ''),
+        /* 🆕 v2.145.0 参考（保険・社員）＝集計の外。紙にも1行で出す */
+        refText:(d.ref && d.ref.rows.length ? '参考（保険・社員の実績待〜予測）'+d.ref.rows.length+'台・'+man(sumTiers(d.ref.tiers,TIER_IDS))+'＝売上の集計には入れていません' : '')
       };
       return { title:'売上サマリー', period:ym.y+'年'+(ym.m+1)+'月', infographic:info,
         kpis:[{label:'実績（返車済）',value:man(t.actual.sum)},{label:'実績見込み（＋実績待）',value:man(sumTiers(t,TIER_NEAR))},{label:'着地見込み',value:man(_mAll(t))},{label:'月目標',value:man(tg.min)+'〜'+man(tg.max)}],

@@ -78,6 +78,33 @@
     return Promise.resolve();
   }
 
+  /* 🔗 v2.160.0（ゆうた報告 2026-10-07「共通部品にした時に、カード詳細から作れるカードへのリンク付き付箋の機能がバグってる」）
+     カード詳細の「付箋を発行」は付箋に linkResNo / linkLabel（v2.160.0〜 linkCardId も）を書いているのに、
+     共通部品（_shared/coreflow-note-board.js）はそれを読まない＝**どの車の付箋か出ず、カードも開けなかった。**
+     🔴 部品の差し込み口 badgeHtml に「🔗 予約番号・お客様・車種」のボタンを足す。押すとそのカードを開く。
+     ⚠ 部品には書き足さない（リンク先＝PitFlow のカードは PitFlow だけの事情）。 */
+  function _esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]); }
+  function _linkCard(n) {
+    if (!n || !(n.linkCardId || n.linkResNo)) return null;
+    const cards = (window.state && state.cards) || [];
+    return (n.linkCardId && cards.find(c => c && c.id === n.linkCardId))
+        || (n.linkResNo && cards.find(c => c && c.resNo === n.linkResNo)) || null;
+  }
+  function _linkHtml(n) {
+    if (!n || _foreign(n) || !(n.linkLabel || n.linkResNo)) return '';
+    const ic = (typeof window.ic === 'function') ? window.ic('link', '🔗', 13) : '🔗';
+    return `<button type="button" class="bn-link" title="この車のカードを開く"
+      onclick="event.stopPropagation();pitOpenNoteLink('${_esc(n.id)}')">${ic}<span>${_esc(n.linkLabel || n.linkResNo)}</span></button>`;
+  }
+  window.pitOpenNoteLink = function (id) {
+    const n = _notes().find(x => x && x.id === id);
+    const c = _linkCard(n);
+    if (!c) { _toast('つながっていたカードが見つかりません（消去された可能性があります）'); return; }
+    if (window.openDetail) openDetail(c.id);
+  };
+  /* 「自分」の1人目＝付箋を作った人（カード詳細の「付箋を発行」が使う） */
+  window.pitBnMe = function () { return _meIds()[0] || null; };
+
   /* 「まとめて表示」のボタン（新規より控えめ）。⚠ 出すのは本番モードだけ（部品の available が決める） */
   function _allBtnHtml() {
     if (!window.CFNoteAll || !CFNoteAll.available()) return '';
@@ -118,7 +145,7 @@
         storage: { folder: 'pitBoardNotes', company: () => (window.PIT_CLOUD && window.fb && window.fb.currentCompanyId) || null }
       },
       isForeign: _foreign,
-      badgeHtml: n => (window.CFNoteAll ? CFNoteAll.badgeHtml(n) : ''),
+      badgeHtml: n => (window.CFNoteAll ? CFNoteAll.badgeHtml(n) : '') + _linkHtml(n),   /* 🔗 v2.160.0 カードへのリンク */
       headerExtraHtml: _allBtnHtml,
       /* 表示先はビューごとに切替可能（マイダッシュボードは 'mydash-notes-area'）。既定は従来のダッシュボード。 */
       targets: () => [document.getElementById(window.PIT_BN_TARGET || 'board-notes-area') || document.getElementById('board-notes-area')],

@@ -2119,16 +2119,22 @@
     if(!body){ cvCloseFusen(); return; }
     if(!Array.isArray(state.boardNotes)) state.boardNotes=[];
     const maxOrder = state.boardNotes.reduce(function(m,n){return Math.max(m, n.order||0);},0);
+    /* 🔴 v2.160.0（ゆうた報告「カード詳細から作るリンク付き付箋がバグってる」）共通部品の付箋の形にそろえた
+       ・作った人＝ログインしている人（board-notes.js の pitBnMe）。前は無くなった window.bnMe を読んで**空**になっていた
+       ・作った時刻（createdAt）を入れる（済の扱い・並びに使う）
+       ・どのカードか＝予約番号に加えてカードの番号（linkCardId）も持つ（予約番号が無い・変わっても開ける）
+       ・知らせは pitToast（前の window.toast は無い＝何も出ていなかった） */
     state.boardNotes.push({
       id:'bn_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+      createdAt:Date.now(),
       title:'', body:body, color:color, noteType:'execute', deadline:null,
-      memberUids:[], doneByUids:[], authorUid:(window.bnMe||null), status:'open',
-      order:maxOrder+1, imageURL:'', replies:[],
-      linkResNo:(_c.resNo||''), linkLabel:((_c.resNo?_c.resNo+' ・ ':'')+((window.pitCustName?pitCustName(_c):_c.customer)||'')+'様 '+(_c.car||''))
+      memberUids:[], doneByUids:[], authorUid:(window.pitBnMe ? pitBnMe() : null), status:'open',
+      order:maxOrder+1, imageURL:'', pdfURL:'', pdfName:'', replies:[],
+      linkCardId:_c.id, linkResNo:(_c.resNo||''), linkLabel:((_c.resNo?_c.resNo+' ・ ':'')+((window.pitCustName?pitCustName(_c):_c.customer)||'')+'様 '+(_c.car||''))
     });
     save(); if(window.renderBoardNotes) try{ renderBoardNotes(); }catch(e){}
     cvCloseFusen();
-    if(window.toast) toast('付箋を発行しました');
+    if(window.pitToast) pitToast('付箋を発行しました（ダッシュボードの付箋ボードに出ます）');
   };
 
   /* 仮予約 ⇄ 本予約 の切替（⋮メニュー）v0.100.0 */

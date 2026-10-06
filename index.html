@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.150.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.151.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.150.0</div>
+    <div class="login-ver">v2.151.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.150.0</span>
+    <span class="ver">v2.151.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -838,7 +838,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/sales-visit.js?v=4"></script><!-- 🔍 v2.59.0 来店属性（売上ビューの5つ目のタブ）。**sales-date.js（売上日）と sales-count.js より後ろ／sales.js より前** -->
 <script src="js/analytics-pit.js?v=2"></script><!-- 📊 v2.143.0 分析用の書き出し（Claude が読む表）。画面は持たない＝毎晩サーバーがこのファイルを読み込んで呼ぶ。MINI のまとめ方・伝票の原価はここ1本（sales-ai が借りる）ので sales-ai.js より前 -->
 <script src="js/sales-ai.js?v=19"></script><!-- 🤖 v2.132.0 売上ビューの「AIレポート」＝月締めのあとに AI が書く月次レポート。sales.js（pitSalesMonthCollect）・quarter-*（締めの判定）を借りる -->
-<script src="js/sales.js?v=36"></script><!-- 🆕 v2.145.0 保険・社員は集計の外（参考の別枠）・一覧PDF --><!-- 🆕 v2.124.0 課別＝積み上げの階段・課の目標の縦線（pitSalesDivTarget）／🆕 v2.123.0 collectMonth を app-summary.js（売上ボード）へ貸す -->
+<script src="js/sales.js?v=37"></script><!-- 🆕 v2.145.0 保険・社員は集計の外（参考の別枠）・一覧PDF --><!-- 🆕 v2.124.0 課別＝積み上げの階段・課の目標の縦線（pitSalesDivTarget）／🆕 v2.123.0 collectMonth を app-summary.js（売上ボード）へ貸す -->
 <script src="js/sales-print.js?v=13"></script><!-- 🆕 v2.145.0 一覧PDF（A4白黒）／v2.146.0 返車と金額の種類 --><!-- v2.124.0 紙は課別がメイン（フロント別をやめた） -->
 <script src="js/shaken-line.js?v=3"></script><!-- 🔍 v2.58.0 車検ライン（作業サマリーの2つ目のタブ）。mech-summary より前に読む -->
 <script src="js/mech-summary.js?v=8"></script>

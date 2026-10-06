@@ -747,7 +747,7 @@
     var G = qGoalOf(Q, k);
     return '<div class="sv-qgoal '+(G.ok?'is-ok':'is-ng')+'"><div><em>Q'+(Q.sel.q+1)+'までの目標（月目標を4等分）</em><b>'+man1(G.min)+'</b><span>最高 '+man1(G.max)+'</span></div>'
       + '<div><em>Q'+(Q.sel.q+1)+'までの実績（Q1〜Q'+(Q.sel.q+1)+'）</em><b>'+man(G.act)+'</b><span>目標の '+G.p+'%</span></div>'
-      + '<div class="sv-qgoal-v">'+(G.okMax ? '<b>最高も達成</b>' : G.ok ? '<b>達成</b><span>＋'+man(-G.gap)+'</span>' : '<b>未達</b><span>あと '+man(G.gap)+'</span>')+'</div></div>';
+      + '<div class="sv-qgoal-v">'+(G.ok ? '<b>達成</b><span>＋'+man(-G.gap)+'</span>' : '<b>未達</b><span>あと '+man(G.gap)+'</span>')   /* v2.151.0 ゆうた「最高も達成は分かりにくい。素直に達成＋〇〇に」 */+'</div></div>';
   }
 
   function collectQuarter(sel){
@@ -1403,7 +1403,7 @@
           {type:'table',title:(qm+1)+'月のクォーター実績（営業日配分）',head:['Q','目標','実績','達成率','台数'],rows:qrows,align:['l','r','r','r','r']},
           {type:'table',title:'課別：前Qまで → '+qName(Q.sel)+'の実績 → '+qNextLabel(Q),head:['課','前Qまで',qName(Q.sel),qName(Q.nx),'着地','目標最低','目標最高','最低比'],rows:crow,align:['l','r','r','r','r','r','r','r']},
           {type:'table',title:'Q'+(Q.sel.q+1)+'までの目標（月目標を4等分）の達成',head:['課','目標（最低）','目標（最高）','Q1〜Q'+(Q.sel.q+1)+'の実績','達成率','判定'],
-           rows:[null,'div1','div2'].map(function(k){ var G=qGoalOf(Q,k); return [k?(k==='div1'?'1課（国産）':'2課（輸入）'):'全体', man1(G.min), man1(G.max), man(G.act), G.p+'%', G.okMax?'最高も達成':G.ok?'達成（＋'+man(-G.gap)+'）':'未達（あと '+man(G.gap)+'）']; }),
+           rows:[null,'div1','div2'].map(function(k){ var G=qGoalOf(Q,k); return [k?(k==='div1'?'1課（国産）':'2課（輸入）'):'全体', man1(G.min), man1(G.max), man(G.act), G.p+'%', G.ok?'達成（＋'+man(-G.gap)+'）':'未達（あと '+man(G.gap)+'）']; }),
            align:['l','r','r','r','r','l']},
           {type:'table',title:qNextLabel(Q)+'の中身（区分ごと・台数）',head:['課'].concat(TIERS.map(function(t){return t.label;})).concat(['計']),rows:nrow,align:['l'].concat(TIERS.map(function(){return 'r';})).concat(['r'])}
         ],

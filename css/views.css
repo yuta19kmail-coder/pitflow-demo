@@ -1157,3 +1157,7 @@ select.cf-input{
   padding:1px 8px; cursor:pointer; white-space:nowrap; overflow:hidden; }
 .bn-link span{ overflow:hidden; text-overflow:ellipsis; }
 .bn-link:hover{ background:#fff; border-color:rgba(0,0,0,.35); }
+/* 🔗 v2.161.0 カード詳細から開いた付箋の編集画面に「この車にリンク」の1行 */
+.pit-ed-link{ display:flex; align-items:center; gap:6px; margin:0 16px 4px; padding:6px 10px; font-size:12px;
+  color:var(--text2,#444); background:var(--bg3,#f3f4f6); border:1px dashed var(--border2,#ccc); border-radius:8px; }
+.pit-ed-link b{ color:var(--text,#111); }

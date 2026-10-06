@@ -1534,12 +1534,8 @@
 
   function popsHtml(c){
     const link = (c.resNo?c.resNo+' ・ ':'') + ((window.pitCustName?pitCustName(c):c.customer)||'') + '様 ' + (c.car||'');
-    return '<div class="cv-fusenpop" id="cv-fusenpop"><div class="cv-fph"><i data-ic=sticky data-ics=16></i> 付箋を発行（この車両にリンク）</div>'
-      + '<div class="cv-fplink"><i data-ic=link data-ics=16></i> '+esc(link)+'</div>'
-      + '<textarea class="cv-fpbody" id="cv-fpbody" placeholder="付箋の内容（例：部品が入荷したら連絡）"></textarea>'
-      + '<div class="cv-fpcolors"><span class="cv-fpc on" data-col="yellow" style="background:#fde68a" onclick="cvFpColor(this)"></span><span class="cv-fpc" data-col="red" style="background:#fca5a5" onclick="cvFpColor(this)"></span><span class="cv-fpc" data-col="green" style="background:#a7f3d0" onclick="cvFpColor(this)"></span><span class="cv-fpc" data-col="blue" style="background:#bfdbfe" onclick="cvFpColor(this)"></span></div>'
-      + '<div class="cv-fpacts"><button class="cv-ng" onclick="cvCloseFusen()">取消</button><button class="cv-ok" onclick="cvFusenIssue()">付箋を発行</button></div></div>'
-      + delPopHtml(c, link);
+    /* v2.161.0 付箋の小さい窓はやめた（ふつうの付箋の編集画面で作る＝cvToggleFusen） */
+    return delPopHtml(c, link);
   }
 
   /* 🗑 消去の**2枚目**（v1.136.0）＝その車を名指しして見せる最終確認。
@@ -2081,9 +2077,9 @@
   // ===== ⋮オプション・付箋・削除 =====
   function closeAllPop(){ ['cv-optmenu','cv-fusenpop','cv-delpop'].forEach(function(id){ const e=document.getElementById(id); if(e)e.classList.remove('show'); }); }
   window.cvToggleOpt = function(e){ e.stopPropagation(); const m=document.getElementById('cv-optmenu'); const sh=m.classList.contains('show'); closeAllPop(); if(!sh)m.classList.add('show'); };
-  window.cvToggleFusen = function(e){ e.stopPropagation(); const f=document.getElementById('cv-fusenpop'); const sh=f.classList.contains('show'); closeAllPop(); if(!sh)f.classList.add('show'); };
-  window.cvCloseFusen = function(){ const f=document.getElementById('cv-fusenpop'); if(f)f.classList.remove('show'); };
-  window.cvFpColor = function(el){ el.parentNode.querySelectorAll('.cv-fpc').forEach(function(x){x.classList.remove('on');}); el.classList.add('on'); };
+  /* 🔴 v2.161.0（ゆうた指定「メンバーとタイトルも、普通の付箋と同じ感じで入力できるように」）
+     付箋は**ふつうの付箋と同じ編集画面**で作る（board-notes.js の pitNewNoteForCard）。前の小さい窓（本文と色だけ）はやめた。 */
+  window.cvToggleFusen = function(e){ if(e&&e.stopPropagation) e.stopPropagation(); closeAllPop(); if(_c && window.pitNewNoteForCard) pitNewNoteForCard(_c); };
   /* 🗑🗑 v1.136.0（ゆうた確定・2026-08-18）**消去は2枚聞く。**
      🗣「消すは誰でもでいいが、ポップアップを2重で出す。戻らない旨、通常は何かしらのアーカイブに
         落ち着く旨を伝えて」
@@ -2112,30 +2108,6 @@
       });
   };
   window.cvCloseDel = function(){ const d=document.getElementById('cv-delpop'); if(d)d.classList.remove('show'); };
-
-  window.cvFusenIssue = function(){
-    const body = (document.getElementById('cv-fpbody').value||'').trim();
-    const colEl = document.querySelector('#cv-fusenpop .cv-fpc.on'); const color = colEl ? colEl.dataset.col : 'yellow';
-    if(!body){ cvCloseFusen(); return; }
-    if(!Array.isArray(state.boardNotes)) state.boardNotes=[];
-    const maxOrder = state.boardNotes.reduce(function(m,n){return Math.max(m, n.order||0);},0);
-    /* 🔴 v2.160.0（ゆうた報告「カード詳細から作るリンク付き付箋がバグってる」）共通部品の付箋の形にそろえた
-       ・作った人＝ログインしている人（board-notes.js の pitBnMe）。前は無くなった window.bnMe を読んで**空**になっていた
-       ・作った時刻（createdAt）を入れる（済の扱い・並びに使う）
-       ・どのカードか＝予約番号に加えてカードの番号（linkCardId）も持つ（予約番号が無い・変わっても開ける）
-       ・知らせは pitToast（前の window.toast は無い＝何も出ていなかった） */
-    state.boardNotes.push({
-      id:'bn_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-      createdAt:Date.now(),
-      title:'', body:body, color:color, noteType:'execute', deadline:null,
-      memberUids:[], doneByUids:[], authorUid:(window.pitBnMe ? pitBnMe() : null), status:'open',
-      order:maxOrder+1, imageURL:'', pdfURL:'', pdfName:'', replies:[],
-      linkCardId:_c.id, linkResNo:(_c.resNo||''), linkLabel:((_c.resNo?_c.resNo+' ・ ':'')+((window.pitCustName?pitCustName(_c):_c.customer)||'')+'様 '+(_c.car||''))
-    });
-    save(); if(window.renderBoardNotes) try{ renderBoardNotes(); }catch(e){}
-    cvCloseFusen();
-    if(window.pitToast) pitToast('付箋を発行しました（ダッシュボードの付箋ボードに出ます）');
-  };
 
   /* 仮予約 ⇄ 本予約 の切替（⋮メニュー）v0.100.0 */
   window.cvToggleTentative = function(){

@@ -445,14 +445,14 @@
   /* 返車日：返した車＝返車日／まだの車＝返車予定日（＝この月に数える日。未定は空） */
   /* 🆕 v2.146.0（ゆうた指定 2026-10-06「返車日なのか返車予定日ははっきり記載して」）
      返車の日付に**どの日か**の札を付ける。
-       済＝返した日／確定＝確定返車日（C）／約束＝受注時にお客様と約束した日（B）／概算＝入庫日＋預かり日数の目安（A）／未定
+       済＝返した日／確定＝確定返車日（C）／予定＝受注時にお客様に伝えた返車予定日（B）／🔴 v2.147.0 ゆうた指定「約束→予定」／概算＝入庫日＋預かり日数の目安（A）／未定
      🔴 日付の拾い方は return-slot.js の pitReturnDates 1本（C→B→A＝この月に数える日と同じ順）。 */
   function retOf(c){
     if (c.status==='returned') return { d:String(c.returnDateFinal || c.returnDate || ''), k:'済' };
     if (window.pitReturnDates){
       var r = pitReturnDates(c);
       if (r.c) return { d:String(r.c), k:'確定' };
-      if (r.b) return { d:String(r.b), k:'約束' };
+      if (r.b) return { d:String(r.b), k:'予定' };
       if (r.a) return { d:String(r.a), k:'概算' };
       return { d:'', k:'未定' };
     }

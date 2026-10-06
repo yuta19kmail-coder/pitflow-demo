@@ -127,6 +127,7 @@
        ⚠ 見るのは**見積と確定の大きいほう**。だから「20万 → 40万」は当たる（大きいほうが40万）。 */
     gapMin:      200000,    /* 見積・確定の大きいほうがこの額以下なら、倍率は見ない */
     farReturn:      120,    /* 返車予定が今日からこれ以上先＝年を打ち間違えた疑い */
+    tbdLong:          7,    /* 🆕 v2.157.0 完TEL済のまま「返車日未定」に置いてある日数がこれ以上＝忘れていないか見る */
     soon:             3,    /* 「もうすぐ」＝何日以内 */
     noShowLeft:       5,    /* 未入庫の自動アーカイブ（30日）まであと何日で知らせるか */
     noShowAuto:      30,    /* 未入庫が自動でアーカイブされるまでの日数（undetermined.js と同じ） */
@@ -518,14 +519,28 @@
           言いたいのは「**この車の金額が、今月の見込みに入ったままになっている**」。 */
 
 
-    { id:'F03', cat:'flow', level:'red',
-      title:'完TELを通ったのに、返車予定日が空',
-      why:'返車カレンダーのどこにも出ません。お客様を待たせたまま忘れられます。',
-      fix:'完TELの画面で、返す日と時間を決めてください。',
-      each: function(c){
+    /* 🔴🔴 v2.157.0（ゆうた指摘 2026-10-07・F03-153105「返車日未定にチェックあり（リアルに）。この状態は要対応ではちょっとズレてる」）
+       ◎前＝「完TELを通ったのに返車予定日が空」を**赤（要対応）**。理由は「返車カレンダーのどこにも出ない」。
+       ◎今の作り＝返車日が空の車は、返車カレンダーの**「返車日未定」の箱にちゃんと出る**（return-slot.js の dateTbd）。
+         しかも「返車日未定」は**人がわざと付けるチェック**（チェック＝日付が空、それだけ。印は別に持たない）。
+         ＝ 正しく運用している車を赤で責めていた。完TEL待ち（まだ電話していない）の車も、日付が空なのは当たり前なのに出ていた。
+       🔴 これから＝**完TEL済で「返車日未定」に置いたまま、完TELから LIM.tbdLong 日以上たった車だけ**を「確認」（黄）で出す。
+         ＝ 置いてあること自体は正しい。長く置きっぱなしで忘れていないかだけを見る。
+       ⚠ 番号（F03-xxxxxx）は変わらない（key は規則ID＋カードID のまま）。
+       ⚠ 置き場の判定は return-slot.js の pitReturnPlace 1本。ここで returnStage を並べ直さない。 */
+    { id:'F03', cat:'flow', level:'amber',
+      title:'「返車日未定」のまま、長く置いてある',
+      why:'完TELを通って「返車日未定」に置いたまま ' + LIM.tbdLong + '日以上たっています。置いておくこと自体は正しい使い方ですが、お客様と日にちを決め忘れていないかだけ見てください。',
+      fix:'お客様と返す日が決まったら返車日を入れてください。まだ決まらないなら、そのままで構いません（日にちが決まるまで出続けます）。',
+      each: function(c, ctx){
         if (c.status === 'returned' || !c.returnStage) return '';
         if (!(w.pitCardActive ? w.pitCardActive(c) : true)) return '';
-        return t(c.returnDate) ? '' : '完TELを通っていますが返車予定日が空です';
+        var place = w.pitReturnPlace ? w.pitReturnPlace(c) : (t(c.returnDate) ? 'calendar' : 'dateTbd');
+        if (place !== 'dateTbd' || t(c.returnDate)) return '';           /* 日付が入っている＝過ぎた日の車は別の話（未定の箱に出しているだけ） */
+        var since = t(c.completeCallAt);
+        if (!since) return '';                                           /* 完TELの日が分からない＝何日置いたか言えないので責めない */
+        var n = days(since, ctx.today);
+        return (n != null && n >= LIM.tbdLong) ? ('完TEL ' + since + ' から ' + n + '日、返車日未定のままです') : '';
       } },
 
     { id:'F04', cat:'flow', level:'red',

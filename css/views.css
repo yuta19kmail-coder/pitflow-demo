@@ -673,9 +673,14 @@
 .tr-front.empty{ background:transparent; }
 
 .tr-main{ min-width:0; }
-.tr-headline{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
-.tr-customer{ font-weight:800; font-size:16px; white-space:nowrap; }
-.tr-carname{ font-weight:700; font-size:15px; color:var(--text); white-space:nowrap; }
+/* 🔴 v2.163.0（ゆうた報告 2026-10-08）名前と車種は**折り返さない**。入りきらない時は両方を「…」で縮める。
+   ⚠ 折り返すと 56px 固定の行に3段（名前／車種／ナンバー）が入らず、行の中で下にズレてナンバーが隠れる。
+   ⚠ 縮み方は flex の既定（長い方ほど多く縮む＝長さに比例）＝ゆうた指定「名前・車種ともにバランスよく」。 */
+.tr-headline{ display:flex; align-items:baseline; gap:10px; flex-wrap:nowrap; min-width:0; overflow:hidden; }
+.tr-customer{ font-weight:800; font-size:16px; white-space:nowrap; display:flex; align-items:baseline; flex:0 1 auto; min-width:0; }
+.tr-customer .tr-cn{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tr-customer .tr-sama{ flex:none; margin-left:.2em; }
+.tr-carname{ font-weight:700; font-size:15px; color:var(--text); white-space:nowrap; flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .tr-plate{ font-size:12px; color:var(--text2); margin-top:1px; }
 /* ナンバー横の当日メモ（クイック引継ぎ）＝当日ビュー内だけ v0.123.0 */
 .tr-plateline{ display:flex; align-items:center; gap:8px; margin-top:1px; min-width:0; }

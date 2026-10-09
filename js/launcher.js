@@ -180,7 +180,7 @@
           var nm = (b.querySelector('img') && b.querySelector('img').getAttribute('alt')) || b.dataset.app;
           /* ブラウザ標準の alert は出ている間ページが止まる（PCによっては固まって見える）ので使わない。
              ui-dialog.js が入っていないアプリのためだけに、最後の逃げ道として標準を残してある。 */
-          if(window.UI && UI.alert){ UI.alert(nm + ' は準備中です。'); }
+          if(window.UI && typeof window.UI.alert==='function'){ window.UI.alert(nm + ' は準備中です。'); }   /* 🔴 素の UI と書かない（StockFlow の const UI を指す・2026-10-08） */
           else { alert(nm + ' は準備中です。'); }
           return;
         }

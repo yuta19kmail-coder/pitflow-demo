@@ -161,7 +161,10 @@
 
   /* ---------- 1回聞く（純正の confirm は使わない＝全アプリ共通の決めごと） ---------- */
   function ask(title, opt) {
-    if (w.UI && typeof UI.confirm === 'function') return Promise.resolve(UI.confirm(title, opt || {}));
+    /* 🔴 2026-10-08 必ず w.UI（窓口＝ui-dialog.js）で呼ぶ。素の `UI` と書かない。
+       StockFlow は state.js に `const UI = {…}`（画面の状態）を持っていて、素の `UI` はそちらを指す。
+       ＝ UI.confirm が無くて止まり、**ログアウト・強制更新の確認が出なかった**。 */
+    if (w.UI && typeof w.UI.confirm === 'function') return Promise.resolve(w.UI.confirm(title, opt || {}));
     /* 万一 ui-dialog.js が無いアプリでも止まらないように、最低限の窓を自前で出す */
     return new Promise(function (res) {
       var wrap = d.createElement('div');

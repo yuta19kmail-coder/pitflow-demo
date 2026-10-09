@@ -279,7 +279,8 @@
      ========================================================= */
   /* ⚠ v1.17.0：まだ保存していない新規予約（_draft）は出さない・数えない */
   function pickIntake() {
-    return C.cards.filter(function (c) { return !c._draft && c.reserveDate === C.tStr && c.status !== 'scrap'; })
+    /* 🔴 v2.164.0（2026-10-09）予約キャンセルも出さない・数えない（当日ビューの入庫数と揃える） */
+    return C.cards.filter(function (c) { return !c._draft && c.reserveDate === C.tStr && c.status !== 'scrap' && c.status !== 'cancelled'; })
       .sort(function (a, b) { return pitTimeMin(a.reserveTime) - pitTimeMin(b.reserveTime); });   /* v1.33.0 */
   }
   /* =========================================================

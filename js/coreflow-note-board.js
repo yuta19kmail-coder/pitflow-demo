@@ -250,7 +250,7 @@
   function toast(m) { if (A && A.toast) call('toast', m); }
   function ask(msg, opt) {
     if (A && A.ask) { var r = call('ask', msg, opt || {}); if (r && r.then) return r; return Promise.resolve(!!r); }
-    if (w.UI && UI.confirm) return UI.confirm(msg, opt || {}).then(function (y) { return !!y; });
+    if (w.UI && typeof w.UI.confirm === 'function') return w.UI.confirm(msg, opt || {}).then(function (y) { return !!y; });   /* 🔴 素の UI と書かない（StockFlow の const UI を指してしまう・2026-10-08） */
     return Promise.resolve(w.confirm(msg));
   }
   function log(m) { if (A && A.onLog) call('onLog', m); }

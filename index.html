@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.168.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.169.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -39,7 +39,7 @@
 <link rel="stylesheet" href="css/inspect.css?v=12"><!-- 🩺 データチェック（日常チェック／クォーターチェック） -->
 <link rel="stylesheet" href="css/quarter.css?v=25">
 <link rel="stylesheet" href="css/master.css?v=3"><!-- 🗂 v2.86.0 マスター入力 --><!-- 🧾 クォーターチェック（②売上チェックリスト突合／③AIチェック） -->
-<link rel="stylesheet" href="css/members.css?v=7">
+<link rel="stylesheet" href="css/members.css?v=8">
 <link rel="stylesheet" href="css/news-oplog.css?v=5">
 <style id="pit-dev-style">
   /* 「開発中サンプル」バッジ（タイトル横） */
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.168.0</div>
+    <div class="login-ver">v2.169.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.168.0</span>
+    <span class="ver">v2.169.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -847,7 +847,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/maint-pit.js?v=28"></script><!-- 🔧 v2.44.0 代車作業予定ボード（月の目標＋飛び地の候補＋警告）。loaner-free.js より後ろ・fleet.js より前 -->
 <script src="js/fleet.js?v=53"></script>
 <script src="js/auth-pit.js?v=17"></script>
-<script src="js/members-pit.js?v=18"></script>
+<script src="js/members-pit.js?v=19"></script>
 <script src="js/oplog-pit.js?v=6"></script>
 <script src="js/news-pit.js?v=48"></script>
 <script src="js/launcher.js?v=34b8456a"></script>

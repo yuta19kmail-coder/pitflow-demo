@@ -714,7 +714,7 @@ function renderCardForm(c){
       c.boardId = bd;
       c.division = (bd === 'import') ? 'div2' : 'div1';
       _syncStaffToDivision(c);
-      if (window.PitDB) PitDB.save();
+      _cfSaveFor(c);
       renderCardForm(c);
       /* 描き直しで焦点が飛ぶので、次に打つ車種へ移す */
       const nx = document.querySelector('.cf-panel[data-tab="basic"] input[data-cn="car"]');
@@ -829,7 +829,7 @@ function cfLineClear(){
   const c = state.cards.find(x => x.id === _editingCardId);
   if (!c) return;
   c.lstepId = '';
-  if (window.PitDB) PitDB.save();
+  _cfSaveFor(c);
   renderCardForm(c);
 }
 window.cfLineClear = cfLineClear;
@@ -1485,7 +1485,7 @@ function _cfsLoanClashAsk(c, before){
     if (yes){ _cfsLoanAccept(c); return; }
     if (back) Object.keys(back).forEach(function (k) { c[k] = back[k]; });
     _cfsLoanAccept(c);
-    if (window.PitDB) PitDB.save();
+    _cfSaveFor(c);
     renderCardForm(c);
   });
 }
@@ -2233,7 +2233,7 @@ function cfMenuAddTpl(i){
   const cur = (c.menu || '').replace(/\s+$/, '');
   c.menu = cur ? (cur + '\n' + t) : t;
   if (ta) { ta.value = c.menu; ta.focus(); }
-  if (window.PitDB) PitDB.save();
+  _cfSaveFor(c);
 }
 window.cfMenuTplToggle = cfMenuTplToggle;
 window.cfMenuAddTpl = cfMenuAddTpl;
@@ -2300,7 +2300,7 @@ function _bindAutoKana(nameEl, kanaEl, c){
   nameEl.addEventListener('compositionend', function(){
     base = base + _toKatakana(comp); comp = '';
     kanaEl.value = base; c.kana = base;
-    if (window.PitDB) PitDB.save();
+    _cfSaveFor(c);
   });
   // 名前を空にしたらカナも空に（打ち直し時のゴミ防止）
   nameEl.addEventListener('input', function(){ if (!nameEl.value){ base = ''; comp = ''; kanaEl.value = ''; c.kana = ''; } });
@@ -2455,7 +2455,7 @@ window.cfAddVehicle = function(kind){
             /* 🔴 v2.103.0 担当は番号ごと引き継ぐ（名前だけだと、名簿の読み直しで前の人に戻る） */
             if (veh.frontStaff){ c.frontStaff=veh.frontStaff; c.frontStaffId=veh.frontStaffId||''; }
           }
-          if (window.PitDB) PitDB.save();
+          _cfSaveFor(c);
           renderCardForm(c);
           if (window.pitToast) pitToast(veh && veh.perVisit ? '都度車両変動で登録しました。今回の車種名を入力してください' : '新しい車を登録しました');
         }
@@ -2465,7 +2465,7 @@ window.cfAddVehicle = function(kind){
     /* 車両ごとの欄をぜんぶ空に（登録画面が使えない時の逃げ道） */
     c.plate=''; c.maker=''; c.car=''; c.karteNo='';
     c.drive=[]; c.perVisit=false; c.vehId='';
-    if(window.PitDB) PitDB.save();
+    _cfSaveFor(c);
     renderCardForm(c);
   });
 };
@@ -2499,10 +2499,10 @@ window.cfContactTel = function(i){
   c.contacts[i].tel=tel;
   const main=row.querySelector('.cf-tel-main'); if(main) main.value=tel;
   if(c.contacts[i].primary) c.tel=tel;
-  if(window.PitDB) PitDB.save();
+  _cfSaveFor(c);
 };
-window.cfContactLabel = function(i,val){ const c=_cfCard(); if(!c||!c.contacts[i]) return; c.contacts[i].label=val; if(window.PitDB) PitDB.save(); };
-window.cfContactSetPrimary = function(i){ const c=_cfCard(); if(!c||!c.contacts[i]) return; c.contacts.forEach(x=>x.primary=false); c.contacts[i].primary=true; c.tel=c.contacts[i].tel||''; if(window.PitDB) PitDB.save(); };
+window.cfContactLabel = function(i,val){ const c=_cfCard(); if(!c||!c.contacts[i]) return; c.contacts[i].label=val; _cfSaveFor(c); };
+window.cfContactSetPrimary = function(i){ const c=_cfCard(); if(!c||!c.contacts[i]) return; c.contacts.forEach(x=>x.primary=false); c.contacts[i].primary=true; c.tel=c.contacts[i].tel||''; _cfSaveFor(c); };
 window.cfContactAdd = function(){ const c=_cfCard(); if(!c) return; _cfEnsureContacts(c); c.contacts.push({tel:'',label:'',primary:false}); _cfRenderContacts(c); };
 window.cfContactDel = function(i){
   const c=_cfCard(); if(!c||!Array.isArray(c.contacts)) return;
@@ -2521,7 +2521,7 @@ window.cfContactsClose = function(){
     else if(!c.contacts.some(x=>x.primary)){ c.contacts[0].primary=true; }
     const pri=(c.contacts||[]).find(x=>x.primary);
     if(pri) c.tel=pri.tel||'';
-    if(window.PitDB) PitDB.save();
+    _cfSaveFor(c);
   }
   const m=document.getElementById('cf-contacts-modal'); if(m){ m.classList.remove('show'); m.innerHTML=''; }
   if(c) renderCardForm(c);
@@ -2697,7 +2697,13 @@ function conditionChips(c){
      （本番並みの件数・事務所のPCで1回 0.25〜0.45秒止まり、押した時と重なると待たされる）。
    ◎控え（この端末の書きかけ）は PitDB.save に相乗りして取っていた＝**控えは今までどおり取る**（pitKeepDraft）。
    ⚠ 新規予約の画面は下書き以外のデータ（代車の予定・顧客・設定）を書き換えない（2026-09-15 に確認）。
-      ここに下書き以外を書き換える処理を足す時は、そこで PitDB.save を呼ぶこと。 */
+      ここに下書き以外を書き換える処理を足す時は、そこで PitDB.save を呼ぶこと。
+   🔴🔴 v2.170.0（ゆうた報告 2026-10-11「新規予約で代車有や作業タイプを押すと数秒〜数十秒無反応。話を聞きながら予約できない」）
+      **v2.116.0 で直したのはバッジだけだった。**文字の欄・電話・ナンバー・時間・名前・代車の表など
+      **19か所はまだ PitDB.save を直接呼んでいた**＝打つ手を止めるたびに 0.5秒後、全データ（本番 7,333件）の見比べが走り、
+      **本番・速いPCで 1回 0.32〜0.36秒**画面が止まっていた（事務所のPCは数倍）。そこで押したバッジ・代車有が待たされていた。
+      → 19か所とも `_cfSaveFor(c)` に。⚠ 残す PitDB.save は「画面を閉じる時」（顧客控え・代車の同期＝カードの外を書く）だけ。
+      ⚠ この画面に保存を足す時は **PitDB.save ではなく _cfSaveFor(c)**（見張り＝test_draft_nosave） */
 function _cfSaveFor(c){
   if (c && c._draft){ try { if (window.pitKeepDraft) pitKeepDraft(); } catch (e) {} return; }
   if (window.PitDB) PitDB.save();
@@ -2877,7 +2883,7 @@ function bindCardFormEvents(root){
       if (el.type === 'number') v = v === '' ? null : Number(v);
       c[key] = v;
       if (_cardCheckOn) _cardMarkMisses(c, root);   // 入力したら、その項目の赤枠はその場で外れる
-      if (window.PitDB) PitDB.save();   // v0.83.1 入力を自動保存（従来は close/unload 任せで取りこぼし＝「保存されない」原因）
+      _cfSaveFor(c);   // v0.83.1 入力を自動保存（従来は close/unload 任せで取りこぼし＝「保存されない」原因）
       /* 🆕 v1.157.0（ゆうた指定）**打っている最中に、最短入庫日と緑の帯をリニアに動かす。**
          ⚠ ここで renderCardForm を呼ばないこと（焦点が飛んで数字が打てなくなる）。 */
       if (key === 'estHoldDays' || key === 'loanerFrom' || key === 'loanerTo'){
@@ -2904,7 +2910,7 @@ function bindCardFormEvents(root){
 
       function _applyChange(v){
       c[key] = v;
-      if (window.PitDB) PitDB.save();   // v0.83.1 変更を自動保存
+      _cfSaveFor(c);   // v0.83.1 変更を自動保存
       /* v1.8.0：担当を選んだら「誰か（メンバーの番号）」も一緒に持つ。
          ＝結婚などで名前が変わっても、過去のカードの担当が自動でついてくる。 */
       if (key === 'frontStaff' || key === 'reserveStaff' || key === 'completeCallStaff') {
@@ -2936,7 +2942,7 @@ function bindCardFormEvents(root){
       c.customer = [c.sei, c.mei].filter(Boolean).join(' ');
       c.kana = [c.seiKana, c.meiKana].filter(Boolean).join(' ');
       if (_cardCheckOn) _cardMarkMisses(c, root);
-      if (window.PitDB) PitDB.save();
+      _cfSaveFor(c);
     };
     ['sei', 'mei', 'seiKana', 'meiKana'].forEach(function(k){ if (segs[k]) segs[k].addEventListener('input', recompose); });
     _bindAutoKanaSeg(segs.sei, segs.seiKana, recompose);   // 姓→姓カナ
@@ -2951,7 +2957,7 @@ function bindCardFormEvents(root){
     if (window.pitTimeGuideBind){
       pitTimeGuideBind(timeWrap, {
         onInput:  function(v){ c.reserveTime = v; },                              // 打っている最中（保存しない）
-        onCommit: function(v){ c.reserveTime = v; if (window.PitDB) PitDB.save(); } // 確定（900→09:00 に整形済み）
+        onCommit: function(v){ c.reserveTime = v; _cfSaveFor(c); } // 確定（900→09:00 に整形済み）
       });
       return;
     }
@@ -2967,7 +2973,7 @@ function bindCardFormEvents(root){
       c.tel = [tg('.cf-tel-1'), tg('.cf-tel-2'), tg('.cf-tel-3')].filter(Boolean).join('-');
       if (mainEl) mainEl.value = c.tel;
       if (Array.isArray(c.contacts)){ const pri = c.contacts.find(x=>x.primary); if (pri) pri.tel = c.tel; }   // 代表連絡先も同期
-      if (window.PitDB) PitDB.save();
+      _cfSaveFor(c);
     };
     telEls.forEach((el, i) => {
       if (!el) return;
@@ -2989,7 +2995,7 @@ function bindCardFormEvents(root){
   // ナンバー：見た目は1BOX。クリック/フォーカスでガイドを開き、4項目を入力→c.plate に合成（半角スペース1つ＝揺れ防止）
   _bindPlateGuide(root.querySelector('.cf-plate'), function(v){
     c.plate = v;
-    if (window.PitDB) PitDB.save();
+    _cfSaveFor(c);
   });
 
   // v0.85.0 受付タイプ＝最大2つ選択（待/当/預）。主=dropType・副=dropType2。表示は「待or預」。
@@ -3163,7 +3169,7 @@ function bindCardFormEvents(root){
           c.menu = rest ? (rest + '\n' + line) : line;
         })();
         drag = null;
-        if (window.PitDB) PitDB.save();
+        _cfSaveFor(c);
         renderCardForm(c);   // 使用代車セレクト・日付欄・緑マスがすべて追従
         _cfsLoanClashAsk(c, _before);   /* 🆕 v2.127.0 予定と重なったら聞く（帯とマスが赤くなった画面の上で） */
       }, { once: true });
@@ -3201,7 +3207,7 @@ function bindCardFormEvents(root){
       c.loanerId = (c.loanerId === id) ? '' : id;     /* もう一度押すと選択解除 */
       const sel = root.querySelector('select[data-key="loanerId"]');
       if (sel) sel.value = c.loanerId;
-      if (window.PitDB) PitDB.save();
+      _cfSaveFor(c);
       pitLgSync(c);
       _cardReapplyCheck(root);
     });

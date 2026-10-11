@@ -252,19 +252,6 @@
       color: '#d6a846'
     };
   }
-  function _eventItem(e) {
-    /* ⚠ `FL_EVT_TYPES` は fleet.js の **const**＝`window.FL_EVT_TYPES` にはならない。
-       `w.FL_EVT_TYPES` で取ろうとすると必ず undefined になり、
-       **車検入庫の赤・12ヶ月点検の橙・リースアップの紫が全部あおに落ちる**（画面は出るので気づけない）。
-       ⚠ このファイルは fleet.js より**前**に読むので、読み込み時には居ない。呼ばれる時には居る。 */
-    var TY = (typeof FL_EVT_TYPES !== 'undefined') ? FL_EVT_TYPES : null;
-    var t = (TY && TY[e.type]) || null;
-    return {
-      kind: 'event', id: e.id, from: e.fromDate, to: e.toDate,
-      event: e, auto: !!e.auto,
-      memo: '', label: e.label || (t ? t.label : '予定'), color: t ? t.color : '#3b82f6'
-    };
-  }
   function _pick(items, opt) {
     if (opt && opt.kinds && opt.kinds.length) {
       items = items.filter(function (x) { return opt.kinds.indexOf(x.kind) >= 0; });
@@ -287,26 +274,13 @@
       if (!(a.fromDate <= to && a.toDate >= from)) return;
       out.push(_assignItem(a));
     });
-    /* 代車自身の予定（車検入庫・リースアップなど）＝いままでどおり fleetEvents */
-    arr(w.state && w.state.fleetEvents).forEach(function (e) {
-      if (!e || e.vehicleId !== loanerId) return;
-      if (!(e.fromDate <= to && e.toDate >= from)) return;
-      if (e.maint) return;   /* ⚠ v2.49.0 まで整備の枠もここに居た。**もうカードにある**ので拾わない */
-      /* 🔴🔴 v2.70.1（ゆうた報告 2026-09-05「整備の仕組みになる以前の車検の予定が代車カレンダーに残ってる」）
-         **アプリが勝手に作った予定（auto）は、もうどの画面にも出さない。**
-         ◎正体 … v1.12 のころ、車を保存するたびに「車検入庫（赤）」「12ヶ月点検（橙）」を
-           `fleetEvents` に自動で作っていた（`auto_<車id>_shakenIn` / `_tenken`）。
-           車両カレンダーは v2.46.0 で**画面側で** `!x.auto` として外したが、
-           **代車カレンダーは外していなかった**＝そこだけ古い車検の予定が残って見えていた。
-           しかも車を保存するたびに**作り直されて**いたので、消しても戻ってきた。
-         ◎いま … 作るのをやめた（fleet.js の `_flSyncVehEvent` を廃止）。
-           残っている古いぶんは `pitCleanupAutoVehEvents` が画面を開いた時に片付ける。
-         ⚠ ここで弾くのは**その片付けが回るまでの間**と、古い端末の控えのため。
-            画面側の `!x.auto` は**もう要らない**（物差しが1本で弾く）。
-         ⚠ 手で入れた「車検入庫」は auto が付かない＝**消えない**（人が入れたものは勝手に消さない）。 */
-      if (e.auto) return;
-      out.push(_eventItem(e));
-    });
+    /* 🔴🔴 v2.165.0（ゆうた指定 2026-10-11「窓ごとけしていい、古い方の予定も消えてほしい」）
+       **代車自身の予定（fleetEvents）は、もうどの画面にも出さない。手で入れたものも。**
+       ◎正体 … v1.12 のころの「＋ イベントを追加」の窓（車検入庫・12ヶ月点検・リースアップ・その他）。
+         いまは全部ほかが持っている＝車検・12点・一般・B.P は作業予定、リースアップは v2.106.0 のリース車両。
+         ここから車検を入れると**作業予定ボードにも完了の流れにも乗らない別の車検**ができていた。
+       ◎いま … 入れる窓を消した。残っているぶんは `pitCleanupAutoVehEvents` が画面を開いた時に片付ける。
+       ⚠ ここで読まないのは**その片付けが回るまでの間**と、古い端末の控えのため（物差しが1本で弾く・v2.70.1 の教訓）。 */
     /* 🔧 整備の枠＝予約カードの候補（v2.49.0）。
        🔴 **月の目標（候補が1本も無いカード）は日の軸には出ない**（配列が空なので自然に出ない）。
           縮尺が違うものを日のカレンダーに乗せると必ず破綻する（2026-08-31 の整理）。
@@ -617,9 +591,7 @@
 
   /* 期間にかかる「代車自身の予定」（車検入庫など）。貸出とは別に知らせたい時に使う */
   function eventsIn(loanerId, from, to) {
-    var list = arr(w.state && w.state.fleetEvents).filter(function (e) {
-      return e.vehicleId === loanerId && overlap(from, to, e.fromDate, e.toDate);
-    });
+    var list = [];   /* ⚠ v2.165.0 fleetEvents はもう読まない（_collect の注記） */
     /* 🏁 v2.106.0 リースアップ日から先にかかる貸出＝窓で「この代車自身の予定と重なります」と聞く（止めない） */
     var lv = _vehById(loanerId), le = leaseEnd(lv);
     if (le && le <= to) list.push({ id: 'lease_' + loanerId, vehicleId: loanerId, type: 'lease',

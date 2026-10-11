@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.164.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.165.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.164.0</div>
+    <div class="login-ver">v2.165.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.164.0</span>
+    <span class="ver">v2.165.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -719,37 +719,7 @@
   </div>
 </div>
 
-<!-- ===== 車両イベント 追加・編集ポップアップ ===== -->
-<div class="modal-backdrop" id="fleet-event-modal" onclick="if(event.target.id==='fleet-event-modal')flEventClose()">
-  <div class="modal-box fl-modal">
-    <div class="modal-head">
-      <div class="modal-title" id="flev-title">＋ イベントを追加</div>
-      <button class="modal-close" onclick="flEventClose()"><i data-ic=close data-ics=16></i></button>
-    </div>
-    <div class="modal-body">
-      <div class="fl-mform">
-        <label class="fl-mlb">車両 <select id="flev-vehicle" class="fl-in"></select></label>
-        <label class="fl-mlb">種別
-          <select id="flev-type" class="fl-in">
-            <option value="shakenIn">車検入庫（この期間で車検をやる）</option>
-            <option value="tenken">12ヶ月点検</option>
-            <option value="lease">リースアップ／新車切替</option>
-            <option value="other">その他（タイヤ交換・修理など）</option>
-          </select>
-        </label>
-        <label class="fl-mlb">内容（任意） <input id="flev-label" class="fl-in" placeholder="例：代車5 車検入庫／リースアップ→切替"></label>
-        <label class="fl-mlb">開始日 <input id="flev-from" type="date" class="fl-in"></label>
-        <label class="fl-mlb">終了日 <input id="flev-to" type="date" class="fl-in"></label>
-        <div class="fl-note">※ ここで入れたイベントは<b>代車カレンダー（利用ビュー）にも重ねて表示</b>されます。例：「この3日で代車5の車検」を先に押さえる。</div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-          <button class="vh-btn del" id="flev-del" style="display:none;margin-right:auto;border-color:var(--red);color:var(--red)" onclick="flEventDelete()"><i data-ic=trash data-ics=16></i> 削除</button>
-          <button class="vh-btn" onclick="flEventClose()">キャンセル</button>
-          <button class="vh-btn primary" onclick="flEventSubmit()"><i data-ic=save data-ics=16></i> 保存</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- 🗑 v2.165.0 車両イベントの窓（＋ イベントを追加）は廃止。作業予定とリース車両が持っている -->
 
 <!-- ===== カード詳細ポップアップ（各ビューからカードを開く時） =====
      🔴 v1.56.0（ゆうた指定）**予約を編集している間は、エリア外クリックで閉じない。**
@@ -788,7 +758,7 @@
 <script src="js/intern-pit.js?v=2"></script><!-- 🏢 v2.6.0 社内車両（中古・代車・内部）の物差し1本（区分マスター・実績化・参考の台数）。**card-detail.js / card-miss.js より前** -->
 <script src="js/sales-date.js?v=2"></script><!-- 💴 v1.185.0 「売上日」（整備ソフトの伝票が立った日）の物差し1本。完TEL日（ログ）とは別物・数字だけ引っ張る。state.js より後ろ、使う側（return-slot / card-view / return-popup / inspect-rules / quarter-match）より前 -->
 <script src="js/coreflow-loaner-remain.js?v=608d586a"></script><!-- 🚙 代車の残り日数と色（全アプリ共通・_shared から配布）。loaner-free.js より **前** に読むこと -->
-<script src="js/loaner-free.js?v=18"></script>
+<script src="js/loaner-free.js?v=19"></script>
 <script src="js/fleet-link.js?v=5"></script><!-- 🔗 v2.62.0 代車・自社車両とお客様の車の紐づけの物差し1本。使う側（customers / inspect-rules / maint-pit / fleet）より前に読む --><!-- 🔴 v1.80.0 代車の「空いているか」の物差し1本（引退・緊急・代車自身の車検を除く）。使う側（loaner / dashboard / mydash / card-detail / fleet）より前に読む -->
 <script src="js/theme.js?v=5"></script>
 <script src="js/sync-pit.js?v=4"></script>
@@ -873,9 +843,9 @@ window.PIT_DEMO = true;</script>
 <script src="js/shaken.js?v=37"></script>
 <script src="js/shaken-log.js?v=10"></script>
 <script src="js/outsource.js?v=5"></script>
-<script src="js/loaner.js?v=87"></script>
-<script src="js/maint-pit.js?v=23"></script><!-- 🔧 v2.44.0 代車作業予定ボード（月の目標＋飛び地の候補＋警告）。loaner-free.js より後ろ・fleet.js より前 -->
-<script src="js/fleet.js?v=52"></script>
+<script src="js/loaner.js?v=88"></script>
+<script src="js/maint-pit.js?v=24"></script><!-- 🔧 v2.44.0 代車作業予定ボード（月の目標＋飛び地の候補＋警告）。loaner-free.js より後ろ・fleet.js より前 -->
+<script src="js/fleet.js?v=53"></script>
 <script src="js/auth-pit.js?v=17"></script>
 <script src="js/members-pit.js?v=18"></script>
 <script src="js/oplog-pit.js?v=6"></script>

@@ -42,6 +42,7 @@
     mem: [],         /* ⑤ メモリ */
     pit: {},         /* ③ PitFlow の重い所 */
     pitSlow: [],     /* ③ そのうち 0.1 秒以上かかった1回ずつ */
+    link: [],        /* 🆕 v2.172.0 つながりの切れ・張り直し・全件の読み直し */
     labels: {}       /* 押した物の名前（時刻 → 名前） */
   };
   function now() { return Math.round(performance.now()); }
@@ -173,6 +174,24 @@
     wrap(w.PitDB, '_cloudFlush', '保存の見比べ(_cloudFlush)');
     wrap(w.PitDB, '_afterApply', '他の人の保存を受けて描き直し(_afterApply)');
     /* ⚠ PitDB.save は包まない（blank-cards.js が同じ所を包んで書きかけの控えを取っている＝二重にしない） */
+    /* 🆕 v2.172.0 つながりの見張りと、全件の読み直し（_resync＝全データをサーバーから取り直す）。
+       ⚠ _resync は通信を待つので、ここで測れるのは「呼ばれた回数と時刻」。重さは②（db-pit.js の then）に出る */
+    ['_resync', '_watch', '_scheduleRelink'].forEach(function (n) {
+      var f = w.PitDB[n]; if (typeof f !== 'function' || f.__perf) return;
+      var g = function () {
+        P.link.push({ at: now(), what: n, view: view() }); if (P.link.length > 200) P.link.shift();
+        return f.apply(this, arguments);
+      };
+      g.__perf = 1; w.PitDB[n] = g;
+    });
+    var sl = w.PitDB._setLink;
+    if (typeof sl === 'function' && !sl.__perf) {
+      w.PitDB._setLink = function (on, why) {
+        if (this._link !== on) { P.link.push({ at: now(), what: on ? 'つながった' : ('切れた：' + (why || '')), view: view() }); if (P.link.length > 200) P.link.shift(); }
+        return sl.apply(this, arguments);
+      };
+      w.PitDB._setLink.__perf = 1;
+    }
     ['showView', 'renderCardForm', 'cfSideHtml', 'renderToday', 'renderDashboard', 'renderFleet', 'renderLoaner',
      'pitInspectRun', 'upsertCustomerFromCard', 'pitSyncLoanerAssigns', 'renderCustomers', 'renderBoard', 'renderKanban']
       .forEach(function (n) { wrap(w, n); });
@@ -227,6 +246,7 @@
       丸ごと止まった: top(P.stalls, 'ms', 30),
       PitFlowの重い所: pit,
       PitFlowの重い所_1回ずつ: top(P.pitSlow, 'ms', 40),
+      つながり_読み直し: P.link.slice(-60),
       通信: net(),
       メモリ: P.mem.filter(function (x, i, a) { return i % Math.max(1, Math.floor(a.length / 30)) === 0; })
     };
@@ -240,7 +260,8 @@
     var worst = P.events.reduce(function (a, e) { return Math.max(a, e.total); }, 0);
     var slow = P.events.filter(function (e) { return e.total >= 500; }).length;
     var fr = P.frames.reduce(function (a, f) { return Math.max(a, f.ms); }, 0);
-    box.querySelector('.pf-s').textContent = '遅い操作 ' + slow + '回 ／ 最長 ' + (worst / 1000).toFixed(1) + '秒 ／ 止めた仕事 最長 ' + (fr / 1000).toFixed(1) + '秒';
+    var rs = P.link.filter(function (x) { return x.what === '_resync'; }).length;
+    box.querySelector('.pf-s').textContent = '遅い操作 ' + slow + '回 ／ 最長 ' + (worst / 1000).toFixed(1) + '秒 ／ 止めた仕事 最長 ' + (fr / 1000).toFixed(1) + '秒 ／ 全件読み直し ' + rs + '回';
   }
   function mount() {
     if (box || !d.body) return;
@@ -271,7 +292,7 @@
         aa.download = 'PitFlow測定_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json';
         d.body.appendChild(aa); aa.click(); aa.remove();
       }
-      if (a === 'clear') { P.events.length = 0; P.frames.length = 0; P.stalls.length = 0; P.pitSlow.length = 0; P.pit = {}; T0 = Date.now(); P.startedAt = new Date().toISOString(); try { performance.clearResourceTimings(); } catch (e2) {} paint(); }
+      if (a === 'clear') { P.events.length = 0; P.frames.length = 0; P.stalls.length = 0; P.pitSlow.length = 0; P.link.length = 0; P.pit = {}; T0 = Date.now(); P.startedAt = new Date().toISOString(); try { performance.clearResourceTimings(); } catch (e2) {} paint(); }
       if (a === 'off') { try { localStorage.removeItem(KEY); } catch (e3) {} box.remove(); box = null; }
     });
     d.body.appendChild(box);

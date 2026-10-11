@@ -843,21 +843,8 @@ function _loRenderDays(start, n){
         }
       }
       if (mtTitle) attrs += ' title="' + _loEsc(mtTitle) + '"';
-      // 車両イベント（車検・点検・修理等）の予定オーバーレイ＝日付枠で目立たせる（セル全体を色づけ＋ラベル）
+      /* 🗑 v2.165.0（ゆうた指定 2026-10-11）車両イベント（fleetEvents）の色帯は窓ごと廃止＝もう描かない */
       let ov = '', evCls = '';
-      const evs = day.events;
-      if (evs.length){
-        const e0 = evs[0], c0 = e0.color || '#3b82f6';
-        evCls = ' lo-evday';
-        ov += '<span class="lo-evbg" style="background:' + c0 + '22;box-shadow:inset 4px 0 0 ' + c0 + ',inset -4px 0 0 ' + c0 + '"></span>';
-        /* 🔴🔴 v2.72.1（ゆうた指定 2026-09-05）**ここも押せなくした。**
-           ⚠ v2.70.1 で一度「押すと直す・消せる」にしたが、**取り消した。**
-              🗣「代車カレンダー本体側からは修理系のイベントはさわれなくていい」
-              ＝ 貸出を入れる画面なので、押した先は**マスの通常の動き**であってほしい。
-           ⚠ 直す・消すのは**車両管理の月カレンダー**（そこでは今までどおり押せる）。 */
-        if (e0.isStart) ov += '<span class="lo-evt-tag" style="background:' + c0 + '">'
-          + '<i data-ic=wrench data-ics=16></i> ' + _loEsc(e0.label) + '</span>';
-      }
       /* 🏁 v2.106.0（ゆうた指定 2026-09-13）**リース車両＝リースアップ日の当日から先はグレー。**
          ⚠ 押せなくはしない（貸出は止めない＝入れようとした時に窓で「それでも登録しますか？」と聞く）。
          ⚠ 何の日かは物差し（loaner-free.js の leaseout）が答える。ここで日付を比べない。 */

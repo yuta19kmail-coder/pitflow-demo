@@ -553,7 +553,7 @@
        + '</div>';
 
     if (!cloud) {
-      h += '<div class="mb-warn"><i data-ic=info data-ics=15></i> いまはサンプルの名簿です。本番のアドレスで開くと CoreFlow の実メンバーになります。</div>';
+      h += '<div class="mem-warn"><i data-ic=info data-ics=15></i> いまはサンプルの名簿です。本番のアドレスで開くと CoreFlow の実メンバーになります。</div>';
     }
     /* v1.8.0：気づけるように、あぶない状態を先に出す */
     if (cloud) {
@@ -573,11 +573,11 @@
       if (other.length) warn.push('「その他」になっている人：' + esc(other.join('、')) +
         '。1課・2課・受付の人がここに入っていたら、CoreMembers の部署名を確認してください（名前に「1課」等が入っていないと判定できません）。');
       if (warn.length) {
-        h += '<div class="mb-warn mb-warn-check"><i data-ic=warn data-ics=15></i><div>' + warn.join('<br>') + '</div></div>';
+        h += '<div class="mem-warn mem-warn-check"><i data-ic=warn data-ics=15></i><div>' + warn.join('<br>') + '</div></div>';
       }
     }
     if (cloud && !canEdit) {
-      h += '<div class="mb-warn"><i data-ic=lock data-ics=15></i> 見るだけの権限です。変更できるのは PitFlow の役割が「管理」の人だけです。</div>';
+      h += '<div class="mem-warn"><i data-ic=lock data-ics=15></i> 見るだけの権限です。変更できるのは PitFlow の役割が「管理」の人だけです。</div>';
     }
 
     h += '<div class="mb-table-wrap"><table class="mb-table"><thead><tr>'
@@ -597,7 +597,7 @@
         : (s.isSelf ? '<span class="mb-div">1課・2課 共通</span>' : '<span class="mb-div is-none">未所属</span>');
       h += '<tr data-mid="' + esc(s.id) + '">'
         + '<td class="mb-c-name"><span class="mb-av">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="">' : esc((s.name || '？').slice(0, 2))) + '</span>'
-        + '<span class="mb-nm">' + esc(s.name)
+        + '<span class="mem-nm">' + esc(s.name)
         + ((s.realName && s.realName !== s.name) ? '<small class="mb-real">' + esc(s.realName) + '</small>' : '')
         + '</span>'
         + (s.isSelf ? '<span class="mb-login is-self" title="人ではなく自社そのもの。整備ソフト側で担当が「小林モータース」になっている分の受け皿です">自社</span>'

@@ -1,6 +1,12 @@
 /* ========================================
    members.css  -  メンバー画面（PitFlow）
    接頭辞は mb-。他の画面と当たらないようにしてある。
+   🔴 v2.169.0（ゆうた報告 2026-10-11「社長のハイエースだけ表紙印刷と日を決めるボタンが左につまってる」）
+      **代車作業予定ボード（maint-pit.js）も接頭辞が mb- だった。**名前が2つ当たっていた＝
+        ・.mb-warn … ボードの「警告」の行（mb-row mb-warn）に、ここの display:flex・枠・黄色の字が乗り、
+                     横並び（grid）が崩れてボタンが左に詰まっていた（警告の行だけ。v2.44.0 から）
+        ・.mb-nm   … ボードの車名の太さ（800）をここの 600 が上書きしていた／逆にボードの nowrap がここに乗っていた
+      → こちら側の2つを **mem-warn／mem-nm** に改名。⚠ 新しく足す名前は、ボードと当たらないか grep してから
    ======================================== */
 
 #members-body { padding: 0 4px 40px; }
@@ -21,7 +27,7 @@
 }
 .mb-openportal:hover{ border-color:#2ea567; color:#2ea567 }
 
-.mb-warn{
+.mem-warn{
   display:flex; align-items:center; gap:8px;
   background:rgba(234,179,8,.10); border:1px solid rgba(234,179,8,.35);
   color:#eab308; border-radius:var(--r); padding:10px 14px; margin-bottom:14px; font-size:12.5px;
@@ -52,7 +58,7 @@
   font-size:11px; font-weight:700; vertical-align:middle; flex:none;
 }
 .mb-av img{ width:100%; height:100%; object-fit:cover; display:block }
-.mb-nm{ font-weight:600 }
+.mem-nm{ font-weight:600 }
 
 .mb-sel{
   background:var(--bg3); color:var(--text); border:1px solid var(--border);
@@ -84,11 +90,11 @@
 .mb-div.is-none{ opacity:.55; }
 
 /* v1.7.0：通称の下に本名を小さく（違う時だけ） */
-.mb-table .mb-nm{ display:inline-flex; flex-direction:column; line-height:1.25; }
+.mb-table .mem-nm{ display:inline-flex; flex-direction:column; line-height:1.25; }
 .mb-table .mb-real{ font-size:10.5px; color:var(--text3); font-weight:400; }
 
 /* v1.8.0：見守り表示と、辞めた人の一覧 */
-.mb-warn-check{ align-items:flex-start; line-height:1.8; }
+.mem-warn-check{ align-items:flex-start; line-height:1.8; }
 .mb-former{ margin-top:16px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r); padding:14px; }
 .mb-former-h{ font-size:13px; font-weight:700; color:var(--text2); display:flex; align-items:center; gap:6px; margin-bottom:8px; }
 .mb-former-b{ display:flex; flex-wrap:wrap; gap:6px; }

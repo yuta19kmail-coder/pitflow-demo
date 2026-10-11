@@ -172,6 +172,43 @@
     return rows;
   }
 
+  /* ================= 🚙 v2.166.0 代車・社用車の整備の表紙 =================
+     🗣 ゆうた指定 2026-10-11「代車作業予定の各予定の看板に表紙を印刷を足したい。
+        候補日の場合はテキストエリアに一覧を入れて、確定日は記載しない。代車用の書式にしてほしい」
+     （確かめた答え）**今の様式を代車向けに直す**（専用の様式は作らない）／**確定していれば入庫日の欄に書く**
+     ◎お客様向けの欄は空ける＝お名前の「様」・初回/リピーター・受付タイプ・代車（有/無）・
+       管理費・条件・課・フロント・予約担当・予約受付日・TEL
+     ◎お名前欄＝車の名前（代車3／積載車）／車種欄＝メーカー＋車種（v1.26.0 の「表紙は素直に車種名」と同じ）／ナンバー
+     ◎入庫日＝確定の初日。確定が無ければ空欄にして、左の罫線に「候補日」を並べる
+     ⚠ 中身を決めるのは maint-pit.js（ボードの行）。ここは「渡された物を代車の形で刷る」だけ。 */
+  /* 様式の「様」（アウトライン・x292〜301・お名前の線の上）を白で隠す四角 */
+  var SAMA_MASK = { x: 289, y: 34, w: 15, h: 18 };
+  function fleetTokens(f){
+    var fx = f.fixed || null, pl = splitPlate(f.plate);
+    return {
+      name: f.name || '', maker: makerDisp(f.maker), car: f.car || '', plateA: pl.a, plateB: pl.b,
+      m: fx ? moN(fx.fromDate) : '', d: fx ? dayN(fx.fromDate) : '', dow: fx ? dows(fx.fromDate) : '',
+      time: '', tel: '', repeat: '', drop: '', loaner: '', loanerSpan: '', loanerCond: '', fee: '',
+      course: '', front: '', resStaff: '', bm: '', bd: '', bdow: ''
+    };
+  }
+  function fleetMemoRows(c, f){
+    var rows = String(c.menu || '').split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+    if (!f.fixed && (f.cands || []).length){
+      if (rows.length) rows.push(null);
+      rows.push('候補日');
+      f.cands.forEach(function(x){
+        rows.push('・' + mdDow(x.fromDate) + (x.toDate && x.toDate !== x.fromDate ? (' 〜 ' + mdDow(x.toDate)) : ''));
+      });
+    }
+    return rows;
+  }
+  function injectSamaMask(svg){
+    var b = SAMA_MASK;
+    return svg.replace(/<\/svg>\s*$/,
+      '<rect id="pcv-samamask" x="' + b.x + '" y="' + b.y + '" width="' + b.w + '" height="' + b.h + '" fill="#fff"/></svg>');
+  }
+
   /* ================= トークン → 値 ================= */
   function tokenMap(c){
     var pl = splitPlate(c.plate);
@@ -260,8 +297,8 @@
   }
 
   /* 罫線メモ用プレースホルダ <g>（実配置は印刷doc内スクリプト＝バッジの下から書き始め） */
-  function injectMemoPlaceholder(svg, c){
-    var rows = memoRows(c);
+  function injectMemoPlaceholder(svg, c, rowsOpt){
+    var rows = rowsOpt || memoRows(c);
     if (!rows.length) return svg;
     var g = '<g id="pcv-memo" data-x="'+MEMO_X+'" data-fs="'+MEMO_FS+'" '
           + 'data-w="'+MEMO_W+'" data-ind="'+MEMO_IND+'" '
@@ -424,18 +461,21 @@
     var raw = String(opts.formSvg || '');
     raw = ensureFont(raw);
     raw = tagCenterEls(raw);
-    var svg = fillTokens(raw, tokenMap(c));
+    var fl = opts.fleet || null;          /* 🚙 v2.166.0 代車・社用車の整備の表紙（上の fleetTokens） */
+    var svg = fillTokens(raw, fl ? fleetTokens(fl) : tokenMap(c));
     // 既存バッジ（黒塗り・白抜き）＋特殊バッジ（保証/保険＝黒字・黒枠のアウトライン）を1列に流し込む v0.116.0
     var badges = workBadges(c).map(function(t){ return {t:t,o:0}; })
                  .concat(specialBadges(c).map(function(t){ return {t:t,o:1}; }));
     svg = injectBadgePlaceholder(svg, badges);
-    svg = injectMemoPlaceholder(svg, c);
-    svg = injectLoanerFeeCheck(svg, c);   /* v1.40.0 代車ありなら管理費の四角にチェック */
+    svg = injectMemoPlaceholder(svg, c, fl ? fleetMemoRows(c, fl) : null);
+    if (fl) svg = injectSamaMask(svg);
+    else svg = injectLoanerFeeCheck(svg, c);   /* v1.40.0 代車ありなら管理費の四角にチェック */
     svg = injectResNo(svg, c);            /* v2.20.0 入庫日ボックスの右上に予約番号（小さく） */
-    if (c.earlyDiscount && opts.stampUri) svg = injectStamp(svg, opts.stampUri);
+    if (!fl && c.earlyDiscount && opts.stampUri) svg = injectStamp(svg, opts.stampUri);
 
     var vmark = opts.vmark ? '<div style="position:fixed;top:6px;left:8px;z-index:9999;background:#e11d48;color:#fff;font:700 12px/1.3 sans-serif;padding:3px 9px;border-radius:5px" data-noprint="1">'+esc(opts.vmark)+'</div><style>@media print{[data-noprint]{display:none!important}}</style>' : '';
-    return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>表紙 '+esc((window.pitCustName?pitCustName(c):c.customer)||'')+'様</title><style>'+CSS+'</style></head><body>'
+    var ttl = fl ? ('表紙 ' + (fl.name || '') + '（代車の整備）') : ('表紙 ' + ((window.pitCustName?pitCustName(c):c.customer)||'') + '様');
+    return '<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>'+esc(ttl)+'</title><style>'+CSS+'</style></head><body>'
       + vmark
       + '<div class="pcv-sheet">' + svg + '</div>'
       + '<script>' + layoutScript(!!opts.noPrint) + '<\/script>'
@@ -470,6 +510,18 @@
     // 印刷ダイアログを閉じた後にiframeを撤去（doc側onloadがprintを呼ぶ）
     try { f.contentWindow.onafterprint = function(){ setTimeout(function(){ try{ f.remove(); }catch(e){} }, 100); }; } catch(e){}
   }
+
+  /* 🚙 v2.166.0 代車・社用車の整備の表紙（呼ぶのは maint-pit.js の flMaintCover だけ）。
+     card＝整備カード（まだ無ければ車と作業から作った仮の形）／fleet＝{ name, maker, car, plate, cands, fixed } */
+  window.pitPrintFleetCover = function(card, fleet){
+    if (!card || !fleet){ if(window.pitToast) pitToast('印刷する予定が見つかりません', 'PF-8001'); return; }
+    ensureAssets().then(function(a){
+      openAndPrint(buildDoc(card, { formSvg:a.formSvg, fleet:fleet }));
+    }).catch(function(err){
+      if (window.pitToast) pitToast('表紙テンプレートを読み込めませんでした', 'PF-8002');
+      try{ console.error('[cover-print]', err); }catch(e){}
+    });
+  };
 
   window.pitPrintCover = function(cardId){
     var c = ((window.state&&state.cards)||[]).find(function(x){ return x.id === cardId; });

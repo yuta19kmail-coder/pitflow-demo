@@ -636,6 +636,9 @@
 
       if (r.msg) h += '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>';
       h += '</div><div class="mb-act">'
+        /* 🖨 v2.166.0（ゆうた指定 2026-10-11）表紙を印刷＝代車用の書式（cover-print.js の pitPrintFleetCover）。
+           ⚠ 実績に入った行（完了する待ち）には出さない＝もう紙は回っている */
+        + (r.doneReady ? '' : '<button class="vh-btn" onclick="flMaintCover(\'' + r.vehicleId + '\',\'' + r.groupId + '\')"><i data-ic=printer data-ics=16></i> 表紙を印刷</button>')
         /* 🔴 v2.53.0 実績に入ったら、ここが「完了する」に変わる（日を決める・取り下げは出さない） */
         + (r.doneReady
             ? '<button class="vh-btn mb-done" onclick="flMaintFinish(\'' + (r.card && r.card.id) + '\')"><i data-ic=check data-ics=16></i> 完了する</button>'
@@ -800,6 +803,28 @@
       label:(WORK_LB[work]||'') + ' ' + ym + (memoOf(c) ? '（' + memoOf(c) + '）' : '') }); } catch(e){}
     return c;
   }
+
+  /* 🖨 v2.166.0（ゆうた指定 2026-10-11）**ボードの行から表紙を印刷**（代車用の書式）。
+     ◎中身＝その行と同じ物（rows の1本）。カードがまだ無い目標（候補0本の車検など）は、車と作業から仮の形を作って刷る
+       ＝ 保存はしない（印刷のためにカードを作らない）。
+     ◎候補日＝**まだ来ていない候補だけ**（live）。確定していれば入庫日の欄に確定の初日、候補の一覧は出さない。 */
+  w.flMaintCover = function(vehId, gid){
+    var r = rows(today()).filter(function(x){ return x.vehicleId === vehId && x.groupId === gid; })[0];
+    if (!r){ if (w.pitToast) w.pitToast('この予定が見つかりません（画面を開き直してください）', 'PF-8001'); return; }
+    var v = r.veh;
+    var card = r.card || {
+      id: '', resNo: '', internKind: 'loanercar', workType: r.work, workTypes: [r.work],
+      menu: '', workSpecials: [], needLoaner: false
+    };
+    /* お名前欄＝車の名前（代車3／積載車）。車種は下の欄に出るので、「3 タント」の呼び名にすると2回書くことになる */
+    var nm = v.name || (r.isLoaner && vehNo(v) ? ('代車' + vehNo(v)) : '') || vehName(v);
+    if (w.pitPrintFleetCover) w.pitPrintFleetCover(card, {
+      name: nm, maker: v.maker || '', car: v.model || '', plate: v.plate || '',
+      cands: r.live, fixed: r.fixed
+    });
+    try { if (w.pitLog) w.pitLog('代車の作業予定の表紙を印刷した', { cardId: (r.card && r.card.id) || '', kind: 'loaner',
+      label: nm + ' ' + (r.workLabel || '') }); } catch(e){}
+  };
 
   /* 「日を決める」＝**いまもある「月をクリック → 日ビュー」をそのまま使う**（ゆうた指定 2026-08-31）。
      🔴 代車カレンダーへは飛ばさない。車両管理の中で完結させる。

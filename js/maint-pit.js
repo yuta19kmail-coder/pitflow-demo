@@ -927,6 +927,7 @@
     var kt = (lk && lk.veh && String(lk.veh.karteNo || '').trim()) || '';
     if (w.pitPrintFleetCover) w.pitPrintFleetCover(card, {
       name: nm, maker: v.maker || '', car: v.model || '', plate: v.plate || '', karteNo: kt,
+      lease: !!v.lease,   /* 🏁 v2.168.0 表紙に「リース車両」 */
       cands: r.live, fixed: r.fixed
     });
     try { if (w.pitLog) w.pitLog('代車の作業予定の表紙を印刷した', { cardId: (r.card && r.card.id) || '', kind: 'loaner',

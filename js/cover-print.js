@@ -197,7 +197,10 @@
     /* 🔗 v2.167.0（ゆうた指定 2026-10-11「リンク済みのカルテナンバーは表示したい」）
        紐づけたお客様の車のカルテNo を、ふつうの表紙と同じ「カルテNo：」で先頭に（1行空けて作業内容） */
     var kt = String(f.karteNo || '').trim();
-    if (kt){ rows = ['カルテNo：' + kt].concat(rows.length ? [null] : [], rows); }
+    /* 🏁 v2.168.0（ゆうた指定 2026-10-11「リース車両の場合はリース車両という記述を出して」）
+       リース車両は紐づけが無い（v2.106.0）＝カルテNo の場所に「リース車両」 */
+    var head = f.lease ? 'リース車両' : (kt ? ('カルテNo：' + kt) : '');
+    if (head){ rows = [head].concat(rows.length ? [null] : [], rows); }
     if (!f.fixed && (f.cands || []).length){
       if (rows.length) rows.push(null);
       rows.push('候補日');
@@ -516,7 +519,7 @@
   }
 
   /* 🚙 v2.166.0 代車・社用車の整備の表紙（呼ぶのは maint-pit.js の flMaintCover だけ）。
-     card＝整備カード（まだ無ければ車と作業から作った仮の形）／fleet＝{ name, maker, car, plate, karteNo, cands, fixed } */
+     card＝整備カード（まだ無ければ車と作業から作った仮の形）／fleet＝{ name, maker, car, plate, karteNo, lease, cands, fixed } */
   window.pitPrintFleetCover = function(card, fleet){
     if (!card || !fleet){ if(window.pitToast) pitToast('印刷する予定が見つかりません', 'PF-8001'); return; }
     ensureAssets().then(function(a){

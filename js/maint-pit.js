@@ -596,7 +596,8 @@
       } else {
         h += '<span class="mb-due">' + esc(ymText(p.months[0])) + ' の予定</span>';
         if (p.slipped) h += '<span>→</span><span class="mb-due">' + esc(ymText(p.ym)) + ' へ繰り越し</span>';
-        if (r.memo) h += '<span>' + esc(r.memo) + '</span>';
+        /* ⚠ v2.167.0 作業内容は下の「内容」の行に全部出す＝ここは古い「ひとことメモ」（menu が無いカード）だけ */
+        if (r.memo && !(r.card && String(r.card.menu || '').trim())) h += '<span>' + esc(r.memo) + '</span>';
       }
       h += '</div>';
 
@@ -633,6 +634,18 @@
       });
       if (!r.fixed) h += '<span class="mb-chip add" onclick="flMaintGoto(\'' + r.vehicleId + '\',\'' + p.ym + '\')">＋ 候補を置く</span>';
       h += '</span></div>';
+
+      /* 3行目＝作業内容（依頼事項）
+         🔴 v2.167.0（ゆうた指摘 2026-10-11「入力した代車の修理予定から依頼事項とかを確認する部分、
+            そしてそれを修正する部分がないよね？」）＝**足した後に見る所も直す所も無かった。**
+         ⚠ 改行は「／」でつないで1行に（ボードの行の高さをそろえる）。全部は title と「直す」の窓で見られる。
+         ⚠ 実績に入った行（完了する待ち）は直させない＝もう済んだ作業の記録 */
+      var _mn = r.card ? String(r.card.menu || '').trim() : '';
+      h += '<div class="mb-line mb-menu"><span>内容</span>'
+         + (_mn ? '<span class="mb-menu-t" title="' + esc(_mn) + '">' + esc(_mn.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean).join(' ／ ')) + '</span>'
+                : '<span class="mb-menu-t none">まだ入っていません</span>')
+         + (r.doneReady ? '' : '<span class="mb-chip add" onclick="flMaintEdit(\'' + r.vehicleId + '\',\'' + r.groupId + '\')">✎ ' + (_mn ? '直す' : '入れる') + '</span>')
+         + '</div>';
 
       if (r.msg) h += '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>';
       h += '</div><div class="mb-act">'
@@ -735,6 +748,97 @@
     flMaintClose(); if (w.renderFleet) w.renderFleet();
   };
 
+  /* ==================================================================
+     ✎ v2.167.0 足した予定の中身を見る・直す（ゆうた指摘 2026-10-11）
+     🗣「入力した代車の修理予定から、依頼事項とかを確認する部分、そしてそれを修正する部分がないよね？」
+     ◎窓の形は「予定を足す」と同じ（作業の札・作業内容・テンプレ）。車は変えられない（変えたいなら取り下げて足し直す）
+     🔴 直せる範囲は行の生まれで分ける
+        ・手で足した予定（修理・B.P など）… 作業・いつまでに・作業内容
+        ・計算で出る目標（車検・12点）……… **作業内容だけ**。作業や月を変えると目標とカードが噛み合わなくなる（planHit）
+     ⚠ カードがまだ無い目標に内容を入れた時だけ、カードを1枚作る（候補を置いた時と同じ newMaintCard・同じ月）
+     ================================================================== */
+  function rowOf(vehId, gid){
+    return rows(today()).filter(function(x){ return x.vehicleId === vehId && x.groupId === gid; })[0] || null;
+  }
+  w.flMaintEdit = function(vehId, gid){
+    var r = rowOf(vehId, gid);
+    if (!r){ if (w.pitToast) w.pitToast('この予定が見つかりません（画面を開き直してください）', 'PF-8001'); return; }
+    var c = r.card, p = r.plan, manual = !!p.manualId;
+    var td = today();
+    _mbaWork = (c && c.workType) || r.work;
+    var curYm = (c && c.maintYm) || p.ym;
+    var yms = [];
+    for (var i = 0; i < 7; i++) yms.push(ymAdd(ymOf(td), i));
+    if (yms.indexOf(curYm) < 0) yms.unshift(curYm);   /* 過ぎた月（繰り越し中）でも今の値を選べるように */
+    var ymOpts = yms.map(function(y){
+      return '<option value="' + y + '"' + (y === curYm ? ' selected' : '') + '>' + y.replace('-', '年') + '月</option>';
+    }).join('');
+    _modal(
+      '<h3 class="lo-modal-h"><i data-ic=wrench data-ics=16></i> 作業予定の内容</h3>'
+      + '<div class="mba-body" id="mba-body">'
+      + '<div class="lo-modal-row">'
+      + '<div class="lo-modal-f"><span>車両</span><b>' + esc(vehName(r.veh)) + '</b></div>'
+      + (manual
+          ? '<label class="lo-modal-f">いつまでに<select id="mba-ym">' + ymOpts + '</select></label>'
+          : '<div class="lo-modal-f"><span>いつまでに</span><b>' + esc(p.dueDate ? ('満了 ' + p.dueDate) : ymText(p.ym)) + '</b></div>')
+      + '</div>'
+      + (manual
+          ? '<div class="lo-modal-f"><span>作業</span><div class="cf-chips" id="mba-work">' + workChips() + '</div></div>'
+          : '<div class="lo-modal-f"><span>作業</span><b>' + esc(r.workLabel) + '</b></div>')
+      + '<div class="lo-modal-f"><span>作業内容</span>'
+      +   '<textarea class="cf-input" data-key="menu" id="mba-menu" rows="5" placeholder="下の札やテンプレから選べます">'
+      +     esc((c && c.menu) || '') + '</textarea>'
+      +   (w.WorkContent ? w.WorkContent.builderHtml() : '')
+      + '</div>'
+      + '</div>'
+      + '<div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
+      + '<button class="primary" onclick="flMaintEditSave(\'' + vehId + '\',\'' + gid + '\')">保存</button></div>'
+    );
+    if (w.WorkContent){
+      try { w.WorkContent.setHost('mba-body'); if (w.WorkContent.mount) w.WorkContent.mount(); } catch(e){}
+    }
+    if (w.icHydrate){ try { w.icHydrate(document.getElementById('mb-modal')); } catch(e){} }
+  };
+  w.flMaintEditSave = function(vehId, gid){
+    var r = rowOf(vehId, gid);
+    if (!r){ flMaintClose(); if (w.renderFleet) w.renderFleet(); return; }
+    var g = function(id){ var e = document.getElementById(id); return e ? e.value : ''; };
+    var manual = !!r.plan.manualId;
+    var menu = String(g('mba-menu') || '').trim();
+    var work = manual ? _mbaWork : r.work;
+    var ym = manual ? (g('mba-ym') || (r.card && r.card.maintYm) || r.plan.ym) : '';
+    if (!work){ w.pitAlert('作業を選んでください', { code:'PF-3069',
+      detail:'車検・12点・一般・B.P のどれか1つを押してください。' }); return; }
+    /* 足す時と同じ決めごと（v2.67.0）＝一般・B.P は何の作業か名前から分からないので内容が要る */
+    if (!menu && (work === 'general' || work === 'bp')){
+      w.pitAlert('作業内容を入れてください', { code:'PF-3051',
+        detail:'あとで見た人が「何の作業か」分かるように、下の札やテンプレから1つ以上入れてください。' });
+      return;
+    }
+    var c = r.card;
+    if (!c){
+      if (!menu){ flMaintClose(); return; }           /* 何も入れていない＝カードを作らない */
+      c = newMaintCard(vehId, r.work, r.plan.ym, { menu: menu });
+    } else {
+      var before = String(c.menu || '');
+      var ch = [];
+      if (before.trim() !== menu){ c.menu = menu; ch.push('作業内容'); }
+      if (manual && c.workType !== work){
+        c.workType = work;
+        c.workTypes = [work].concat(arr(c.workTypes).filter(function(x){ return x !== work && x !== r.work; }));
+        ch.push('作業 ' + (WORK_LB[r.work] || r.work) + '→' + (WORK_LB[work] || work));
+      }
+      if (manual && ym && c.maintYm !== ym){ ch.push('いつまでに ' + ymText(c.maintYm) + '→' + ymText(ym)); c.maintYm = ym; }
+      if (!ch.length){ flMaintClose(); return; }
+      if (!Array.isArray(c.log)) c.log = [];
+      c.log.push({ label: '代車の作業予定を直した（' + ch.join('・') + '）', at: Date.now() });
+      try { if (w.pitLog) w.pitLog('代車の作業予定を直した', { cardId: c.id, kind: 'loaner',
+        label: vehName(r.veh) + ' ' + ch.join('・') }); } catch(e){}
+    }
+    saveCards();
+    flMaintClose(); if (w.renderFleet) w.renderFleet();
+  };
+
   /* 🔴 v2.49.0（ゆうた確定）取り下げ＝**カードごと消去する。**
      🗣「消去する」
      ⚠ 代車の整備予定は売上も来店履歴も持たないので、予約キャンセルで残しても読む人がいない。
@@ -818,8 +922,11 @@
     };
     /* お名前欄＝車の名前（代車3／積載車）。車種は下の欄に出るので、「3 タント」の呼び名にすると2回書くことになる */
     var nm = v.name || (r.isLoaner && vehNo(v) ? ('代車' + vehNo(v)) : '') || vehName(v);
+    /* 🔗 v2.167.0 紐づけたお客様の車のカルテNo（車両管理のスペック表と同じ pitFleetLinkTarget 1本） */
+    var lk = (!v.lease && w.pitFleetLinkTarget) ? w.pitFleetLinkTarget(v) : null;
+    var kt = (lk && lk.veh && String(lk.veh.karteNo || '').trim()) || '';
     if (w.pitPrintFleetCover) w.pitPrintFleetCover(card, {
-      name: nm, maker: v.maker || '', car: v.model || '', plate: v.plate || '',
+      name: nm, maker: v.maker || '', car: v.model || '', plate: v.plate || '', karteNo: kt,
       cands: r.live, fixed: r.fixed
     });
     try { if (w.pitLog) w.pitLog('代車の作業予定の表紙を印刷した', { cardId: (r.card && r.card.id) || '', kind: 'loaner',

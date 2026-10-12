@@ -724,6 +724,9 @@
   background:var(--bg3); color:var(--text2); border:1px solid var(--border); white-space:nowrap;
 }
 .tag-side.consult{ background:rgba(234,179,8,.15); color:#a16207; border-color:#eab308; }
+/* 🆕 v2.179.0 受付タイプの待・当（空きカレンダーの入庫一覧）。色はタスクボードのカードと同じ＝待 黄・当 青 */
+.tag-side.wait{ background:rgba(245,158,11,.14); color:#d97706; border-color:#f59e0b; }
+.tag-side.sameDay{ background:rgba(59,130,246,.12); color:#2563eb; border-color:#3b82f6; }
 .tag-side.loaner{ background:rgba(245,158,11,.12); color:#b45309; border-color:#f59e0b; }
 .tag-side.wash{ background:rgba(59,130,246,.1); color:#2563eb; border-color:#3b82f6; }
 /* 洗車 済＝他ビューと同じ赤い「済」スタンプを右上角に v0.123.3 */

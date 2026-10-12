@@ -329,7 +329,7 @@
       /* 🔴 v2.54.0 「再2」の吹き出しに**落ちた理由（1行メモ）**を出す（ゆうた指定）。
          ⚠ 画面には出さない＝この列は1行しか無いので、字を増やすと車名が消える。読むのは吹き出しで。 */
       var rcA=(s.history||[]).filter(function(x){return x.result==='recheck';});
-      var rcTip='不合格 '+rcA.length+'回\n'+rcA.map(function(x){ return fmtMD(x.date)+' '+(x.slot==='pm'?'PM':'AM')+(x.note?'：'+x.note:''); }).join('\n');
+      var rcTip='不合格 '+rcA.length+'回\n'+rcA.map(function(x){ return fmtMD(x.date)+' '+(x.slot==='pm'?'PM':'AM')+((window.pitShakenHistNote?pitShakenHistNote(x):x.note)?'：'+(window.pitShakenHistNote?pitShakenHistNote(x):x.note):''); }).join('\n');
       /* 🔴 v2.56.0 「再1」→「不合格1」。数は物差しで数える（画面で数え直さない） */
       var rcN=window.pitShakenReCount?pitShakenReCount(s):rcA.length;
       var post=rcN?['不合格'+rcN]:[];

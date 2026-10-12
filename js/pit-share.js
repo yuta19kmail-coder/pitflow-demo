@@ -1499,6 +1499,18 @@ w.pitDivisionColor = pitDivisionColor;
   }
   w.pitShakenReCount = pitShakenReCount;
 
+  /* 🆕 v2.175.0（ゆうた指定 2026-10-12）**車検の記録1行の「落ちた理由」は、ここ1本で読む。**
+     ◎正体＝理由の欄の名前が2つあった。
+       ・ふだんの道（車検予定・予約詳細・MHS）… `note`
+       ・マスター入力（v2.99.0〜）……………… `why`
+       ＝ マスター入力で入れた理由は、**車検履歴・カード詳細・車検ラインに1度も出ていなかった**。
+     🔴 これからマスター入力も `note` に書く（開いた時に `why` を `note` へ移す）。
+        **もう入っている `why` は消えずに残るので、読む側はここを通して両方を見る。** */
+  function pitShakenHistNote(h){
+    return String((h && (h.note || h.why)) || '').replace(/[\r\n\t]+/g, ' ').trim();
+  }
+  w.pitShakenHistNote = pitShakenHistNote;
+
   /* 🔴 v2.56.0 その完了が「再検合格」か。
      ⚠ **完了の記録に付ける印**であって、履歴には積まない
         （積むと、同じ日に「完了の行」と「履歴の行」が2つ出る）。 */
@@ -1764,7 +1776,7 @@ w.pitDivisionColor = pitDivisionColor;
           r2.officeName = r2.office ? String(q.officeName || r2.officeName || '') : '';
         }
         if (q.round != null){ var rn = Number(q.round || 0); r2.round = (rn >= 1 && rn <= 4) ? rn : 0; }
-        if (q.note != null) r2.note = String(q.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
+        if (q.note != null){ r2.note = String(q.note).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120); delete r2.why; }   /* 🆕 v2.175.0 古い欄名（マスター入力の why）は片づける */
         s.history[ix] = r2;
         return { insp: s, act: act,
                  log: '車検 不合格の記録を直した ' + _shkMD(r2.date) + ' ' + _shkSlotT(r2.slot)

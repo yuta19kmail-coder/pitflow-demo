@@ -39,7 +39,7 @@
         repass:(window.pitShakenIsRepass?pitShakenIsRepass(s):!!s.repass), note:s.repassNote||''}); }
       /* 🔴 v2.54.0 再検の理由（1行）も一緒に持ってくる＝吹き出しと検索で使う */
       (s.history||[]).forEach(function(h){ if(h&&h.result==='recheck'&&h.date) out.push({iso:h.date, slot:h.slot==='pm'?'pm':'am', c:c, result:'recheck', staff:h.staff||'',
-        staff2:(h.staff2&&h.staff2!==h.staff)?h.staff2:'', staff2Note:h.staff2Note||'', note:h.note||''}); });
+        staff2:(h.staff2&&h.staff2!==h.staff)?h.staff2:'', staff2Note:h.staff2Note||'', note:(window.pitShakenHistNote?pitShakenHistNote(h):(h.note||''))}); });
     });
     return out;
   }

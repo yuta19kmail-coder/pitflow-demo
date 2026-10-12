@@ -137,8 +137,10 @@
       if (!t(x.date)) stop.push('車検の ' + n + '回目の日が空です');
       if (t(x.date) && rd && t(x.date) < rd) stop.push('車検の ' + n + '回目（' + x.date + '）が、入庫日より前です');
       if (t(x.date) && rf && t(x.date) > rf) stop.push('車検の ' + n + '回目（' + x.date + '）が、確定返車日より後です');
-      if (x.result === 'pass' && t(x.why)) stop.push('車検の ' + n + '回目は合格なのに、落ちた理由が入っています');
-      if (x.result !== 'pass' && !t(x.why)) warn.push('車検の ' + n + '回目に、落ちた理由が入っていません');
+      /* 🆕 v2.175.0 理由は pit-share.js の pitShakenHistNote 1本で読む（note／古い why の両方） */
+      var _why = w.pitShakenHistNote ? w.pitShakenHistNote(x) : t(x.note || x.why);
+      if (x.result === 'pass' && _why) stop.push('車検の ' + n + '回目は合格なのに、落ちた理由が入っています');
+      if (x.result !== 'pass' && !_why) warn.push('車検の ' + n + '回目に、落ちた理由が入っていません');
     });
     if (s2.result === 'done' && hist.length && hist[hist.length-1].result === 'recheck')
       stop.push('車検は「終わった（合格）」なのに、最後の記録が不合格のままです');
@@ -315,15 +317,21 @@
   function hist(){
     if (!M.inspSchedule) M.inspSchedule = { mode:'manual', slots:{}, history:[] };
     if (!Array.isArray(M.inspSchedule.history)) M.inspSchedule.history = [];
+    /* 🆕 v2.175.0（ゆうた指定 2026-10-12）**理由は `note` に書く**（ふだんの道と同じ欄）。
+       ⚠ 前は `why` に書いていて、車検履歴・カード詳細・車検ラインに理由が出ていなかった。
+          開いた時に古い `why` を `note` へ移す（読む側は pitShakenHistNote で両方見ている）。 */
+    M.inspSchedule.history.forEach(function(x){
+      if (x && x.why != null){ if (!t(x.note)) x.note = x.why; delete x.why; }
+    });
     return M.inspSchedule.history;
   }
-  w.pitMasterShkAdd = function(){ hist().push({ date:'', slot:'am', round:'', staff:'', result:'recheck', why:'' }); render(); };
+  w.pitMasterShkAdd = function(){ hist().push({ date:'', slot:'am', round:'', staff:'', result:'recheck', note:'' }); render(); };
   w.pitMasterShkDel = function(i){ hist().splice(i, 1); render(); };
   w.pitMasterShkSet = function(i, k, v){
     var a = hist(); if (!a[i]) return;
     a[i][k] = v;
     /* 🔴 合格にしたら理由は消す（残すと「合格なのに理由がある」を自分で作る＝ゆうた指定） */
-    if (k === 'result' && v === 'pass') a[i].why = '';
+    if (k === 'result' && v === 'pass') a[i].note = '';
     /* 👥 v2.113.0 2人目を外したら理由も消す／1人目と同じ人なら2人目は無し（揃え方は物差し1本） */
     if ((k === 'staff' || k === 'staff2' || k === 'staff2Note') && w.pitShakenStaff2Norm){
       var n2 = w.pitShakenStaff2Norm(a[i].staff, a[i].staff2, a[i].staff2Note);
@@ -655,8 +663,8 @@
         /* 🔴 ゆうた指定＝理由は合格なら出さない（不合格・再検合格の時だけ入れられる） */
         + (x.result === 'pass'
             ? '<div class="ms-hint" style="align-self:center">（合格なので理由はありません）</div>'
-            : '<input value="' + esc(x.why) + '" placeholder="落ちた理由・ひとこと"'
-              + ' onchange="pitMasterShkSet(' + i + ',\'why\',this.value)">')
+            : '<input value="' + esc(w.pitShakenHistNote ? w.pitShakenHistNote(x) : (x.note || x.why || '')) + '" placeholder="落ちた理由・ひとこと"'
+              + ' onchange="pitMasterShkSet(' + i + ',\'note\',this.value)">')
         + '<button class="ms-x" title="この記録を消す" onclick="pitMasterShkDel(' + i + ')">✕</button></div>';
     });
     if (!hs.length) h += '<div class="ms-hint">まだ1件もありません。</div>';

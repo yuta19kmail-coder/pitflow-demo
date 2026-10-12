@@ -1053,11 +1053,22 @@ function _cfsDayListHtml(c){
     const badge = front || divL || '—';
     const car = (x.car || '').trim();   // v0.84.1 メーカーは出さない＝車種のみ
     const nm = ((window.pitCustSurname ? pitCustSurname(x) : (x.customer||'')) || '（未入力）');   // v0.86.1 名字だけ（法人はフル）
+    /* 🆕 v2.178.0（ゆうた指定 2026-10-12）**待・当・相談だけバッジで出す。預かりは出さない。**
+       🗣「預りはそのまま非表示で、待ちと当返を 待 当 相談 だけバッチ化して表示するようにしてほしい」
+       ＝ その日に「お客様が来て待つ／その日に返す／相談で来る」車＝接客の時間が読める車だけ目立たせる。
+       ⚠ 文字は受付タイプの表（state.dropTypes）から引く。色はタスクボードのカードと同じ（待＝黄・当＝青）。 */
+    const _DLC = { wait:'#f59e0b', sameDay:'#3b82f6' };
+    const _dts = [x.dropType, x.dropType2].filter(function(id, i, a){ return _DLC[id] && a.indexOf(id) === i; });
+    const marks = _dts.map(function(id){
+      const d = (state.dropTypes || []).find(function(o){ return o.id === id; });
+      return '<span class="dl-mk" style="background:'+_DLC[id]+'22;color:'+_DLC[id]+';border-color:'+_DLC[id]+'66"'
+           + (d && d.desc ? ' title="'+_pe(d.desc)+'"' : '') + '>'+_pe(d ? d.label : (id === 'wait' ? '待' : '当'))+'</span>';
+    }).join('') + (x.consult ? '<span class="dl-mk dl-mk-consult" title="見積相談">相談</span>' : '');
     return '<div class="dl-ev'+(imp?' imp':'')+(isHl?' hl':'')+'">'
       + '<div class="dl-top"><span class="dl-time">'+_pe(t||'—')+'</span>'
       + '<span class="dl-badge'+(front?'':(divL?' is-div':' is-none'))+'" style="background:'+_pe(badgeBg)+'"'
       + (divL ? ' title="担当者はまだ決まっていません（'+_pe(divL)+'）"' : '')
-      + '>'+_pe(badge)+'</span></div>'
+      + '>'+_pe(badge)+'</span>'+marks+'</div>'
       + '<div class="dl-line">'+_pe(nm)+' 様 <span class="dl-car">'+_pe(car)+'</span></div></div>';
   }
   function col(list, isRet){

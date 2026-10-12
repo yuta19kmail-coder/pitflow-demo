@@ -8,7 +8,8 @@
       「いつ返す予定か」は **_shared/coreflow-return-plan.js の1本**（確定→未完→暫定→待・当の入庫日）。
       ⚠ 返車カレンダー・当日ビューは今までどおり「確定だけ」。**物差しが違う。混ぜない。**
      ② 今週の洗車予定  ＝翌営業日より後〜今週末(日曜)の洗車。**返車日が決まっていない車も同じ並びに混ぜる**（v1.152.0）
-     🚙 v2.173.0 ①②に**代車**も出す（次に出す日の前の営業日に洗う。戻っていなければグレー）＝ _csLoanerWash
+     🚙 v2.173.0 ①に**代車**も出す（次に出す日の前の営業日に洗う。戻っていなければグレー）＝ _csLoanerWash
+        🔴 v2.180.0 ②（今週の洗車予定）には代車を出さない＝お客様の車だけ（ゆうた 2026-10-12）
      ③ 車検ヘッドライト磨き ＝headlight フラグ（受注時に車検車へ設定）
      ④ コーティング・その他依頼 ＝**受注が取れたぶん**（v2.51.0）。依頼メモもここに出す
      ⑤ 直近1か月のコーティング・その他予定 ＝**まだ受注前のぶん**（v2.51.0）
@@ -286,8 +287,10 @@ function renderCarSales(){
     put('1か月の予定', coatPlan);
   })();
 
-  /* 🚙 v2.173.0 洗う代車（今週日曜まで）。条件は _csLoanerWash の1本 */
-  const loWash = _csLoanerWash(todayStr, sun);
+  /* 🚙 v2.173.0 洗う代車。条件は _csLoanerWash の1本
+     🔴 v2.180.0（ゆうた 2026-10-12「今週の洗車予定は非表示でOK。今日明日には代車も含めて出す。今週は客の車だけ」）
+     ＝ 代車は**今日・明日の段だけ**。拾う範囲も翌営業日まで（今週の洗車予定には出さない） */
+  const loWash = _csLoanerWash(todayStr, nextBiz);
 
   let h = '<div class="cs-cols">';
 
@@ -325,14 +328,10 @@ function renderCarSales(){
   {
     const weekAll = washWeek.concat(washNoDate);
     const sw = split(weekAll.sort(sortDate), 'washSalesDone');
-    /* 🚙 v2.173.0 代車（洗う日が翌営業日より後〜今週日曜）。お客様の車と同じ並びに、洗う日の順で混ぜる */
-    const loW = loWash.filter(x => x.washDay > nextBiz).sort(_csLoSort);
-    const rows = sw.open.map(c => ({ k: String(_wd(c) || '9999'), h: _csCard(c,'wash',_csWashLabel(c),'今週の洗車') }))
-      .concat(loW.filter(x => !_csLoWashDone(x.a)).map(x => ({ k: x.washDay, h: _csLoItem(x) })));
-    rows.sort((p, q) => p.k.localeCompare(q.k));   /* 同じ日の中は元の並びのまま（安定ソート） */
-    let bodyHtml = rows.length ? rows.map(r => r.h).join('') : '<div class="cs-empty">なし</div>';
-    const doneHtml = sw.done.map(c=>_csDoneCard(c,'wash')).join('')
-      + loW.filter(x => _csLoWashDone(x.a)).map(_csLoDoneItem).join('');
+    /* 🔴 v2.180.0（ゆうた 2026-10-12「今週の洗車予定は非表示でOK。今日明日には代車も含めて出す。今週は客の車だけ」）＝ここは**お客様の車だけ**（代車は出さない） */
+    let bodyHtml = (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csWashLabel(c),'今週の洗車')).join('')
+                                   : '<div class="cs-empty">なし</div>');
+    const doneHtml = sw.done.map(c=>_csDoneCard(c,'wash')).join('');
     h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '〜今週日曜（暫定・未完・未定も一緒に）', bodyHtml, doneHtml);
   }
   // ③ 車検ヘッドライト磨き

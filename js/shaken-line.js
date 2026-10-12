@@ -36,7 +36,8 @@
   function isShaken(c){ return window.pitIsShaken ? pitIsShaken(c) : ((c.workTypes||[]).indexOf('shaken')>=0 || c.workType==='shaken'); }
   function teamOf(c){ return (window.pitTeamKey?pitTeamKey(c):((c&&c.boardId==='import')?'import':'default')); }
   function teamLabel(t){ return t==='import' ? '輸入' : '国産'; }
-  function staffOf(n){ return n ? (window.pitStaffShort?pitStaffShort(n):n) : '（未記録）'; }
+  /* 🔴 v2.176.0（ゆうた指定 2026-10-12）担当は**通称**（無ければ姓）＝ pit-share.js の pitStaffCall 1本。車検履歴と同じ */
+  function staffOf(n){ return n ? (window.pitStaffCall?pitStaffCall(n):(window.pitStaffShort?pitStaffShort(n):n)) : '（未記録）'; }
 
   /* ═══════════════════════════════════════════════════════════
      入場（ラインを1回通したこと）を集める。

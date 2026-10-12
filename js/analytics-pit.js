@@ -1,5 +1,5 @@
 /* ================================================================================
-   analytics-pit.js  -  📊 分析用の書き出し（Claude が読む表）  PitFlow v2.143.0
+   analytics-pit.js  -  📊 分析用の書き出し（Claude が読む表）  PitFlow v2.143.0（v2.177.0 受付の列・車検の表）
    ================================================================================
    ◎ゆうた指定（2026-10-05）
      🗣「ありとあらゆるデータをあなたに渡すってのがイメージの全容」
@@ -30,7 +30,9 @@
 (function (w) {
   'use strict';
 
-  var VERSION = '1';   /* 🔴 列を足す・意味を変えたら上げる（辞書の頭に出る） */
+  var VERSION = '2';   /* 🔴 列を足す・意味を変えたら上げる（辞書の頭に出る）
+                          v2（2026-10-12）予約受付日・受付から入庫まで・予約担当・代車・取消の種類・取消日・取消理由を**後ろに**足した
+                          ＋ 2枚目の表 pitflow.車検（1行＝1回の陸運局行き） */
 
   function s(v){ return v == null ? '' : String(v); }
   function t(v){ return s(v).trim(); }
@@ -127,6 +129,13 @@
     return '';   /* 空＝未入力 */
   }
 
+  /* 🆕 v2 取り消しの種類。⚠ 人が押した予約キャンセル（cancelled）と、来なかった（noShow）は別物（card-view.js / today.js / overdue-pit.js） */
+  function cancelKind(c){
+    if (!c || c.status !== 'cancelled') return '';
+    if (c.noShow && !c.cancelled) return '来店なし';
+    return 'キャンセル';
+  }
+
   /* CSV の1マス */
   function cell(v){
     if (v == null) return '';
@@ -179,7 +188,15 @@
     ['粗利率', '粗利 ÷ 金額（%・小数1桁）'],
     ['1日あたり粗利', '粗利 ÷ 預かり日数（0日は1日として割る＝AIレポートと同じ）'],
     ['売掛', '入金日を分ける（売掛）なら 1'],
-    ['入金日', '売掛・保険の入金日']
+    ['入金日', '売掛・保険の入金日'],
+    /* 🆕 v2（2026-10-12・ゆうた「受付部分の追加」）**後ろに足した**＝前の列の並びは変えない */
+    ['予約受付日', '予約を受けた日（予約詳細の「予約受付日」bookedAt）。空＝入っていない（古いカード・入庫のあと入力など）'],
+    ['受付から入庫まで', '予約受付日 → 入庫日の日数（0＝当日の予約）。どちらかが空なら空'],
+    ['予約担当', '予約を受けた人（reserveStaff）。フロント担当とは別の人のことがある。空＝未入力'],
+    ['代車', '代車「必要」なら 1'],
+    ['取消の種類', 'キャンセル＝人が押した予約キャンセル／来店なし＝入庫日を過ぎても来なかった（自動・当日ビューの「来なかった」）。取り消していなければ空'],
+    ['取消日', 'キャンセル・来店なしになった日（cancelledAt）'],
+    ['取消理由', 'キャンセルの窓に書いた1行（任意・自由文）。来店なしは空']
   ];
 
   function pitAnalyticsTable(opt){
@@ -255,7 +272,15 @@
         (gross == null || !amt) ? '' : Math.round(gross / amt * 1000) / 10,
         (gross == null || stay == null) ? '' : Math.round(gross / Math.max(1, stay)),
         c.paymentSeparate ? 1 : '',
-        day(c.paymentDate)
+        day(c.paymentDate),
+        /* 🆕 v2 受付 */
+        day(c.bookedAt),
+        days(c.bookedAt, c.reserveDate),
+        t(c.reserveStaff),
+        c.needLoaner ? 1 : '',
+        cancelKind(c),
+        cancelKind(c) ? day(c.cancelledAt) : '',
+        (cancelKind(c) === 'キャンセル') ? t(c.cancelReason).replace(/[\r\n\t]+/g, ' ') : ''
       ];
     });
 
@@ -296,6 +321,123 @@
     return L.join('\n');
   }
 
+  /* ================================================================
+     🚗 2枚目の表：車検（v2・2026-10-12・ゆうた「車検の追加」）
+     ----------------------------------------------------------------
+     1行＝**1回の陸運局行き**（合格も不合格も）。カード1枚に何行も付く（不合格 → 再検 → 合格）。
+     ◎どこから
+       ・不合格（とマスター入力で足した合格の行）… inspSchedule.history[]
+       ・最後の合格 ……………………………………… inspSchedule.result === 'done'（resultDate 等）
+       ⚠ マスター入力は合格も history に行として持つことがある＝同じ日の合格が両方にあれば1行にする
+     ◎結果の言葉は車検予定の窓と同じ（pit-share.js pitShakenChoices の分かれ道）
+       一発合格／再検合格（その場で直した）／再検で合格（不合格のあと）／不合格
+     🔴 理由は pit-share.js pitShakenHistNote 1本（note／古い why）。回送担当は記録のまま（フルネーム）。
+     ================================================================ */
+  var SHK_COLS = [
+    ['アプリ', '常に pitflow'],
+    ['ID', 'カードの番号＝pitflow.csv の ID と同じ（カード1枚に何行も付く）。PitFlow で `?card=<ID>` を開くと予約詳細'],
+    ['書き出した日', 'この表を作った日'],
+    ['予約番号', 'カードの予約番号'],
+    ['お客様番号', 'customerId'],
+    ['車両番号', 'vehId'],
+    ['呼び名', '苗字＋車種（pitflow.csv と同じ）'],
+    ['課', '1課（国産）／2課（輸入）／受付'],
+    ['メーカー', 'BMW の MINI と MINI はまとめて MINI'],
+    ['車種', 'カードの車種'],
+    ['社内車両', '中古・代車・内部 のどれか（代車・社用車の車検）。空＝お客様の車'],
+    ['何回目の行き', 'このカードで陸運局へ行った何回目か（日付順）'],
+    ['行った日', '陸運局へ行った日'],
+    ['時間帯', 'AM／PM'],
+    ['結果', '一発合格／再検合格（その場で直した）／再検で合格（不合格のあと）／不合格'],
+    ['それまでの不合格', 'この行より前の不合格の回数（0＝初回）'],
+    ['回送担当', '陸運局へ行った人（1人目・記録のままの名前）。担当別の数はこの人で数える。空＝未入力'],
+    ['2人目', '一緒に行った2人目（数えない・見せるだけ）'],
+    ['2人目の理由', '2人目がいる理由（研修・同乗 など）'],
+    ['落ちた理由', '不合格・再検合格の時の1行（光軸・サイドスリップ など）。合格は空'],
+    ['陸運局', '行った陸運局（名前）'],
+    ['R', 'ラウンド（1〜4）。空＝未定'],
+    ['入庫日', 'カードの入庫日'],
+    ['カードの状態', '画面の札と同じ言葉（返車完了 など）']
+  ];
+  function shkReLabel(prevFails, kind){
+    if (kind === 'fail') return '不合格';
+    if (prevFails > 0) return '再検で合格';
+    return kind === 'repass' ? '再検合格（その場で直した）' : '一発合格';
+  }
+  function pitAnalyticsShakenTable(opt){
+    opt = opt || {};
+    var today = opt.today || ymd(new Date());
+    _custById = null;
+    var st = S(), cards = (st.cards || []).filter(function (c) { return c && c.id && !c._draft; });
+    var hn = function (h) { return w.pitShakenHistNote ? w.pitShakenHistNote(h) : t(h && (h.note || h.why)); };
+    var count = { 行: 0, 台: 0, 不合格: 0 };
+    var rows = [];
+    cards.forEach(function (c) {
+      var sc = c.inspSchedule;
+      if (!sc || typeof sc !== 'object') return;
+      if (!safe(function () { return w.pitIsShaken(c); }, false)) return;
+      var trips = [];
+      (Array.isArray(sc.history) ? sc.history : []).forEach(function (h) {
+        if (!h || !day(h.date)) return;
+        var kind = (h.result === 'pass') ? 'pass' : (h.result === 'repass') ? 'repass' : 'fail';
+        trips.push({ d: day(h.date), slot: h.slot === 'pm' ? 'PM' : 'AM', kind: kind, staff: t(h.staff), staff2: t(h.staff2), note2: t(h.staff2Note),
+                     why: (kind === 'pass') ? '' : hn(h), office: t(h.officeName), round: num(h.round) || '' });
+      });
+      var dd = day(sc.resultDate || sc.decided);
+      if (sc.result === 'done' && dd){
+        var dup = trips.some(function (x) { return x.kind !== 'fail' && x.d === dd; });
+        if (!dup) trips.push({ d: dd, slot: (sc.resultSlot || sc.decidedSlot) === 'pm' ? 'PM' : 'AM', kind: sc.repass ? 'repass' : 'pass',
+                               staff: t(sc.resultStaff), staff2: (t(sc.resultStaff2) !== t(sc.resultStaff)) ? t(sc.resultStaff2) : '', note2: t(sc.resultStaff2Note),
+                               why: sc.repass ? t(sc.repassNote) : '', office: t(sc.officeName), round: num(sc.round) || '' });
+      }
+      if (!trips.length) return;
+      trips.sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : (a.slot < b.slot ? -1 : a.slot > b.slot ? 1 : 0); });
+      count.台++;
+      var fails = 0;
+      trips.forEach(function (x, i) {
+        rows.push([
+          'pitflow', c.id, today, t(c.resNo), t(c.customerId), t(c.vehId), callName(c),
+          labelIn(st.divisions, divOf(c)), pitCardMaker(c), t(c.car),
+          safe(function () { return w.pitInternLabel(c); }, ''),
+          i + 1, x.d, x.slot, shkReLabel(fails, x.kind), fails,
+          x.staff, x.staff2, x.staff2 ? x.note2 : '', x.why.replace(/[\r\n\t]+/g, ' '), x.office, x.round,
+          day(c.reserveDate), safe(function () { return w.pitCardStatusText(c); }, t(c.status))
+        ]);
+        count.行++;
+        if (x.kind === 'fail'){ fails++; count.不合格++; }
+      });
+    });
+    var head = SHK_COLS.map(function (x) { return x[0]; });
+    var csv = '﻿' + [head].concat(rows).map(function (r) { return r.map(cell).join(','); }).join('\r\n') + '\r\n';
+    return { name: 'pitflow.車検', cols: head, rows: rows, csv: csv, dict: shkDict(today, count), count: count };
+  }
+  function shkDict(today, count){
+    var L = [];
+    L.push('# pitflow.車検.csv の辞書（版 ' + VERSION + '）');
+    L.push('');
+    L.push('- 書き出した日：' + today + '（PitFlow ' + t(w.PIT_APP_VERSION || '') + '）');
+    L.push('- 1行＝**1回の陸運局行き**（合格・不合格とも）。カード1枚に何行も付く。カードの中身（金額など）は pitflow.csv を ID で引く。');
+    L.push('- 行数：' + count.行 + '（' + count.台 + '台ぶん）／うち不合格 ' + count.不合格);
+    L.push('- 決まり＝`CoreFlowアプリ\\_記録\\仕様\\分析用の書き出し_全アプリ共通の決まり.md`');
+    L.push('');
+    L.push('## 読むときの注意');
+    L.push('- 🔴 **台数は「結果が合格の行」を数える**（不合格の行は同じ車の途中の記録）。不合格の率は「不合格の行 ÷ 行った回数」か「不合格が1回以上あった台 ÷ 台」かを必ず言い分ける。');
+    L.push('- 再検合格（その場で直した）は**1回の行き**（その場で直して受かった）。再検で合格は不合格で持ち帰ったあとの回。');
+    L.push('- 担当別の数は回送担当（1人目）で数える（PitFlow の車検履歴と同じ）。2人目は数えない。');
+    L.push('- 記録の抜け（担当・理由が空）はデータチェックの S09〜S14 で直している最中。空は「分からない」。');
+    L.push('- まだ行っていない予定は入れていない（行った記録だけ）。');
+    L.push('- 出す時の段：ゆうた宛ては全部言ってよい。社員が見る物では個人の比較・評価を出さない（決まり §6.5）。');
+    L.push('');
+    L.push('## 列');
+    L.push('');
+    L.push('| 列 | 中身 |');
+    L.push('|---|---|');
+    SHK_COLS.forEach(function (x) { L.push('| ' + x[0] + ' | ' + x[1].replace(/\|/g, '／') + ' |'); });
+    L.push('');
+    return L.join('\n');
+  }
+
+  w.pitAnalyticsShakenTable = pitAnalyticsShakenTable;
   w.pitCardMaker = pitCardMaker;
   w.pitCardCost = pitCardCost;
   w.pitAnalyticsTable = pitAnalyticsTable;

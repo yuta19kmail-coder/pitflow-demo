@@ -916,6 +916,9 @@
    ⚠ 文字は白＝当日ビューの担当バッジ（.tr-front）と同じ。課が空のグレーの上でも読める。 */
 .dl-badge{font-size:9.5px;font-weight:700;color:#fff;background:var(--pit-div-none,#8390a6);border-radius:5px;padding:1px 5px;line-height:1.5;white-space:nowrap}
 .dl-badge.is-div{letter-spacing:0}
+/* 🆕 v2.178.0 待・当・相談のバッジ（預かりは出さない）。色は JS（待＝黄・当＝青＝タスクボードと同じ）／相談は相談ボタンと同じ黄 */
+.dl-mk{font-size:9.5px;font-weight:800;border:1px solid;border-radius:5px;padding:0 5px;line-height:1.5;white-space:nowrap}
+.dl-mk-consult{background:rgba(234,179,8,.15);color:#eab308;border-color:rgba(234,179,8,.6)}
 .dl-line{font-size:12px;font-weight:600;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px}
 .dl-car{color:var(--text2)}
 .dl-ev.hl{box-shadow:inset 0 0 0 1px rgba(202,161,75,.40);background:rgba(202,161,75,.055)}

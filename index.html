@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.172.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.174.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=12">
 <link rel="stylesheet" href="css/views.css?v=63">
-<link rel="stylesheet" href="css/polish.css?v=239">
+<link rel="stylesheet" href="css/polish.css?v=241">
 <link rel="stylesheet" href="css/fleet-cal.css?v=8"><!-- 🗓 v2.70.0 車両カレンダー・代車カレンダーの整備予定。polish.css より **後ろ**（ここが上書きする側） -->
 <link rel="stylesheet" href="css/floor.css?v=24">
 <link rel="stylesheet" href="css/coreflow-note-board.css?v=87c1247a"><!-- 📌 付箋ボードの見た目（全アプリ共通・_shared から配布）。v2.109.0 で前の付箋専用の見た目から置き換え -->
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.172.0</div>
+    <div class="login-ver">v2.174.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver">v2.172.0</span>
+    <span class="ver">v2.174.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -837,7 +837,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/undetermined.js?v=25"></script>
 <script src="js/reserve.js?v=78"></script>
 <script src="js/return.js?v=31"></script>
-<script src="js/car-sales.js?v=10"></script>
+<script src="js/car-sales.js?v=11"></script>
 <script src="js/task.js?v=24"></script>
 <script src="js/work.js?v=14"></script>
 <script src="js/result.js?v=18"></script>
@@ -850,7 +850,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/auth-pit.js?v=17"></script>
 <script src="js/members-pit.js?v=19"></script>
 <script src="js/oplog-pit.js?v=6"></script>
-<script src="js/news-pit.js?v=48"></script>
+<script src="js/news-pit.js?v=49"></script>
 <script src="js/launcher.js?v=34b8456a"></script>
 <script src="js/holidays.js?v=1c79064f"></script>
 <script>window.PIT_CAL_MIRROR = 1;   /* 🔴 PitFlow だけ：MHSの値を state.settings の予備値に写す（cal-pit.js より前） */</script>

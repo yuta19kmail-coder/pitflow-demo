@@ -824,7 +824,7 @@
            （古い記録には入っていない＝無いものに「—」を書かない・2026-08-13 の決めごと）。 */
         return '<span class="cv-shrc-i" onclick="cvShReOpen('+o.i+')" title="押すと、この記録を直す・取り消す">'
           + (window.fmtMD?fmtMD(r.date):r.date)+' '+_slT(r.slot)+(ex?'・'+esc(ex):'')
-          + (r.note?'<span class="cv-shrc-n">'+esc(r.note)+'</span>':'')
+          + ((window.pitShakenHistNote?pitShakenHistNote(r):r.note)?'<span class="cv-shrc-n">'+esc(window.pitShakenHistNote?pitShakenHistNote(r):r.note)+'</span>':'')
           + '</span>';
       }).join('');
       if (_si.result==='done'){
@@ -2768,7 +2768,7 @@
       + '<label>R（ラウンド）</label><select id="cv-shround"><option value="">（未定）</option>'
         + [1,2,3,4].map(function(n){ return '<option value="'+n+'"'+(Number(h.round)===n?' selected':'')+'>'+n+'R</option>'; }).join('')
         + '</select>'
-      + '<label>再検の理由（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" value="'+esc(h.note||'')+'" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
+      + '<label>再検の理由（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" value="'+esc(window.pitShakenHistNote?pitShakenHistNote(h):(h.note||''))+'" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
       + '<div class="cv-shpb-act"><button class="cv-shbtn ok" onclick="cvShReSave()">この内容で直す</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
       + '<button class="cv-shbtn re cv-shrc-del" onclick="cvShReDrop()">🗑 この再検の記録を取り消す</button>'
       + '</div>';

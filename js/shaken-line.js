@@ -55,7 +55,7 @@
         if(h.date<moS || h.date>moE) return;
         trips.push({ iso:h.date, kind:'ng', c:c, team:team, staff:h.staff||'',
           staff2:(h.staff2&&h.staff2!==h.staff)?h.staff2:'',   /* 👥 v2.113.0 見せるだけ。数えるのは staff（1人目） */
-          office:h.officeName||'', round:num(h.round), slot:(h.slot==='pm')?'pm':'am', note:h.note||'' });
+          office:h.officeName||'', round:num(h.round), slot:(h.slot==='pm')?'pm':'am', note:(window.pitShakenHistNote?pitShakenHistNote(h):(h.note||'')) });
       });
       /* ② 合格＝この月に締まった車 */
       if(s.result==='done'){

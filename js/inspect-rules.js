@@ -131,7 +131,8 @@
     soon:             3,    /* 「もうすぐ」＝何日以内 */
     noShowLeft:       5,    /* 未入庫の自動アーカイブ（30日）まであと何日で知らせるか */
     noShowAuto:      30,    /* 未入庫が自動でアーカイブされるまでの日数（undetermined.js と同じ） */
-    vehShaken:       30     /* 代車・社用車の車検満了まであと何日で知らせるか */
+    vehShaken:       30,    /* 代車・社用車の車検満了まであと何日で知らせるか */
+    reShaken:        60     /* 🆕 v2.175.0 同じ車の車検「合格」が2枚のカードでこの日数以内＝2枚目は再検では？（S14） */
   };
 
   /* ================================================================
@@ -142,7 +143,7 @@
     { id:'flow',   label:'日付・進行',   note:'止まったままの車・日付の前後が逆' },
     { id:'resv',   label:'予約',         note:'二重・休みの日・置き場所' },
     { id:'loaner', label:'代車',         note:'ダブり・戻っていない・カードとカレンダーの食い違い' },
-    { id:'shaken', label:'車検',         note:'行く日・担当・陸運局・満了' },
+    { id:'shaken', label:'車検',         note:'行く日・陸運局・満了・行った記録（担当・理由・ダブり）' },
     { id:'data',   label:'データの抜け', note:'お客様・車の情報' },
     { id:'state',  label:'状態の矛盾',   note:'タスクの移動と中身が食い違っている' }
   ];
@@ -230,6 +231,13 @@
   function shakenOff(iso){ return w.pitShakenDayOff ? w.pitShakenDayOff(iso) : { off:false }; }
   function shakenStaff(c){ return w.pitShakenStaff ? w.pitShakenStaff(c) : ''; }
   function shakenOffice(c){ return w.pitShakenOffice ? w.pitShakenOffice(c) : ''; }
+  /* 🆕 v2.175.0 車検の記録（S09〜S14）の道具。⚠ 合否・理由の読み方は pit-share.js の1本を借りる */
+  function shkOn(c){ return !!c && !c._draft && c.status !== 'cancelled' && isShaken(c) && !!c.inspSchedule; }
+  function shkRows(c){ var h = (c.inspSchedule || {}).history; return Array.isArray(h) ? h.filter(Boolean) : []; }
+  /* 不合格の行か（ふだんの道は 'recheck' だけ。マスター入力は 'pass'／'repass' も行にする） */
+  function shkFail(h){ return !!h && h.result !== 'pass' && h.result !== 'repass'; }
+  function shkNote(h){ return w.pitShakenHistNote ? w.pitShakenHistNote(h) : t(h && (h.note || h.why)); }
+  function md(v){ var d = toD(v); return d ? (d.getMonth() + 1) + '/' + d.getDate() : (t(v) || '日付なし'); }
   function loanerBack(c){ return w.pitLoanerBackOf ? w.pitLoanerBackOf(c) : { back:false, at:'' }; }
   /* 代車の呼び名。⚠ 消された代車は名前が引けないので、その時だけ id を出す（人が追える形にする） */
   function loName(id){ return (w.pitLoanerModel ? (w.pitLoanerModel(id) || '') : '') || s(id); }
@@ -959,6 +967,129 @@
           if (n == null || n > LIM.vehShaken) return;
           out.push({ kind:'veh', refId:v.id, name:(t(v.name) || v.id) + '（' + t(v.model) + '）',
                      text:'車検満了 ' + v.shakenDate + (n < 0 ? '（' + (-n) + '日前に切れています）' : '（あと' + n + '日）') });
+        });
+        return out;
+      } },
+
+    /* ── 車検の記録（履歴） v2.175.0 ────────────────────────────
+       🗣（ゆうた 2026-10-12）「日常データチェックに車検の履歴系がないよね？
+       　　担当者抜けとか　Wってて再検じゃないの？とか　理由ぬけ、など」
+       ◎見るのは**行った記録**（合格＝inspSchedule.result 'done'／不合格＝history[] の1行ずつ）。予定は S02・S05。
+       ◎1台に何か所あっても**所見は1件**（「／」でつなぐ）。key は 規則ID＋カード。
+       🔴 理由は pit-share.js の `pitShakenHistNote` 1本（note／マスター入力の古い why の両方）。
+       ⚠ 欄が1つに決まらない（何回目の記録か）ので inspect-fix.js の RULE_FIX には**わざと足さない**。
+          直す所＝予約詳細の車検の欄（記録を押すと直せる）か、マスター入力の ③車検。 */
+    { id:'S09', cat:'shaken', level:'red',
+      title:'車検に行った記録に、担当が入っていない',
+      why:'車検履歴の「担当別」の数に入りません（誰が陸運局へ行ったか分からない）。',
+      fix:'予約詳細の車検の欄で、その記録を押して担当を入れてください。',
+      each: function(c){
+        if (!shkOn(c)) return '';
+        var sc = c.inspSchedule || {}, out = [];
+        if (sc.result === 'done' && !t(sc.resultStaff)) out.push('合格 ' + md(sc.resultDate || sc.decided) + ' の担当が空');
+        shkRows(c).forEach(function(h){
+          if (!t(h.staff)) out.push((shkFail(h) ? '不合格 ' : '合格 ') + md(h.date) + ' の担当が空');
+        });
+        return out.join('／');
+      } },
+
+    { id:'S10', cat:'shaken', level:'amber',
+      title:'車検の不合格（再検合格）に、落ちた理由が入っていない',
+      why:'次に同じ車が来た時に、どこで落ちたか分かりません（光軸・サイドスリップなど）。',
+      fix:'予約詳細の車検の欄で、その記録を押して理由を1行入れてください。',
+      each: function(c){
+        if (!shkOn(c)) return '';
+        var sc = c.inspSchedule || {}, out = [];
+        shkRows(c).forEach(function(h){
+          if ((shkFail(h) || h.result === 'repass') && !shkNote(h))
+            out.push((h.result === 'repass' ? '再検合格 ' : '不合格 ') + md(h.date) + ' の理由が空');
+        });
+        if (sc.result === 'done' && sc.repass && !t(sc.repassNote))
+          out.push('再検合格 ' + md(sc.resultDate || sc.decided) + ' の落ちた所が空');
+        return out.join('／');
+      } },
+
+    { id:'S11', cat:'shaken', level:'amber',
+      title:'車検の回送に2人目がいるのに、2人目の理由が入っていない',
+      why:'なぜ2人で行ったのか（研修・同乗・2台まとめて など）があとで分かりません。',
+      fix:'予約詳細の車検の欄で、その記録を押して2人目の理由を入れてください。',
+      each: function(c){
+        if (!shkOn(c)) return '';
+        var sc = c.inspSchedule || {}, out = [];
+        if (sc.result === 'done' && t(sc.resultStaff2) && !t(sc.resultStaff2Note))
+          out.push('合格 ' + md(sc.resultDate || sc.decided) + '（2人目 ' + t(sc.resultStaff2) + '）');
+        shkRows(c).forEach(function(h){
+          if (t(h.staff2) && !t(h.staff2Note))
+            out.push((shkFail(h) ? '不合格 ' : '合格 ') + md(h.date) + '（2人目 ' + t(h.staff2) + '）');
+        });
+        return out.join('／');
+      } },
+
+    { id:'S12', cat:'shaken', level:'amber', judge:true,
+      title:'同じ日に「不合格」と「合格」がある＝再検合格では？',
+      why:'その場で直してその回で受かったなら「再検合格（その場で直した）」1件です。'
+        + '不合格と合格の2件に分かれていると、車検履歴に同じ車が2回出て、不合格の数も1つ多く数えます。',
+      fix:'予約詳細の車検の欄で、不合格の記録を取り消して、合格を「再検合格」に直してください。'
+        + '本当に同じ日に2回行った（いったん持ち帰って直し、午後にもう一度）なら「確認した」を押してください。',
+      each: function(c){
+        if (!shkOn(c)) return '';
+        var sc = c.inspSchedule || {}, rows = shkRows(c), out = [];
+        var passDays = {};
+        if (sc.result === 'done' && t(sc.resultDate || sc.decided)) passDays[s(sc.resultDate || sc.decided)] = 1;
+        rows.forEach(function(h){ if (!shkFail(h) && t(h.date)) passDays[s(h.date)] = 1; });
+        var seen = {};
+        rows.forEach(function(h){
+          var d = s(h.date);
+          if (shkFail(h) && d && passDays[d] && !seen[d]){ seen[d] = 1; out.push(md(d) + ' に不合格と合格'); }
+        });
+        return out.join('／');
+      } },
+
+    { id:'S13', cat:'shaken', level:'amber',
+      title:'車検の不合格の記録が、同じ日・同じ時間帯に2つある',
+      why:'押し直しなどで同じ記録が二重になっています。不合格の回数（再◯）が1つ多くなります。',
+      fix:'予約詳細の車検の欄で、ダブっている方の記録を取り消してください。',
+      each: function(c){
+        if (!shkOn(c)) return '';
+        var cnt = {}, out = [];
+        shkRows(c).forEach(function(h){
+          if (!shkFail(h) || !t(h.date)) return;
+          var k = s(h.date) + (h.slot === 'pm' ? ' PM' : ' AM');
+          cnt[k] = (cnt[k] || 0) + 1;
+        });
+        Object.keys(cnt).sort().forEach(function(k){
+          if (cnt[k] > 1) out.push(md(k.slice(0, 10)) + k.slice(10) + ' に不合格が' + cnt[k] + '件');
+        });
+        return out.join('／');
+      } },
+
+    { id:'S14', cat:'shaken', level:'amber', judge:true,
+      title:'同じ車の車検が、短い間に2枚のカードで「合格」になっている＝2枚目は再検では？',
+      why:'不合格で持ち帰った車を、再検の記録ではなく新しい予約（カード）で入れると、車検の台数が1台多くなり、不合格の記録も残りません。',
+      fix:'2枚目が再検なら、1枚目のカードに不合格の記録を足し、2枚目は売上なし等で片づけてください。'
+        + '本当に別の車検（名義変更・一時抹消のあとなど）なら「確認した」を押してください。',
+      all: function(ctx){
+        var by = {}, out = [], done = {};
+        ctx.cards.forEach(function(c){
+          if (!shkOn(c)) return;
+          var sc = c.inspSchedule || {};
+          var d = sc.result === 'done' ? t(sc.resultDate || sc.decided) : '';
+          if (!d) return;
+          carKeys(c).forEach(function(k){ (by[k] = by[k] || []).push({ c:c, d:d }); });
+        });
+        Object.keys(by).forEach(function(k){
+          var a = by[k].sort(function(x, y){ return x.d < y.d ? -1 : (x.d > y.d ? 1 : 0); });
+          for (var i = 1; i < a.length; i++){
+            var p = a[i-1], q = a[i];
+            if (p.c.id === q.c.id) continue;
+            var n = days(p.d, q.d);
+            if (n == null || n > LIM.reShaken) continue;
+            var pair = p.c.id + '>' + q.c.id;
+            if (done[pair]) continue;
+            done[pair] = 1;
+            out.push({ refId: q.c.id,
+                       text: '合格 ' + md(p.d) + '（' + (t(p.c.resNo) || nameOf(p.c)) + '）と 合格 ' + md(q.d) + '（このカード）＝' + n + '日あいだ' });
+          }
         });
         return out;
       } },

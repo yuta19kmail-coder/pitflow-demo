@@ -26,7 +26,12 @@
   function dayOff(iso){ return window.pitShakenDayOff ? pitShakenDayOff(iso) : { off:false, kind:'', label:'', short:'' }; }
   function todayIso(){ var t=new Date(); t.setHours(0,0,0,0); return ymd(t); }
   /* 👥 v2.113.0 担当の出し方＝「1人目＋2人目」（理由は吹き出しだけ）。 */
-  function staffTxt(r, withNote){ return r.staff2 ? ((r.staff||'—')+'＋'+r.staff2+(withNote&&r.staff2Note?'（'+r.staff2Note+'）':'')) : (r.staff||''); }
+  /* 🔴 v2.176.0（ゆうた指定 2026-10-12）**担当は通称で出す**（通称が無ければ姓）。
+     🗣「車検実績で担当者欄がフルネーム。通称入ってるやつは通称にて」
+     ⚠ 記録にはフルネームのまま入っている＝**見せる時だけ**ここで変える。数える鍵（担当別）はフルネームのまま。
+     ⚠ 呼び方は pit-share.js の pitStaffCall 1本（通称 → 姓 → 苗字。自社はコバモ）。 */
+  function call(n){ return n ? (window.pitStaffCall ? pitStaffCall(n) : n) : ''; }
+  function staffTxt(r, withNote){ return r.staff2 ? ((call(r.staff)||'—')+'＋'+call(r.staff2)+(withNote&&r.staff2Note?'（'+r.staff2Note+'）':'')) : call(r.staff); }
 
   // 事実ベースの実績レコードを収集
   function records(){
@@ -55,7 +60,7 @@
     var res=recs.filter(function(r){
       var d=new Date(r.iso+'T00:00:00');
       var dstr=r.iso+' '+(d.getMonth()+1)+'/'+d.getDate()+' '+(d.getMonth()+1)+'月'+d.getDate()+'日 '+d.getFullYear();
-      var hay=[surname(r.c), r.c.customer||'', r.c.kana||'', carLabel(r.c), r.c.car||'', r.c.maker||'', r.c.plate||'', r.staff||'', r.staff2||'', r.staff2Note||'', r.note||'', dstr, (r.result==='done'?(r.repass?'済 done 再検合格 repass':'済 done'):'不合格 再検 recheck')].join(' ').toLowerCase();
+      var hay=[surname(r.c), r.c.customer||'', r.c.kana||'', carLabel(r.c), r.c.car||'', r.c.maker||'', r.c.plate||'', r.staff||'', r.staff2||'', call(r.staff), call(r.staff2), r.staff2Note||'', r.note||'', dstr, (r.result==='done'?(r.repass?'済 done 再検合格 repass':'済 done'):'不合格 再検 recheck')].join(' ').toLowerCase();
       return terms.every(function(t){ return hay.indexOf(t)>=0; });
     }).sort(function(a,b){ return a.iso<b.iso?1:(a.iso>b.iso?-1:(a.slot<b.slot?-1:1)); });
     var h='<div class="skl-res-head">検索結果 <b>'+res.length+'</b>件</div>';
@@ -94,7 +99,7 @@
     /* 🔴 v2.56.0 再検合格は**済の内訳**（別の台数ではない） */
     var rpN=mRecs.filter(function(r){return r.result==='done'&&r.repass;}).length;
     var byStaff={}; mRecs.forEach(function(r){ var k=r.staff||'（未記録）'; byStaff[k]=(byStaff[k]||0)+1; });
-    var staffArr=Object.keys(byStaff).map(function(k){return {name:k,n:byStaff[k]};}).sort(function(a,b){return b.n-a.n;});
+    var staffArr=Object.keys(byStaff).map(function(k){return {name:(k==='（未記録）'?k:call(k)),n:byStaff[k]};}).sort(function(a,b){return b.n-a.n;});
     var h='';
     h+='<div class="skl-head"><div class="skl-nav"><button onclick="sklShift(-1)"><i data-ic=chevLeft data-ics=16></i> 前月</button><b>'+y+'年'+(mo+1)+'月</b><button onclick="sklShift(1)">次月 <i data-ic=chevRight data-ics=16></i></button><button class="skl-now" onclick="sklShift(0)">今月</button></div>';
     h+='<div class="skl-sum"><span class="skl-lg done">済 '+doneN+'</span><span class="skl-lg rp">再合 '+rpN+'</span><span class="skl-lg re">不合格 '+reN+'</span><span class="skl-lg all">計 '+(doneN+reN)+'</span></div></div>';

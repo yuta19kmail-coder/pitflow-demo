@@ -38,6 +38,14 @@ function _availRow(c){
   });
   // 添え物タグ（他の予約ビュー・当日ビューと同じ tag-side の配色に合わせる）
   let side = '';
+  /* 🆕 v2.179.0（ゆうた指定 2026-10-12「同様の処理を空きカレンダーでも」）**待・当を札で出す。預かりは出さない。**
+     ＝ 新規予約の右カラム（card-detail.js `_cfsDayListHtml`・v2.178.0）と同じ決め。文字は受付タイプの表（state.dropTypes）から。 */
+  [c.dropType, c.dropType2].filter(function (id, i, a) { return (id === 'wait' || id === 'sameDay') && a.indexOf(id) === i; })
+    .forEach(function (id) {
+      const d = (state.dropTypes || []).find(function (o) { return o.id === id; });
+      side += '<span class="tag-side ' + id + '"' + (d && d.desc ? ' title="' + _avEsc(d.desc) + '"' : '') + '>'
+            + _avEsc(d ? d.label : (id === 'wait' ? '待' : '当')) + '</span>';
+    });
   if (c.consult)    side += '<span class="tag-side consult">相談</span>';
   if (c.needLoaner) side += '<span class="tag-side loaner">代車</span>';
 

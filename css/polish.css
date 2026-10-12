@@ -1502,6 +1502,15 @@ th.cfs-lg-d{ z-index:3; }
 .cs-done-lb{ font-size:10.5px; font-weight:700; color:var(--text3); margin-bottom:6px; }
 .cs-done-row{ display:flex; flex-wrap:wrap; gap:8px; }
 .cs-doneitem{ opacity:.5; }
+/* 🚙 v2.173.0 洗車の段の代車。**カードの高さはお客様の車と同じ**（2行・下の文字も1行・札もボタンと同じ高さ）
+   ⚠ 行を足さないこと（ゆうた 2026-10-12「既存のものの高さを変えないでほしい」）＝緑のボタンの列がガタつく */
+/* 🔴 v2.174.0 予約番号の耳が無いカード（代車・番号の無い予約）は、耳の高さ（9px）ぶん下げて**耳つきとそろえる**
+   ＝ 耳つきは .pcm-tab が margin-top:9px で下がっている。車販作業の並びの中だけ */
+.cs-cardwrap > .pit-card.pcm:not(.pcm-tab){ margin-top:9px; }
+.cs-lo-ex{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cs-lo-back{ background:#475569; color:#fff; border:1px solid #64748b; }   /* 未返却＝グレーのカードの中でも沈まない */
+.cs-wait{ align-self:stretch; font-size:12px; font-weight:700; padding:5px 0; border-radius:7px; text-align:center; line-height:normal;
+  color:var(--text3); border:1px dashed var(--border2); }
 
 /* ===== タスクボード：完TEL済／完TEL依頼 ドラッグエリア（v0.99.34） ===== */
 /* ⚠ v1.47.0 ここだけは**破線のまま**＝「投げ込む場所」だと分かる形は崩さない。

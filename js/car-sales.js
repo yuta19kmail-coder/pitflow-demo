@@ -8,6 +8,7 @@
       「いつ返す予定か」は **_shared/coreflow-return-plan.js の1本**（確定→未完→暫定→待・当の入庫日）。
       ⚠ 返車カレンダー・当日ビューは今までどおり「確定だけ」。**物差しが違う。混ぜない。**
      ② 今週の洗車予定  ＝翌営業日より後〜今週末(日曜)の洗車。**返車日が決まっていない車も同じ並びに混ぜる**（v1.152.0）
+     🚙 v2.173.0 ①②に**代車**も出す（次に出す日の前の営業日に洗う。戻っていなければグレー）＝ _csLoanerWash
      ③ 車検ヘッドライト磨き ＝headlight フラグ（受注時に車検車へ設定）
      ④ コーティング・その他依頼 ＝**受注が取れたぶん**（v2.51.0）。依頼メモもここに出す
      ⑤ 直近1か月のコーティング・その他予定 ＝**まだ受注前のぶん**（v2.51.0）
@@ -99,6 +100,114 @@ function _csDoneCard(c, task){
     + '<button class="cs-undo" onclick="event.stopPropagation();csUndo(\'' + c.id + '\',\'' + task + '\')">↩ 戻す</button></div>';
 }
 
+/* ===================================================================
+   🚙 v2.173.0（ゆうた指定 2026-10-12）**洗車の段に代車も出す。**
+   🗣「代車は戻ってきてから、次の顧客に出す前日に洗車する」
+   🗣「一番大切なのは、その代車がまだ前の客の返車が終わってなくて**もどってきていない**ということは往々にしておこりえる」
+   ◎1枚＝「次に出す貸出（札）1枚」。洗う日＝**その札の「から」の前の営業日**（定休・祝日は飛ばす）。
+   ◎戻ったか＝**1つ前の札**が返却済みか（返ったかの物差しは loaner-free.js の pitLoanerBackOf 1本）。
+     戻っていなければ未完と同じグレー（views.css の .is-retpend）＋「未返却」。完了は**押せない**。
+   ◎カード … 左の帯は青／名前の場所は代車の名前（代車5）／作業タイプは出さない／
+     担当は**出す相手の予約の担当**／下は「入庫 日付 時間」。出す相手はカードに出さない（ホバーの文字だけ）。
+   ◎押すと**出す相手の予約詳細**。予約を通さない貸出（手動・緊急）は代車カレンダーへ。
+   ◎洗った印は**札の側**（washDone＝洗った代車のid）。代車を差し替えたら印は外れる（別の車は洗っていない）。
+   ⚠ 仮押さえ（hold）は貸出ではないので出さない。引退した代車も出さない。
+   ⚠ 「代車は要るが、どれかは未定」は札が無いので出ない（どの車を洗うか決まらない）。
+   ⚠ 「戻りが間に合わない」の赤は**出さない**（ゆうた 2026-10-12）。グレーだけ。
+   =================================================================== */
+const CS_LO_COLOR = '#3b82f6';
+function _csPrevBiz(ds){
+  const p = String(ds).split('-'); let d = new Date(+p[0], +p[1]-1, +p[2]);
+  for (let i=0;i<14;i++){
+    d.setDate(d.getDate()-1);
+    const s = ymd(d);
+    const isClosed = (window.PitCal ? PitCal.isClosed(s) : false);
+    const isHol = !!(window.Holidays && Holidays.name && Holidays.name(s));
+    if (!isClosed && !isHol) return s;
+  }
+  return ymd(d);
+}
+function _csMDW(ds){
+  const p = String(ds||'').split('-'); if (p.length !== 3) return '';
+  const d = new Date(+p[0], +p[1]-1, +p[2]);
+  return (d.getMonth()+1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）';
+}
+function _csLoWashDone(a){ return !!a.washDone && a.washDone === a.loanerId; }
+/* 洗う代車の一覧 [{ a, prev, lo, card, prevCard, washDay, back }]（洗う日が今週日曜まで） */
+function _csLoanerWash(todayStr, sun){
+  const S = window.state || {};
+  const cards = S.cards || [];
+  const byId = id => cards.find(c => c.id === id) || null;
+  const deadCard = c => !!c && (c.status === 'returned' || c.status === 'cancelled' || c.status === 'scrap');
+  const byLo = {};
+  (S.loanerAssigns || []).forEach(a => {
+    if (!a || a.hold || !a.loanerId || !a.fromDate) return;
+    (byLo[a.loanerId] = byLo[a.loanerId] || []).push(a);
+  });
+  const out = [];
+  (S.loaners || []).forEach(lo => {
+    if (!lo || lo.retired) return;
+    const list = (byLo[lo.id] || []).slice().sort((x,y) => String(x.fromDate).localeCompare(String(y.fromDate)));
+    list.forEach((a, i) => {
+      if (a.returned || a.fromDate < todayStr) return;
+      const card = a.cardId ? byId(a.cardId) : null;
+      if (a.cardId && (!card || deadCard(card))) return;
+      const washDay = _csPrevBiz(a.fromDate);
+      if (washDay > sun) return;
+      const prev = i > 0 ? list[i-1] : null;
+      const prevCard = (prev && prev.cardId) ? byId(prev.cardId) : null;
+      let back = true;
+      if (prev && !prev.returned){
+        /* 🔴 v1.81.0 の決まり「車を返したら、代車も返ってきたことにする」。
+           札の自動返却は代車カレンダー・予約詳細を開いた時の同期で付くので、それを待たずに**予約の返車済み**も見る */
+        back = !!(prevCard && (prevCard.status === 'returned'
+                  || (window.pitLoanerBackOf && pitLoanerBackOf(prevCard).back)));
+      }
+      out.push({ a, prev, lo, card, prevCard, washDay, back });
+    });
+  });
+  return out;
+}
+function _csLoCard(x){
+  const a = x.a, lo = x.lo, c = x.card;
+  const stf = c ? (c.frontStaff || c.staff || '') : '';
+  const _stf = stf ? (window.pitStaffShort ? pitStaffShort(stf) : (window.pitSurname ? pitSurname(stf) : stf)) : '';
+  const nm = (c && window.pitCustSurname ? pitCustSurname(c) : (c ? c.customer : a.customer)) || '';
+  /* ホバーの文字だけ＝出す相手と、戻っていない時はどこにいるか */
+  let tip = '出す相手：' + (nm ? nm + '様' : '（予約以外の貸出）') + ((c && c.car) || a.car ? '　' + ((c && c.car) || a.car) : '');
+  if (!x.back && x.prev){
+    const pc = x.prevCard;
+    const pn = (pc && window.pitCustSurname ? pitCustSurname(pc) : (pc ? pc.customer : x.prev.customer)) || '';
+    tip += '\n未返却：' + (pn ? pn + '様から ' : '') + _csMDW(x.prev.toDate) + ' 戻り予定';
+  }
+  const click = c ? ("openDetail('" + c.id + "')") : "showView('loaner')";
+  let h = '<div class="pit-card pcm cs-lo' + (x.back ? '' : ' is-retpend') + '" onclick="' + click + '" title="' + _csEsc(tip) + '" style="border-left-color:' + CS_LO_COLOR + ';">';
+  h += '<div class="pcm-r"><span class="pcm-nm2"><span class="pcm-name">' + _csEsc(lo.name || '代車') + '</span></span>'
+     + (x.back ? '' : '<span class="pcm-badges"><span class="cs-lo-back">未返却</span></span>') + '</div>';
+  h += '<div class="pcm-r"><span class="pcm-car">' + _csEsc(lo.model || '') + '</span><span class="pcm-wash">洗車</span>'
+     + (_stf ? '<span class="pcm-front">' + _csEsc(_stf) + '</span>' : '') + '</div>';
+  h += '</div>';
+  return h;
+}
+function _csLoItem(x){
+  const a = x.a, c = x.card;
+  const tm = (c && c.reserveDate === a.fromDate && c.reserveTime) ? ' ' + c.reserveTime : '';
+  const ex = '<div class="cs-extra cs-lo-ex"><i data-ic=calendar data-ics=16></i> ' + (c ? '入庫 ' : '貸出 ') + _csMDW(a.fromDate) + tm + '</div>';
+  const btn = x.back
+    ? '<button class="cs-done" onclick="event.stopPropagation();csLoDone(\'' + a.id + '\')">✓ 完了</button>'
+    : '<div class="cs-wait">戻ってから洗車</div>';
+  return '<div class="cs-item"><div class="cs-cardwrap">' + _csLoCard(x) + ex + '</div>' + btn + '</div>';
+}
+function _csLoDoneItem(x){
+  return '<div class="cs-item cs-doneitem"><div class="cs-cardwrap">' + _csLoCard(x) + '</div>'
+    + '<button class="cs-undo" onclick="event.stopPropagation();csLoUndo(\'' + x.a.id + '\')">↩ 戻す</button></div>';
+}
+/* 時刻の並び（入庫の時間。無ければ最後） */
+function _csLoSort(p, q){
+  const t = x => (x.card && x.card.reserveDate === x.a.fromDate && window.pitTimeMin) ? pitTimeMin(x.card.reserveTime || '') : 99999;
+  return String(p.a.fromDate).localeCompare(String(q.a.fromDate)) || (t(p) - t(q));
+}
+
 /* セクション枠 */
 function _csSec(title, sub, bodyHtml, doneHtml){
   let h = '<div class="cs-sec">';
@@ -177,6 +286,9 @@ function renderCarSales(){
     put('1か月の予定', coatPlan);
   })();
 
+  /* 🚙 v2.173.0 洗う代車（今週日曜まで）。条件は _csLoanerWash の1本 */
+  const loWash = _csLoanerWash(todayStr, sun);
+
   let h = '<div class="cs-cols">';
 
   // ① 洗車（今日・明日）＝枠は1つ。中を「今日」「明日」の2グループに分ける v0.123.4
@@ -184,13 +296,20 @@ function renderCarSales(){
     const washToday = washAll.filter(c => _wd(c) === todayStr);
     const st = split(washToday.sort(sortTime), 'washSalesDone');
     const sm = split(washTomorrow.sort(sortTime), 'washSalesDone');
+    /* 🚙 v2.173.0 代車（洗う日が今日以前＝今日／翌営業日＝明日）。お客様の車の後ろに並べる */
+    const loT = loWash.filter(x => x.washDay <= todayStr).sort(_csLoSort);
+    const loM = loWash.filter(x => x.washDay > todayStr && x.washDay <= nextBiz).sort(_csLoSort);
+    const loOpen = arr => arr.filter(x => !_csLoWashDone(x.a)).map(_csLoItem).join('');
+    const tH = st.open.map(c=>_csCard(c,'wash',_csWashLabel(c),'洗車')).join('') + loOpen(loT);
+    const mH = sm.open.map(c=>_csCard(c,'wash',_csWashLabel(c),'洗車')).join('') + loOpen(loM);
     /* 🔴 v1.151.0 どの札の日で出ているのかが分からないと現場が困るので、**全部に返車予定を付ける**
        （確定／未完／暫定 の印つき。文字は _csWashLabel の1本） */
     const bodyHtml = '<div class="cs-subh"><i data-ic=sun data-ics=16></i> 今日</div>'
-      + (st.open.length ? st.open.map(c=>_csCard(c,'wash',_csWashLabel(c),'洗車')).join('') : '<div class="cs-empty">なし</div>')
+      + (tH || '<div class="cs-empty">なし</div>')
       + '<div class="cs-subh"><i data-ic=moon data-ics=16></i> 明日 <small>（翌営業日 ' + nextBiz.slice(5).replace('-','/') + '）</small></div>'
-      + (sm.open.length ? sm.open.map(c=>_csCard(c,'wash',_csWashLabel(c),'洗車')).join('') : '<div class="cs-empty">なし</div>');
-    const doneHtml = st.done.concat(sm.done).map(c=>_csDoneCard(c,'wash')).join('');
+      + (mH || '<div class="cs-empty">なし</div>');
+    const doneHtml = st.done.concat(sm.done).map(c=>_csDoneCard(c,'wash')).join('')
+      + loT.concat(loM).filter(x => _csLoWashDone(x.a)).map(_csLoDoneItem).join('');
     h += _csSec('<i data-ic=drop data-ics=16></i> 洗車', '今日・明日ぶん（暫定・未完も出します）', bodyHtml, doneHtml);
   }
   /* ② 今週の洗車予定
@@ -206,9 +325,14 @@ function renderCarSales(){
   {
     const weekAll = washWeek.concat(washNoDate);
     const sw = split(weekAll.sort(sortDate), 'washSalesDone');
-    let bodyHtml = (sw.open.length ? sw.open.map(c=>_csCard(c,'wash',_csWashLabel(c),'今週の洗車')).join('')
-                                   : '<div class="cs-empty">なし</div>');
-    const doneHtml = sw.done.map(c=>_csDoneCard(c,'wash')).join('');
+    /* 🚙 v2.173.0 代車（洗う日が翌営業日より後〜今週日曜）。お客様の車と同じ並びに、洗う日の順で混ぜる */
+    const loW = loWash.filter(x => x.washDay > nextBiz).sort(_csLoSort);
+    const rows = sw.open.map(c => ({ k: String(_wd(c) || '9999'), h: _csCard(c,'wash',_csWashLabel(c),'今週の洗車') }))
+      .concat(loW.filter(x => !_csLoWashDone(x.a)).map(x => ({ k: x.washDay, h: _csLoItem(x) })));
+    rows.sort((p, q) => p.k.localeCompare(q.k));   /* 同じ日の中は元の並びのまま（安定ソート） */
+    let bodyHtml = rows.length ? rows.map(r => r.h).join('') : '<div class="cs-empty">なし</div>';
+    const doneHtml = sw.done.map(c=>_csDoneCard(c,'wash')).join('')
+      + loW.filter(x => _csLoWashDone(x.a)).map(_csLoDoneItem).join('');
     h += _csSec('<i data-ic=calendar data-ics=16></i> 今週の洗車予定', '〜今週日曜（暫定・未完・未定も一緒に）', bodyHtml, doneHtml);
   }
   // ③ 車検ヘッドライト磨き
@@ -295,6 +419,20 @@ window.csDone = function(id, task){
   if (window.PitDB) PitDB.save();
   renderCarSales();
   if (window.pitToast) pitToast('✓ 完了にしました');
+};
+/* 🚙 v2.173.0 代車の洗車 完了／戻す（印は札の側。値＝洗った代車のid） */
+window.csLoDone = function(aid){
+  const a = (state.loanerAssigns||[]).find(x=>x.id===aid); if (!a) return;
+  a.washDone = a.loanerId;
+  if (window.PitDB) PitDB.save();
+  renderCarSales();
+  if (window.pitToast) pitToast('✓ 完了にしました');
+};
+window.csLoUndo = function(aid){
+  const a = (state.loanerAssigns||[]).find(x=>x.id===aid); if (!a) return;
+  delete a.washDone;
+  if (window.PitDB) PitDB.save();
+  renderCarSales();
 };
 window.csUndo = function(id, task){
   const c = (state.cards||[]).find(x=>x.id===id); if (!c) return;

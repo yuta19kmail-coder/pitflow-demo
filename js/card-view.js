@@ -1875,10 +1875,11 @@
     if (on){
       /* 未定にする＝日付を空にする（唯一の入口を通す）。「外している最中」の印も下ろす。 */
       _retTbdOff = false; _retTbdFor = _c.id;
+      const _r0 = String(_c.returnDateFinal || _c.returnDate || '');   /* 📝 v2.183.0 消した日を残す */
       if (window.pitReturnSetDateTime) pitReturnSetDateTime(_c, '', undefined);
       else { _c.returnDate = ''; }
       _c.returnDateFinal = null;
-      if (window.logFlow) logFlow(_c, '返車日を未定に戻した');
+      if (window.logFlow) logFlow(_c, '返車日を未定に戻した' + (_r0 ? '　元は ' + _r0 : ''));
       save(); cvRefreshBg();
       if (window.renderCardView) renderCardView(_c, 'md-body-modal');
       return;

@@ -220,6 +220,17 @@
     try { if (w.pitSyncLoanerAssigns) w.pitSyncLoanerAssigns(); } catch(e){}
     try {
       if (MODE === 'fix' && BEFORE && w.pitLogCardEdit) w.pitLogCardEdit(live, BEFORE);
+      /* 📝 v2.183.0 編集の差分（pitLogCardEdit）が**わざと外している日付**は、ここで1本ずつ残す。
+         ⚠ 差分が外しているのは「専用の記録が出るから」だが、マスター入力には専用の記録が無かった
+            ＝実績日・返車日・売上日を直しても「マスター入力で直した」の1行だけで、何をどう直したか分からなかった。 */
+      if (MODE === 'fix' && BEFORE && w.pitLogDateChange){
+        [['actualInAt','実際に入った日','in'], ['returnDate','返車日','out'], ['returnDateFinal','確定返車日','out'],
+         ['returnTime','返車時間','out'], ['completedAt','実績カウント日','result'], ['salesDate','売上日','result'],
+         ['completeCallAt','完TELの日','out'], ['cancelledAt','キャンセルした日','in'], ['noShowAt','未入庫にした日','in']
+        ].forEach(function(f){
+          w.pitLogDateChange(live, f[1], t(BEFORE[f[0]]), t(live[f[0]]), { kind: f[2], note: 'マスター入力' });
+        });
+      }
       if (w.pitLog) w.pitLog(MODE === 'fix' ? 'マスター入力で直した' : 'マスター入力で作った',
         { cardId: live.id, kind:'edit',
           label: (t(live.customer) || '（無名）') + ' / ' + (t(live.car) || t(live.plate) || '') });

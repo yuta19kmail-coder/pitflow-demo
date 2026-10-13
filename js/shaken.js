@@ -386,16 +386,22 @@
        ⚠ すでに決まっている車を別の日へ動かしただけの時は**出さない**（毎回聞かれると邪魔）。
        ⚠ 担当・陸運局・R は日を動かしても**消さない**（同じ車検の話なので持ち回る）。 */
     var isNew = !s.decided;
+    /* 📝 v2.183.0 行く日が動いたら必ず残す（前は「はじめて決めた時に窓で保存した時」だけ＝別の日へ動かすと何も残らなかった） */
+    var _d0 = s.decided ? (s.decided + ' ' + (s.decidedSlot === 'pm' ? '午後' : '午前')) : '';
     s.decided=iso; s.decidedSlot=(slot==='pm'?'pm':'am'); s.result=''; s.resultDate=''; s.resultSlot='';
     /* 🅿 v2.54.0 本決まりになったら**暫定は必ず落とす**（決定と暫定が両方ある状態を作らない） */
     s.tent=''; s.tentSlot='';
+    if(window.pitLogDateChange) pitLogDateChange(c, '車検の行く日', _d0, iso + ' ' + (s.decidedSlot === 'pm' ? '午後' : '午前'), { kind: 'shaken' });
     save(); renderShaken();
     if(isNew) setTimeout(function(){ shkDecidePop(id); }, 60);
   }
 
   /* 決定チップを「予定」エリアへ運ぶ＝決定を解除して候補（行ける日）に戻す（候補の枠は残す）v0.124.0 */
   function unassign(id){ var c=card(id); if(!c) return; var s=ins(c); if(!s.decided) return;   // 決定中の車だけ候補へ戻す
-    s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot=''; save(); renderShaken();
+    var _d0 = s.decided + ' ' + (s.decidedSlot === 'pm' ? '午後' : '午前');
+    s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot='';
+    if(window.pitLogDateChange) pitLogDateChange(c, '車検の行く日', _d0, '', { kind: 'shaken', note: '候補に戻した' });   /* 📝 v2.183.0 */
+    save(); renderShaken();
     if(window.pitToast) pitToast('↩ 候補（行ける日）に戻しました'); }
 
   /* ═══ ドラッグ（マウス＋タッチ・ポインタ方式）v0.124.1 ═══

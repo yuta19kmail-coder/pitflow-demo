@@ -505,6 +505,13 @@ window.loHeadSync = _loHeadSync;
 function _loCardBackDate(c){
   return String((c && (c.returnDateFinal || c.returnDate || c.completedAt)) || '');
 }
+/* 📝 v2.183.0 代車の期間が動いたら、紐づくカードのフローにも残す（前は代車まわりは**どこにも残らなかった**）。
+   ⚠ 書き方は card-tabs.js の pitLogDateChange 1本。期間は「開始〜返却」の1つの字で比べる。 */
+function _loSpan(f, t){ f = String(f || ''); t = String(t || ''); return (f || t) ? (f || '未定') + '〜' + (t || '未定') : ''; }
+function _loLogSpan(card, from0, to0, note, opt){
+  if (!card || !window.pitLogDateChange) return;
+  pitLogDateChange(card, '代車の期間', _loSpan(from0, to0), _loSpan(card.loanerFrom, card.loanerTo), Object.assign({ kind: 'loaner', note: note }, opt || {}));
+}
 function _loAutoReturnByCard(a, c){
   if (!a || !c) return false;
   if (a.returned) return false;                 /* 手で確定済み＝そちらが正 */
@@ -520,8 +527,11 @@ function _loAutoReturnByCard(a, c){
     if (a.toDateBefore == null) a.toDateBefore = a.toDate;   /* 元の予定＝「返却取消」で戻すため */
     a.toDate = back;                            /* 枠を実際の返却日に合わせる */
   }
+  const _to0 = c.loanerTo;
   c.loanerTo = a.toDate;
   c.loanerReturned = true;
+  if (window.logFlowAuto) logFlowAuto(c, '代車を返却済みにした（車の返車に合わせて自動）　返却日 ' + back
+    + (_to0 && _to0 !== a.toDate ? '／返却予定 ' + _to0 + ' → ' + a.toDate : ''));
   return true;
 }
 
@@ -1288,7 +1298,11 @@ window.loDraftApply = function(){
   // 紐づくカードの代車情報を同期
   changed.forEach(function(a){
     const card = a.cardId ? (state.cards||[]).find(function(c){return c.id===a.cardId;}) : null;
-    if (card){ card.loanerId=a.loanerId; card.loanerFrom=a.fromDate; card.loanerTo=a.toDate; }
+    if (card){
+      const _f0 = card.loanerFrom, _t0 = card.loanerTo;
+      card.loanerId=a.loanerId; card.loanerFrom=a.fromDate; card.loanerTo=a.toDate;
+      _loLogSpan(card, _f0, _t0, '代車カレンダーで反映');
+    }
   });
   _loDraftClear();
   if (window.PitDB) PitDB.save();
@@ -1300,7 +1314,7 @@ window.loDraftUndoApply = function(){
   if (!_loApplySnap) return;
   pitAsk('直前の一括実行を取り消して、実行前の状態に戻します。よろしいですか？', { ok:'元に戻す' }).then(function(yes){
     if (!yes) return;
-  (state.loanerAssigns||[]).forEach(function(a){ const o=_loApplySnap[a.id]; if(o){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; const card=a.cardId?(state.cards||[]).find(function(c){return c.id===a.cardId;}):null; if(card){card.loanerId=a.loanerId;card.loanerFrom=a.fromDate;card.loanerTo=a.toDate;} } });
+  (state.loanerAssigns||[]).forEach(function(a){ const o=_loApplySnap[a.id]; if(o){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; const card=a.cardId?(state.cards||[]).find(function(c){return c.id===a.cardId;}):null; if(card){ const _f0=card.loanerFrom, _t0=card.loanerTo; card.loanerId=a.loanerId;card.loanerFrom=a.fromDate;card.loanerTo=a.toDate; _loLogSpan(card, _f0, _t0, '代車カレンダーの反映を取り消し'); } } });
   _loApplySnap = null;
   if (window.PitDB) PitDB.save();
   _loRefresh();
@@ -1405,7 +1419,11 @@ window.loUnreturn = function(aid){
   if (a.autoReturned && a.toDateBefore){ a.toDate = a.toDateBefore; }
   delete a.autoReturned; delete a.toDateBefore;
   const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
-  if (card){ card.loanerReturned = false; card.loanerTo = a.toDate; }
+  if (card){
+    const _t0 = card.loanerTo;
+    card.loanerReturned = false; card.loanerTo = a.toDate;
+    if (window.logFlow) logFlow(card, '代車の返却を取り消した' + (_t0 !== a.toDate ? '　返却予定 ' + (_t0 || '未定') + ' → ' + (a.toDate || '未定') : ''));
+  }
   if (window.PitDB) PitDB.save();
   _loBadgePopClose(); renderLoaner();
 };
@@ -1433,7 +1451,11 @@ window.loReturnConfirm = function(aid){
     delete a.autoReturned;              /* 🔴 v1.81.0 人が押したもの＝自動の印は外す（こちらが正） */
     if (rd < a.toDate) a.toDate = rd;   // 早く返ってきたらバーを実際の返却日まで縮める
     const card = a.cardId ? (state.cards || []).find(function(c){ return c.id === a.cardId; }) : null;
-    if (card){ card.loanerTo = a.toDate; card.loanerReturned = true; }
+    if (card){
+      const _t0 = card.loanerTo;
+      card.loanerTo = a.toDate; card.loanerReturned = true;
+      if (window.logFlow) logFlow(card, '代車の返却を確定した　返却日 ' + rd + (_t0 && _t0 !== a.toDate ? '／返却予定 ' + _t0 + ' → ' + a.toDate : ''));
+    }
     if (window.PitDB) PitDB.save();
     _loBadgePopClose(); renderLoaner();
   });
@@ -1477,7 +1499,11 @@ window.loCancelLoaner = function(aid){
                      loanerTo: card.loanerTo, loanerFixed: card.loanerFixed } : null
     };
     state.loanerAssigns = (state.loanerAssigns || []).filter(function(x){ return x.id !== aid; });
-    if (card){ card.needLoaner = false; card.loanerId = ''; card.loanerFrom = ''; card.loanerTo = ''; card.loanerFixed = false; }
+    if (card){
+      const _sp0 = _loSpan(card.loanerFrom, card.loanerTo);
+      card.needLoaner = false; card.loanerId = ''; card.loanerFrom = ''; card.loanerTo = ''; card.loanerFixed = false;
+      if (window.logFlow) logFlow(card, '代車をキャンセルした' + (_sp0 ? '　元の期間 ' + _sp0 : ''));
+    }
     if (window.PitDB) PitDB.save();
     _loBadgePopClose(); renderLoaner();
     _loRenderDraftBar();   /* ⚠ renderLoaner だけでは下のバーが描き直されない＝「↩ 元に戻す」が出ない */
@@ -1496,7 +1522,8 @@ window.loCancelUndo = function(){
     if (sn.cardId && sn.card){
       const c = (state.cards || []).find(function(x){ return x.id === sn.cardId; });
       if (c){ c.needLoaner = sn.card.needLoaner; c.loanerId = sn.card.loanerId; c.loanerFrom = sn.card.loanerFrom;
-              c.loanerTo = sn.card.loanerTo; c.loanerFixed = sn.card.loanerFixed; }
+              c.loanerTo = sn.card.loanerTo; c.loanerFixed = sn.card.loanerFixed;
+              if (window.logFlow) logFlow(c, '代車のキャンセルを取り消した　期間 ' + (_loSpan(c.loanerFrom, c.loanerTo) || '未定')); }
     }
     _loCancelSnap = null;
     if (window.PitDB) PitDB.save();

@@ -1802,6 +1802,8 @@
       return;
     }
     const _before = _c ? (_c.completedAt || '（なし）') : '';
+    /* 📝 v2.182.0 実績カードの「確定 返車日」に見えていた日（表示と同じ拾い方＝returnDateFinal → returnDate） */
+    const _retShown = _c ? String(_c.returnDateFinal || _c.returnDate || '') : '';
     /* 🔴 v1.66.0 書き込みは return-slot.js の唯一の入口を通す。
        ここは長いあいだ「returnDate が空のときだけ入れる」だったので、
        **確定返車日を直しても返車カレンダー上の位置が動かなかった**（v1.60.0 と同じ形の取り残し）。 */
@@ -1817,9 +1819,15 @@
     if(v && _c.status === 'returned'){
       _c.returnDate = v; _c.completedAt = v;
       if (_before !== v){
-        try { if (window.logFlow) logFlow(_c, '確定返車日を ' + v + ' に変更（実績カウント日も ' + _before + ' → ' + v + '）'); } catch(e){}
+        try { if (window.logFlow) logFlow(_c, '確定返車日を ' + (_retShown || '（なし）') + ' → ' + v + ' に変更（実績カウント日も ' + _before + ' → ' + v + '）'); } catch(e){}
         try { if (window.pitLog) pitLog('実績カウント日を変更（返車日から）', { cardId: _c.id, kind: 'result',
           label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + _before + ' → ' + v }); } catch(e){}
+      } else if (_retShown !== v){
+        /* 📝 v2.182.0（D75134）**実績カウント日が変わらなくても、確定返車日が動いたら残す。**
+           前は実績カウント日が動いた時だけ書いていたので、16日 → 13日（実績日はもともと13日）が1行も残らなかった。 */
+        try { if (window.logFlow) logFlow(_c, '確定返車日を ' + (_retShown || '（なし）') + ' → ' + v + ' に変更（実績カウント日は ' + _before + ' のまま）'); } catch(e){}
+        try { if (window.pitLog) pitLog('確定返車日を変更（実績）', { cardId: _c.id, kind: 'result',
+          label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + (_retShown || '（なし）') + ' → ' + v }); } catch(e){}
       }
     }
     save(); cvRefreshBg();
@@ -1898,6 +1906,8 @@
     if (window.pitReturnSetDateTime){
       var res = pitReturnSetDateTime(_c, undefined, v);
       if (window.pitReturnCommit && _c.status !== 'returned') pitReturnCommit(_c, res, { silent: true });
+      /* 📝 v2.182.0 実績カードは commit を通らないので、時間の変更はここで残す（書く中身は return-slot.js の1本） */
+      else if (_c.status === 'returned' && window.pitReturnLogChange) pitReturnLogChange(_c, res);
     } else {
       _c.returnTime = v;
     }

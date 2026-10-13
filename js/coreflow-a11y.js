@@ -690,6 +690,8 @@
     setMag: setMag,
     state: function () { return { enabled: enabled, kukkiri: prefs.kukkiri, ookisa: prefs.ookisa, viewer: prefs.viewer, simple: root.classList.contains('cf-simple'), mag: mag.on, uid: uid }; },
     setViewer: setViewer,
+    /* 🆕 2026-10-12 名簿のその人の書類（1回だけ読む・同じ Promise を返す）。英語表示（coreflow-en.js）の旗 `en` もここから読む */
+    member: readMember,
     /* 試験・見本用：Firestore を通さずに状態を決める */
     _set: function (on, p) { setState(on, p || {}); }
   };

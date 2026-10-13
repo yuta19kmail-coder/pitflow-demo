@@ -333,6 +333,8 @@
   function pitReturnSetDateTime(c, date, time){
     if (!c) return null;
     var before = pitReturnPlace(c);
+    /* 📝 v2.182.0 動く前の日付・時間を控える（記録を書く pitReturnLogChange が使う） */
+    var _dFrom = String(c.returnDate || ''), _tFrom = String(c.returnTime || '');
     /* ☎ v1.185.0（ゆうた指定 2026-08-23）**「完TEL待ちの欄から返車日を入れた」も完TELの記録に残す。**
        🗣「また依頼の欄から返車日を入力したのもログに入れたい」
        ◎なぜここか＝完TEL待ち（依頼ぶん）の車に日付や時間が入るのは、
@@ -402,19 +404,46 @@
     /* ⚠ `完TEL` を返すのは、下の `pitReturnCommit` に**同じことを2度書かせない**ため。
        あちらの「返車の予定を更新 → …」と、上の1行は同じ操作の話なので、
        両方出すとフローが同じ内容で2行に増える（読む人がいちばん嫌がる形）。 */
-    return { before: before, after: after, moved: (before !== after), 完TEL: _markedCall };
+    return { before: before, after: after, moved: (before !== after), 完TEL: _markedCall,
+             dFrom: _dFrom, tFrom: _tFrom, dTo: String(c.returnDate || ''), tTo: String(c.returnTime || '') };
   }
   window.pitReturnSetDateTime = pitReturnSetDateTime;
+
+  /* ---------------------------------------------------------------
+     📝 v2.182.0（ゆうた報告 2026-10-13 D75134）**返車の日付・時間が動いたら、必ずフローに1行残す。**
+     🗣「返車確定日に16日が入っていて、当日ビューから返車済みにしたのに実績に入らず、
+     　　返車カレンダーの16日に入っていた。確定日を手動で直したら実績化された。ただしログにも残ってない」
+     ◎正体＝前は「**行き先（返車カレンダー／時刻未定…）が変わった時だけ**」書いていた。
+       カレンダーの中で 13日 → 16日 に動いても行き先は「返車予定カレンダー」のまま＝**1行も残らなかった**。
+       ドラッグ・当日ビューの日時変更・予約詳細・マウスオーバー入力の4本とも同じ穴。
+       しかも編集の差分（pit-share.js の _DIFF_SKIP）は「専用の記録が出るから」と返車日を外している＝どこにも残らない。
+     🔴 **書くのはここ1本。** 4本の道はこれを呼ぶだけ（どれか1本に書くと残りから入れた時だけ落ちる）。
+     ⚠ 完TELの記録を上で書いた時（res.完TEL）は書かない＝同じ操作が2行にならないように（v1.185.0 の決めごと）。
+     --------------------------------------------------------------- */
+  function _dtText(d, t){ return (d ? d : '未定') + (t ? ' ' + t : ''); }
+  function pitReturnLogChange(c, res){
+    if (!c || !res || res.完TEL) return false;
+    var dtMoved = (res.dFrom !== res.dTo) || (res.tFrom !== res.tTo);
+    if (!res.moved && !dtMoved) return false;
+    var change = dtMoved ? _dtText(res.dFrom, res.tFrom) + ' → ' + _dtText(res.dTo, res.tTo) : '';
+    var label = (res.moved && res.after)
+      ? '返車の予定を更新 → ' + pitReturnPlaceLabel(res.after) + (change ? '（' + change + '）' : (c.returnDate ? '（' + _dtText(c.returnDate, c.returnTime) + '）' : ''))
+      : '返車の予定を変更 ' + change;
+    if (window.logFlow) logFlow(c, label);
+    try {
+      if (window.pitLog) pitLog('返車の予定を変更', { cardId: c.id, kind: 'out',
+        label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + (change || pitReturnPlaceLabel(res.after)) });
+    } catch (e) {}
+    return true;
+  }
+  window.pitReturnLogChange = pitReturnLogChange;
 
   /* 書き込んだあとの後始末を1か所に。保存・描き直し・お知らせをまとめてやる。
      🔴 ここを通さないと「入れたのに画面が変わらない（＝移動しないように見える）」が起きる。 */
   function pitReturnCommit(c, res, opt){
     opt = opt || {};
     /* ⚠ v1.185.0 完TELの記録を上で書いた時は、ここは書かない（同じ操作が2行になるため）。 */
-    if (window.logFlow && res && res.moved && res.after && !res.完TEL){
-      logFlow(c, '返車の予定を更新 → ' + pitReturnPlaceLabel(res.after)
-              + (c.returnDate ? '（' + c.returnDate + (c.returnTime ? ' ' + c.returnTime : '') + '）' : ''));
-    }
+    pitReturnLogChange(c, res);   /* 📝 v2.182.0 行き先が同じでも、日付・時間が動けば残す */
     if (window.PitDB && PitDB.save) PitDB.save(true);
     if (window.state && state.currentView && window.showView) showView(state.currentView);
     if (window.PitPip && PitPip.isOpen && PitPip.isOpen()) PitPip.refresh();

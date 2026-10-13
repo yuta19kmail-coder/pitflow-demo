@@ -209,6 +209,30 @@ window.logFlow = function(card, label, opt){
 /* 自動でやったこと専用の入口（呼び間違いを防ぐ）。中身は上の1本を通る。 */
 window.logFlowAuto = function(card, label){ return window.logFlow(card, label, { auto: true }); };
 
+/* 📝 v2.183.0（ゆうた指定 2026-10-14「日付系を動かした時にフローに残らないものは全部直して」）
+   **日付・時刻が動いたら「何を・前 → 後」で1行残す入口。** フロー（カード）と操作ログ（pitAuditLogs）の両方。
+   ◎なぜ1本か＝予約カレンダーのドラッグ・当日ビュー・代車・車検・マスター入力…と道が多く、
+     道ごとに書き方がバラバラだと「どれが残ってどれが残らないか」がまた分からなくなる（D75134 で踏んだ）。
+   ・what  … 「入庫の予定」「代車の期間」など（画面の言葉）
+   ・from / to … 文字のまま並べる。空は「未定」
+   ・opt.kind … 操作ログの種類（in / out / result …）。opt.auto … 自動の処理
+   🔴 前と後が同じなら**何も書かない**（同じ日を入れ直しただけの行を出さない）。 */
+window.pitLogDateChange = function(card, what, from, to, opt){
+  if (!card) return false;
+  opt = opt || {};
+  var f = String(from == null ? '' : from).trim(), t = String(to == null ? '' : to).trim();
+  if (f === t) return false;
+  var txt = what + 'を ' + (f || '未定') + ' → ' + (t || '未定') + ' に変更' + (opt.note ? '（' + opt.note + '）' : '');
+  if (window.logFlow) window.logFlow(card, txt, opt.auto ? { auto: true } : undefined);
+  try {
+    if (window.pitLog) pitLog(what + 'を変更', { cardId: card.id, kind: opt.kind || '',
+      label: ((window.pitCustName ? pitCustName(card) : card.customer) || '') + ' 様' + (card.car ? ' / ' + card.car : '') + '　' + (f || '未定') + ' → ' + (t || '未定') });
+  } catch (e) {}
+  return true;
+};
+/* 日付＋時刻をひとつの字に（「2026-10-13 17:00」／時刻が無ければ日付だけ） */
+window.pitDtText = function(d, t){ d = String(d || ''); t = String(t || ''); return d ? (d + (t ? ' ' + t : '')) : (t ? '日付未定 ' + t : ''); };
+
 /* ===== フェーズ移動ログ（誰が・いつ・どこから→どこへ）＋ phaseAt 更新 =====
    dnd.js（ドラッグ）／task.js（<i data-ic=chevLeft data-ics=16></i><i data-ic=chevRight data-ics=16></i>）から status を変える時に呼ぶ。
    card.phaseAt ＝ 今のフェーズに入った時刻（「このフェーズ何日目」のカウント起点）。 */

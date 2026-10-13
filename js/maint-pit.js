@@ -1047,6 +1047,9 @@
     if (recId){                                   /* 直す */
       var hit = spanOf(recId);
       if (!hit){ w.pitAlert('この候補が見つかりません', { code:'PF-3059' }); return; }
+      /* 📝 v2.183.0 候補の期間を直したら、カードのフローにも残す */
+      if ((hit.span.from !== from || hit.span.to !== to) && w.pitLogDateChange)
+        w.pitLogDateChange(hit.card, '整備の候補の期間', md(hit.span.from) + '〜' + md(hit.span.to), md(from) + '〜' + md(to), { kind: 'loaner' });
       hit.span.from = from; hit.span.to = to;
       if (mode === 'fixed') _fixSpan(hit.card, hit.span);
       else if (hit.card.maintFixSid === hit.span.sid) _unfixCard(hit.card);
@@ -1058,6 +1061,7 @@
       var sp = { sid: newSid(), from: from, to: to };
       c.maintSpans.push(sp);
       if (mode === 'fixed') _fixSpan(c, sp);
+      else if (w.logFlow) try { w.logFlow(c, '整備の候補を置いた（' + md(from) + '〜' + md(to) + '）'); } catch(e){}   /* 📝 v2.183.0 */
     }
     saveCards();
     try { if (w.pitLog) w.pitLog(mode === 'fixed' ? '整備の枠を確定した' : '整備の候補を置いた',
@@ -1075,7 +1079,10 @@
   }
   /* 確定をやめる＝未定（候補待ち）に戻す。 */
   function _unfixCard(c){
+    var _rd0 = c.reserveDate || '';
     c.maintFixSid = ''; c.reserveDate = ''; c.reserveTime = ''; c.intakeTbd = true;
+    /* 📝 v2.183.0 確定を外した＝入庫日が消える。前は**フローに何も残らなかった** */
+    if (_rd0 && w.logFlow) try { w.logFlow(c, '整備の枠の確定を外した（入庫日 ' + _rd0 + ' → 未定）'); } catch(e){}
   }
   w.pitMaintUnfix = _unfixCard;
 
@@ -1132,6 +1139,7 @@
     var c = hit.card, sp = hit.span;
     c.maintSpans = arr(c.maintSpans).filter(function(x){ return x.sid !== sp.sid; });
     if (c.maintFixSid === sp.sid) _unfixCard(c);
+    if (w.logFlow) try { w.logFlow(c, '整備の候補を取り消した（' + md(sp.from) + '〜' + md(sp.to) + '）'); } catch(e){}   /* 📝 v2.183.0 */
     saveCards();
     try { if (w.pitLog) w.pitLog('整備の枠を取り消した', { cardId:c.id, kind:'loaner',
       label:(WORK_LB[c.workType]||'') + ' ' + md(sp.from) + '〜' + md(sp.to) }); } catch(e){}

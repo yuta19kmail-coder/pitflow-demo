@@ -309,9 +309,11 @@ window.pitUndSetIntake = function(id){
   /* 🔵 v1.75.0 ブラウザ純正の prompt をやめてアプリ内の入力ダイアログ（pitAskText）に。 */
   pitAskText('入庫日を入れてください（例 2026-06-20）', c.reserveDate || ymd(new Date()), { ok:'入れる' }).then(function (d) {
     if (!d) return;
+    const _in0 = c.reserveDate || '';
     c.reserveDate = String(d).trim();
     c.intakeTbd = false;
-    if (window.logFlow) logFlow(c, '入庫日を設定（予約へ）');
+    /* 📝 v2.183.0 何日に入れたかも残す（前は「入庫日を設定（予約へ）」だけで日付が無かった） */
+    if (window.logFlow) logFlow(c, '入庫日を設定（予約へ）　' + (_in0 && _in0 !== c.reserveDate ? _in0 + ' → ' : '') + c.reserveDate);
     if (window.PitDB) PitDB.save();
     renderReserveTbd();
     if (window.pitToast) pitToast(''+ c.reserveDate + 'の予約に入れました');
@@ -426,13 +428,18 @@ window.pitUndComplete = function(id){
   if (!c) return;
   pitAskText('完TEL！ 返車日を入れてください（例 2026-06-20）', c.returnDate || ymd(new Date()), { ok:'入れる' }).then(function (d) {
     if (!d) return;
-    c.returnDate = String(d).trim();
+    /* 🔴 v2.183.0 返車日は唯一の入口（return-slot.js）を通す。
+       ⚠ 前はここだけ returnDate を直に書いていて、**確定返車日（returnDateFinal）が古いまま残った**
+          （カードの「確定 返車日」と返車カレンダーの日が食い違う＝D75134 と同じ形の食い違い）。 */
+    const _res = window.pitReturnSetDateTime ? pitReturnSetDateTime(c, String(d).trim(), undefined) : null;
+    if (!_res) c.returnDate = String(d).trim();
     c.returnTbd = false;
     /* ☎ v1.185.0 完TEL日（ログ）の記録は sales-date.js の1本を通す（上書きしない）。
        ⚠ 前はここで直に今日を入れていたので、**すでに依頼で通っていた日が消えていた**。 */
     if (window.pitMarkCompleteCall) pitMarkCompleteCall(c);
     else c.completeCallAt = c.completeCallAt || ymd(new Date());
-    if (window.logFlow) logFlow(c, '完TEL → 返車日設定'
+    /* ⚠ 完TEL待ちから来た車は、上の入口がもう完TELの1行を書いている＝2行にしない */
+    if (window.logFlow && !(_res && _res.完TEL)) logFlow(c, '完TEL → 返車日設定　' + (c.returnDate || '')
       + (c.completeCallAt ? '／完TEL日 ' + c.completeCallAt : ''));
     if (window.PitDB) PitDB.save();
     renderReturnTbd();

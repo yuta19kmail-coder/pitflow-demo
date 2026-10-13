@@ -294,7 +294,11 @@
         var need = (card.outsourceTo === '各ディーラー' || card.outsourceTo === 'その他');
         card.outsourceNote = need ? ((el('pp-outnote') && el('pp-outnote').value.trim()) || '') : '';
         var due = el('pp-outdue') ? el('pp-outdue').value : '';
-        if (due) card.outsourceDue = due;
+        if (due){
+          var _od0 = card.outsourceDue || '';
+          card.outsourceDue = due;
+          if (window.pitLogDateChange) pitLogDateChange(card, '外注の戻り予定日', _od0, due, { kind: 'phase' });   /* 📝 v2.183.0 */
+        }
       } else {
         // 金額（空なら据え置き）。見積 → amountQuote／受注 → amountOrder／確定 → amountFinal
         var amt = digits(el('pp-amt') ? el('pp-amt').value : '');
@@ -327,7 +331,12 @@
           /* 🔴 v1.65.0（ゆうた確定）ここで入れるのは **B＝お客様への約束**であって、確定返車日（C）ではない。
              売上の見込み（今月に入るか）には使うが、**返車カレンダーには使わない**。
              カレンダーは完TELを通したときの確定日（C）だけで動く。 */
-          if (r) card.returnDatePlan = r;
+          if (r){
+            var _rp0 = card.returnDatePlan || '';
+            card.returnDatePlan = r;
+            /* 📝 v2.183.0 受注の時に入れた「お客様への約束の日」も残す（前はクイック受注の時だけ残っていた） */
+            if (window.pitLogDateChange) pitLogDateChange(card, '返車予定日（お客様への約束）', _rp0, r, { kind: 'phase', note: '受注' });
+          }
           var _hl = el('pp-headlight'); if (_hl) card.headlight = _hl.checked;
           var _co = el('pp-coatingok'); if (_co) card.coatingOK = _co.checked;
           var _sr = el('pp-salesreq');  if (_sr) { card.salesReq = _sr.checked; card.salesReqTouched = true; }

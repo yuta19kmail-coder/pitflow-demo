@@ -375,7 +375,12 @@ window.pitTodaySaveDt = function(id, isReturn){
     }
     c.returnDate = d; c.returnTime = t;
   }
-  else { c.reserveDate = d; c.reserveTime = t; if (d) c.intakeTbd = false; }
+  else {
+    /* 📝 v2.183.0 入庫の日時変更は前は**どこにも残らなかった** */
+    const _in0 = window.pitDtText ? pitDtText(c.reserveDate, c.reserveTime) : '';
+    c.reserveDate = d; c.reserveTime = t; if (d) c.intakeTbd = false;
+    if (window.pitLogDateChange) pitLogDateChange(c, '入庫の予定', _in0, pitDtText(c.reserveDate, c.reserveTime), { kind: 'in', note: '当日ビューの日時変更' });
+  }
   if (window.PitDB) PitDB.save();
   pitTodayActionClose();
   renderToday();
@@ -409,9 +414,10 @@ window.pitTodayCancel = function(id, isReturn){
   if (isReturn){
     /* 🔴 v1.65.0 `returnTbd` は v1.60.0 で廃止した旧フラグ。日付を空にすれば「返車日未定」に戻る。
        書き込みは唯一の入口（pitReturnSetDateTime）を通す。 */
+    const _ret0 = window.pitDtText ? pitDtText(c.returnDate, c.returnTime) : '';   /* 📝 v2.183.0 消した日を残す */
     if (window.pitReturnSetDateTime) pitReturnSetDateTime(c, '', '');
     else { c.returnDate = ''; c.returnTime = ''; }
-    if (window.logFlow) logFlow(c, '返車予定キャンセル（未定へ）');
+    if (window.logFlow) logFlow(c, '返車予定キャンセル（未定へ）' + (_ret0 ? '　元は ' + _ret0 : ''));
   } else {
     c.status = 'cancelled';
     /* 🔴 v1.139.0（ゆうた確定）**自動の未入庫と同じ印を立てる。**

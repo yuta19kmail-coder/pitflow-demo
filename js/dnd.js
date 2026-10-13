@@ -93,6 +93,8 @@
   function applyCardDrop(cardId, kind, val) {
     const c = state.cards.find(x => x.id === cardId);
     if (!c) return;
+    /* 📝 v2.183.0 入庫の日時を動かす前を控える（_finishDrop で「前 → 後」を1行残す） */
+    const _in0 = window.pitDtText ? pitDtText(c.reserveDate, c.reserveTime) : '';
 
     // 完TEL済／完TEL依頼エリアへドロップ＝ポップアップで入力（カードは盤面から外れる）
     if (kind === 'callDone' || kind === 'callReq') {
@@ -257,6 +259,8 @@
        🔵 v1.74.1 入庫日のガードが非同期になったので、**答えが返ってから**ここを通ることがある。
        ⚠ だから1本の関数にしてある。書き写さないこと。 */
     function _finishDrop(){
+      /* 📝 v2.183.0 予約カレンダーのドラッグ（日・時刻・週の日時）は前は**どこにも残らなかった** */
+      if (window.pitLogDateChange && window.pitDtText) pitLogDateChange(c, '入庫の予定', _in0, pitDtText(c.reserveDate, c.reserveTime), { kind: 'in', note: 'カレンダーで移動' });
       if (window.PitDB) PitDB.save();
       if (state.currentView) showView(state.currentView);
       if (window.PitPip && PitPip.isOpen && PitPip.isOpen()) PitPip.refresh();  // PiP小窓も同期（2画面連携）

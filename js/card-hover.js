@@ -147,10 +147,8 @@
       if (time !== undefined) c.returnTime = (window._normTime ? _normTime(time||'') : (time||''));
       saveNow(); rerenderReturn(); return;
     }
-    if (window.logFlow && res.moved && res.after){
-      logFlow(c, '返車の予定を更新 → ' + pitReturnPlaceLabel(res.after)
-              + (c.returnDate ? '（' + c.returnDate + (c.returnTime ? ' ' + c.returnTime : '') + '）' : ''));
-    }
+    /* 📝 v2.182.0 記録は return-slot.js の1本（行き先が同じでも日付・時間が動けば残す） */
+    if (window.pitReturnLogChange) pitReturnLogChange(c, res);
     saveNow();
     rerenderReturn();
     if (window.state && state.currentView && state.currentView !== 'return' && window.showView) showView(state.currentView);

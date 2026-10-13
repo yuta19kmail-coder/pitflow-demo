@@ -773,6 +773,31 @@ w.pitDivisionColor = pitDivisionColor;
     var t = String(v);
     return t.length > 30 ? t.slice(0, 30) + '…' : t;
   }
+  /* 🔴 v2.182.0（ゆうた報告 2026-10-13 D75134）**項目の並び順で「変わった」と言わない。**
+     ◎正体＝入れ子（車検の日取り・連絡先）を JSON の字で見くらべていた。
+       サーバーから戻った姿と画面の姿で**項目の並び順だけ**が違うと、中身が同じでも「変わった」になり、
+       「編集：車検の日取り {"mode":"manual","slots":{},"c → {"slots":{},"cutBefore":"","mo」
+       「編集：連絡先 3件 → 3件」が、**何も触っていない人の保存のたびに**出ていた
+       （車検でない車にも空の車検の日取りが入っているので、どの車でも出る）。
+     ＝ 項目名を並べ直してから見くらべる。空っぽの書き方の違い（undefined／''／false）も同じに扱う。 */
+  function _stable(v){
+    if (_emptyish(v)) return null;
+    if (Array.isArray(v)) return v.map(_stable);
+    if (v && typeof v === 'object'){
+      var o = {};
+      Object.keys(v).sort().forEach(function (k) {
+        if (k.charAt(0) === '_') return;
+        var x = _stable(v[k]);
+        if (x !== null) o[k] = x;
+      });
+      return o;
+    }
+    return v;
+  }
+  function _sameDeep(a, b){
+    var z = function (v) { var x = _stable(v); return (x && typeof x === 'object' && !Array.isArray(x) && !Object.keys(x).length) ? null : x; };
+    try { return JSON.stringify(z(a)) === JSON.stringify(z(b)); } catch (e) { return false; }
+  }
   function _same(a, b){
     if (_emptyish(a) && _emptyish(b)) return true;   /* 🔴 空っぽどうしは「変わっていない」 */
     if (Array.isArray(a) || Array.isArray(b)) {
@@ -785,13 +810,11 @@ w.pitDivisionColor = pitDivisionColor;
           return JSON.stringify(x.slice().map(String).sort()) === JSON.stringify(y.slice().map(String).sort());
         } catch (e) { return false; }
       }
-      try { return JSON.stringify(x) === JSON.stringify(y); } catch (e) { return false; }
+      return _sameDeep(x, y);
     }
     if (a == null && b === '') return true;
     if (b == null && a === '') return true;
-    if (typeof a === 'object' || typeof b === 'object') {
-      try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
-    }
+    if (typeof a === 'object' || typeof b === 'object') return _sameDeep(a, b);
     return String(a == null ? '' : a) === String(b == null ? '' : b);
   }
   /* 開いた時の姿(before) と いまの姿(after) を見くらべて、変わった欄だけ返す。
@@ -822,6 +845,13 @@ w.pitDivisionColor = pitDivisionColor;
           });
           return;
         }
+        return;   /* 🔴 v2.182.0 中の項目がどれも同じ＝変わっていない（{…} の字を記録に出さない） */
+      }
+      /* 🔴 v2.182.0 連絡先・部品など「件数が同じで中身だけ変わった」は「3件 → 3件」と出さない */
+      if (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.length
+          && a.concat(b).some(function (x) { return x && typeof x === 'object'; })) {
+        out.push({ key: k, label: _diffLabel(k), from: a.length + '件', to: b.length + '件（中身を変更）' });
+        return;
       }
       out.push({ key: k, label: _diffLabel(k),
                  from: _diffVal(a, b), to: _diffVal(b, a) });

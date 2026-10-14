@@ -507,7 +507,16 @@ w.pitDivisionColor = pitDivisionColor;
          ・操作ログ … action=`完了アーカイブを直した` / label=`高橋 様 / ゴルフ　支払い 現金 → カード`
          ⚠ 「支払い」の3文字だけで弾かない。**入金**の記録まで巻き添えにする（保険の要）。
             「直した記録で、かつ 支払い ◯◯ → ◯◯ の形」の両方がそろった時だけ隠す。 */
-      み: function (t) { return /完了アーカイブを直した/.test(t) && /支払い[^→]*→/.test(t); } }
+      み: function (t) { return /完了アーカイブを直した/.test(t) && /支払い[^→]*→/.test(t); } },
+    { 版: '2.184.0', 何: '並び順だけ違う入れ子の「編集」（D75134）',
+      /* v2.182.0 より前の差分は、入れ子を JSON の字で比べていた。**丸ごとの行**（`編集：車検の日取り {…} → {…}`）が出るのは
+         「中の項目がどれも同じ」時だけ＝**並び順が違っただけで、何も変わっていない**。だから隠してよい。
+         ⚠ `・` の付いた行（`車検の日取り・slots {…}`）は**本当に変わった記録**。隠さず pitLogReword で読める言葉にする。 */
+      み: function (t) { return /^編集：[^・\s：]+ \{.*→ \{/.test(t); } },
+    { 版: '2.184.0', 何: '空から空の「編集」（{} の箱ができただけ）',
+      /* `編集：整備チェック （空） → {}`・`編集：バックオフィス後処理 （空） → {}` ＝カードを開いた時に空の箱が置かれただけ（本番に447行）。
+         何も入っていない＝何も変わっていない。v2.182.0 からは出ない（空の箱は空として比べる）。 */
+      み: function (t) { return /^編集：[^\s：]+ （空） → \{\}$/.test(t) || /^編集：[^\s：]+ \{\} → （空）$/.test(t); } }
   ];
   function pitLogGone(text){
     var t = String(text == null ? '' : text);
@@ -518,6 +527,38 @@ w.pitDivisionColor = pitDivisionColor;
     return false;
   }
   w.pitLogGone = pitLogGone;
+
+  /* 📝 v2.184.0（ゆうた「古いフローのバグ文字は書き換わらない？」2026-10-14）
+     **保存されている記録は書き換えず、描く時だけ読める言葉にする**（フロー・操作ログの両方がここを通る）。
+     ◎直すもの（v2.182.0 より前の差分が残した形）
+       ・`車検の日取り・slots {"2026-09-01":["am","pm"]} → {…` … 中身が `{…}` の字のまま＝読めない。
+         しかも30字で切れていて元に戻せない → **「車検の日取り・行ける日 を変更」** と言う
+       ・`車検の日取り {…} → {…}`（・が無い丸ごとの行）… 並び順だけ＝何も変わっていない → 消す
+         （フローの1行まるごとの時は pitLogGone が隠す。操作ログの中の一部の時はここで消す）
+       ・`連絡先 3件 → 3件` … 並び順だけか中身が変わったか、記録からは分からない → そう書く
+     ⚠ 新しい記録（v2.184.0 から）はこの形を作らない。手で足した記録は呼ぶ側で通さない。 */
+  var _SUBRAW = { slots: '行ける日', history: '履歴', checks: 'チェック' };
+  function pitLogReword(text){
+    var t = String(text == null ? '' : text);
+    if (t.indexOf('{') < 0 && t.indexOf('件 → ') < 0) return t;
+    /* 項目名（・の後ろが英語のまま残っているもの）を日本語に */
+    t = t.replace(/・(slots|history|checks)(?=[ （])/g, function (m, k) { return '・' + (_SUBRAW[k] || k); });
+    /* `名前・項目 {…} → {…` ＝本当に変わった。中身は読めない字なので言わない */
+    t = t.replace(/([^\s：、/]+・[^\s：、/]+) [\{\[][^→]*→ [\{\[][^、]*/g, '$1 を変更');
+    /* 片方が（空）＝`整備チェック・チェック （空） → {"oil":true…` も同じ（入れた／外した） */
+    t = t.replace(/([^\s：、/]+・[^\s：、/]+) （空） → [\{\[][^、]*/g, '$1 を変更');
+    t = t.replace(/([^\s：、/]+・[^\s：、/]+) [\{\[][^→]*→ （空）/g, '$1 を変更');
+    /* `名前 （空） → {}` ＝空の箱ができただけ（操作ログの中の一部の時はここで消す） */
+    t = t.replace(/(^|、| \/ )[^\s：、/]+ （空） → \{\}(?=、|$)/g, function (m, pre) { return pre === ' / ' ? ' / ' : ''; });
+    /* `名前 {…} → {…`（・なし）＝並び順だけ。区切り（、）ごと消す */
+    /* ⚠ 操作ログでは「… 様 / 車 / 車検の日取り {…}、連絡先 …」の形で、前が「 / 」のこともある */
+    t = t.replace(/(^|、| \/ )[^\s：、/]+ \{[^→]*→ \{[^、]*/g, function (m, pre) { return pre === ' / ' ? ' / ' : ''; });
+    t = t.replace(/^、/, '').replace(/ \/ 、/, ' / ').replace(/：、/, '：').replace(/ \/ $/, '');
+    /* `連絡先 3件 → 3件`（同じ数・後ろに説明なし）＝変わったかどうか記録に無い */
+    t = t.replace(/([^\s：、/]+) (\d+)件 → \2件(?!（)/g, '$1 $2件（変わったかは記録なし）');
+    return t;
+  }
+  w.pitLogReword = pitLogReword;
 
   /* ===================================================================
      💬 v2.13.3 **お礼LINEは、LINEが繋がっているお客様にだけ聞く**（ゆうた 2026-08-25）
@@ -714,7 +755,9 @@ w.pitDivisionColor = pitDivisionColor;
                torque:'増締め', light:'ライト', slip:'サイドスリップ', checks:'チェック' },
     office:  { invoice:'請求発行', paid:'入金確認', cost:'原価チェック', checks:'チェック' },
     coverCall:{ done:'完TEL 済', at:'完TELの日時', staff:'完TELの担当' },
-    inspSchedule:{ decided:'行く日', decidedSlot:'午前／午後', cands:'候補' }
+    inspSchedule:{ decided:'行く日', decidedSlot:'午前／午後', cands:'候補', slots:'行ける日', history:'履歴',
+                   result:'結果', resultDate:'結果の日', resultSlot:'結果の午前／午後', tent:'暫定の日', tentSlot:'暫定の午前／午後',
+                   officeName:'陸運局', round:'R', mode:'決め方', cutBefore:'この日より前は出さない' }
   };
   function _diffLabel(k, parent){
     if (parent && _DIFF_SUB[parent] && _DIFF_SUB[parent][k]) return _DIFF_SUB[parent][k];
@@ -769,7 +812,7 @@ w.pitDivisionColor = pitDivisionColor;
       var t2 = v.join('・');
       return t2.length > 30 ? t2.slice(0, 30) + '…' : t2;
     }
-    if (typeof v === 'object') { try { return JSON.stringify(v).slice(0, 30); } catch (e) { return '（中身）'; } }
+    if (typeof v === 'object') return _objText(v);
     var t = String(v);
     return t.length > 30 ? t.slice(0, 30) + '…' : t;
   }
@@ -797,6 +840,25 @@ w.pitDivisionColor = pitDivisionColor;
   function _sameDeep(a, b){
     var z = function (v) { var x = _stable(v); return (x && typeof x === 'object' && !Array.isArray(x) && !Object.keys(x).length) ? null : x; };
     try { return JSON.stringify(z(a)) === JSON.stringify(z(b)); } catch (e) { return false; }
+  }
+  /* 📝 v2.184.0 入れ子の中身を**読める言葉**で出す（前は JSON の字を30字で切っていた＝「{"2026-09-01":["am","pm"]」）。
+     ・日付が鍵の箱（車検の行ける日）… 「9/1 午前・午後、9/25 午前」
+     ・○×だけの箱（整備チェックのチェック）… 「✓ 3個」
+     ・それ以外 … 「◯項目」（中身が読めない字を出さない） */
+  function _md(d){ var p = String(d).split('-'); return p.length === 3 ? (+p[1]) + '/' + (+p[2]) : String(d); }
+  function _ampm(x){ return x === 'am' ? '午前' : x === 'pm' ? '午後' : String(x); }
+  function _objText(v){
+    var ks = Object.keys(v || {}).filter(function (k) { return k.charAt(0) !== '_' && !_emptyish(v[k]); });
+    if (!ks.length) return '（空）';
+    if (ks.every(function (k) { return /^\d{4}-\d{2}-\d{2}$/.test(k); })) {
+      var t = ks.sort().map(function (k) {
+        var x = v[k];
+        return _md(k) + (Array.isArray(x) && x.length ? ' ' + x.map(_ampm).join('・') : '');
+      }).join('、');
+      return t.length > 40 ? t.slice(0, 40) + '…' : t;
+    }
+    if (ks.every(function (k) { return typeof v[k] === 'boolean'; })) return '✓ ' + ks.length + '個';
+    return ks.length + '項目';
   }
   function _same(a, b){
     if (_emptyish(a) && _emptyish(b)) return true;   /* 🔴 空っぽどうしは「変わっていない」 */

@@ -132,6 +132,9 @@
       var sl = w.statusLabel || function(x){ return x; };
       return e.from ? (sl(e.from) + ' → ' + sl(e.to)) : (sl(e.to) + ' へ');
     }
+    /* 📝 v2.184.0 自動の記録に残った読めない字（{…}）は、描く時だけ言葉にする（記録は書き換えない）。
+       ⚠ 手で足した記録は人が打った言葉＝そのまま出す */
+    if (!isManual(e) && w.pitLogReword) return w.pitLogReword(textOf(e));
     return textOf(e);
   }
   /* 手で足した記録か＝消せる・言葉も直せる */

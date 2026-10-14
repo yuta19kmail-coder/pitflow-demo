@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.183.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.184.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.183.0</div>
+    <div class="login-ver">v2.184.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver" data-cf-ver>v2.183.0</span>
+    <span class="ver" data-cf-ver>v2.184.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -751,7 +751,7 @@
 <script src="js/perf-pit.js?v=2"></script><!-- ⏱ v2.171.0 測定モード（?perf=1 を付けて開いた端末だけ。普段は1行目で帰る）。起動中の重さも拾うので**一番最初** -->
 <script src="js/coreflow-icons.js?v=9ae48aea"></script><!-- 線画アイコン IC()（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <script src="js/pit-icons.js?v=3"></script><!-- 画面に線画アイコンを流し込む -->
-<script src="js/pit-share.js?v=37"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
+<script src="js/pit-share.js?v=38"></script><!-- 🔴 v1.103.0 PitFlow と MHS が一緒に使う物差し（名前の出し方・時間の表・課・売上なし・返車の関門・実績の金額）。**state.js より前**に読む -->
 <script src="js/coreflow-errcode.js?v=8d7c4b2d"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
 <script src="js/errcode-pit.js?v=25"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
@@ -782,9 +782,9 @@ window.PIT_DEMO = true;</script>
 <script src="js/work-content.js?v=15"></script>
 <script src="js/card-miss.js?v=3"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
 <script src="js/card-detail.js?v=157"></script>
-<script src="js/flow-pit.js?v=7"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
+<script src="js/flow-pit.js?v=8"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=85"></script>
+<script src="js/card-view.js?v=86"></script>
 <script src="js/cover-print.js?v=20"></script>
 <script src="js/avail.js?v=9"></script>
 <script src="js/card-tabs.js?v=16"></script>
@@ -849,7 +849,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/fleet.js?v=53"></script>
 <script src="js/auth-pit.js?v=17"></script>
 <script src="js/members-pit.js?v=19"></script>
-<script src="js/oplog-pit.js?v=6"></script>
+<script src="js/oplog-pit.js?v=7"></script>
 <script src="js/news-pit.js?v=49"></script>
 <script src="js/launcher.js?v=34b8456a"></script>
 <script src="js/holidays.js?v=1c79064f"></script>

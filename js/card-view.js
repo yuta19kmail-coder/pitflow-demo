@@ -1210,8 +1210,13 @@
   };
   function flowTab(c){
     /* 🗑 v2.13.2 もう無い機能の記録は出さない（記録は消さない）。物差しは `pitLogGone` 1本。 */
-    const log = (c.log || []).filter(function(e){
-      return !(window.pitLogGone && pitLogGone(e && (e.label || e.text)));
+    /* 🔴 v2.184.0 隠した行があっても ✕ が**正しい行を消す**ように、元の並びの番号を控える。
+       ⚠ 前は隠したあとの番号で `pitFlowDel` を呼んでいた＝隠した行より後ろの手書きの記録を消すと、**別の行が消えた**。 */
+    const _orig = [];
+    const log = (c.log || []).filter(function(e, i){
+      var keep = !(window.pitLogGone && pitLogGone(e && (e.label || e.text)));
+      if (keep) _orig.push(i);
+      return keep;
     });
     let h = '<div class="cv-sec"><div class="cv-sect"><i data-ic=clock data-ics=16></i> フロー（進捗ログ）</div><div class="cv-flow">';
     /* 🪜 v2.22.0（ゆうた指定）**大きい節目を主役にして、そのあいだの細かい記録は畳む。**
@@ -1234,12 +1239,14 @@
       } else {
         /* 🔴 v1.42.0 古い記録には <i data-ic=…> の文字がそのまま入っていることがある。
            **データは書き換えず**、描く時に線画アイコンへ読み替える（新規予約カード側と同じ）。 */
-        title = (window.icoText ? icoText(e.text || e.label || '') : esc(e.text || e.label || ''));
+        /* 📝 v2.184.0 自動の記録に残った読めない字（{…}）は描く時だけ言葉にする（物差しは flow-pit.js の titleOf 1本） */
+        var _tt = window.PitFlowLog ? PitFlowLog.titleOf(e) : (e.text || e.label || '');
+        title = (window.icoText ? icoText(_tt) : esc(_tt));
       }
       var who = window.PitFlowLog ? PitFlowLog.byOf(e) : (e.by || '');
       /* 手で足した記録だけ ✕ を付ける＝打ち間違いをその場で消せる（自動の工程記録は残す） v1.43.0 */
       var del = (window.PitFlowLog && PitFlowLog.isManual(e))
-        ? '<button type="button" class="cv-fdel" title="この記録を消す" onclick="pitFlowDel(\''+esc(c.id)+'\','+_i+')">'+(window.ico?ico('close',15):'×')+'</button>' : '';
+        ? '<button type="button" class="cv-fdel" title="この記録を消す" onclick="pitFlowDel(\''+esc(c.id)+'\','+(_orig[_i] != null ? _orig[_i] : _i)+')">'+(window.ico?ico('close',15):'×')+'</button>' : '';
       return '<div class="cv-frow done"><span class="cv-fdot"></span><div class="cv-fmain"><div class="cv-ft">'+title+(amtTxt?'<span class="cv-famt">'+esc(amtTxt)+'</span>':'')+'</div><div class="cv-fd">'+esc(String(when)+(who?' ・ '+who:''))+'</div></div>'+del+'</div>';
     };
     if (!log.length){ h += '<div class="cv-wl cv-muted">記録はまだありません。</div>'; }

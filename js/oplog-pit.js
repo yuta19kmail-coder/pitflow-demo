@@ -186,6 +186,8 @@
   }
 
   /* ---- 画面 ---- */
+  /* 📝 v2.184.0 古い記録の読めない字（{…}）は描く時だけ言葉にする（記録は書き換えない）。物差しは pit-share.js の pitLogReword 1本 */
+  function _rw(t) { return window.pitLogReword ? pitLogReword(t) : t; }
   function visibleList() {
     var q = _q.trim().toLowerCase();
     return (_cache || []).filter(function (e) {
@@ -252,8 +254,8 @@
           + '<span class="op-user">' + esc(e.userName) + '</span>'
           + '<span class="op-act">' + esc(e.action) + '</span>'
           + '<span class="op-label">' + (e.cardId
-              ? '<a href="javascript:void(0)" onclick="pitOpenCardDetail(\'' + esc(e.cardId) + '\')">' + esc(e.label) + '</a>'
-              : esc(e.label)) + '</span>'
+              ? '<a href="javascript:void(0)" onclick="pitOpenCardDetail(\'' + esc(e.cardId) + '\')">' + esc(_rw(e.label)) + '</a>'
+              : esc(_rw(e.label))) + '</span>'
           + (del
               ? '<label class="op-ck" title="この行を選ぶ"><input type="checkbox" data-k="' + esc(e._k) + '"'
                 + (_sel[e._k] ? ' checked' : '') + ' aria-label="この行を選ぶ"'

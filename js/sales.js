@@ -165,6 +165,7 @@
   window.PIT_SALES_TIERS = TIERS;   /* 📊 v2.143.0 分析用の書き出し（analytics-pit.js）が区分の名前を引く。条件は持たない */
   window.pitSalesTarget = target;
   window.pitSalesDivTarget = divTarget;
+  window.pitOrderDateMs = orderDateMs;   /* 📊 v2.187.2 分析用の書き出しの「受注日」が借りる（フロントの受注日の数え方はここ1本） */
 
   function sumTiers(t, ids){ var s=0; ids.forEach(function(id){ s += t[id].sum; }); return s; }
 

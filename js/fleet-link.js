@@ -85,6 +85,8 @@
 
   /* ===== ② 代車 → お客様の車（設定画面はこれ） ===== */
   function targetOf(fv){
+    /* v2.187.0 物差しは pit-share.js の pitFleetTargetIn 1本（MHS の入庫も同じものを借りる） */
+    if (w.pitFleetTargetIn) return w.pitFleetTargetIn(fv, st().customers);
     var cid = t(fv && fv.custId), vid = t(fv && fv.custVehId);
     if (!cid || !vid) return null;
     var cust = arr(st().customers).filter(function(c){ return c && c.id === cid; })[0];

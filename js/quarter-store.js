@@ -383,15 +383,26 @@
     var arr = Array.isArray(ds) ? ds : [ds];
     if (!arr.length) return Promise.resolve();
     var ref = c.collection('pitSettings').doc('qruns');
-    return ref.get().then(function (snap) {
-      var list = (snap.exists && snap.data() && snap.data().一覧) || [];
+    function merged(snap){
+      var list = (snap && snap.exists && snap.data() && snap.data().一覧) || [];
       var ids = {}; arr.forEach(function (d) { if (d && d.id) ids[d.id] = 1; });
       list = list.filter(function (x) { return x && !ids[x.id]; });
       list = arr.concat(list);
       list.sort(function (a, b) { return (a.from < b.from) ? 1 : (a.from > b.from ? -1 : 0); });
       if (list.length > CAP_LIST) list = list.slice(0, CAP_LIST);
-      return ref.set({ 一覧: list });
-    });
+      return { 一覧: list };
+    }
+    /* 🔴 v2.186.0（棚卸し B-14）**読んで足して書くを1つの取引（transaction）に。**
+       前は get → set の間に別の端末が足した行を、こちらの set が上書きで消していた（2台同時で一覧から行が抜ける）。
+       取引なら、間に誰かが書いたらサーバーが読み直させる＝両方の行が残る。
+       ⚠ 取引を持たない環境（見張りの偽クラウド等）だけ前の書き方 */
+    var db = ref.firestore;
+    if (db && typeof db.runTransaction === 'function') {
+      return db.runTransaction(function (tx) {
+        return tx.get(ref).then(function (snap) { tx.set(ref, merged(snap)); });
+      });
+    }
+    return ref.get().then(function (snap) { return ref.set(merged(snap)); });
   }
 
   /* ================================================================
@@ -470,11 +481,16 @@
     var id = runId(from, to);
     return c.collection('pitSettings').doc(id).delete().then(function () {
       var ref = c.collection('pitSettings').doc('qruns');
-      return ref.get().then(function (snap) {
-        var list = (snap.exists && snap.data() && snap.data().一覧) || [];
-        list = list.filter(function (x) { return x && x.id !== id; });
-        return ref.set({ 一覧: list });
-      });
+      function drop(snap){
+        var list = (snap && snap.exists && snap.data() && snap.data().一覧) || [];
+        return { 一覧: list.filter(function (x) { return x && x.id !== id; }) };
+      }
+      /* v2.186.0（B-14）一覧の読み書きは取引で（pushList と同じ・2台同時で他の行を消さない） */
+      var db = ref.firestore;
+      if (db && typeof db.runTransaction === 'function') {
+        return db.runTransaction(function (tx) { return tx.get(ref).then(function (snap) { tx.set(ref, drop(snap)); }); });
+      }
+      return ref.get().then(function (snap) { return ref.set(drop(snap)); });
     });
   }
 

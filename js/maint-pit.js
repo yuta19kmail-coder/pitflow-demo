@@ -189,7 +189,7 @@
   w.PIT_MAINT_COLOR = MAINT_COLOR;
   try { document.documentElement.style.setProperty('--pit-maint', MAINT_COLOR); } catch (e) {}
 
-  var WORK_LB = { shaken:'車検', '12pt':'12ヶ月点検', general:'一般（修理）', bp:'B.P' };
+  var WORK_LB = w.PIT_MAINT_WORK_LB || { shaken:'車検', '12pt':'12ヶ月点検', general:'一般（修理）', bp:'B.P' };   /* v2.187.0 表は pit-share.js の1本 */
   /* 🔴 v2.70.0（ゆうた指定 2026-09-05）**作業の色は、どの画面でも同じ。**
      ◎前まで … ボードは 一般＝紫・B.P＝あお、カレンダーは金一色。**画面ごとに意味が違った。**
      ◎いま  … 車検＝赤／12点＝橙／一般＝黄緑／B.P＝紫 の1組だけ。
@@ -1328,26 +1328,22 @@
      ＝ v2.48.0 で塞いだ「二重にカードができる」穴が、**構造的に起きえなくなった。**
      ⚠ ふつうの車の `pitTodayCheckIn` と同じことをしている（予約 → 点検待ち）。
         別の道を作っているのではなく、**同じ階段を、代車の窓から上っている**だけ。 */
+  /* 🏢🔴 v2.187.0（棚卸し A-26）**確かめも書く中身も pit-share.js の `pitMaintIntakePlan` 1本。**
+     ＝ MHS も同じ関数で入庫する（本体と MHS で答えが必ず同じ）。ここは「読む物を渡す・聞く・当てる」だけ。
+     ⚠ 確かめ・期間合わせ・お客様の控え・課・記録の言葉をここに書き戻さないこと。 */
+  function _intakeCtx(sid){
+    return { today: today(), loaners: arr(w.state && w.state.loaners), companyCars: arr(w.state && w.state.companyCars),
+             customers: arr(w.state && w.state.customers), sid: sid };
+  }
+  w.pitMaintIntakeCtx = _intakeCtx;   /* 見張り用 */
   w.pitMaintIntake = function(recId){
-    var hit = spanOf(recId);
-    if (!hit){ w.pitAlert('この枠が見つかりません', { code:'PF-3060',
-      detail:'画面を開き直してください。' }); return; }
-    var c = hit.card, sp = hit.span;
-    var v = vehOf(c.maintVehId);
-    if (!v){ w.pitAlert('この車両が見つかりません', { code:'PF-3055' }); return; }
-    if (c.status !== 'reserved' || c.actualInAt){
-      w.pitAlert('この枠はもう入庫しています', { code:'PF-3058',
-        detail:'タスクボードにカードがあります。そちらから進めてください。' });
-      return;
-    }
-    var td = today();
-    var own = ownerOf(v);
-    var det = 'お客様＝自社（社内区分「代車」）。売上・完TEL・洗車・伝票はありません。\n'
-            + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）'))
-                   : '⚠ この車は顧客控えと紐づいていません（そのまま入庫できます）。\n　 車両管理 ▸ この車を開く ▸「顧客車両との紐づけ」で結べます。');
+    var k = splitRecId(recId), c = cardOf(k.cid);
+    if (!c){ w.pitAlert('この枠が見つかりません', { code:'PF-3060', detail:'画面を開き直してください。' }); return; }
+    var plan = w.pitMaintIntakePlan(c, _intakeCtx(k.sid));
+    if (!plan.ok){ w.pitAlert(plan.why, { code:plan.code, detail:plan.detail || '' }); return; }
     if (w.pitTodayActionClose) w.pitTodayActionClose();
-    w.pitAsk('この代車を入庫させますか？', { title:(WORK_LB[c.workType] || '整備') + '　' + vehName(v), ok:'入庫する', detail:det })
-      .then(function(yes){ if (yes) _intakeGo(c, sp, v, own, td); });
+    w.pitAsk(plan.ask.msg, { title:plan.ask.title, ok:plan.ask.ok, detail:plan.ask.detail })
+      .then(function(yes){ if (yes) _intakeGo(c.id, k.sid); });
   };
   /* ==================================================================
      🔴🔴 v2.63.0（ゆうた 2026-09-05）**代車・社用車の入庫は、この道1本しか通さない。**
@@ -1381,46 +1377,23 @@
     return true;
   };
 
-  function _intakeGo(c, sp, v, own, td){
-    /* ① その候補で確定させ、期間を実際に合わせる（④で完TELのときにもう一度縮む／伸びる） */
-    c.maintFixSid = sp.sid;
-    sp.from = td; if (sp.to < td) sp.to = td;
-    /* ② 🔴 v2.62.0 **代車マスタには何も書かない。**（結び目を作るのは車両管理の紐づけ欄だけ）
-       　 結ばれている時は、そのお客様を**カードに控えるだけ**。
-       🏢🔴 v2.80.0（ゆうた報告 2026-09-07）**お客様欄の名前は上書きしない。**
-       🗣「社用車の方、予約カードの顧客名が自社車両になってない。本当の顧客名が出ちゃってる」
-         ＝ ここで `c.customer` を本物のお客様の名前に塗り替えていたのが正体。
-         いまは **`c.customerId` だけ**を持つ＝顧客ビューにも履歴にも今までどおり行けて、
-         **ボードの名札は「自社代車／自社車両」のまま。** */
-    if (own && own.cust){
-      c.customerId = own.cust.id;
-      if (own.veh && own.veh.karteNo) c.karteNo = own.veh.karteNo;
-    }
-    /* 🏢 v2.80.0 **課をここでもう一度そろえる。**
-       ＝ 作業予定を立てたあとに紐づけることがあるので、作った時の判断が古いことがある。
-       🔴🔴 ただし**そろえ直すのは「紐づけた相手が国産／輸入を持っている時」だけ。**
-       　 紐づけていない車まで毎回そろえ直すと、**人がカードで課を選び直したぶんを黙って巻き戻す**。
-       　 ＝「人が動かしたと言えるのは、人が動かしたのを見た時だけ」（2026-09-06 の全アプリ共通の決めごと）。
-       　 紐づけた相手の設定は**あとから分かった本当のこと**なので、こちらは上書きしてよい（ゆうた確定）。
-       ⚠ 紐づけていない時の既定は、カードを作った時に**車両管理の区分**から入れてある。 */
-    if (w.pitFleetLinkBoard){
-      var _b = w.pitFleetLinkBoard(c.maintVehId);
-      if (_b) c.boardId = _b;
-    }
-    /* ③ 🔴 カードを作らない。**status を進めるだけ**（ふつうの車と同じ階段） */
-    c.status      = 'check';
-    c.intakeTbd   = false;
-    c.reserveDate = td;
-    c.bookedAt    = c.bookedAt || td;
-    c.actualInAt  = td;
-    if (w.logFlow) try { w.logFlow(c, '代車の整備で入庫した'); } catch(e){}
+  /* 聞いている間に別の端末が動かしたかもしれない＝**当てる直前にもう一度** pitMaintIntakePlan で確かめる */
+  function _intakeGo(cardId, sid){
+    var c = cardOf(cardId);
+    var plan = c ? w.pitMaintIntakePlan(c, _intakeCtx(sid)) : { ok:false, code:'PF-3060', why:'この枠が見つかりません' };
+    if (!plan.ok){ w.pitAlert(plan.why, { code:plan.code, detail:plan.detail || '' }); return; }
+    w.pitMaintIntakeApply(c, plan);
     saveCards();
-    try { if (w.pitLog) w.pitLog('代車を整備で入庫した', { cardId:c.id, kind:'in',
-      label: vehName(v) + ' / ' + (WORK_LB[c.workType] || '整備') }); } catch(e){}
-    if (w.pitToast) w.pitToast('入庫しました → タスク「点検待ち」へ');
+    if (w.pitToast) w.pitToast(plan.toast);
     if (w.renderToday) w.renderToday();
     if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
   }
+  /* 物差しの答えをカードに当てる（フロー・操作ログも）。MHS は同じ答えを pitPatch で書く */
+  w.pitMaintIntakeApply = function(c, plan){
+    Object.keys(plan.patch).forEach(function(k){ c[k] = plan.patch[k]; });
+    (plan.logLines || []).forEach(function(t){ if (w.logFlow) try { w.logFlow(c, t); } catch(e){} });
+    (plan.audit || []).forEach(function(a){ try { if (w.pitLog) w.pitLog(a.action, { cardId:c.id, kind:a.kind, label:a.label }); } catch(e){} });
+  };
 
   /* 🏁 完TEL関門を通った時＝**残りの候補をまとめて消す**（ゆうた指定「入庫時ではなく完TELで」）。
      ＋ ④ 本黄色を**実際の入庫〜返車に合わせる**。
@@ -1523,13 +1496,10 @@
   w.pitMaintOnComplete = function(c){
     if (!c || !(w.pitCardMaint ? w.pitCardMaint(c) : Array.isArray(c.maintSpans))) return;
     var td = today();
-    var keep = (c.maintSpans || []).filter(function(x){ return x.sid === c.maintFixSid; });
-    var gone = (c.maintSpans || []).length - keep.length;
-    if (keep[0]){
-      keep[0].to = c.returnDate || c.completedAt || td;      /* 実際に合わせて縮む／伸びる */
-      if (keep[0].to < keep[0].from) keep[0].to = keep[0].from;
-    }
-    c.maintSpans = keep;                                     /* 🔴 残りの候補はここで消える */
+    /* v2.187.0 片付け方は pit-share.js の pitMaintCompleteSpans 1本（社内車両の実績化の物差しと同じ） */
+    var cs = w.pitMaintCompleteSpans(c, c.returnDate || c.completedAt || td);
+    var gone = cs.gone;
+    c.maintSpans = cs.spans;                                 /* 🔴 残りの候補はここで消える */
     /* ⚠⚠ v2.53.0 **ここで `maintDone` を立てない。**
        `maintDone` は「ボードで**完了するを押した**」という意味に変わった（flMaintFinish）。
        実績に入っただけで立ててしまうと、**車検満了日を進める前に行が消える**＝

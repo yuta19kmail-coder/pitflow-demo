@@ -1658,6 +1658,7 @@
   }
   window.pitCardEditRelease = editRelease;
   window.pitCardEnsure = ensure;      /* 🔴 v2.22.0 下ごしらえ（既定値入れ）を外へ */
+  window.pitCardFillDefaults = ensure; /* v2.186.0（A-09）保存の比べ方（db-pit.js）が「既定値だけの違い」を書かないために借りる */
 
   /* 予約詳細に戻る（ポップアップは開けたまま） */
   function backToView(card){
@@ -2054,6 +2055,9 @@
     /* 🔴 v1.171.0 返車済みの記録は管理だけ（画面から消しただけにしない） */
     if (!_archGuard()) return;
     var _aFrom = _archWord(group);
+    /* 📝 v2.186.0（棚卸し A-05・⑧）返車前のカードでも「完TEL 済／未」は前 → 後をフローと操作ログに残す
+       （前は返車済みの時だけ＝_archLog。預かり中に押した分はどこにも残らなかった） */
+    var _cFrom = (group === 'call' && _aFrom == null) ? _archVal('call') : null;
     el.parentNode.querySelectorAll('.cv-chip').forEach(function(s){s.classList.remove('on');}); el.classList.add('on');
     if(group==='call'){ _c.coverCall.done = (val==='done'); if(_c.coverCall.done && !_c.coverCall.at){ const d=new Date(); _c.coverCall.at = (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); _c.coverCall.staff = (window.pitFlowMe?pitFlowMe():''); } }   /* 🔴 v1.55.0 ここも同じ死んだ変数を見ていて、ずっと空だった */
     else if(group==='wash'){ _c.needWash = (val==='1'); }
@@ -2064,6 +2068,12 @@
     else if(group==='coatingok'){ _c.coatingOK = (val==='1'); }
     else if(group==='salesreq'){ _c.salesReq = (val==='1'); }
     if (_aFrom != null) _archLog(ARCH_W[group], _aFrom, _archVal(group));
+    if (_cFrom != null && _cFrom !== _archVal('call')){
+      var _w = '完TEL ' + _cFrom + ' → ' + _archVal('call');
+      try { if (window.logFlow) logFlow(_c, _w); } catch(e){}
+      try { if (window.pitLog) pitLog('完TELの印を変えた', { cardId: _c.id, kind: 'out',
+        label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + _w }); } catch(e){}
+    }
     save();
   };
   window.cvSalesMemo = function(v){
@@ -2135,11 +2145,11 @@
   /* 仮予約 ⇄ 本予約 の切替（⋮メニュー）v0.100.0 */
   window.cvToggleTentative = function(){
     if(!_c) return;
+    const _tFrom = _c.tentative ? '仮予約' : '本予約';
     _c.tentative = !_c.tentative;
-    if(!Array.isArray(_c.log)) _c.log=[];
-    const d=new Date();
-    /* 🔴 v1.55.0 自動で入る記録にも操作した人の名前を（名前の作り方は flow-pit.js の pitFlowMe に一本化） */
-    _c.log.push({ text:(_c.tentative?'仮予約にした':'本予約に確定した'), at:(d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()), by:(window.pitFlowMe?pitFlowMe():'') });
+    /* 📝 v2.186.0（棚卸し A-05・⑧）前は `log.push` で「仮予約にした」だけ（前の状態なし・操作ログなし・年の無い時刻）。
+       日付・状態の入口（pitLogDateChange＝card-tabs.js）を通して、フローと操作ログの両方に「前 → 後」を残す */
+    if (window.pitLogDateChange) pitLogDateChange(_c, '予約の種類', _tFrom, _c.tentative ? '仮予約' : '本予約', { kind: 'in' });
     save(); closeAllPop();
     if(window.pitToast) pitToast(_c.tentative?'仮予約にしました':'✓ 本予約に確定しました');
     renderCardView(_c, 'md-body-modal');
@@ -2567,7 +2577,24 @@
     /* 🔴 v1.154.0 カードを消す時も代車の予定を外す。
        ＝残すと**持ち主のいない予定**が代車カレンダーに居座り、外す道がなくなる（返却済みは触らない）。 */
     if (window.pitLoanerReleaseForCard) pitLoanerReleaseForCard(_c.id, 'カードの消去');
-    if(window.pitLog) pitLog('予約カードを消去', { kind:'delete', label: (_c.resNo? '['+_c.resNo+'] ':'') + ((window.pitCustName?pitCustName(_c):_c.customer)? (window.pitCustName?pitCustName(_c):_c.customer)+' 様':'') + (_c.car? ' / '+_c.car:'') });
+    /* 📝 v2.186.0（棚卸し A-06・⑧）**消す前の中身を操作ログに残す。**前は名前と車だけ＝実績のあるカードを消すと
+       月の売上が黙って減り、どのカード（cardId）だったか・いくら・いつの実績だったかが追えなかった。
+       ⚠ 消すこと自体（誰でも消せる）はゆうたの決定のまま。ゴミ箱（30日）は共通の作り（C-05）で */
+    if(window.pitLog){
+      const _n = (window.pitCustName?pitCustName(_c):_c.customer) || '';
+      const _st = (typeof statusLabel === 'function') ? statusLabel(_c.status) : (_c.status||'');
+      const _y = function(v){ return (v==null||v==='') ? '' : '¥'+Number(v).toLocaleString(); };
+      const _det = [
+        '状態 ' + (_st||'—'),
+        (_c.inDate||_c.reserveDate) ? '入庫 ' + (_c.inDate||_c.reserveDate) : '',
+        _c.completedAt ? '実績日 ' + _c.completedAt : '',
+        _c.salesDate ? '売上日 ' + _c.salesDate : '',
+        (_c.amountFinal!=null && _c.amountFinal!=='') ? '確定金額 ' + _y(_c.amountFinal) : '',
+        _c.returnDateFinal ? '確定返車日 ' + _c.returnDateFinal : ''
+      ].filter(Boolean).join('・');
+      pitLog('予約カードを消去', { kind:'delete', cardId: _c.id,
+        label: (_c.resNo? '['+_c.resNo+'] ':'') + (_n? _n+' 様':'') + (_c.car? ' / '+_c.car:'') + '　' + _det });
+    }
     if(idx>=0) state.cards.splice(idx,1);
     if (window.PitDB && PitDB.removed) PitDB.removed('cards', _c.id);   /* 🔴 v2.185.0 消す操作を通った印（これが無いと delete を送らない） */
     cvCloseDel();
@@ -2771,7 +2798,7 @@
     }) : null;
     if(!_r){ if(window.pitToast) pitToast('記録できませんでした（PF-記録）'); return; }
     _c.inspSchedule = _r.insp;
-    if(_r.log && window.logFlow) logFlow(_c, _r.log);
+    if(window.pitShakenLog) pitShakenLog(_c, _r); else if(_r.log && window.logFlow) logFlow(_c, _r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); cvShClose(); renderCardView(_c,'md-body-modal');
     if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();
   };
@@ -2829,7 +2856,7 @@
       return;
     }
     _c.inspSchedule=r.insp;
-    if(r.log && window.logFlow) logFlow(_c, r.log);
+    if(window.pitShakenLog) pitShakenLog(_c, r); else if(r.log && window.logFlow) logFlow(_c, r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); cvShClose(); window._cvShReAt=null;
     renderCardView(_c,'md-body-modal');
     if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();
@@ -2944,7 +2971,7 @@
       return;
     }
     _c.inspSchedule=r.insp;
-    if(r.log && window.logFlow) logFlow(_c, r.log);
+    if(window.pitShakenLog) pitShakenLog(_c, r); else if(r.log && window.logFlow) logFlow(_c, r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); cvShClose(); window._cvShDoneAt=null;
     renderCardView(_c,'md-body-modal');
     if(window.renderShaken && window.state && state.currentView==='shakencal') renderShaken();

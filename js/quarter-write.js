@@ -34,6 +34,9 @@
   function s(v){ return String(v == null ? '' : v); }
   function t(v){ return s(v).trim(); }
   function num(v){ v = +s(v).replace(/[^0-9\-]/g, ''); return isFinite(v) ? v : 0; }
+  /* 🕘 v2.186.0（棚卸し A-07）今の日時は日本時間（この端末の時刻）で。toISOString は世界時間＝朝9時前は前日になる */
+  function p2(n){ return (n < 10 ? '0' : '') + n; }
+  function nowLocal(n){ var d = new Date(); return (d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes())).slice(0, n); }
   function yen(n){ return (+n || 0).toLocaleString(); }
   function esc(x){ return s(x).replace(/[&<>"']/g, function (m) {
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]; }); }
@@ -200,7 +203,7 @@
       var out = write(R);
       /* 🔴 v2.10.1 済んだ印は**この組に**置く（ほかのQは書き込めるまま） */
       var g = G();
-      g.書き込んだ = (new Date()).toISOString().slice(0, 16).replace('T', ' ')
+      g.書き込んだ = nowLocal(16)
                    + '　車体番号 ' + out.vin + '件／伝票 ' + out.den + '件'
                    + (out.ちがう.length ? '　⚠ 別の番号が入っていた車が ' + out.ちがう.length + '件' : '');
       g.書き込み結果 = out;
@@ -262,7 +265,7 @@
                  数量: +x.数量 || 0, 単価: num(x.単価), 金額: num(x.金額), 原価: num(x.原価) };
       }),
       フロント: t(S.受付担当),
-      入れた日: (new Date()).toISOString().slice(0, 10)
+      入れた日: nowLocal(10)
     };
   }
 

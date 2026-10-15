@@ -471,18 +471,31 @@
         /* 🔴 v1.60.0 日付・時間の書き込みは return-slot.js の pitReturnSetDateTime 1本を通す。
            行き先（完TEL待ち／返車日未定／返車時間未定／カレンダー）の決め方をここに書き写さない。 */
         c.returnStage = 'returnWait';
-        if (window.pitReturnSetDateTime) pitReturnSetDateTime(c, d, t);
+        var _rs = null;
+        if (window.pitReturnSetDateTime) _rs = pitReturnSetDateTime(c, d, t);
         else { c.returnDate = d || ''; c.returnTime = t || ''; }
-        c.returnDateFinal = d || c.returnDateFinal || null;
+        /* 🔴 v2.186.0（棚卸し A-03）「返車日 未定」で閉じたら確定返車日も空に（前は古い日が残った）。
+           空にするのは入口（pitReturnSetDateTime）がやる。ここで前の日を拾い直さない。 */
+        c.returnDateFinal = d || null;
         /* ☎ 完TEL日（ログ）は上の1本ですでに記録済み。ここで書き写さない（v1.185.0） */
         if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd=new Date(); c.coverCall.at=(dd.getMonth()+1)+'/'+dd.getDate(); } }
-        if (window.logFlow) logFlow(c, '完TEL済 → ' + ((window.pitReturnPlaceLabel ? pitReturnPlaceLabel(pitReturnPlace(c)) : '') || '返車未定')
-                                      + (d ? '（' + d + (t ? ' ' + t : '') + '）' : ''));
+        /* 📝 v2.186.0（⑧）前の返車日・確定返車日もフローと操作ログの両方に残す */
+        var _was = (_rs && (_rs.dFrom || _rs.tFrom)) ? (_rs.dFrom || '未定') + (_rs.tFrom ? ' ' + _rs.tFrom : '') : '';
+        var _wasF = (_rs && _rs.fFrom) ? '・確定返車日 ' + _rs.fFrom + ' → なし' : '';
+        var _tx = '完TEL済 → ' + ((window.pitReturnPlaceLabel ? pitReturnPlaceLabel(pitReturnPlace(c)) : '') || '返車未定')
+                + (d ? '（' + d + (t ? ' ' + t : '') + '）' : '')
+                + ((_was && _was !== (d || '未定') + (t ? ' ' + t : '')) ? '　元は ' + _was : '') + _wasF;
+        if (window.logFlow) logFlow(c, _tx);
+        if (window.pitLog) pitLog('完TEL済にした', { cardId: c.id, kind: 'out',
+          label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + _tx });
       } else {
         c.returnStage = 'callWait';
         /* ☎ v1.185.0 依頼も「完TELの流れを通った」記録として日付ごと残す（ゆうた指定）。 */
-        if (window.logFlow) logFlow(c, '完TEL依頼（金額入力・完TEL待ちへ）'
-          + (c.completeCallAt ? '／完TEL日 ' + c.completeCallAt : ''));
+        var _tq = '完TEL依頼（金額入力・完TEL待ちへ）' + (c.completeCallAt ? '／完TEL日 ' + c.completeCallAt : '');
+        if (window.logFlow) logFlow(c, _tq);
+        /* 📝 v2.186.0（⑧）状態が動いた＝操作ログにも */
+        if (window.pitLog) pitLog('完TEL依頼にした', { cardId: c.id, kind: 'out',
+          label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + _tq });
       }
 
       if (window.PitDB) PitDB.save();

@@ -37,3 +37,6 @@ _pf_snap_*.tgz
 # メーカー・車種の候補テストが書き出す確認用ファイル（v1.23.0）
 test-carname.html
 shot_carname.png
+
+# 見張りの書き出し（v2.186.1）＝試しの画面は _tmp_mihari／画面写真は %TEMP%\pitflow_見張り
+_tmp_mihari/

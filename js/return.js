@@ -40,7 +40,7 @@ function renderReturnNav(){
   } else if (range === 'month'){
     label.textContent = d.getFullYear() + '年 ' + (d.getMonth()+1) + '月';
   } else if (range === '2month'){
-    const next = new Date(d); next.setMonth(next.getMonth()+1);
+    const next = new Date(d); next.setDate(1); next.setMonth(next.getMonth()+1);  // 月末に1か月飛ばない（A-04）
     label.textContent = d.getFullYear() + '年 ' + (d.getMonth()+1) + '月 〜 ' + (next.getMonth()+1) + '月';
   }
 }
@@ -299,7 +299,7 @@ function renderReturn2Month(){
   wrap.style.display = '';
 
   const m1 = new Date(state.returnDate);
-  const m2 = new Date(state.returnDate); m2.setMonth(m2.getMonth()+1);
+  const m2 = new Date(state.returnDate); m2.setDate(1); m2.setMonth(m2.getMonth()+1);  // 月末に1か月飛ばない（A-04）
 
   let html = '';
   html += '<div>';
@@ -396,8 +396,8 @@ function returnPrev(){
   const d = new Date(state.returnDate);
   if (range === 'day')    d.setDate(d.getDate() - 1);
   if (range === 'week')   d.setDate(d.getDate() - 7);
-  if (range === 'month')  d.setMonth(d.getMonth() - 1);
-  if (range === '2month') d.setMonth(d.getMonth() - 1);
+  if (range === 'month')  { d.setDate(1); d.setMonth(d.getMonth() - 1); }  // 1日に寄せてから（A-04）
+  if (range === '2month') { d.setDate(1); d.setMonth(d.getMonth() - 1); }  // 1日に寄せてから（A-04）
   state.returnDate = d;
   renderReturn();
 }
@@ -406,8 +406,8 @@ function returnNext(){
   const d = new Date(state.returnDate);
   if (range === 'day')    d.setDate(d.getDate() + 1);
   if (range === 'week')   d.setDate(d.getDate() + 7);
-  if (range === 'month')  d.setMonth(d.getMonth() + 1);
-  if (range === '2month') d.setMonth(d.getMonth() + 1);
+  if (range === 'month')  { d.setDate(1); d.setMonth(d.getMonth() + 1); }  // 1日に寄せてから（A-04）
+  if (range === '2month') { d.setDate(1); d.setMonth(d.getMonth() + 1); }  // 1日に寄せてから（A-04）
   state.returnDate = d;
   renderReturn();
 }

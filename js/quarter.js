@@ -48,6 +48,17 @@
   function yen(n){ return (+n || 0).toLocaleString(); }
   function pad(n){ return (n < 10 ? '0' : '') + n; }
   function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  /* 🕘 v2.186.0（棚卸し A-07）記録の時刻は世界時間の ISO（…Z）で残っている＝**前から16字を切ると9時間ずれる**（朝9時前は前日）。
+     見せる時は日本時間（この端末の時刻）に直す。ISO でない文字（昔の「YYYY-MM-DD HH:MM」）はそのまま切る。n＝10（日付）か16（日時） */
+  function jt(v, n){
+    var x = s(v);
+    if (/T\d\d:\d\d.*(Z|[+-]\d\d:?\d\d)$/.test(x)){
+      var d = new Date(x);
+      if (!isNaN(d)) { var o = ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); return o.slice(0, n); }
+    }
+    return x.slice(0, n).replace('T', ' ');
+  }
+  w.pitQStamp = jt;
   function shift(v, n){ var p = s(v).split('-'); if (p.length !== 3) return ''; var d = new Date(+p[0], +p[1]-1, +p[2]); d.setDate(d.getDate()+n); return ymd(d); }
 
   /* 画面の覚え（データではないので保存しない） */
@@ -199,7 +210,7 @@
                  ⚠ 黙ると「いまPDFを読んだ」と勘ちがいされる。どこから来た画面かを必ず言う。 */
               /* ✂️ v2.10.2 どこから来た画面かだけ言う（これを黙ると勘ちがいされるので消せない）。
                  ⚠ 刷り込み印刷・原価チェックが使えないことは、**押した時にそちらが言う**。 */
-              ? '📄 残してある伝票（' + esc(s(U.再生.at).slice(0, 16).replace('T', ' '))
+              ? '📄 残してある伝票（' + esc(jt(U.再生.at, 16))
                 + (U.再生.by ? '・' + esc(U.再生.by) : '') + '）で組み直しました'
               : (U.savedAt ? '残しました（' + esc(U.savedAt) + '）' : '結果を残しています…'))
          + '</div>';
@@ -306,7 +317,7 @@
                 +     (直 ? '直した' : 'このままでよい') + '</span>'
                 +   '<span class="q-done-d">' + esc(s(m.内容)
                       || (s(m.種類) + '：整備ソフト側を直したので、PitFlow はこのまま')) + '</span>'
-                +   '<span class="q-done-a">' + esc(s(m.at).slice(0, 16).replace('T', ' '))
+                +   '<span class="q-done-a">' + esc(jt(m.at, 16))
                 +     (m.by ? '・' + esc(m.by) : '') + '</span>'
                 + '</div>';
         });
@@ -501,7 +512,7 @@
         +       (g.全部 ? '' : '<em class="q-pq-part">' + esc(dd(g.from)) + '〜' + esc(dd(g.to)) + '日だけ</em>')
         +     '</span>'
         +     '<span class="q-pq-d">'
-        +       (保存 ? (esc(s(g.保存 && g.保存.at).slice(0, 10)) + ' に実施（残してある伝票 ' + g.soft.length + '枚）')
+        +       (保存 ? (esc(jt(g.保存 && g.保存.at, 10)) + ' に実施（残してある伝票 ' + g.soft.length + '枚）')
                       : ('このPDF ' + g.soft.length + '枚'))
         +     '</span>'
         +     wBox(g, nok, 保存)
@@ -521,7 +532,7 @@
              /* 🔢 v2.77.0 ここの「+◯円」も消した（いま読んだ組と同じ形にそろえる） */
              /* 🚪 v2.96.0 ここに来るのは**伝票を残していない古い形式**だけ（組み直せない）。
                 ＝ 件数は**残した時のもの**。いまの数ではないことを言う（黙って古い数を出さない）。 */
-             ? '<span class="q-pq-d">' + esc(s(r.走らせた日時).slice(0, 10)) + ' に実施（残した時の件数）</span>'
+             ? '<span class="q-pq-d">' + esc(jt(r.走らせた日時, 10)) + ' に実施（残した時の件数）</span>'
              : '<span class="q-pq-d">まだ実施していません</span>')
       +   '</span>'
       +   '<span class="q-pq-r">' + (r ? (ok2 ? 'OK' : '残 <b>' + nok2 + '</b>件') : '<em>まだ</em>') + '</span>'
@@ -636,7 +647,7 @@
     var R4 = savedGroups(R);   /* 🗂 v2.8.6 残した結果を4つの箱に組み直す（上の数字でも使う） */
     var h = '<div class="q-savedbar">'
           +   '<b>残してある結果</b>'
-          +   '<span>' + esc(s(R.走らせた日時).slice(0, 16).replace('T', ' '))
+          +   '<span>' + esc(jt(R.走らせた日時, 16))
           +     (R.走らせた人 ? '・' + esc(R.走らせた人) : '')
           +     (R.PDF ? '・' + esc(R.PDF) : '') + '</span>'
           +   '<button class="q-open" onclick="pitQCloseSaved()">閉じる</button>'
@@ -1862,7 +1873,7 @@
     var id = w.pitQRunId ? w.pitQRunId(from, to) : '';
     var d = (U.list || []).filter(function (x) { return x && x.id === id; })[0] || null;
     var det = ['・' + from + ' 〜 ' + to + ' の残してある結果を消します',
-               (d ? '・いま残っているのは ' + s(d.at).slice(0, 16).replace('T', ' ')
+               (d ? '・いま残っているのは ' + jt(d.at, 16)
                     + (d.by ? '・' + d.by : '') + ' に走らせたぶんです' : ''),
                '・Q1〜Q4 の印が「まだ」に戻ります',
                '🟢 「伝票を直した」の印は消しません（整備ソフト側を直したという別の記録なので）',

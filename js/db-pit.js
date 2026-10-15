@@ -161,6 +161,7 @@
         return undefined;
       }
       const doSave = function () {
+        try { if (typeof window.pitBeforeFlush === 'function') window.pitBeforeFlush(); } catch (e) {}   /* v2.186.0（A-02）練習モードも同じ */
         try {
           localStorage.setItem(LS_KEY, JSON.stringify({
             v: 1,
@@ -1165,6 +1166,8 @@
          ⚠ 読み込み中は画面にまだサンプルが乗っていることがあり、
             それを「新しいデータ」と勘違いして丸ごとアップしてしまう事故が起きた。 */
       if (!this._loaded) { console.warn('[PitDB] 読み込み前なので保存を見送りました'); return false; }
+      /* 📝 v2.186.0（棚卸し A-02）送る直前に、開いている予約詳細の「編集：…」をフローへ＝**直した中身と同じ1回の書き込み**で届く */
+      try { if (typeof window.pitBeforeFlush === 'function') window.pitBeforeFlush(); } catch (e) {}
       const self = this;
       const ops = [];
       this._maps();
@@ -1205,7 +1208,18 @@
           const base = self._getBase(key);
           let op = null;
           if (base) {
-            const ks = self._diffKeys(base, full);
+            let ks = self._diffKeys(base, full);
+            /* 🔴 v2.186.0（棚卸し A-09）**予約詳細を開いただけで書かない。**
+               開く時の下ごしらえ（card-view.js の ensure＝欄が無い古いカードに既定値を入れる）は「読む時に補うだけ」。
+               ⚠ 前は既定値が「違う欄」に数えられ、開いて閉じただけで版（rev）が進み、他の人の「予約を編集」を弾いていた。
+               ＝ 両方に同じ既定値を補ってから比べ、既定値だけの違いは書かない（人が値を変えた欄は今までどおり書く） */
+            if (k === 'cards' && ks.length && typeof window.pitCardFillDefaults === 'function') {
+              try {
+                const fB = window.pitCardFillDefaults(JSON.parse(JSON.stringify(base)));
+                const fF = window.pitCardFillDefaults(JSON.parse(JSON.stringify(full)));
+                ks = ks.filter(function (f) { return self._stable(fB[f]) !== self._stable(fF[f]); });
+              } catch (e) {}
+            }
             const DEL = self._delMark();
             const 消す欄 = ks.filter(function (f) { return !(f in full); });
             if (!ks.length) { self._shadow.docs[key] = js; return; }       /* 並びだけの違い＝書かない */

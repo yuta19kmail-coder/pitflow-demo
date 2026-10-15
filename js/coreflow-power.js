@@ -395,19 +395,27 @@
 
   /* ④ いま読み直しても人の手を止めないか（auto-update.js と同じ考え方）
      ⚠ 「打ち込み中かどうか」の物差しはここ1本。アプリごとに持たせない。 */
-  function 手が空いている() {
+  /* 🆕 2026-10-15（棚卸し A-59）埋め込みの窓（iframe・StockFlow の料金表など）の中も見る。
+     カーソルが窓の中にあれば、窓の中の入力欄・開いている窓・__appBusy まで確かめる（よその住所の窓は見られない＝使用中とみなす） */
+  function 使用中(doc, win, depth) {
     try {
-      if (w.__appBusy) return false;
-      var ae = d.activeElement;
+      if (win && win.__appBusy) return true;
+      var ae = doc.activeElement;
       if (ae) {
         var tag = (ae.tagName || '').toUpperCase();
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable) return false;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable) return true;
+        if ((tag === 'IFRAME' || tag === 'FRAME') && depth < 3) {
+          var cw = null, cd = null;
+          try { cw = ae.contentWindow; cd = ae.contentDocument || (cw && cw.document); } catch (e) { return true; }
+          if (!cd || 使用中(cd, cw, depth + 1)) return true;
+        }
       }
-      var dlg = d.querySelector('[role="dialog"], .modal, #modal, .modal-backdrop, .overlay, .crop-box');
-      if (dlg && dlg.offsetParent !== null) return false;
+      var dlg = doc.querySelector('[role="dialog"], .modal, #modal, .modal-backdrop, .overlay, .crop-box');
+      if (dlg && dlg.offsetParent !== null) return true;
     } catch (e) {}
-    return true;
+    return false;
   }
+  function 手が空いている() { return !使用中(d, w, 0); }
 
   /* 合図を受け取ってから、実際に読み直すまで。**判断はここ1本。** */
   function 読み直しを予約する() {

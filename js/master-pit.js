@@ -201,17 +201,65 @@
     });
   };
 
+  /* v2.185.0（S-02）開いた時（BEFORE）から自分が変えた欄。並び順だけの違いは変えたことにしない */
+  function _stableJs(v){
+    return JSON.stringify(v === undefined ? null : v, function(k, val){
+      if (val && typeof val === 'object' && !Array.isArray(val)){
+        var o = {}; Object.keys(val).sort().forEach(function(x){ if (val[x] !== undefined) o[x] = val[x]; }); return o;
+      }
+      return val;
+    });
+  }
+  function _same(a, b){ return _stableJs(a) === _stableJs(b); }
+  function _mineChanged(){
+    var seen = {}, out = [];
+    Object.keys(M || {}).concat(Object.keys(BEFORE || {})).forEach(function(k){
+      if (seen[k] || k === 'id') return; seen[k] = 1;
+      if (!_same(M[k], BEFORE[k])) out.push(k);
+    });
+    return out;
+  }
+  w.__pitMasterMineChanged = _mineChanged;   /* 見張り用 */
+
   function _save(print, noSale){
     if (!Array.isArray(st().cards)) st().cards = [];
     syncWorkTypes(M);   /* 🔧 v2.98.0 保存する前に、バッジの並びを基本＋併用可にそろえる（古いカードを直した時も） */
     syncInsurance(M);   /* 🛡 v2.99.0 保険なら、実績カウント日＝入金日にそろえてから保存 */
     numFields(M);       /* 🔢 v2.103.0 金額・日数は数字で保存（文字のまま残さない） */
-    var live = null;
+    var live = null, liveBefore = null;
     if (MODE === 'fix'){
       live = (st().cards || []).filter(function(x){ return x && x.id === M.id; })[0];
       if (!live){ if (w.pitAlert) w.pitAlert('直すカードが見つかりません', { code:'PF-3080',
         detail:'ほかの端末で消された可能性があります。画面を開き直してください。' }); return; }
-      Object.keys(M).forEach(function(k){ live[k] = M[k]; });
+      /* 🔴🔴 v2.185.0（棚卸し S-02）**開いた時（BEFORE）から自分が変えた欄だけ**を本物へ写す。
+         ⚠ 前は写しの全欄（フロー・状態も）で本物を上書きしていた＝開いている間に MHS・FlowDesk・自動で
+            足されたフローの行と、ほかの人が変えた状態・日付が**消えていた**（版の関門も通り抜け、記録にも残らなかった）。
+         ・フロー（log）は写さない。自分が足した行だけ本物の後ろへ足す
+         ・同じ欄をほかの人も直していたら聞く（自分の内容で上書きするか／やめるか） */
+      var mine = _mineChanged();
+      var 重なる = mine.filter(function(k){ return k !== 'log' && !_same(live[k], BEFORE[k]) && !_same(live[k], M[k]); });
+      if (重なる.length && !_save._force){
+        var 名 = 重なる.map(function(k){ return w.pitFieldLabel ? w.pitFieldLabel(k) : k; });
+        (w.pitAsk ? w.pitAsk('ほかの人が同じ所を先に直しています', { code:'PF-3081', title:'マスター入力', danger:true,
+            ok:'自分の内容で上書きする',
+            detail:'開いている間に、ほかの端末で「' + 名.join('・') + '」が直されました。\n上書きすると、その直しは消えます（記録には残ります）。\nやめる時は「キャンセル」→「開いた時に戻す」で最新を読み直せます。' })
+          : Promise.resolve(false)).then(function(yes){
+            if (!yes) return;
+            _save._force = true;
+            try { _save(print, noSale); } finally { _save._force = false; }
+          });
+        return;
+      }
+      liveBefore = JSON.parse(JSON.stringify(live));
+      mine.forEach(function(k){
+        if (k === 'log'){
+          var had = {}; (Array.isArray(BEFORE.log) ? BEFORE.log : []).forEach(function(r){ had[JSON.stringify(r)] = 1; });
+          var add = (Array.isArray(M.log) ? M.log : []).filter(function(r){ return !had[JSON.stringify(r)]; });
+          if (add.length){ if (!Array.isArray(live.log)) live.log = []; add.forEach(function(r){ live.log.push(r); }); }
+          return;
+        }
+        if (M[k] === undefined) delete live[k]; else live[k] = JSON.parse(JSON.stringify(M[k]));
+      });
     } else {
       live = JSON.parse(JSON.stringify(M));
       st().cards.push(live);
@@ -219,16 +267,17 @@
     try { if (!live._sample && w.upsertCustomerFromCard) w.upsertCustomerFromCard(live); } catch(e){}
     try { if (w.pitSyncLoanerAssigns) w.pitSyncLoanerAssigns(); } catch(e){}
     try {
-      if (MODE === 'fix' && BEFORE && w.pitLogCardEdit) w.pitLogCardEdit(live, BEFORE);
+      /* v2.185.0 記録は「写す直前の本物 → 写した後」＝ほかの人の直しを自分の名前で書かない */
+      if (MODE === 'fix' && liveBefore && w.pitLogCardEdit) w.pitLogCardEdit(live, liveBefore);
       /* 📝 v2.183.0 編集の差分（pitLogCardEdit）が**わざと外している日付**は、ここで1本ずつ残す。
          ⚠ 差分が外しているのは「専用の記録が出るから」だが、マスター入力には専用の記録が無かった
             ＝実績日・返車日・売上日を直しても「マスター入力で直した」の1行だけで、何をどう直したか分からなかった。 */
-      if (MODE === 'fix' && BEFORE && w.pitLogDateChange){
+      if (MODE === 'fix' && liveBefore && w.pitLogDateChange){
         [['actualInAt','実際に入った日','in'], ['returnDate','返車日','out'], ['returnDateFinal','確定返車日','out'],
          ['returnTime','返車時間','out'], ['completedAt','実績カウント日','result'], ['salesDate','売上日','result'],
          ['completeCallAt','完TELの日','out'], ['cancelledAt','キャンセルした日','in'], ['noShowAt','未入庫にした日','in']
         ].forEach(function(f){
-          w.pitLogDateChange(live, f[1], t(BEFORE[f[0]]), t(live[f[0]]), { kind: f[2], note: 'マスター入力' });
+          w.pitLogDateChange(live, f[1], t(liveBefore[f[0]]), t(live[f[0]]), { kind: f[2], note: 'マスター入力' });
         });
       }
       if (w.pitLog) w.pitLog(MODE === 'fix' ? 'マスター入力で直した' : 'マスター入力で作った',

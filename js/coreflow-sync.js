@@ -230,9 +230,12 @@
         un = ref.onSnapshot({ includeMetadataChanges: true }, function (d) {
           var 写しから = !!(d && d.metadata && d.metadata.fromCache);
           if (写しから) {
-            need = true;
+            /* 🔴 v2026-10-15（A-01）「張り直しが要る」の印は、猶予を過ぎて本当に「届いていません」と
+               言った時だけ立てる。線の張り直しで起きる一瞬（1秒）の写しでは立てない
+               （立てると「同期が戻りました」と全購読の読み直しが、有線でもちょこちょこ起きていた） */
             if (!off) off = setTimeout(function () {
               off = null;
+              need = true;
               API.set('cache');
               if (!told) { told = true; try { API.bubble('サーバーから届いていません。画面を読み込み直すか、電波を確かめてください'); } catch (e) {} }
               try { if (opt.onLost) opt.onLost(); } catch (e) {}

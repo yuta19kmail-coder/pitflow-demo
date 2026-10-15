@@ -62,6 +62,11 @@ function _loStartDraft(){
   _loDraftSave();
 }
 function _loAssignChanged(a){ const o = _loDraftOrig && _loDraftOrig[a.id]; return !!o && (o.loanerId!==a.loanerId || o.fromDate!==a.fromDate || o.toDate!==a.toDate); }
+/* 🔴 v2.185.0（棚卸し S-06）**下書きで動かしている札か。**db-pit.js の保存がこれを見て、その札はクラウドへ送らない。
+   ＝「反映」を押すまで下書きはこの端末の中だけ（ほかの人に見えない・ほかの端末に戻されない）。
+   ⚠ 上のコメント（v1.80.0）の「別の画面へ移ってそこで保存が走ると、確定していない下書きがそのまま保存される」はこれで止まった。
+      端末の控え（LO_DRAFT_KEY）は「破棄」で元に戻すための保険として残す。 */
+window.pitLoanerInDraft = function (a) { return !!(_loDraftOrig && a && _loAssignChanged(a)); };
 function _loChangedList(){ return _loDraftOrig ? (state.loanerAssigns||[]).filter(_loAssignChanged) : []; }
 /* 重複（同じ代車で期間が重なる）割当idの集合。
    ※同じ予約（同じ cardId）の割当どうしは「同一予約」なので衝突に数えない。 */
@@ -106,11 +111,37 @@ function _loDedupeAssigns(){
     if (a && a.cardId){ if (seen[a.cardId]){ changed = true; return; } seen[a.cardId] = 1; }
     out.push(a);
   });
-  if (changed){ state.loanerAssigns = out; if (window.PitDB) PitDB.save(); }
+  if (changed){
+    const 残す = new Set(out);
+    (state.loanerAssigns || []).forEach(function(a){ if (!残す.has(a)) _loOpLog('代車の貸出の二重を1件に片付けた（自動）', a); });
+    _loKeep(function(a){ return 残す.has(a); });   /* v2.185.0 消す印を付けて外す */
+    if (window.PitDB) PitDB.save();
+  }
 }
 function _loAssignLabel(a){
   const card = a.cardId ? (state.cards||[]).find(function(c){return c.id===a.cardId;}) : null;
   return card ? ((window.pitCustSurname?pitCustSurname(card):(card.customer||''))||'予約') : (a.customer || '予約');
+}
+/* 🔴 v2.185.0（棚卸し S-27）**貸出の札を作る・動かす・消すは、予約に紐づかない札（手入力・緊急）も操作ログに残す。**
+   前は予約に紐づく札のフローにしか残らず、手入力・緊急の札は作っても消しても**どこにも跡が無かった**。
+   1行の形：代車 タント（5）／山田 様／2026-10-14〜2026-10-16（種類）＋ 前 → 後 */
+function _loAssignDesc(a){
+  if (!a) return '';
+  const kind = a.emergency ? '緊急' : (a.hold ? '仮押さえ' : (a.cardId ? '' : '予約以外'));
+  return '代車 ' + _loName(a.loanerId) + '／' + _loAssignLabel(a) + ' 様／' + (_loSpan(a.fromDate, a.toDate) || '期間なし')
+       + (kind ? '（' + kind + '）' : '') + (a.memo ? '／' + String(a.memo).slice(0, 20) : '');
+}
+function _loOpLog(what, a, more){
+  try {
+    if (window.pitLog) pitLog(what, { kind: 'loaner', cardId: (a && a.cardId) || undefined,
+      label: _loAssignDesc(a) + (more ? '　' + more : '') });
+  } catch (e) {}
+}
+/* 🔴 v2.185.0（S-04）札を外す時は PitDB.keep を通す＝「消す操作を通った」印が付く（印の無い物に delete は送らない） */
+function _loKeep(fn){
+  if (window.PitDB && PitDB.keep) return PitDB.keep('loanerAssigns', fn);
+  state.loanerAssigns = (state.loanerAssigns || []).filter(fn);
+  return state.loanerAssigns;
 }
 /* 代車の呼び名。🔴 v1.46.0 **車種名が主・番号は括弧**（「タント（5）」）＝現場の呼び方に合わせる。
    ⚠ 車種が未登録なら今までどおり元の名前（「代車5」）。 */
@@ -266,6 +297,7 @@ function _loProcessReplacements(){
       const old = (state.loaners||[]).find(function(l){ return l.id === nv.replaceOf; });
       if (old){ old.retired = true; old.retiredAt = today; }   // 撤去せず引退（予約/履歴は保持）
       state.fleetEvents = (state.fleetEvents||[]).filter(function(e){ return e.id !== ('rep_'+nv.id); });
+      if (window.PitDB && PitDB.removed) PitDB.removed('fleetEvents', 'rep_' + nv.id);   /* v2.185.0 消す操作を通った印 */
       nv.name = '代車' + nv.number; delete nv.replaceOf; delete nv.replaceDate;
       changed = true;
     }
@@ -585,7 +617,7 @@ function pitSyncLoanerAssigns(){
   // 2) 不要になった割当を削除（カード由来なのに代車不要/カード消滅）。手動・緊急は残す。
   if (!drafting){
     const before = assigns.length;
-    state.loanerAssigns = assigns.filter(function(a){
+    _loKeep(function(a){   /* v2.185.0 消す印を付けて外す（PitDB.keep） */
       if (!a.cardId) return true;   // 手動/緊急
       /* 🔴 v1.80.0 **返却済みの貸出は消さない。**
          ⚠ 以前は、返却まで済んだ貸出でも、あとからカードの「代車 不要」を押すと
@@ -1298,6 +1330,10 @@ window.loDraftApply = function(){
   // 紐づくカードの代車情報を同期
   changed.forEach(function(a){
     const card = a.cardId ? (state.cards||[]).find(function(c){return c.id===a.cardId;}) : null;
+    /* 🔴 v2.185.0（S-27）予約に紐づかない札も「前 → 後」を操作ログへ（前は紐づく札のフローにしか残らなかった） */
+    const o = _loDraftOrig && _loDraftOrig[a.id];
+    if (o) _loOpLog('代車の貸出を動かした（代車カレンダーで反映）', a,
+      '元 ' + _loName(o.loanerId) + ' ' + (_loSpan(o.fromDate, o.toDate) || '期間なし') + ' → ' + _loName(a.loanerId) + ' ' + (_loSpan(a.fromDate, a.toDate) || '期間なし'));
     if (card){
       const _f0 = card.loanerFrom, _t0 = card.loanerTo;
       card.loanerId=a.loanerId; card.loanerFrom=a.fromDate; card.loanerTo=a.toDate;
@@ -1314,7 +1350,10 @@ window.loDraftUndoApply = function(){
   if (!_loApplySnap) return;
   pitAsk('直前の一括実行を取り消して、実行前の状態に戻します。よろしいですか？', { ok:'元に戻す' }).then(function(yes){
     if (!yes) return;
-  (state.loanerAssigns||[]).forEach(function(a){ const o=_loApplySnap[a.id]; if(o){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; const card=a.cardId?(state.cards||[]).find(function(c){return c.id===a.cardId;}):null; if(card){ const _f0=card.loanerFrom, _t0=card.loanerTo; card.loanerId=a.loanerId;card.loanerFrom=a.fromDate;card.loanerTo=a.toDate; _loLogSpan(card, _f0, _t0, '代車カレンダーの反映を取り消し'); } } });
+  (state.loanerAssigns||[]).forEach(function(a){ const o=_loApplySnap[a.id];
+    if (o && (o.loanerId!==a.loanerId || o.fromDate!==a.fromDate || o.toDate!==a.toDate))   /* v2.185.0 S-27 */
+      _loOpLog('代車カレンダーの反映を取り消した', a, '→ 元の ' + _loName(o.loanerId) + ' ' + (_loSpan(o.fromDate, o.toDate) || '期間なし'));
+    if(o){ a.loanerId=o.loanerId; a.fromDate=o.fromDate; a.toDate=o.toDate; const card=a.cardId?(state.cards||[]).find(function(c){return c.id===a.cardId;}):null; if(card){ const _f0=card.loanerFrom, _t0=card.loanerTo; card.loanerId=a.loanerId;card.loanerFrom=a.fromDate;card.loanerTo=a.toDate; _loLogSpan(card, _f0, _t0, '代車カレンダーの反映を取り消し'); } } });
   _loApplySnap = null;
   if (window.PitDB) PitDB.save();
   _loRefresh();
@@ -1424,6 +1463,7 @@ window.loUnreturn = function(aid){
     card.loanerReturned = false; card.loanerTo = a.toDate;
     if (window.logFlow) logFlow(card, '代車の返却を取り消した' + (_t0 !== a.toDate ? '　返却予定 ' + (_t0 || '未定') + ' → ' + (a.toDate || '未定') : ''));
   }
+  _loOpLog('代車の返却を取り消した', a);   /* v2.185.0 S-27（予約に紐づかない札も残す） */
   if (window.PitDB) PitDB.save();
   _loBadgePopClose(); renderLoaner();
 };
@@ -1456,6 +1496,7 @@ window.loReturnConfirm = function(aid){
       card.loanerTo = a.toDate; card.loanerReturned = true;
       if (window.logFlow) logFlow(card, '代車の返却を確定した　返却日 ' + rd + (_t0 && _t0 !== a.toDate ? '／返却予定 ' + _t0 + ' → ' + a.toDate : ''));
     }
+    _loOpLog('代車の返却を確定した', a, '返却日 ' + rd);   /* v2.185.0 S-27（予約に紐づかない札も残す） */
     if (window.PitDB) PitDB.save();
     _loBadgePopClose(); renderLoaner();
   });
@@ -1498,7 +1539,9 @@ window.loCancelLoaner = function(aid){
       card: card ? { needLoaner: card.needLoaner, loanerId: card.loanerId, loanerFrom: card.loanerFrom,
                      loanerTo: card.loanerTo, loanerFixed: card.loanerFixed } : null
     };
-    state.loanerAssigns = (state.loanerAssigns || []).filter(function(x){ return x.id !== aid; });
+    _loKeep(function(x){ return x.id !== aid; });   /* v2.185.0 消す印を付けて外す */
+    /* 🔴 v2.185.0（S-27）予約に紐づかない札も、消した中身を操作ログに残す（直後の「↩ 元に戻す」を逃しても、何だったか分かる） */
+    _loOpLog('代車の貸出をキャンセル（カレンダーから消した）', a);
     if (card){
       const _sp0 = _loSpan(card.loanerFrom, card.loanerTo);
       card.needLoaner = false; card.loanerId = ''; card.loanerFrom = ''; card.loanerTo = ''; card.loanerFixed = false;
@@ -1519,6 +1562,7 @@ window.loCancelUndo = function(){
     if (!yes) return;
     if (!Array.isArray(state.loanerAssigns)) state.loanerAssigns = [];
     if (!state.loanerAssigns.some(function(x){ return x && x.id === sn.assign.id; })) state.loanerAssigns.push(sn.assign);
+    _loOpLog('代車の貸出のキャンセルを取り消した（元に戻した）', sn.assign);   /* v2.185.0 S-27 */
     if (sn.cardId && sn.card){
       const c = (state.cards || []).find(function(x){ return x.id === sn.cardId; });
       if (c){ c.needLoaner = sn.card.needLoaner; c.loanerId = sn.card.loanerId; c.loanerFrom = sn.card.loanerFrom;
@@ -1580,7 +1624,7 @@ window.pitLoanerPlanOf = function(cardId){
 window.pitLoanerReleaseForCard = function(cardId, why, opt){
   var plan = pitLoanerPlanOf(cardId);
   if (!plan.n) return plan;                       /* 返却済みしか無い／もともと無い＝触らない */
-  state.loanerAssigns = (state.loanerAssigns || []).filter(function(a){
+  _loKeep(function(a){   /* v2.185.0 消す印を付けて外す */
     return !(a && a.cardId === cardId && !a.returned);
   });
   var card = (state.cards || []).find(function(c){ return c.id === cardId; });
@@ -1682,6 +1726,7 @@ window.loSaveManualBlock = function(){
   function _go(){
   state.loanerAssigns = state.loanerAssigns || [];
   state.loanerAssigns.push({ id:'la'+Date.now().toString(36), loanerId:lo, cardId:null, customer:(cust||'(貸出)'), car:car, purpose:pp, fromDate:from, toDate:to, manual:true });
+  _loOpLog('代車を貸し出した（予約以外）', state.loanerAssigns[state.loanerAssigns.length - 1], pp ? '用途 ' + pp : '');   /* v2.185.0 S-27 */
   if (window.PitDB) PitDB.save();
   _loModalClose(); renderLoaner();
   }
@@ -1865,7 +1910,7 @@ window.loReleaseHold = function(id){
   const a = (state.loanerAssigns || []).find(function(x){ return x.id === id && x.hold; });
   if (!a) return;
   _loBadgePopClose();
-  state.loanerAssigns = (state.loanerAssigns || []).filter(function(x){ return x.id !== id; });
+  _loKeep(function(x){ return x.id !== id; });   /* v2.185.0 消す印を付けて外す */
   if (window.PitDB) PitDB.save();
   try { if (window.pitLog) pitLog('仮押さえを解除', { kind:'loaner',
     label: _loName(a.loanerId) + ' ' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate) + '（' + (a.memo || '') + '）' }); } catch (e) {}
@@ -1914,6 +1959,7 @@ window.loSaveEmergency = function(){
   state.loaners.push({ id:lid, name:'緊急', model:model, plate:plate, srcId:srcId, emergency:true, category:'normal', etc:false, navi:false, iso:false });
   state.loanerAssigns = state.loanerAssigns || [];
   state.loanerAssigns.push({ id:'la'+Date.now().toString(36), loanerId:lid, cardId:null, customer:(cust||'(緊急)'), purpose:pp, fromDate:from, toDate:to, manual:true, emergency:true });
+  _loOpLog('緊急車両を追加して貸し出した', state.loanerAssigns[state.loanerAssigns.length - 1], (model || '') + (plate ? ' ' + plate : '') + (pp ? '　理由 ' + pp : ''));   /* v2.185.0 S-27 */
   if (window.PitDB) PitDB.save();
   _loModalClose(); renderLoaner();
   }

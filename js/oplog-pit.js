@@ -141,6 +141,15 @@
     if (window.state && state.currentView === 'oplog') renderOplog();
   };
 
+  /* 🔴🔴 v2.185.0（棚卸し S-26）**顧客まわりの記録の入口。**
+     customers.js・cust-reg.js・cust-merge.js・veh-merge.js・dup-find.js は `pitOpLog(何をした, 中身の文字)` を呼んでいたのに、
+     **この関数がどこにも無かった**＝顧客の登録・車両の追加・名前やナンバーの変更・顧客と車両の統合と取り消し・
+     ダブりの「これでOK」が、操作ログに**ずっと1件も入っていなかった**（呼ぶ側が `if (window.pitOpLog)` で黙って飛ばしていた）。
+     ＝ pitLog へつなぐ。名前違いの記録関数を新しく作らないこと（見張り＝test_oplog_exists.mjs） */
+  window.pitOpLog = function (action, label, opt) {
+    return window.pitLog(action, Object.assign({ kind: 'customer', label: String(label == null ? '' : label) }, opt || {}));
+  };
+
   /* ---- 読み込み ---- */
   function load() {
     if (isCloudLive()) {

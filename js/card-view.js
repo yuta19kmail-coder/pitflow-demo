@@ -1245,9 +1245,14 @@
       }
       var who = window.PitFlowLog ? PitFlowLog.byOf(e) : (e.by || '');
       /* 手で足した記録だけ ✕ を付ける＝打ち間違いをその場で消せる（自動の工程記録は残す） v1.43.0 */
+      /* 🔴 v2.185.0（S-25）✕ は消さずに打ち消し線（確認の1行あり）。消した記録には「戻す」 */
+      var _oi = (_orig[_i] != null ? _orig[_i] : _i);
+      var _gone = !!(e && e.deleted);
       var del = (window.PitFlowLog && PitFlowLog.isManual(e))
-        ? '<button type="button" class="cv-fdel" title="この記録を消す" onclick="pitFlowDel(\''+esc(c.id)+'\','+(_orig[_i] != null ? _orig[_i] : _i)+')">'+(window.ico?ico('close',15):'×')+'</button>' : '';
-      return '<div class="cv-frow done"><span class="cv-fdot"></span><div class="cv-fmain"><div class="cv-ft">'+title+(amtTxt?'<span class="cv-famt">'+esc(amtTxt)+'</span>':'')+'</div><div class="cv-fd">'+esc(String(when)+(who?' ・ '+who:''))+'</div></div>'+del+'</div>';
+        ? (_gone ? '<button type="button" class="cv-fundel" title="消した記録を戻す" onclick="pitFlowUndel(\''+esc(c.id)+'\','+_oi+')">戻す</button>'
+                 : '<button type="button" class="cv-fdel" title="この記録を消す（打ち消し線で残る）" onclick="pitFlowDel(\''+esc(c.id)+'\','+_oi+')">'+(window.ico?ico('close',15):'×')+'</button>') : '';
+      if (_gone) who = (who ? who + ' ・ ' : '') + '消した：' + (e.deletedBy || '');
+      return '<div class="cv-frow done'+(_gone?' cv-fgone':'')+'"><span class="cv-fdot"></span><div class="cv-fmain"><div class="cv-ft">'+title+(amtTxt?'<span class="cv-famt">'+esc(amtTxt)+'</span>':'')+'</div><div class="cv-fd">'+esc(String(when)+(who?' ・ '+who:''))+'</div></div>'+del+'</div>';
     };
     if (!log.length){ h += '<div class="cv-wl cv-muted">記録はまだありません。</div>'; }
     else {
@@ -2461,6 +2466,22 @@
       if (PitArchive.denyRestore) PitArchive.denyRestore();
       return;
     }
+    /* 🔴 v2.185.0（棚卸し S-28）**消す前の値を「元は …」で1行に残す**（フローと操作ログの両方）。
+       ⚠ 前は「入庫を取り消して予約に戻した」だけで、いくらで・何日に実績だったかが二度と分からず、
+          押し間違えた時に戻す材料が無かった（⑧「返車キャンセル・未定には『元は』」の決めごとから漏れていた）。 */
+    const _元 = [];
+    const _add = function(lb, v){ if (v != null && v !== '' && v !== false) _元.push(lb + ' ' + v); };
+    _add('工程', window.pitCardStatusText ? pitCardStatusText(c) : c.status);
+    _add('実入庫日', c.actualInAt ? String(c.actualInAt).slice(0, 16).replace('T', ' ') : '');
+    _add('実績日', c.completedAt);
+    _add('確定', (c.amountFinal != null && c.amountFinal !== '') ? yen(c.amountFinal) : '');
+    _add('売上日', c.salesDate);
+    _add('完TEL日', c.completeCallAt);
+    _add('返車日', c.returnDate);
+    _add('確定返車日', c.returnDateFinal);
+    _add('返車時間', c.returnTime);
+    if (c.noSale) _元.push('売上なし');
+    const _元txt = _元.length ? '　元は ' + _元.join('・') : '';
     c.status = 'reserved';
     c.returnStage    = null;
     c.returnDate     = '';   c.returnTime = '';
@@ -2478,8 +2499,8 @@
     c.bayId = null; c.baySlot = null; c.testDrive = false;
     c.noSale = false; delete c.noSaleAt; delete c.noSaleBy;
     if (c.coverCall && typeof c.coverCall === 'object') c.coverCall.done = false;
-    if (window.logFlow) logFlow(c, '入庫を取り消して予約に戻した');
-    if (window.pitLog) pitLog('入庫を取り消して予約に戻した', { cardId: c.id, kind: 'phase', label: _cvLabel(c) });
+    if (window.logFlow) logFlow(c, '入庫を取り消して予約に戻した' + _元txt);
+    if (window.pitLog) pitLog('入庫を取り消して予約に戻した', { cardId: c.id, kind: 'phase', label: _cvLabel(c) + _元txt });
     save(); cvRefreshBg();
     if (window.pitToast) pitToast('予約に戻しました');
     if (window.closeDetail) closeDetail();
@@ -2548,6 +2569,7 @@
     if (window.pitLoanerReleaseForCard) pitLoanerReleaseForCard(_c.id, 'カードの消去');
     if(window.pitLog) pitLog('予約カードを消去', { kind:'delete', label: (_c.resNo? '['+_c.resNo+'] ':'') + ((window.pitCustName?pitCustName(_c):_c.customer)? (window.pitCustName?pitCustName(_c):_c.customer)+' 様':'') + (_c.car? ' / '+_c.car:'') });
     if(idx>=0) state.cards.splice(idx,1);
+    if (window.PitDB && PitDB.removed) PitDB.removed('cards', _c.id);   /* 🔴 v2.185.0 消す操作を通った印（これが無いと delete を送らない） */
     cvCloseDel();
     if(window.closeDetail) closeDetail(); else save();
   };

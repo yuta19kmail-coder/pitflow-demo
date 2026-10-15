@@ -371,9 +371,30 @@
     _bindAutosave: function () {
       const self = this;
       const flush = function () { self.save(true); };
-      window.addEventListener('beforeunload', flush);
+      /* 🔴 v2.185.0（S-07）閉じる・再読み込みする時に、**まだサーバーに届いていない直し**があれば止める。
+         ・線が切れている（オフライン）間に送れていない物がある
+         ・送り始めてから 1.5 秒たっても届いていない物がある
+         ⚠ 押してすぐ閉じた（いま送り始めた）だけでは止めない＝毎回聞かれると誰も読まなくなる。
+            その分は端末の控え（firebase-init.js の enablePersistence）が次に開いた時に送る。 */
+      window.addEventListener('beforeunload', function (e) {
+        flush();
+        if (self._unsentWarn()) {
+          try { e.preventDefault(); } catch (_) {}
+          e.returnValue = 'まだ送れていない直しがあります';
+          return e.returnValue;
+        }
+      });
       window.addEventListener('pagehide', flush);
       document.addEventListener('visibilitychange', function () { if (document.hidden) flush(); });
+    },
+
+    /* 閉じる前に止めるか（v2.185.0・S-07） */
+    _unsentWarn: function () {
+      if (this.mode !== 'cloud') return false;
+      var n = Object.keys(this._pending || {}).length;
+      if (!n) return false;
+      if (this._link === false) return true;
+      return !!(this._pendingSince && Date.now() - this._pendingSince > 1500);
     },
 
     /* =========================================================
@@ -452,6 +473,7 @@
       this._loaded = false;
       this._rev = {};                             /* 版番号の控えも作り直す */                       // 読み終わるまでは書かない
       this._shadow = { docs: {}, settings: null };
+      this._base = {}; this._missed = {}; this._delOk = {}; this._rejN = {};   /* v2.185.0 受け取った形・見送り・消す印・弾かれた回数 */
       console.log('[PitDB] クラウドから読み込みます…');
 
       const names = Object.keys(this._COLS);
@@ -472,6 +494,7 @@
             const o = self._takeRev(self._COLS[k], d.id, d.data() || {});   /* 🔴 版番号は中身から外して控える */
             o.id = d.id; arr.push(o);
             self._shadow.docs[self._COLS[k] + '/' + d.id] = self._js(o);
+            self._setBase(self._COLS[k] + '/' + d.id, o);                 /* v2.185.0 変えた欄だけ送るための控え */
           });
           state[k] = arr;
           total += arr.length;
@@ -479,12 +502,14 @@
 
         if (sdoc.exists) {
           const sv = sdoc.data() || {};
+          if (sv.rev !== undefined && sv.rev !== null) self._rev['@settings'] = sv.rev;   /* v2.185.0 設定1枚にも版 */
           self._SETTINGS_KEYS.forEach(function (k) {
             if (sv[k] !== undefined && sv[k] !== null) {
               if (k === 'settings') self._mergeSettings(sv[k]); else state[k] = sv[k];
             }
           });
           self._shadow.settings = self._js(self._settingsPayload());
+          self._base['@settings'] = JSON.stringify(self._settingsRaw(sv));
         } else {
           /* 初回：いまの既定（自社PIT配置図・作業タイプ・入庫ルールなど）をそのまま初期値として上げる */
           console.log('[PitDB] 初回です。いまの設定を初期値としてクラウドに保存します');
@@ -503,6 +528,9 @@
               **開いた瞬間の値では動かない**作り＝ここで黙らせる必要がない。 */
 
         self._loaded = true;                      // ここから先だけ保存を許す
+        /* v2.185.1 前の回に送り終わらなかった直しを、少し待ってから見くらべる（端末の控えが送られ終わるのを待つ） */
+        var _jt = setTimeout(function () { try { self._jCheck(); } catch (e) { console.warn('[PitDB] 送れなかった直しの確かめでエラー', e); } }, self._JWAIT);
+        if (_jt && _jt.unref) _jt.unref();   /* 見張り（node）を待たせない */
         console.log('[PitDB] 読み込み完了（' + total + '件）');
         if (window.PitSync) PitSync.connected();
         if (!sdoc.exists) self._cloudFlush();     // 初回だけ設定を書き上げる
@@ -561,6 +589,217 @@
       return o;
     },
 
+    /* =========================================================
+       🔴🔴 v2.185.0（棚卸し S-01・S-03・S-04）**変えた欄だけ送る／受け取っても握っている物を生かす**
+       ---------------------------------------------------------
+       ◎前の形
+         ・保存＝文書を**丸ごと set**。まだ相手の変更を受け取っていない端末が何か1つ直すと、
+           相手の直しを古い写しで消していた（顧客・代車・貸出・設定は版の関門も無かった）＝決まり⑥違反
+         ・受け取り＝`arr[idx] = o` で**別の物に差し替え**。予約詳細などが握っていたカードは
+           「保存されない抜け殻」になり、そのあと入れた金額・日付が黙って消えていた
+         ・弾かれた（版が古い）時＝打った内容を**全部捨てて**いた
+       ◎いまの形
+         ① 最後にサーバーから受け取った形（_base）を控え、**違う欄だけ** `set(…,{mergeFields})` で書く。
+            消した欄は `FieldValue.delete()`。まだ一度も受け取っていない文書（作ったばかり）だけ丸ごと書く。
+            設定1枚（pitSettings/main）は `settings.〇〇`・`inspectMarks.〇〇` の1つずつまで細かく分ける。
+            版（rev）は全部の入れ物で「見た版＋1」を添える（設定1枚も）。
+         ② 受け取ったら**中身を入れ替える**（同じ物のまま）。手元でまだ送っていない欄のうち、
+            相手が触っていない欄は手元を残す（3者比較）。
+         ③ 弾かれたら、サーバーの今の姿を読み、**相手と自分が変えた欄が重ならなければ自分の欄だけ載せ直す**。
+            重なった欄は**相手を残す**（迷ったら、みんなの側を残す＝v2.26.0 の考えはそのまま）。
+            同じ文書で3回続けて弾かれたら、前と同じく相手を丸ごと採る（空回り止め）。
+         ④ 手元の一覧から消えていても、**消す操作（PitDB.keep／PitDB.removed）を通っていない物には delete を送らない**。
+            消えていた物は控えから戻す（読み込みのやり直し・取り込みの置き換え等で全員の分が消えるのを止める）。
+       ========================================================= */
+    _base: null,            /* '入れ物名/id' → 最後にサーバーと合っていた形（JSON の文字・id と rev は外す） */
+    _missed: null,          /* 送っている最中・編集中で受け取りを見送った文書（'入れ物名/id' → 配列名）。あとで取り直す */
+    _delOk: null,           /* 消す操作を通った文書（'入れ物名/id' → 1）。ここに無い物には delete を送らない */
+    _rejN: null,            /* 同じ文書が続けて弾かれた回数（空回り止め） */
+    _pendingSince: 0,       /* いちばん古い「送っている最中」の始まり（閉じる時の警告に使う） */
+    _DEEP_SETTINGS: { settings: 1, aiVerdicts: 1, boardLabels: 1, inspectMarks: 1, inspectMutes: 1 },
+
+    /* 並べ替えた文字（id も残す＝欄ごとの見くらべ用）。_js と違って id を外さない */
+    _stable: function (v) {
+      if (v === undefined) return '\u0000u';
+      return JSON.stringify(v, function (k, val) {
+        if (val && typeof val === 'object' && !Array.isArray(val)) {
+          var ks = Object.keys(val).filter(function (x) { return typeof val[x] !== 'function' && val[x] !== undefined; }).sort();
+          var o = {};
+          for (var i = 0; i < ks.length; i++) o[ks[i]] = val[ks[i]];
+          return o;
+        }
+        return val;
+      });
+    },
+    _maps: function () {
+      if (!this._base) this._base = {};
+      if (!this._missed) this._missed = {};
+      if (!this._delOk) this._delOk = {};
+      if (!this._rejN) this._rejN = {};
+      if (!this._rev) this._rev = {};
+    },
+    _isObj: function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); },
+    _setBase: function (key, o) {
+      if (!this._base) this._base = {};
+      /* ⚡ 開いた時に全件（本番 7,000件超）に掛かる＝文字にするのは1回だけ（上の段の id と rev は外す） */
+      try {
+        this._base[key] = JSON.stringify(o, function (k, v) {
+          if (this === o && (k === 'id' || k === 'rev')) return undefined;
+          return typeof v === 'function' ? undefined : v;
+        });
+      } catch (e) { delete this._base[key]; }
+    },
+    _getBase: function (key) {
+      var s = this._base && this._base[key];
+      if (!s) return null;
+      try { return JSON.parse(s); } catch (e) { return null; }
+    },
+    /* 欄の住所（mergeFields 用）。欄の名前に記号があっても切れないように FieldPath で作る */
+    _fp: function () {
+      var a = [].slice.call(arguments);
+      try {
+        if (window.firebase && firebase.firestore && firebase.firestore.FieldPath) {
+          return new (Function.prototype.bind.apply(firebase.firestore.FieldPath, [null].concat(a)))();
+        }
+      } catch (e) {}
+      return a.join('.');
+    },
+    _delMark: function () {
+      try {
+        var FV = (window.fb && window.fb.FieldValue) || (window.firebase && firebase.firestore && firebase.firestore.FieldValue);
+        return (FV && FV.delete) ? FV.delete() : null;
+      } catch (e) { return null; }
+    },
+    /* 2つの形で違う欄（上の段だけ）。id と rev は見ない */
+    _diffKeys: function (a, b) {
+      var self = this, seen = {}, out = [];
+      Object.keys(a || {}).concat(Object.keys(b || {})).forEach(function (k) {
+        if (seen[k] || k === 'id' || k === 'rev') return;
+        seen[k] = 1;
+        if (self._stable((a || {})[k]) !== self._stable((b || {})[k])) out.push(k);
+      });
+      return out;
+    },
+    /* フロー（log）は足すだけの記録＝両方が足した時は、相手の並びに自分が足した行を後ろへ足す */
+    /* 🔴 v2.185.2（出す前の確認の指摘）**行の場所で合わせる。**
+       フローは足すだけ（消すのも打ち消し線＝並びから抜かない）なので、控えにあった行は「同じ番号の行」が同じ記録。
+       ・控えの範囲で自分が書き換えた行（打ち消し線・日時の直し）→ 相手がその行を触っていなければ自分の行で置き換える
+       ・控えより後ろに自分が足した行 → 相手の並びの後ろへ足す（同じ中身が既にあれば足さない）
+       ⚠ 前は中身の文字で見ていたので、書き換えた行を「新しい行」と読んで**2行**にしていた */
+    _logUnion: function (base, mine, theirs) {
+      var self = this, out = (theirs || []).slice(), had = {};
+      base = base || []; mine = mine || [];
+      out.forEach(function (r) { had[self._stable(r)] = 1; });
+      mine.forEach(function (r, i) {
+        var s = self._stable(r);
+        if (i < base.length) {
+          var b = self._stable(base[i]);
+          if (s === b) return;                                         /* 触っていない行 */
+          if (i < out.length && self._stable(out[i]) === b) { out[i] = r; had[s] = 1; }   /* 自分だけが書き換えた行 */
+          return;                                                      /* 両方が同じ行を書き換えた＝相手を残す */
+        }
+        if (!had[s]) { had[s] = 1; out.push(r); }
+      });
+      return out;
+    },
+
+    /* 🔴 受け取った1件を手元に入れる（**差し替えずに中身を入れ替える**＝画面が握っている物が生き続ける）。
+       手元でまだ送っていない欄（控えと違う欄）のうち、相手が触っていない欄は手元を残す。 */
+    _applyRemote: function (k, col, id, o) {
+      var self = this, key = col + '/' + id;
+      var arr = state[k] || (state[k] = []);
+      var idx = arr.findIndex(function (x) { return x && x.id === id; });
+      var base = this._getBase(key);
+      this._shadow.docs[key] = this._js(o);
+      this._setBase(key, o);
+      if (idx < 0) { arr.push(o); return o; }
+      var cur = arr[idx];
+      if (cur === o) return cur;
+      var keep = {}, 相手が変えた = [];
+      var seen = {};
+      Object.keys(cur).concat(Object.keys(base || {})).concat(Object.keys(o)).forEach(function (f) {
+        if (seen[f] || f === 'id') return; seen[f] = 1;
+        var b = base ? self._stable(base[f]) : null;
+        var r = self._stable(o[f]);
+        if (!base || r !== b) 相手が変えた.push(f);
+        if (!base) return;                                   /* 控えが無い＝手元の直しは分からない＝サーバーを採る */
+        var c = self._stable(cur[f]);
+        if (c === b) return;                                 /* 手元は触っていない */
+        if (r === b) keep[f] = { has: Object.prototype.hasOwnProperty.call(cur, f) && cur[f] !== undefined, v: cur[f] };   /* 相手は触っていない＝手元を残す */
+        else if (f === 'log' && Array.isArray(cur[f]) && Array.isArray(o[f])) keep[f] = { has: true, v: self._logUnion(base[f], cur[f], o[f]) };
+      });
+      Object.keys(cur).forEach(function (f) { if (f !== 'id') delete cur[f]; });
+      Object.keys(o).forEach(function (f) { if (f !== 'id') cur[f] = o[f]; });
+      cur.id = id;
+      Object.keys(keep).forEach(function (f) { if (keep[f].has) cur[f] = keep[f].v; else delete cur[f]; });
+      /* 予約詳細などが開いている時に知らせる（閉じた時の「編集：…」に相手の直しを混ぜないため） */
+      if (k === 'cards' && 相手が変えた.length && typeof window.pitCardRemoteChanged === 'function') {
+        try { window.pitCardRemoteChanged(cur, 相手が変えた); } catch (e) { console.warn('[PitDB] 受け取りの知らせでエラー', e); }
+      }
+      return cur;
+    },
+
+    /* 🔴 消す操作の入口。`state[k]` から fn が false を返した物を外し、**消してよい**と印を付ける。
+       ⚠ この印が無い物は、手元の一覧から消えていても delete を送らない（控えから戻す）。 */
+    keep: function (k, fn) {
+      var self = this, col = this._COLS[k], out = [];
+      (state[k] || []).forEach(function (o) {
+        if (fn(o)) { out.push(o); return; }
+        if (o && o.id && col) { if (!self._delOk) self._delOk = {}; self._delOk[col + '/' + o.id] = 1; }
+      });
+      state[k] = out;
+      return out;
+    },
+    /* もう手元から外した物に「消してよい」の印だけ付ける（ids は1つでも配列でも） */
+    removed: function (k, ids) {
+      var col = this._COLS[k]; if (!col) return;
+      if (!this._delOk) this._delOk = {};
+      var self = this;
+      [].concat(ids || []).forEach(function (id) { if (id) self._delOk[col + '/' + id] = 1; });
+    },
+
+    /* その文書をサーバーから受け取ったことがあるか（＝クラウドに在る） */
+    hasBase: function (k, id) { var col = this._COLS[k]; return !!(col && this._base && this._base[col + '/' + id]); },
+    /* よその道（付箋の 1件足す／抜く など）で**もう書いた欄**を控えに入れる。
+       ＝次の保存がその欄（配列）を丸ごと書き直して、ほぼ同時の相手の分を消さないように（v2.185.0・S-18） */
+    sentFields: function (k, obj, fields) {
+      var col = this._COLS[k]; if (!col || !obj || !obj.id || !this._shadow) return;
+      this._maps();
+      var key = col + '/' + obj.id, b = this._getBase(key);
+      if (!b) return;
+      (fields || []).forEach(function (f) {
+        if (obj[f] === undefined) delete b[f];
+        else b[f] = JSON.parse(JSON.stringify(obj[f]));
+      });
+      b.id = obj.id;
+      this._setBase(key, b);
+      this._shadow.docs[key] = this._js(b);
+    },
+
+    /* 見送った受け取りを取り直す（送り終わった・編集が終わった後） */
+    _catchUp: function () {
+      var self = this;
+      if (this.mode !== 'cloud' || !this._missed) return;
+      var jobs = [];
+      Object.keys(this._missed).forEach(function (key) {
+        if (self._pending[key]) return;
+        var k = self._missed[key];
+        if (key === '@settings') { delete self._missed[key]; self._reloadSettings(); return; }
+        var id = key.slice(key.indexOf('/') + 1);
+        if (k === 'cards' && window.pitCardEditingId && window.pitCardEditingId() === id) return;
+        delete self._missed[key];
+        jobs.push(self.refreshDoc(k, id).catch(function () {}));
+      });
+      /* v2.185.2 描き直しはまとめて1回（1件ずつ描き直すと、20枚の保存で20回描き直していた） */
+      if (jobs.length) Promise.all(jobs).then(function () { self._afterApply(); });
+    },
+    _reloadSettings: function () {
+      var self = this;
+      return this._co().collection('pitSettings').doc('main').get({ source: 'server' }).then(function (d) {
+        if (d && d.exists) self._applySettings(d.data() || {});
+      }).catch(function () {});
+    },
+
     _link: true,            /* サーバーとつながっているか */
     _relinkT: null,
     _relinkN: 0,
@@ -607,6 +846,7 @@
     _resync: function () {
       var self = this;
       if (this.mode !== 'cloud' || !this._shadow) return Promise.resolve(0);
+      this._maps();
       var names = Object.keys(this._COLS);
       var gets = names.map(function (k) { return self._co().collection(self._COLS[k]).get({ source: 'server' }); });
       return Promise.all(gets).then(function (res) {
@@ -624,8 +864,9 @@
               if (self._shadow.docs[key] === js) return;                 /* 変わっていない */
               var idx = arr.findIndex(function (x) { return x && x.id === d.id; });
               /* ⚠ いま「予約を編集」で開いているカードは差し替えない（v1.56.1・打った内容が消える）。
-                 　 **見送ってよいのはここだけ。** */
-              if (col === 'pitCards' && window.pitCardEditingId && window.pitCardEditingId() === d.id) { 見送った++; return; }
+                 　 **見送ってよいのはここだけ。** 見送った分は編集が終わってから取り直す（v2.185.0） */
+              if (col === 'pitCards' && window.pitCardEditingId && window.pitCardEditingId() === d.id) { 見送った++; self._missed[key] = k; return; }
+              if (self._pending[key]) { 見送った++; self._missed[key] = k; return; }   /* v2.185.0 送っている最中＝届いてから取り直す */
               /* 🔴🔴 v2.24.0 **それ以外は、サーバーが勝つ。**
                  手元にまだ保存していない直しがあっても、ここではサーバーの姿を採る。
                  ◎なぜそう決めたか（2026-08-29・事故のあと）
@@ -633,9 +874,10 @@
                    他人の作業を消す）が、その1か所から必ず戻ってくる。
                    人が打っている最中のものは**編集中の関門**で守られているし、
                    ふつうの保存は0.5秒で飛ぶので、ここで守る必要のある手元の直しは実質ない。
-                 ⚠ 受け取り（_watch）も同じ考え方で動いている。**2つの道で答えを変えない。** */
-              self._shadow.docs[key] = js;
-              if (idx >= 0) arr[idx] = o; else arr.push(o);
+                 ⚠ 受け取り（_watch）も同じ考え方で動いている。**2つの道で答えを変えない。**
+                 🔴 v2.185.0 「サーバーが勝つ」は**欄ごと**になった（_applyRemote）。相手が変えた欄はサーバー、
+                    相手が触っていない欄で手元がまだ送っていない直しだけ手元を残す。差し替えずに中身を入れ替える。 */
+              self._applyRemote(k, col, d.id, o);
               直した++;
             });
             /* サーバーではもう無いもの＝切れている間に誰かが消した */
@@ -644,6 +886,7 @@
               var id = key.slice(col.length + 1);
               if (生きている[id]) return;
               delete self._shadow.docs[key];
+              if (self._base) delete self._base[key];
               var j = arr.findIndex(function (x) { return x && x.id === id; });
               if (j >= 0) arr.splice(j, 1);
               直した++;
@@ -671,9 +914,12 @@
           .onSnapshot({ includeMetadataChanges: true }, function (d) {
             var 写しから = !!(d && d.metadata && d.metadata.fromCache);
             if (写しから) {
-              self._needResync = true;
+              /* 🔴 v2.185.0（A-01）「読み直しが要る」の印は、猶予を過ぎて本当に「届いていません」と言った時だけ立てる。
+                 ⚠ 前はここで先に立てていた＝線の張り直しで起きる「一瞬（1秒）だけ写しから」でも、
+                    戻った時に全部を読み直していた（読み取りの費用と描き直し）。共通部品 CFSync.watchLink と同じ直し。 */
               if (!self._offT) self._offT = setTimeout(function () {          /* 猶予を置いてから言う */
                 self._offT = null;
+                self._needResync = true;
                 self._setLink(false, 'サーバーから届いていません');
               }, self._OFF_WAIT);
               return;
@@ -706,6 +952,7 @@
     refreshDoc: function (k, id) {
       var self = this, col = this._COLS[k];
       if (this.mode !== 'cloud' || !col || !this._shadow || !id) return Promise.resolve(null);
+      this._maps();
       return this._co().collection(col).doc(id).get({ source: 'server' }).then(function (d) {
         var key = col + '/' + id;
         var arr = state[k] || (state[k] = []);
@@ -714,13 +961,13 @@
         try {
           if (!d.exists) {                       /* サーバーではもう消えている */
             delete self._shadow.docs[key];
+            delete self._base[key];
             if (idx >= 0) arr.splice(idx, 1);
             return null;
           }
           var o = self._takeRev(col, id, d.data() || {}); o.id = id;   /* 🔴 版番号を控える */
-          self._shadow.docs[key] = self._js(o);
-          if (idx >= 0) arr[idx] = o; else arr.push(o);
-          return o;
+          /* 🔴 v2.185.0 差し替えずに中身を入れ替える（S-01：overdue-pit の読み直しで、開いている詳細が抜け殻にならない） */
+          return self._applyRemote(k, col, id, o);
         } finally { self._applying = false; }
       });
     },
@@ -736,6 +983,7 @@
     /* ---- 他の端末の変更を受け取る ---- */
     _watch: function () {
       const self = this;
+      this._maps();
       this.disconnectCloudKeepMode_ = true;
       this._unsubs.forEach(function (u) { try { u(); } catch (e) {} });
       this._unsubs = [];
@@ -751,26 +999,35 @@
             if (ch.type === 'removed') {
               if (self._shadow.docs[key] === undefined) return;   // 自分で消した分
               delete self._shadow.docs[key];
+              delete self._base[key];
               state[k] = (state[k] || []).filter(function (x) { return x.id !== id; });
               touched = true;
               return;
             }
-            if (self._pending[key]) return;                        // 自分がいま書いた分＝見送る
+            /* 自分がいま書いている最中＝見送る。
+               🔴 v2.185.0 見送った分は、送り終わってから**取り直す**（前は捨てたまま＝相手の変更がこの画面に来なかった） */
+            if (self._pending[key]) {
+              /* 🔴 v2.185.2 自分の書き込みの「手元向けの受信」（本物の Firestore は書いた直後に出す）は、送った中身と同じなら
+                 見送りに入れない。⚠ 入れると、送り終わるたびに1件ずつサーバーを読み直して描き直していた（出す前の確認の指摘） */
+              const raw = Object.assign({}, ch.doc.data() || {}); delete raw.rev; raw.id = id;
+              if (self._pendingJs && self._pendingJs[key] === self._js(raw)) return;
+              self._missed[key] = k; return;
+            }
             /* 🔴 v1.56.1 **いま「予約を編集」で開いている入庫カードは差し替えない。**
                下の `arr[idx] = o` は state.cards の中身を**別の物に入れ替える**。
                画面（フォーム）が握っているのは入れ替わる前の物なので、差し替えられると
                **打ち込んだ内容が行き場を失って、保存を押しても消えてしまう。**
                ⚠ v1.55.0 までは打つたびに保存していたので窓が一瞬しかなく表に出なかったが、
                   v1.56.0 で「押すまで保存しない」にした結果、**編集中ずっとこの窓が開く**ようになった。
-               ⚠ 見送った分は、編集を終えて保存した時に自分の内容で上書きされる。 */
-            if (col === 'pitCards' && window.pitCardEditingId && window.pitCardEditingId() === id) return;
+               🔴 v2.185.0 （前のコメント「見送った分は、編集を終えて保存した時に自分の内容で上書きされる」は v2.26.0 から逆だった）
+                  見送った分は印を付けておき、編集を終えて保存する時に、弾かれたら3者比較で載せ直す（_rebase）／
+                  弾かれなければ送り終わってから取り直す（_catchUp）。 */
+            if (col === 'pitCards' && window.pitCardEditingId && window.pitCardEditingId() === id) { self._missed[key] = k; return; }
             const o = self._takeRev(col, id, ch.doc.data() || {}); o.id = id;   /* 🔴 版番号を控える */
             const js = self._js(o);
-            if (self._shadow.docs[key] === js) return;             // 自分が書いた分＝何もしない
-            self._shadow.docs[key] = js;
-            const arr = state[k] || (state[k] = []);
-            const idx = arr.findIndex(function (x) { return x.id === id; });
-            if (idx >= 0) arr[idx] = o; else arr.push(o);
+            if (self._shadow.docs[key] === js) { self._setBase(key, o); return; }   // 自分が書いた分＝何もしない（控えだけ最新に）
+            /* 🔴 v2.185.0 差し替えずに中身を入れ替える（S-01：予約詳細が握っているカードを抜け殻にしない） */
+            self._applyRemote(k, col, id, o);
             touched = true;
           });
           } finally { self._applying = false; }
@@ -794,22 +1051,14 @@
       const un2 = this._co().collection('pitSettings').doc('main').onSnapshot(function (d) {
         if (!d.exists) return;
         const sv = d.data() || {};
-        if (self._pending['@settings']) return;                    // 自分がいま書いた分＝見送る
-        const js = self._js({
-          settings: sv.settings, bays: sv.bays, floorPlan: sv.floorPlan,
-          aiVerdicts: sv.aiVerdicts, boardLabels: sv.boardLabels,
-          inspectMarks: sv.inspectMarks, inspectMutes: sv.inspectMutes
-        });
-        if (js === self._shadow.settings) return;
-        self._applying = true;
-        try {
-          self._SETTINGS_KEYS.forEach(function (k) {
-            if (sv[k] !== undefined && sv[k] !== null) {
-              if (k === 'settings') self._mergeSettings(sv[k]); else state[k] = sv[k];
-            }
-          });
-          self._shadow.settings = js;
-        } finally { self._applying = false; }
+        if (self._pending['@settings']) {
+          /* v2.185.2 自分の書き込みの手元向けの受信＝見送りに入れない */
+          const sjs0 = self._js({ settings: sv.settings || {}, bays: sv.bays || [], floorPlan: sv.floorPlan || { shapes: [] },
+            aiVerdicts: sv.aiVerdicts || {}, boardLabels: sv.boardLabels || {}, inspectMarks: sv.inspectMarks || {}, inspectMutes: sv.inspectMutes || {} });
+          if (!(self._pendingJs && self._pendingJs['@settings'] === sjs0)) self._missed['@settings'] = 'settings';
+          return;
+        }   // 自分がいま書いた分＝見送る（v2.185.0 あとで取り直す）
+        if (!self._applySettings(sv)) return;
         /* 🔴🔴 v2.8.1 **ここで書き戻さない。**
            前は「他の端末が古い作業タイプを書いていたら、揃え直して書き戻す」を
            **受け取るたびに即**やっていた。これが版のちがう端末との往復を
@@ -846,6 +1095,68 @@
         inspectMutes: state.inspectMutes || {}
       };
     },
+    /* サーバーの設定1枚から、まとめて入れている欄だけを抜いた形（控え用） */
+    _settingsRaw: function (sv) {
+      var out = {};
+      this._SETTINGS_KEYS.forEach(function (k) { if (sv && sv[k] !== undefined && sv[k] !== null) out[k] = sv[k]; });
+      return this._clean(out);
+    },
+    /* 設定1枚で違う所の住所。settings・inspectMarks などは「中の1つずつ」まで分ける（札1枚・設定1つずつ） */
+    _settingsPaths: function (a, b) {
+      var self = this, out = [];
+      this._SETTINGS_KEYS.forEach(function (top) {
+        var x = (a || {})[top], y = (b || {})[top];
+        if (self._DEEP_SETTINGS[top] && self._isObj(x) && self._isObj(y)) {
+          var seen = {};
+          Object.keys(x).concat(Object.keys(y)).forEach(function (sub) {
+            if (seen[sub]) return; seen[sub] = 1;
+            if (self._stable(x[sub]) !== self._stable(y[sub])) out.push([top, sub]);
+          });
+        } else if (self._stable(x) !== self._stable(y)) out.push([top]);
+      });
+      return out;
+    },
+    _pick: function (o, p) { var v = (o || {})[p[0]]; return p.length > 1 ? ((v && typeof v === 'object') ? v[p[1]] : undefined) : v; },
+    /* 受け取った設定1枚を手元に入れる。手元でまだ送っていない所のうち、相手が触っていない所は手元を残す（v2.185.0）。
+       戻り値＝入れた（true）／同じだった（false） */
+    _applySettings: function (sv) {
+      var self = this;
+      this._maps();
+      if (sv.rev !== undefined && sv.rev !== null) this._rev['@settings'] = sv.rev;
+      var raw = this._settingsRaw(sv);
+      var js = this._js({
+        settings: sv.settings, bays: sv.bays, floorPlan: sv.floorPlan,
+        aiVerdicts: sv.aiVerdicts, boardLabels: sv.boardLabels,
+        inspectMarks: sv.inspectMarks, inspectMutes: sv.inspectMutes
+      });
+      if (js === this._shadow.settings) { this._base['@settings'] = JSON.stringify(raw); return false; }
+      var base = this._getBase('@settings');
+      var 残す = [];
+      if (base) {
+        var mine = this._clean(this._settingsPayload());
+        this._settingsPaths(base, mine).forEach(function (p) {
+          if (self._stable(self._pick(base, p)) === self._stable(self._pick(raw, p))) 残す.push([p, self._pick(mine, p)]);
+        });
+      }
+      this._applying = true;
+      try {
+        this._SETTINGS_KEYS.forEach(function (k) {
+          if (sv[k] !== undefined && sv[k] !== null) {
+            if (k === 'settings') self._mergeSettings(sv[k]); else state[k] = sv[k];
+          }
+        });
+        残す.forEach(function (x) {
+          var p = x[0], v = x[1];
+          if (p.length === 1) { if (v === undefined) delete state[p[0]]; else state[p[0]] = v; return; }
+          var box = state[p[0]];
+          if (!box || typeof box !== 'object' || Array.isArray(box)) box = state[p[0]] = {};
+          if (v === undefined) delete box[p[1]]; else box[p[1]] = v;
+        });
+        this._shadow.settings = js;
+        this._base['@settings'] = JSON.stringify(raw);
+      } finally { this._applying = false; }
+      return true;
+    },
 
     /* ---- 変わった所だけ送る ---- */
     _cloudFlush: function () {
@@ -856,6 +1167,7 @@
       if (!this._loaded) { console.warn('[PitDB] 読み込み前なので保存を見送りました'); return false; }
       const self = this;
       const ops = [];
+      this._maps();
       /* 🔴🔴 v2.115.0（ゆうた報告 2026-09-14）**まだサーバーに届いていない書き込みは、次に回す。**
          🗣「予約詳細を保存するときに 他の人が開いています みたいなものと 保存しました が同時にでて保存されている」
          ◎正体＝「保存する」で保存が**立て続けに2回**走る（編集の見張りを外した時／顧客控えの反映のあと）。
@@ -878,15 +1190,40 @@
           const key = col + '/' + o.id;
           const js = self._js(o);
           if (self._shadow.docs[key] === js) return;
+          /* 🔴 v2.185.0（S-06）**代車カレンダーの下書き中の札は送らない。**「反映」を押すまでこの端末の中だけ。
+             ⚠ 前は窓を切り替えた・ほかの所で保存が走っただけで下書きがクラウドへ出て、全員に見え、
+                ほかの端末が「カードと違う」と元へ書き戻し、「反映」しても0件になっていた。 */
+          if (k === 'loanerAssigns' && typeof window.pitLoanerInDraft === 'function' && window.pitLoanerInDraft(o)) return;
           if (self._pending[key]) { 後回し = true; return; }   /* 🔴 v2.115.0 届くのを待ってから */
-          const body = self._clean(o);
+          const full = self._clean(o);
           /* 🔴 v2.26.0 **自分が見た版の次の番号**を添える。
              サーバーはこれが `いまの版 + 1` でなければ受け付けない＝古い画面は書けない。
              ⚠ ここで足すだけ。`js`（差分の控え）には入れない＝入れると毎回「変わった」になる。 */
-          body.rev = (self._rev && self._rev[key] ? self._rev[key] : 0) + 1;
-          ops.push({ t: 'set', ref: self._co().collection(col).doc(o.id), body: body, key: key, js: js });   /* js は並べ替え済みの文字（_js） */
+          const rev = (self._rev && self._rev[key] ? self._rev[key] : 0) + 1;
+          /* 🔴🔴 v2.185.0（S-04・決まり⑥）**変えた欄だけ書く。**受け取った形（_base）と比べて違う欄だけ mergeFields。
+             消した欄は FieldValue.delete()。控えが無い（作ったばかり）文書だけ丸ごと書く。 */
+          const base = self._getBase(key);
+          let op = null;
+          if (base) {
+            const ks = self._diffKeys(base, full);
+            const DEL = self._delMark();
+            const 消す欄 = ks.filter(function (f) { return !(f in full); });
+            if (!ks.length) { self._shadow.docs[key] = js; return; }       /* 並びだけの違い＝書かない */
+            if (!消す欄.length || DEL) {
+              const part = {}, paths = [];
+              ks.forEach(function (f) { part[f] = (f in full) ? full[f] : DEL; paths.push(self._fp(f)); });
+              part.rev = rev; paths.push(self._fp('rev'));
+              op = { t: 'set', ref: self._co().collection(col).doc(o.id), body: part, opt: { mergeFields: paths }, fields: ks, key: key, js: js, full: full, k: k };
+            }
+          }
+          if (!op) {
+            full.rev = rev;
+            op = { t: 'set', ref: self._co().collection(col).doc(o.id), body: full, key: key, js: js, full: full, k: k };   /* js は並べ替え済みの文字（_js） */
+          }
+          ops.push(op);
         });
         /* 消えたもの */
+        const 迷子 = [];
         Object.keys(self._shadow.docs).forEach(function (key) {
           if (key.indexOf(col + '/') !== 0) return;
           /* 🔴 2026-09-26 **付箋（pitBoardNotes）はこの画面から消さない。**付箋に「消去」は無い＝アーカイブ。
@@ -894,17 +1231,59 @@
              ⚠ ルールでも付箋の delete は管理者だけ＝ここで送ると、同じまとめ書きのカードの保存まで失敗する */
           if (col === 'pitBoardNotes') return;
           const id = key.slice(col.length + 1);
-          if (alive[id]) return;
+          if (alive[id]) { delete self._delOk[key]; return; }
+          /* 🔴🔴 v2.185.0（S-04）**消す操作を通っていない物には delete を送らない。**
+             手元の一覧から消えていた理由が「消す」でない（読み込みのやり直し・取り込みの置き換え・書き間違い）と、
+             前は**全員の分がクラウドから消えた**。いまは控えから手元へ戻す。 */
+          if (!self._delOk[key]) { 迷子.push(key); return; }
           if (self._pending[key]) { 後回し = true; return; }
-          ops.push({ t: 'del', ref: self._co().collection(col).doc(id), key: key });
+          ops.push({ t: 'del', ref: self._co().collection(col).doc(id), key: key, k: k });
         });
+        if (迷子.length) {
+          const arr2 = state[k] || (state[k] = []);
+          迷子.forEach(function (key) {
+            const b = self._getBase(key);
+            if (!b) return;
+            b.id = key.slice(col.length + 1);
+            arr2.push(b);
+          });
+          console.warn('[PitDB] 🔴 ' + col + ' の ' + 迷子.length + '件が、消す操作を通らずに手元から消えていました。消さずに戻しました', 迷子.slice(0, 5));
+        }
       });
 
       const sjs = this._js(this._settingsPayload());
       if (sjs !== this._shadow.settings) {
         if (self._pending['@settings']) 後回し = true;
-        else ops.push({ t: 'set', ref: this._co().collection('pitSettings').doc('main'),
-                   body: this._clean(this._settingsPayload()), key: '@settings', js: sjs });
+        else {
+          /* 🔴 v2.185.0（S-04）設定1枚も変えた所だけ（settings・inspectMarks などは中の1つずつ）＋版 */
+          const sfull = this._clean(this._settingsPayload());
+          const sbase = this._getBase('@settings');
+          const srev = (self._rev['@settings'] || 0) + 1;
+          const sref = this._co().collection('pitSettings').doc('main');
+          if (sbase) {
+            const ps = this._settingsPaths(sbase, sfull);
+            const DEL = this._delMark();
+            const 消す = ps.some(function (p) { return self._pick(sfull, p) === undefined; });
+            if (!ps.length) self._shadow.settings = sjs;
+            else if (!消す || DEL) {
+              const part = {}, paths = [];
+              ps.forEach(function (p) {
+                const v = self._pick(sfull, p);
+                if (p.length === 1) part[p[0]] = (v === undefined ? DEL : v);
+                else { part[p[0]] = part[p[0]] || {}; part[p[0]][p[1]] = (v === undefined ? DEL : v); }
+                paths.push(self._fp.apply(self, p));
+              });
+              part.rev = srev; paths.push(self._fp('rev'));
+              ops.push({ t: 'set', ref: sref, body: part, opt: { mergeFields: paths }, key: '@settings', js: sjs, full: sfull, paths: ps });
+            } else {
+              sfull.rev = srev;
+              ops.push({ t: 'set', ref: sref, body: sfull, key: '@settings', js: sjs, full: sfull });
+            }
+          } else {
+            sfull.rev = srev;
+            ops.push({ t: 'set', ref: sref, body: sfull, key: '@settings', js: sjs, full: sfull });
+          }
+        }
       }
 
       /* 後回しにしたもの＝送っている最中の分が届いてから、もう一度（下の then／catch で呼ぶ） */
@@ -913,56 +1292,76 @@
         if (後回し) self._flushAgain = true;       /* 走っている方が終わった時に拾う */
         return true;
       }
-      ops.forEach(function (op) { self._pending[op.key] = 1; });
+      if (!this._pendingJs) this._pendingJs = {};
+      ops.forEach(function (op) { self._pending[op.key] = 1; self._pendingJs[op.key] = op.js; });
+      if (!this._pendingSince) this._pendingSince = Date.now();
       if (window.PitSync) PitSync.saving();
 
       /* Firestore のまとめ書きは1回500件まで。多い時は分けて送る。 */
       const chunks = [];
       for (let i = 0; i < ops.length; i += 400) chunks.push(ops.slice(i, i + 400));
+      let 送っている組 = null;
 
       chunks.reduce(function (p, group) {
         return p.then(function () {
+          送っている組 = group;
           const batch = window.fb.db.batch();
           group.forEach(function (op) {
-            if (op.t === 'del') batch.delete(op.ref); else batch.set(op.ref, op.body);
+            if (op.t === 'del') batch.delete(op.ref);
+            else if (op.opt) batch.set(op.ref, op.body, op.opt);   /* v2.185.0 変えた欄だけ */
+            else batch.set(op.ref, op.body);
           });
+          self._jAdd(group);                          /* v2.185.1 送り終わるまで端末に控える（閉じても次に確かめる） */
           return batch.commit().then(function () {
+            self._jDone(group);
             group.forEach(function (op) {
-              if (op.t === 'del') { delete self._shadow.docs[op.key]; if (self._rev) delete self._rev[op.key]; }
-              else if (op.key === '@settings') self._shadow.settings = op.js;
+              if (op.t === 'del') {
+                delete self._shadow.docs[op.key]; if (self._rev) delete self._rev[op.key];
+                delete self._base[op.key]; delete self._delOk[op.key];
+              }
+              else if (op.key === '@settings') {
+                self._shadow.settings = op.js;
+                if (op.full) { const f = Object.assign({}, op.full); delete f.rev; self._base['@settings'] = JSON.stringify(f); }
+                if (op.body && op.body.rev !== undefined) self._rev['@settings'] = op.body.rev;
+              }
               else {
                 self._shadow.docs[op.key] = op.js;
+                if (op.full) self._setBase(op.key, op.full);
                 if (op.body && op.body.rev !== undefined && self._rev) self._rev[op.key] = op.body.rev;   /* 🔴 版も進める */
               }
-              delete self._pending[op.key];
+              delete self._rejN[op.key];
+              delete self._pending[op.key]; delete self._pendingJs[op.key];
             });
           });
         });
       }, Promise.resolve()).then(function () {
         self._cloudErr = 0;
+        if (!Object.keys(self._pending).length) self._pendingSince = 0;
         if (window.PitSync) PitSync.saved();
         console.log('[PitDB] 保存しました（' + ops.length + '件）');
         /* 🔴 v2.115.0 待たせていた分を送る */
         if (self._flushAgain) { self._flushAgain = false; 後回し = true; }
         続き();
+        self._catchUp();                             /* v2.185.0 送っている間に見送った受け取りを取り直す */
       }).catch(function (e) {
-        ops.forEach(function (op) { delete self._pending[op.key]; });
+        ops.forEach(function (op) { delete self._pending[op.key]; if (self._pendingJs) delete self._pendingJs[op.key]; });
+        if (!Object.keys(self._pending).length) self._pendingSince = 0;
         if (self._flushAgain) { self._flushAgain = false; 後回し = true; }
         /* 🔴🔴🔴 v2.26.0 **版が古くてサーバーに弾かれた**＝この画面が古い。
-           ◎やること＝**読み直すだけ。絶対に書き直さない。**
-             ここで「じゃあ新しい版で書き直そう」とすると、
-             **古い内容で押し切る**ことになり、この仕掛けを自分で無効にする。
-           ◎打った内容は捨てる。＝ 8/28 の事故で消えたのは「他の人が終わらせた仕事」で、
-             こちらの打ち込みより重い。**迷ったら、みんなの側を残す。** */
+           ◎v2.26.0〜v2.184.0 は「読み直すだけ。打った内容は捨てる」だった。
+           🔴 v2.185.0（S-03）**捨てずに3者比較する**（_rebase）。
+             ・サーバーの今の姿を読み、相手が変えた欄と自分が変えた欄を出す
+             ・重ならなければ、自分の欄だけ今の姿に載せ直して、もう一度送る（新しい版で）
+             ・重なった欄は**相手を残す**＝古い内容で押し切らない（迷ったら、みんなの側を残す。は変わらない）
+             ・フロー（log）は足すだけの記録なので、両方が足した行を両方残す
+           ⚠ 同じ文書が3回続けて弾かれたら、前と同じく相手を丸ごと採る（ルールで弾かれる理由が版でない時の空回り止め）。 */
         var 弾かれた = !!(e && (e.code === 'permission-denied' ||
                     /permission[_-]?denied|insufficient permissions/i.test(String((e && e.message) || ''))));
         if (弾かれた) {
-          console.warn('[PitDB] 🔴 版が古いのでサーバーに弾かれました。読み直します');
+          console.warn('[PitDB] 🔴 版が古いのでサーバーに弾かれました。今の姿を読んで、重ならない所だけ載せ直します');
           if (window.PitSync) PitSync.failed();
-          if (window.showToast) {
-            showToast('ほかの端末が先に直していたので、この画面を最新に直しました。いま打った内容は入っていません', 'PF-0012');
-          }
-          self._resync();
+          self._jDone(送っている組 || ops);            /* この画面で載せ直す＝控えは要らない */
+          self._rebaseAll(送っている組 || ops).then(function () { return self._resync(); }).then(function () { self.save(true); });
           return;
         }
         console.error('[PitDB] 保存に失敗', e);
@@ -973,6 +1372,278 @@
         }
       });
       return true;
+    },
+
+    /* =========================================================
+       🔴 v2.185.1→v2.185.2 **送れなかった直しを黙って捨てない（送る前の控え＝journal）。**
+       ◎困っていたこと：Wi-Fi が切れている間・送っている途中に閉じる／再読み込みすると、直しは画面のメモリにしか無く消えていた（S-07）。
+         端末の控え（enablePersistence）で送り直す形も試したが、開くたびに 7,000件超を IndexedDB にも書く重さと、
+         次に開いた時に版で弾かれると**黙って**戻る穴があった（出す前の確認の指摘）＝v2.185.2 で enablePersistence は外し、こちら1本にした。
+       ◎いま：送る前に「何の文書のどの欄をどうしたか」を端末（localStorage）に控え、届いたら消す。
+         次に開いた時、前の回の控えが残っていれば、サーバーの今の姿と見くらべる。
+         入っていれば黙って消す／入っていなければ「送れなかった直し」として、いまの値と直した値を並べて聞く（PF-0013）。
+         「入れ直す」を押せばその欄だけ入れ直して送る（いまの版で）。どちらでも操作ログに残す。
+       ⚠ 線引き（出す前の確認の指摘）
+         ・タブごとの印（_jTab）。**ほかのタブがまだ生きている間**（10秒ごとの合図が30秒以内）は、そのタブの控えに触らない
+         ・控えは7日で黙って捨てる（古すぎて入れ直す意味が無い）
+         ・届いた後でほかの人が直した場合と見分けられないので、「入っていないかもしれない」と言い、いまの値も並べて人が決める
+       ⚠ 見くらべは開いてから少し待ってから。線が切れていれば待つ。
+       ========================================================= */
+    _JKEY: 'pitflow_unsent_v1',
+    _JWAIT: 20000,
+    _JDAYS: 7,
+    _jStart: Date.now(),
+    _jTab: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    _jRead: function () { try { var a = JSON.parse(localStorage.getItem(this._JKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } },
+    _jWrite: function (a) { try { if (a.length) localStorage.setItem(this._JKEY, JSON.stringify(a.slice(-300))); else localStorage.removeItem(this._JKEY); } catch (e) {} },
+    /* このタブが生きている合図（ほかのタブが控えに触らないように） */
+    _jBeat: function () {
+      var self = this;
+      try { localStorage.setItem('pitflow_tab_' + this._jTab, String(Date.now())); } catch (e) {}
+      if (this._jBeatT || typeof setInterval !== 'function') return;
+      this._jBeatT = setInterval(function () { try { localStorage.setItem('pitflow_tab_' + self._jTab, String(Date.now())); } catch (e) {} }, 10000);
+      if (this._jBeatT && this._jBeatT.unref) this._jBeatT.unref();
+      try { window.addEventListener('pagehide', function () { try { localStorage.removeItem('pitflow_tab_' + self._jTab); } catch (e) {} }); } catch (e) {}
+    },
+    _jAlive: function (tab) {
+      if (!tab || tab === this._jTab) return tab === this._jTab;
+      try { var t = +localStorage.getItem('pitflow_tab_' + tab) || 0; return Date.now() - t < 30000; } catch (e) { return false; }
+    },
+    _jTag: function (k, o) {
+      if (!o) return '';
+      if (k === 'cards') return window.pitCardTag ? window.pitCardTag(o) : ('[' + (o.resNo || o.id) + ']');   /* お名前は pit-share.js の1本 */
+      if (k === 'customers') return (o.name || '') + ' 様';
+      if (k === 'loanerAssigns') return '代車の貸出 ' + (o.fromDate || '') + '〜' + (o.toDate || '') + (o.cardId ? '' : '（予約以外）');
+      return o.name || o.model || o.text || '';
+    },
+    _jAdd: function (group) {
+      var self = this, a = this._jRead(), now = Date.now();
+      this._jBeat();
+      (group || []).forEach(function (op) {
+        op.jid = op.key + '@' + now + '@' + Math.random().toString(36).slice(2, 6);
+        var e = { id: op.jid, key: op.key, k: op.k || '', at: now, t: op.t, tab: self._jTab };
+        try {
+          if (op.key === '@settings') {
+            e.tag = '設定'; e.vals = {};
+            (op.paths || []).forEach(function (p) { e.vals[p.join('.')] = self._pick(op.full, p); });
+            if (!op.paths) e.vals = null;
+          } else if (op.t === 'del') {
+            e.tag = self._jTag(op.k, self._getBase(op.key));
+          } else {
+            e.tag = self._jTag(op.k, op.full);
+            if (op.fields) { e.vals = {}; op.fields.forEach(function (f) { e.vals[f] = op.full[f]; }); }
+            else { e.isNew = true; e.full = op.full; }
+          }
+        } catch (err) {}
+        a.push(e);
+      });
+      this._jWrite(a);
+    },
+    _jDone: function (group) {
+      var ids = {}; (group || []).forEach(function (op) { if (op.jid) ids[op.jid] = 1; });
+      this._jWrite(this._jRead().filter(function (e) { return !ids[e.id]; }));
+    },
+    _jShort: function (v) {
+      if (v === undefined || v === null || v === '') return '（空）';
+      var s = typeof v === 'object' ? (Array.isArray(v) ? v.length + '件' : '…') : String(v);
+      return s.length > 24 ? s.slice(0, 24) + '…' : s;
+    },
+    /* 前の回の控えを見くらべる（connectCloud の後で呼ぶ）。戻り値＝入っていなかった物 */
+    _jCheck: function () {
+      var self = this;
+      if (this.mode !== 'cloud') return [];
+      if (this._link === false) { var rt = setTimeout(function () { self._jCheck(); }, 15000); if (rt && rt.unref) rt.unref(); return []; }
+      var a = this._jRead(), keep = [], lost = [], 期限 = Date.now() - this._JDAYS * 86400000;
+      a.forEach(function (e) {
+        if (!e) return;
+        if (e.tab === self._jTab || e.at >= self._jStart) { keep.push(e); return; }   /* この回の物はこの回が見る */
+        if (e.tab && self._jAlive(e.tab)) { keep.push(e); return; }                    /* ほかのタブがまだ送っている */
+        if (e.at < 期限) return;                                                        /* 古すぎる＝黙って捨てる */
+        var id = e.key.slice(e.key.indexOf('/') + 1), k = e.k, cur;
+        if (e.key === '@settings') cur = self._settingsPayload();
+        else cur = (state[k] || []).find(function (x) { return x && x.id === id; });
+        var 欄 = [];
+        if (e.t === 'del') { if (cur) 欄.push({ f: '（消す）' }); }
+        else if (e.isNew) { if (!cur) 欄.push({ f: '（新しく作る）' }); }
+        else Object.keys(e.vals || {}).forEach(function (f) {
+          var v = e.key === '@settings' ? self._pick(cur, f.split('.')) : (cur ? cur[f] : undefined);
+          if (self._stable(v) !== self._stable(e.vals[f])) 欄.push({ f: f, いま: v, 直した: e.vals[f] });
+        });
+        if (欄.length) lost.push({ e: e, tag: e.tag || e.key, 欄: 欄, at: e.at });
+      });
+      this._jWrite(keep);
+      if (!lost.length) return lost;
+      var 行 = lost.slice(0, 12).map(function (x) {
+        var d = new Date(x.at);
+        return '・' + x.tag + '（' + (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2) + '）：'
+             + x.欄.map(function (z) {
+                 var n = z.f.charAt(0) === '（' ? z.f : self._fieldName(z.f.split('.').pop());
+                 return 'いま' in z ? n + ' いま「' + self._jShort(z.いま) + '」→ 直した「' + self._jShort(z.直した) + '」' : n;
+               }).join('、');
+      });
+      try { if (window.pitLog) lost.forEach(function (x) { pitLog('送れなかった直し（前に開いた時の分）', { kind: 'save', label: x.tag + ' / ' + x.欄.map(function (z) { return z.f; }).join('・') }); }); } catch (err) {}
+      var detail = '閉じる前に送り終わらなかったか、ほかの人が先に同じ所を直していた分です。入っていないかもしれません。\n\n'
+                 + 行.join('\n') + (lost.length > 12 ? '\nほか ' + (lost.length - 12) + '件' : '');
+      if (window.pitAsk) {
+        pitAsk('前に開いた時の直しのうち、入っていない物があります', { code: 'PF-0013', ok: '入れ直す', cancel: '入れない', detail: detail })
+          .then(function (yes) { if (yes) self._jReapply(lost); else { try { if (window.pitLog) pitLog('送れなかった直しを入れ直さなかった', { kind: 'save', label: lost.length + '件' }); } catch (e) {} } });
+      } else if (window.showToast) showToast('入っていない直しが ' + lost.length + '件あります（操作ログに残しました）', 'PF-0013');
+      return lost;
+    },
+    /* 「入れ直す」＝控えの欄だけを今の物に入れて、ふつうの保存で送る（いまの版＝弾かれない） */
+    _jReapply: function (lost) {
+      var self = this, n = 0;
+      (lost || []).forEach(function (x) {
+        var e = x.e, id = e.key.slice(e.key.indexOf('/') + 1), k = e.k;
+        try {
+          if (e.key === '@settings') {
+            Object.keys(e.vals || {}).forEach(function (f) {
+              var p = f.split('.'), v = e.vals[f];
+              if (p.length === 1) state[p[0]] = v;
+              else { var box = state[p[0]] || (state[p[0]] = {}); if (v === undefined) delete box[p[1]]; else box[p[1]] = v; }
+            }); n++; return;
+          }
+          var arr = state[k] || (state[k] = []);
+          var cur = arr.find(function (o) { return o && o.id === id; });
+          if (e.t === 'del') { if (cur) { self.keep(k, function (o) { return o.id !== id; }); n++; } return; }
+          if (e.isNew) { if (!cur && e.full) { var o = JSON.parse(JSON.stringify(e.full)); delete o.rev; o.id = id; arr.push(o); n++; } return; }
+          if (!cur) return;
+          x.欄.forEach(function (z) { if (z.直した === undefined) delete cur[z.f]; else cur[z.f] = JSON.parse(JSON.stringify(z.直した)); });
+          n++;
+        } catch (err) { console.warn('[PitDB] 入れ直しでエラー', e.key, err); }
+      });
+      try { if (window.pitLog) pitLog('送れなかった直しを入れ直した', { kind: 'save', label: n + '件' }); } catch (e) {}
+      this.save(true);
+      this._afterApply();
+      return n;
+    },
+
+    /* 🔴 v2.185.0（S-03）弾かれた組の文書を1件ずつ、サーバーの今の姿と3者比較して手元を作り直す */
+    _rebaseAll: function (group) {
+      var self = this, 残した = [], 捨てた = 0;
+      return (group || []).reduce(function (p, op) {
+        return p.then(function () {
+          return Promise.resolve().then(function () { return self._rebase(op); }).then(function (r) {
+            if (!r) return;
+            if (r.lost && r.lost.length) 残した.push(r);
+            if (r.gaveUp) 捨てた++;
+          }).catch(function (e) { console.warn('[PitDB] 載せ直しの読み込みに失敗', op.key, e); });
+        });
+      }, Promise.resolve()).then(function () {
+        if (!window.showToast) return;
+        if (捨てた) {
+          showToast('ほかの端末が先に直していたので、この画面を最新に直しました。いま打った内容は入っていません', 'PF-0012');
+        } else if (残した.length) {
+          var 名 = [];
+          残した.forEach(function (r) { r.lost.forEach(function (f) { var n = self._fieldName(f); if (名.indexOf(n) < 0) 名.push(n); }); });
+          showToast('ほかの端末が同じ所を先に直していました。「' + 名.slice(0, 4).join('・') + (名.length > 4 ? ' ほか' : '') + '」はそちらを残し、ほかに打った所は入れ直しました', 'PF-0012');
+        }
+        self._afterApply();
+      });
+    },
+    _fieldName: function (f) {
+      try { if (window.pitFieldLabel) { var n = pitFieldLabel(f); if (n) return n; } } catch (e) {}
+      return String(f);
+    },
+    _rebase: function (op) {
+      var self = this, key = op.key;
+      this._maps();
+      var n = this._rejN[key] = (this._rejN[key] || 0) + 1;
+      if (key === '@settings') {
+        return this._co().collection('pitSettings').doc('main').get({ source: 'server' }).then(function (d) {
+          var sv = (d && d.exists) ? (d.data() || {}) : {};
+          if (sv.rev !== undefined && sv.rev !== null) self._rev['@settings'] = sv.rev;
+          if (n > 2) { self._shadow.settings = null; self._base['@settings'] = null; self._applySettingsHard(sv); return { gaveUp: true }; }
+          var base = self._getBase('@settings') || {};
+          var raw = self._settingsRaw(sv);
+          var mine = self._clean(self._settingsPayload());
+          var 自分 = self._settingsPaths(base, mine), 相手 = self._settingsPaths(base, raw);
+          var 相手s = {}; 相手.forEach(function (p) { 相手s[p.join('\u0001')] = 1; });
+          var 残す = [], lost = [];
+          自分.forEach(function (p) {
+            if (相手s[p.join('\u0001')] && self._stable(self._pick(mine, p)) !== self._stable(self._pick(raw, p))) lost.push(p.join('.'));
+            else 残す.push([p, self._pick(mine, p)]);
+          });
+          self._applySettingsHard(sv);
+          残す.forEach(function (x) {
+            var p = x[0], v = x[1];
+            if (p.length === 1) { if (v === undefined) delete state[p[0]]; else state[p[0]] = v; return; }
+            var box = state[p[0]];
+            if (!box || typeof box !== 'object' || Array.isArray(box)) box = state[p[0]] = {};
+            if (v === undefined) delete box[p[1]]; else box[p[1]] = v;
+          });
+          return { lost: lost };
+        });
+      }
+      var k = op.k, col = this._COLS[k];
+      if (!k || !col) return Promise.resolve(null);
+      var id = key.slice(col.length + 1);
+      return this._co().collection(col).doc(id).get({ source: 'server' }).then(function (d) {
+        var arr = state[k] || (state[k] = []);
+        var idx = arr.findIndex(function (x) { return x && x.id === id; });
+        var cur = idx >= 0 ? arr[idx] : null;
+        self._applying = true;
+        try {
+          if (!d || !d.exists) {
+            /* サーバーではもう無い＝消した人がいる。手元に残っていれば作り直しになる＝そのまま（次の保存で丸ごと書く） */
+            delete self._shadow.docs[key]; delete self._base[key]; if (self._rev) delete self._rev[key];
+            return null;
+          }
+          var theirs = self._takeRev(col, id, d.data() || {}); theirs.id = id;
+          if (op.t === 'del') {
+            /* 消そうとした物を、ほかの人が直していた＝消さずに残す（相手の側を残す） */
+            delete self._delOk[key];
+            self._shadow.docs[key] = self._js(theirs); self._setBase(key, theirs);
+            if (idx < 0) arr.push(theirs);
+            return { lost: ['（消す）'] };
+          }
+          var base = self._getBase(key);
+          if (!cur || n > 2 || !base) {
+            /* 空回り止め・控えが無い＝前と同じく相手を丸ごと採る */
+            self._shadow.docs[key] = self._js(theirs); self._setBase(key, theirs);
+            if (cur) { Object.keys(cur).forEach(function (f) { if (f !== 'id') delete cur[f]; }); Object.keys(theirs).forEach(function (f) { cur[f] = theirs[f]; }); cur.id = id; }
+            else arr.push(theirs);
+            return { gaveUp: true };
+          }
+          var mine = self._clean(cur);
+          var 自分 = self._diffKeys(base, mine), 相手 = self._diffKeys(base, theirs);
+          var lost = [], 載せる = {};
+          自分.forEach(function (f) {
+            if (相手.indexOf(f) < 0) { 載せる[f] = { has: f in mine, v: cur[f] }; return; }
+            if (f === 'log' && Array.isArray(cur.log) && Array.isArray(theirs.log)) { 載せる[f] = { has: true, v: self._logUnion(base.log, cur.log, theirs.log) }; return; }
+            if (self._stable(mine[f]) !== self._stable(theirs[f])) lost.push(f);
+          });
+          /* 相手の今の姿を控えにして、中身を入れ替え（同じ物のまま）、重ならない自分の欄を載せ直す */
+          self._shadow.docs[key] = self._js(theirs); self._setBase(key, theirs);
+          Object.keys(cur).forEach(function (f) { if (f !== 'id') delete cur[f]; });
+          Object.keys(theirs).forEach(function (f) { if (f !== 'id') cur[f] = theirs[f]; });
+          cur.id = id;
+          Object.keys(載せる).forEach(function (f) { if (載せる[f].has) cur[f] = 載せる[f].v; else delete cur[f]; });
+          if (k === 'cards' && 相手.length && typeof window.pitCardRemoteChanged === 'function') {
+            try { window.pitCardRemoteChanged(cur, 相手.filter(function (f) { return !載せる[f]; })); } catch (e) {}
+          }
+          if (lost.length) console.warn('[PitDB] ' + key + '：同じ欄をほかの端末が先に直していたので、そちらを残しました', lost);
+          return { lost: lost };
+        } finally { self._applying = false; }
+      });
+    },
+    /* 設定1枚をサーバーの姿で入れる（手元を残さない） */
+    _applySettingsHard: function (sv) {
+      var self = this;
+      this._applying = true;
+      try {
+        this._SETTINGS_KEYS.forEach(function (k) {
+          if (sv[k] !== undefined && sv[k] !== null) {
+            if (k === 'settings') self._mergeSettings(sv[k]); else state[k] = sv[k];
+          }
+        });
+        this._shadow.settings = this._js({
+          settings: sv.settings, bays: sv.bays, floorPlan: sv.floorPlan,
+          aiVerdicts: sv.aiVerdicts, boardLabels: sv.boardLabels,
+          inspectMarks: sv.inspectMarks, inspectMutes: sv.inspectMutes
+        });
+        this._base['@settings'] = JSON.stringify(this._settingsRaw(sv));
+      } finally { this._applying = false; }
     },
 
     /* Firestore に入れられない値（undefined・関数）を落とす。id は入れ物の名前と重複するので外す。 */

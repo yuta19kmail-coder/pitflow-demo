@@ -971,12 +971,29 @@
     });
     cust.vehicles=vehicles;
   }
-  window.custEdit=function(id){ const cust=list().find(x=>x.id===id); if(!cust) return; _renderEdit(cust); };
+  /* 🔴🔴 v2.185.0（棚卸し S-05）**編集は写し（_ceWork）に対して行い、本物に入れるのは「保存」の時だけ。**
+     ⚠ 前は「＋ 連絡先」「＋ 車両を追加」「削除」を押した瞬間に本物を書き換えていた（_readEdit(本物)）。
+        キャンセルしても戻らず、次に誰かの保存が走るとクラウドからも消えた。車にはクォーターチェックの
+        伝票・カルテNo・車体番号が入っている＝一緒に消え、記録も残らなかった。
+     ・車の「削除」は保存の時に**アーカイブ**（archived の印・誰・いつ）にする＝消さない・管理者は戻せる */
+  let _ceWork = null;
+  window.custEdit=function(id){ const cust=list().find(x=>x.id===id); if(!cust) return; _ceWork=JSON.parse(JSON.stringify(cust)); _renderEdit(_ceWork); };
   window.custSaveEdit=function(id){
     const cust=list().find(x=>x.id===id); if(!cust) return;
     /* 🚗 v2.114.0 注意を変えた車は、まだ返車していないその車の予約にも入れる */
     const before={}; (cust.vehicles||[]).forEach(function(v){ if(v&&v.id) before[v.id]=JSON.stringify(_vehDrive(cust, v)||[]); });
+    const 元の車=(cust.vehicles||[]).filter(function(v){ return v && v.id; }).map(function(v){ return JSON.parse(JSON.stringify(v)); });
     _readEdit(cust); cust.updatedAt=Date.now();
+    _ceWork=null;
+    /* 🔴 v2.185.0（S-05）画面から消えた車は、消さずにアーカイブで残す（伝票・カルテNo・車体番号ごと） */
+    const 残った={}; (cust.vehicles||[]).forEach(function(v){ if(v&&v.id) 残った[v.id]=1; });
+    元の車.forEach(function(v){
+      if(残った[v.id]) return;
+      const was=!!v.archived;
+      if(!was){ v.archived=true; v.archivedAt=Date.now(); v.archivedBy=(window.pitFlowMe?pitFlowMe():''); v.archiveReason='顧客の編集で削除'; }
+      cust.vehicles.push(v);
+      if(!was && window.pitOpLog) try{ pitOpLog('車両を削除（アーカイブで残した）', (custDispName(cust)||'')+' / '+(v.plate||v.car||'')+(v.karteNo?'　カルテNo '+v.karteNo:'')+(v.vin?'　車体番号 '+v.vin:'')); }catch(e){}
+    });
     (cust.vehicles||[]).forEach(function(v){
       if(!v || !Array.isArray(v.drive) || isPerVisit(v)) return;
       if(before[v.id]!=null && before[v.id]===JSON.stringify(v.drive)) return;
@@ -1006,7 +1023,11 @@
     if(url){ link.href=url; link.style.display=''; }
     else { link.removeAttribute('href'); link.style.display='none'; }
   };
-  function _editTarget(){ const head=document.querySelector('#cust-modal .cm-save'); if(!head) return null; const m=head.getAttribute('onclick')||''; const id=(m.match(/custSaveEdit\('([^']+)'\)/)||[])[1]; return id?list().find(x=>x.id===id):null; }
+  /* 🔴 v2.185.0（S-05）＋／削除が書くのは写し（_ceWork）。本物は返さない（本物を返すと押した瞬間に本物が変わる） */
+  function _editTarget(){ const head=document.querySelector('#cust-modal .cm-save'); if(!head) return null; const m=head.getAttribute('onclick')||''; const id=(m.match(/custSaveEdit\('([^']+)'\)/)||[])[1]; if(!id) return null;
+    if(!_ceWork || _ceWork.id!==id){ const real=list().find(x=>x.id===id); if(!real) return null; _ceWork=JSON.parse(JSON.stringify(real)); }
+    return _ceWork; }
+  window.__custEditWork = function(){ return _ceWork; };   /* 見張り用 */
 
   /* ===== 履歴（車両＝そのナンバー単位） ===== */
   function cardDate(c){ return c.returnDate || c.reserveDate || ''; }

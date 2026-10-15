@@ -120,31 +120,42 @@
     return (typeof s === 'string') ? s.normalize('NFKC').toLowerCase().trim() : '';
   }
 
-  /* 名簿から自分を探す（uid → メール → 大文字小文字・全角＠違いを救済） */
+  /* 名簿から自分を探す（uid → メール → 大文字小文字・全角＠違いを救済）
+     🔴 v2.185.3（2026-10-15）**在籍中（active が false でない）の書類を先に拾う。**
+        玄関のメンバー管理の「外す」が完全削除から「在籍なし（active:false・removed の印）」に変わった＝
+        同じメールで在籍なしの古い書類が名簿に残る。前は「uid の書類があればそれ」「メールの1件目」で止まっていた＝
+        古い方が先に当たると在籍中の本人まで「在籍なし」で入れなかった（玄関 checkAccess・共通部品 FDCore.findMember と同じ形）。
+        在籍中が1件も無い時だけ、在籍なしの書類を返す（呼ぶ側が「在籍なし」と言って止める） */
   function findMyMember(user) {
     var coll = window.fb.company().collection('portalMembers');
+    var off = null;   /* 在籍なしの書類（在籍中が見つからなかった時だけ返す） */
+    function take(d) { var m = d.data() || {}; m.id = d.id; return m; }
+    function pick(snap, match) {
+      var hit = null;
+      snap.forEach(function (x) {
+        if (hit || (match && !match(x))) return;
+        if ((x.data() || {}).active === false) { if (!off) off = x; return; }
+        hit = x;
+      });
+      return hit ? take(hit) : null;
+    }
     return coll.doc(user.uid).get().then(function (doc) {
-      if (doc.exists) { var m = doc.data() || {}; m.id = doc.id; return m; }
-      if (!user.email) return null;
+      if (doc.exists) { if ((doc.data() || {}).active !== false) return take(doc); off = doc; }
+      if (!user.email) return off ? take(off) : null;
       var norm = normEmail(user.email);
-      return coll.where('email', '==', user.email).limit(1).get().then(function (snap) {
-        if (!snap.empty) { var d = snap.docs[0]; var m2 = d.data() || {}; m2.id = d.id; return m2; }
-        return coll.where('email', '==', norm).limit(1).get().then(function (s2) {
-          if (!s2.empty) { var d2 = s2.docs[0]; var m3 = d2.data() || {}; m3.id = d2.id; return m3; }
+      return coll.where('email', '==', user.email).limit(10).get().then(function (snap) {
+        var m2 = pick(snap); if (m2) return m2;
+        return coll.where('email', '==', norm).limit(10).get().then(function (s2) {
+          var m3 = pick(s2); if (m3) return m3;
           return coll.limit(300).get().then(function (all) {
-            var hit = null;
-            all.forEach(function (x) {
-              if (hit) return;
-              if (normEmail(String((x.data() || {}).email || '')) === norm) hit = x;
-            });
-            if (!hit) return null;
-            var m4 = hit.data() || {}; m4.id = hit.id; return m4;
+            var m4 = pick(all, function (x) { return normEmail(String((x.data() || {}).email || '')) === norm; });
+            return m4 || (off ? take(off) : null);
           });
         });
       });
     }).catch(function (e) {
       console.warn('[auth-pit] 名簿の照会に失敗', e);
-      return null;
+      return off ? take(off) : null;
     });
   }
 

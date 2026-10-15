@@ -856,6 +856,7 @@
         /* ⚠ 代車の予定も外す（ふつうのカードの消去と同じ道・v1.154.0） */
         if (w.pitLoanerReleaseForCard) w.pitLoanerReleaseForCard(c.id, '整備予定の取り下げ');
         w.state.cards = arr(w.state.cards).filter(function(x){ return x.id !== c.id; });
+        if (w.PitDB && w.PitDB.removed) w.PitDB.removed('cards', c.id);   /* 🔴 v2.185.0 消す操作を通った印（これが無いと delete を送らない） */
         saveCards();
         try { if (w.pitLog) w.pitLog('代車の作業予定を取り下げた（カードを消去）', { kind:'delete', label:lb }); } catch(e){}
         if (w.renderFleet) w.renderFleet();

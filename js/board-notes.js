@@ -72,10 +72,33 @@
 
   /* 🔴 v1.142.0 保存先は付箋の出どころで変わる（まとめて表示・coreflow-note-all.js）。
      ⚠ **よその付箋を PitDB に保存しない。** PitFlow のデータではないので、書くと二重に増える。 */
-  function _save(note) {
-    if (note && _foreign(note) && window.CFNoteAll) return new Promise(res => CFNoteAll.save(note, res));
+  /* 🔴 v2.185.0（棚卸し S-18・共通部品に合わせる）返信・回覧の確認は「1件足す／抜く」（info.ops）で来る。
+     ・よその付箋 … CFNoteAll.save に info も渡す（向こうが arrayUnion / arrayRemove で書く）
+     ・PitFlow の付箋 … 配列を丸ごと書かずに atomicPatch を merge で書き、書いた欄は PitDB に「送った」と控える
+       （控えないと次の PitDB.save が配列を丸ごと書き直して、ほぼ同時の相手の返信・確認を消す）
+     ⚠ まだクラウドに無い付箋（作ったばかり）・練習モードは今までどおり PitDB.save */
+  function _save(note, info) {
+    if (note && _foreign(note) && window.CFNoteAll) return new Promise(res => CFNoteAll.save(note, res, info));
+    if (note && info && info.ops && _atomicSave(note, info)) return Promise.resolve();
     if (window.PitDB && PitDB.save) PitDB.save();
     return Promise.resolve();
+  }
+  function _atomicSave(note, info) {
+    try {
+      const R = window.CFNoteBoard && CFNoteBoard.rules;
+      const FV = window.firebase && firebase.firestore && firebase.firestore.FieldValue;
+      if (!R || !(R.applyOps || R.atomicPatch) || !FV || !window.PitDB || PitDB.mode !== 'cloud' || !PitDB.hasBase || !PitDB.hasBase('boardNotes', note.id)) return false;
+      const ref = fb.company().collection('pitBoardNotes').doc(note.id);
+      const extra = (window.fb && fb.serverTimestamp) ? { updatedAt: fb.serverTimestamp() } : {};
+      /* v2.185.2 共通部品の applyOps＝抜く（返信を消す）時は id で外す取引、足すだけなら arrayUnion。
+         ⚠ 古い写し（applyOps が無い）は atomicPatch を merge で書く（さらに無ければ上の PitDB.save＝丸ごと） */
+      const p = R.applyOps ? R.applyOps(ref, note, info, FV, fb.db, extra)
+                           : ref.set(Object.assign(R.atomicPatch(note, info, FV), extra), { merge: true });
+      Promise.resolve(p).catch(function (e) { console.error('[board-notes] 付箋の保存に失敗', e); _toast('付箋を保存できませんでした（PF-0002）'); });
+      PitDB.sentFields('boardNotes', note, ((info && info.fields) || []).concat(Object.keys(info.ops || {})));
+      PitDB.save();                                  /* ほかに直した欄があれば、それだけ送る */
+      return true;
+    } catch (e) { console.warn('[board-notes] 1件足す／抜くの保存ができず、ふつうの保存にします', e); return false; }
   }
 
   /* 🔗 v2.160.0（ゆうた報告 2026-10-07「共通部品にした時に、カード詳細から作れるカードへのリンク付き付箋の機能がバグってる」）
@@ -167,7 +190,7 @@
           if (lk) Object.assign(note, lk);
           _notes().push(note);
         }
-        return _save(note);
+        return _save(note, info);
       },
       reorder: list => { state.boardNotes = list; return _save(); },
       /* 🔴 v2.110.0 画像も PDF も付けられる（CarFlow と同じ）。置き場＝companies/{会社}/pitBoardNotes/。

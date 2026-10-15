@@ -924,6 +924,8 @@ w.pitDivisionColor = pitDivisionColor;
   function pitCardDiffText(d){ return d.label + ' ' + d.from + ' → ' + d.to; }
   w.pitCardDiff     = pitCardDiff;
   w.pitCardDiffText = pitCardDiffText;
+  /* v2.185.0 欄の名前を人の言葉に（保存が弾かれて「ここは相手を残しました」と言う時に db-pit.js が借りる） */
+  w.pitFieldLabel   = function (k) { return _diffLabel(k); };
 
   /* 見くらべて、記録まで書く（呼ぶ側はこれ1本でよい）。戻り値＝変わった欄の数 */
   function pitLogCardEdit(card, before, opt){

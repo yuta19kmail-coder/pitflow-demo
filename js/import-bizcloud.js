@@ -18,6 +18,14 @@
   }
 
   window.pitImportCustomersFromFile = function () {
+    /* 🔴 v2.185.1（棚卸し B）**本番では止める。** 上の「本番には送らない」は v1.x の頃の話で、いまの PitDB は本番でクラウドへ送る。
+       本番で呼ぶと顧客控えを全部置き換え、ファイルに無い顧客がクラウドから消える道だった（v2.185.0 で delete は止めたが、置き換え自体が本番の意図と合わない）。
+       ＝練習モード（PIT_CLOUD でない）だけ動かす。 */
+    if (window.PIT_CLOUD) {
+      if (window.pitAlert) pitAlert('本番では顧客データの丸ごと取り込みはできません（練習モードだけ）', { code:'PF-9012',
+        detail:'本番の顧客を全部置き換えてしまうため止めています。顧客はクォーターチェック・顧客の登録から入れてください。' });
+      return false;
+    }
     var inp = document.createElement('input');
     inp.type = 'file'; inp.accept = '.json,application/json';
     inp.onchange = function () {

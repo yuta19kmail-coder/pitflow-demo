@@ -414,7 +414,8 @@ window.csDone = function(id, task){
   const c = (state.cards||[]).find(x=>x.id===id); if (!c) return;
   const f = CS_DONEFLAG[task]; if (!f) return;
   c[f] = true;
-  if (window.logFlow) logFlow(c, '車販作業 完了（'+task+'）');
+  /* 📝 v2.186.0（⑧）フローと操作ログの両方へ（前は英字の task 名のフローだけ） */
+  _csDoneLog(c, task, '車販作業 完了（' + (CS_TASK_W[task] || task) + '・未 → 済）');
   if (window.PitDB) PitDB.save();
   renderCarSales();
   if (window.pitToast) pitToast('✓ 完了にしました');
@@ -433,10 +434,25 @@ window.csLoUndo = function(aid){
   if (window.PitDB) PitDB.save();
   renderCarSales();
 };
+/* 🔴 v2.186.0（CarFlow v3.16.7 と揃える）**戻す時は、済の印を見ている所と同じ本数を外す。**
+   ◎何が起きていた＝コーティング・車販依頼の「済」は `_csCoatDone`＝coatingDone **か** salesReqDone（畳んだ「その他依頼」の印）で見るのに、
+     戻すは押した段の1本（coatingDone）しか外さなかった＝salesReqDone で済んでいた車は「戻す」を押しても済のまま。
+     しかも戻したことがフローにも操作ログにも残らなかった（⑧）。
+   🔴 コーティング／車販依頼は2本とも外す。外した印の前 → 後・誰が を、フローと操作ログの両方へ */
+const CS_TASK_W = { wash:'洗車', headlight:'ライト磨き', coating:'コーティング', salesReq:'車販依頼' };
+function _csDoneLog(c, task, txt){
+  if (window.logFlow) logFlow(c, txt);
+  try { if (window.pitLog) pitLog(txt, { cardId: c.id, kind: 'sales',
+    label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') }); } catch (e) {}
+}
 window.csUndo = function(id, task){
   const c = (state.cards||[]).find(x=>x.id===id); if (!c) return;
   const f = CS_DONEFLAG[task]; if (!f) return;
-  c[f] = false;
+  const fs = (task === 'coating' || task === 'salesReq') ? ['coatingDone', 'salesReqDone'] : [f];
+  const 外した = fs.filter(function(k){ return !!c[k]; });
+  fs.forEach(function(k){ c[k] = false; });
+  _csDoneLog(c, task, '車販作業を戻した（' + (CS_TASK_W[task] || task) + '・済 → 未'
+    + (外した.length ? '・外した印 ' + 外した.join('／') : '') + '）');
   if (window.PitDB) PitDB.save();
   renderCarSales();
 };

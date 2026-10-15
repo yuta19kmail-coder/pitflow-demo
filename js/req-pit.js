@@ -140,6 +140,13 @@
     doc.updatedBy = (w.fb.currentUser && w.fb.currentUser.uid) || null;
     w.fb.company().collection('scheduleEvents').doc(b.id).set(doc, { merge: true })
       .then(function () {
+        /* 📝 v2.186.0（棚卸し A-05・⑧）出した依頼を PitFlow の操作ログにも1行（前はどの操作ログにも残らなかった）。
+           ⚠ 依頼そのものの記録は依頼の reqLog（共通部品が 'open' を入れる）。カード（pitCards）には書かない決めごとのまま */
+        try {
+          if (w.pitLog) w.pitLog('予定依頼を出した', { cardId: (doc.reqCar && doc.reqCar.id) || '', kind: 'req',
+            label: String(doc.title || '') + (doc.reqCar ? '　' + (doc.reqCar.cust ? doc.reqCar.cust + ' 様' : '') + (doc.reqCar.model ? ' / ' + doc.reqCar.model : '') : '')
+                 + (doc.reqPlace ? '　行き先 ' + doc.reqPlace : '') + '　依頼 ' + b.id });
+        } catch (e) {}
         pitReqClose();
         if (w.pitToast) pitToast('予定依頼を出しました（MHS で日が組まれます）');
       })

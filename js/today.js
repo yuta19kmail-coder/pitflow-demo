@@ -415,9 +415,15 @@ window.pitTodayCancel = function(id, isReturn){
     /* 🔴 v1.65.0 `returnTbd` は v1.60.0 で廃止した旧フラグ。日付を空にすれば「返車日未定」に戻る。
        書き込みは唯一の入口（pitReturnSetDateTime）を通す。 */
     const _ret0 = window.pitDtText ? pitDtText(c.returnDate, c.returnTime) : '';   /* 📝 v2.183.0 消した日を残す */
-    if (window.pitReturnSetDateTime) pitReturnSetDateTime(c, '', '');
-    else { c.returnDate = ''; c.returnTime = ''; }
-    if (window.logFlow) logFlow(c, '返車予定キャンセル（未定へ）' + (_ret0 ? '　元は ' + _ret0 : ''));
+    let _rs = null;
+    if (window.pitReturnSetDateTime) _rs = pitReturnSetDateTime(c, '', '');   /* v2.186.0 確定返車日も入口で空になる（A-03） */
+    else { c.returnDate = ''; c.returnTime = ''; c.returnDateFinal = null; }
+    const _tx = '返車予定キャンセル（未定へ）' + (_ret0 ? '　元は ' + _ret0 : '')
+              + ((_rs && _rs.fFrom) ? '・確定返車日 ' + _rs.fFrom + ' → なし' : '');
+    if (window.logFlow) logFlow(c, _tx);
+    /* 📝 v2.186.0（⑧）フローだけでなく操作ログにも */
+    if (window.pitLog) pitLog('返車予定をキャンセル', { cardId: c.id, kind: 'out',
+      label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + _tx });
   } else {
     c.status = 'cancelled';
     /* 🔴 v1.139.0（ゆうた確定）**自動の未入庫と同じ印を立てる。**

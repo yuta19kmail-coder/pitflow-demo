@@ -335,6 +335,7 @@
     var before = pitReturnPlace(c);
     /* 📝 v2.182.0 動く前の日付・時間を控える（記録を書く pitReturnLogChange が使う） */
     var _dFrom = String(c.returnDate || ''), _tFrom = String(c.returnTime || '');
+    var _fFrom = '';   /* v2.186.0 空にした時だけ＝外した確定返車日（A-03） */
     /* ☎ v1.185.0（ゆうた指定 2026-08-23）**「完TEL待ちの欄から返車日を入れた」も完TELの記録に残す。**
        🗣「また依頼の欄から返車日を入力したのもログに入れたい」
        ◎なぜここか＝完TEL待ち（依頼ぶん）の車に日付や時間が入るのは、
@@ -364,6 +365,15 @@
            ⚠ **返車系への入口は完TEL（依頼／済）のドラッグだけ。**ここで昇格させない。 */
         if (c.returnStage) c.returnStage = 'returnWait';
         c.returnDateFinal = c.returnDate;
+      } else if (c.status !== 'returned' && c.returnDateFinal){
+        /* 🔴 v2.186.0（棚卸し A-03）**日付を空にしたら、確定返車日も空にする。**
+           ◎何が起きていた＝完TELの窓の「返車日 未定」・当日ビューの「返車キャンセル」で返車日は空になるのに、
+             確定返車日（returnDateFinal）だけ前の日のまま残った＝予約詳細の「確定 返車日」に古い日が出て、
+             FlowDesk・実績化がその古い日で車を拾いうる（D75134 と同じ形）。
+           🔴 空にする入口はここ1本（5本の道がここを通る）。返車済み（実績）の車は触らない＝実績日を動かさない。
+           📝 前の値は res.fFrom で返し、pitReturnLogChange がフローと操作ログに「前 → 後」を残す */
+        _fFrom = String(c.returnDateFinal);
+        c.returnDateFinal = null;
       }
     }
     if (time !== undefined){
@@ -405,7 +415,8 @@
        あちらの「返車の予定を更新 → …」と、上の1行は同じ操作の話なので、
        両方出すとフローが同じ内容で2行に増える（読む人がいちばん嫌がる形）。 */
     return { before: before, after: after, moved: (before !== after), 完TEL: _markedCall,
-             dFrom: _dFrom, tFrom: _tFrom, dTo: String(c.returnDate || ''), tTo: String(c.returnTime || '') };
+             dFrom: _dFrom, tFrom: _tFrom, dTo: String(c.returnDate || ''), tTo: String(c.returnTime || ''),
+             fFrom: _fFrom };
   }
   window.pitReturnSetDateTime = pitReturnSetDateTime;
 
@@ -426,6 +437,8 @@
     var dtMoved = (res.dFrom !== res.dTo) || (res.tFrom !== res.tTo);
     if (!res.moved && !dtMoved) return false;
     var change = dtMoved ? _dtText(res.dFrom, res.tFrom) + ' → ' + _dtText(res.dTo, res.tTo) : '';
+    /* v2.186.0（A-03）確定返車日も一緒に外した時は、その前の日も残す */
+    if (change && res.fFrom) change += '・確定返車日 ' + res.fFrom + ' → なし';
     var label = (res.moved && res.after)
       ? '返車の予定を更新 → ' + pitReturnPlaceLabel(res.after) + (change ? '（' + change + '）' : (c.returnDate ? '（' + _dtText(c.returnDate, c.returnTime) + '）' : ''))
       : '返車の予定を変更 ' + change;

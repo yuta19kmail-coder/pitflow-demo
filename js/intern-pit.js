@@ -125,32 +125,72 @@
      戻り値 true ＝ここで引き取った（呼び出し元は return する）。
      ⚠ 金額は1円も入れない。洗車・お礼LINE・売上日も触らない。
      ⚠ 実績日（completedAt）は今日。実績カレンダーの「数えない」側に出る。 */
+  /* 🏢🔴 v2.187.0（棚卸し A-25／A-26・ゆうた決定 2026-10-15）**社内車両の実績化の物差し（純粋な関数）。**
+     読むだけ・何も書かない。PitFlow（下の pitInternReturn）も MHS も、これの答えを当てる＝必ず同じ結果。
+     ctx = { today:'YYYY-MM-DD' }
+     返す＝ { ok, skip, ask, patch, logLines, audit, toast }（形は pit-share.js の pitMaintIntakePlan と同じ）
+     ⚠ 完TELの関門（pitReturnCanDone）は呼ぶ側の道が見る（ドラッグで完TELへ入れる道は関門そのものなので）。 */
+  w.pitInternReturnPlan = function (c, ctx) {
+    if (!w.pitCardIntern(c)) return { ok: false, skip: true };
+    var t = String((ctx && ctx.today) || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return { ok: false, code: 'PF-4012', why: '今日の日付が分かりません' };
+    var patch = {
+      status: 'returned',
+      returnStage: '',
+      returnDate: c.returnDate || t,
+      completedAt: t,
+      amountFinal: ''                          /* 社内車両は金額を持たない */
+    };
+    var audit = [{ action: '社内車両を実績化した', kind: 'out',
+                   label: w.pitInternLabel(c) + (c.car ? ' / ' + c.car : '') + '　実績日 ' + t }];
+    /* 🔧 v2.45.0（ゆうた指定）**残りの整備の候補が消えるのはここ＝完TEL関門を通った時。**（入庫した時ではない）
+       片付け方は pit-share.js の pitMaintCompleteSpans 1本（終わりの日＝返車日→実績日） */
+    var isMaint = w.pitCardMaint ? w.pitCardMaint(c) : !!(c.internKind === 'loanercar' && Array.isArray(c.maintSpans));
+    if (isMaint && !w.pitMaintCompleteSpans){
+      /* 片付けの物差し（pit-share.js）が古い＝同じ結果を約束できない。MHS は「PitFlow で開く」へ落とす */
+      return { ok: false, code: 'PF-4013', why: '代車の整備は PitFlow で返車してください（部品が古い）', needPitFlow: true };
+    }
+    if (isMaint){
+      var cs = w.pitMaintCompleteSpans(c, patch.returnDate || t);
+      patch.maintSpans = cs.spans;
+      if (cs.gone) audit.push({ action: '整備が終わったので残りの候補を消した', kind: 'loaner', label: '候補 ' + cs.gone + '本' });
+    }
+    var was = w.pitStatusJa ? w.pitStatusJa(c.status) : String(c.status || '');   /* v2.187.1 PitFlow と MHS で同じ日本語（表は pit-share.js 1本） */
+    return {
+      ok: true,
+      ask: { msg: w.pitInternMsg(c), title: '社内車両', ok: 'OK',
+             detail: '売上・完TEL・洗車・伝票はありません。実績カレンダーの「数えない」側に残ります。' },
+      patch: patch,
+      logLines: ['実績化（社内車両・売上なし・' + (was || '—') + ' → 返車済み・実績日 ' + t + '）'],
+      audit: audit,
+      toast: '実績にしました（売上には数えません）'
+    };
+  };
+  function _todayYmd(){
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
   w.pitInternReturn = function (c) {
     if (!w.pitCardIntern(c)) return false;
-    var msg = w.pitInternMsg(c);
-    var det = '売上・完TEL・洗車・伝票はありません。実績カレンダーの「数えない」側に残ります。';
+    var plan0 = w.pitInternReturnPlan(c, { today: _todayYmd() });
+    /* v2.187.1 物差しが「できない」と言った時は ask が無い＝理由を出して止める（引き取った＝呼んだ側は進めない） */
+    if (!plan0.ok || !plan0.ask) {
+      if (w.pitAlert) w.pitAlert(plan0.why || '実績にできませんでした', { code: plan0.code || 'PF-4012' });
+      else if (w.pitToast) w.pitToast(plan0.why || '実績にできませんでした', plan0.code);
+      return true;
+    }
     var go = function () {
-      var t = (typeof w.ymd === 'function') ? w.ymd(new Date()) : '';
-      c.status      = 'returned';
-      c.returnStage = '';
-      c.returnDate  = c.returnDate || t;
-      c.completedAt = t;
-      c.amountFinal = '';                       /* 社内車両は金額を持たない */
-      if (w.logFlow && typeof w.statusLabel === 'function') w.logFlow(c, '実績化（社内車両・売上なし）');
-      /* 🔧 v2.45.0（ゆうた指定）**残りの整備の候補が消えるのはここ＝完TEL関門を通った時。**
-         🗣「いや、場合によってはその作業が長引く事もあるから、関TEL関門を通った時にして」
-         ＝入庫した時ではない。⚠ 判断は maint-pit.js の1本（ここに条件を書き写さない）。 */
-      if (w.pitMaintOnComplete) w.pitMaintOnComplete(c);
+      var plan = w.pitInternReturnPlan(c, { today: _todayYmd() });   /* 聞いている間に日が変わっても今日で */
+      if (!plan.ok) { if (w.pitToast) w.pitToast(plan.why || '', plan.code); return; }
+      Object.keys(plan.patch).forEach(function (k) { c[k] = plan.patch[k]; });
+      plan.logLines.forEach(function (x) { if (w.logFlow) w.logFlow(c, x); });
       if (w.PitDB) w.PitDB.save();
       if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
       if (w.PitPip && w.PitPip.isOpen && w.PitPip.isOpen()) w.PitPip.refresh();
-      if (w.pitLog) w.pitLog('社内車両を実績化した', {
-        cardId: c.id, kind: 'out',
-        label: w.pitInternLabel(c) + (c.car ? ' / ' + c.car : '')
-      });
-      if (w.pitToast) w.pitToast('実績にしました（売上には数えません）');
+      plan.audit.forEach(function (a) { if (w.pitLog) w.pitLog(a.action, { cardId: c.id, kind: a.kind, label: a.label }); });
+      if (w.pitToast) w.pitToast(plan.toast);
     };
-    if (w.pitAsk) w.pitAsk(msg, { title: '社内車両', ok: 'OK', detail: det }).then(function (yes) { if (yes) go(); });
+    if (w.pitAsk) w.pitAsk(plan0.ask.msg, { title: plan0.ask.title, ok: plan0.ask.ok, detail: plan0.ask.detail }).then(function (yes) { if (yes) go(); });
     else go();
     return true;
   };

@@ -558,7 +558,7 @@
     var r=window.pitShakenTent ? pitShakenTent(s, iso, slot) : null;
     if(!r) return;
     c.inspSchedule=r.insp;
-    if(r.log && window.logFlow) logFlow(c, r.log);
+    if(window.pitShakenLog) pitShakenLog(c, r); else if(r.log && window.logFlow) logFlow(c, r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); renderShaken();
     if(window.pitToast) pitToast(r.on ? '暫定予定を置きました（まだ決定ではありません）' : '暫定予定を外しました');
   };
@@ -629,6 +629,8 @@
     var c=card(id); if(!c) return; var s=ins(c);
     var stEl=document.getElementById('shk-staff'), ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
     var staff=stEl?stEl.value:'', off=ofEl?ofEl.value:'', rd=rdEl?Number(rdEl.value||0):0;
+    /* 📝 v2.186.0（⑧）担当・陸運局・R の「前」を控える */
+    var _was='（回送:'+((window.pitShakenStaffPair?pitShakenStaffPair(s.resultStaff, s.resultStaff2, s.resultStaff2Note, '', true):s.resultStaff)||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）';
     s.resultStaff=staff;
     /* 👥 v2.113.0 2人目も一緒に保存（揃え方は物差しの pitShakenStaff2Norm 1本） */
     var s2r=window.pitShkStaff2Read?pitShkStaff2Read('shk'):{staff2:null,staff2Note:null};
@@ -640,7 +642,9 @@
     s.office=off||'';
     s.officeName=off ? ((window.pitLocName?pitLocName(off):'') || s.officeName || '') : '';
     s.round=(rd>=1&&rd<=4)?rd:0;
-    if(window.logFlow) logFlow(c, '車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（回送:'+(staffTxt||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）');
+    var _now='（回送:'+(staffTxt||'—')+'／'+(s.officeName||'陸運局未定')+'／'+(s.round?s.round+'R':'R未定')+'）';
+    var _lg='車検の予定 '+(s.decided?fmtMD(s.decided):'')+_now+(_was!==_now?'　元は '+_was:'');
+    if(window.pitShakenLog) pitShakenLog(c, { log:_lg }); else if(window.logFlow) logFlow(c, _lg);
     save(); closePop(); renderShaken();
     if(window.pitToast) pitToast('車検の予定を保存しました');
   };
@@ -728,7 +732,7 @@
     }) : null;
     if(!r) return null;
     c.inspSchedule=r.insp;
-    if(r.log && window.logFlow) logFlow(c, r.log);
+    if(window.pitShakenLog) pitShakenLog(c, r); else if(r.log && window.logFlow) logFlow(c, r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); renderShaken();
     return r;
   }
@@ -756,8 +760,10 @@
   };
   window.shkSetRound=function(id,n){
     var c=card(id); if(!c) return; var s=ins(c);
+    var _r0=s.round?s.round+'R':'R未定';   /* 📝 v2.186.0（⑧）前の R */
     s.round=(n>=1&&n<=4)?n:0;
-    if(window.logFlow) logFlow(c, '車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（'+_slT(s.decidedSlot)+'／'+(s.round?s.round+'R':'R未定')+'）');
+    var _lg='車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（'+_slT(s.decidedSlot)+'／'+(s.round?s.round+'R':'R未定')+'）'+'　元は '+_r0;
+    if(window.pitShakenLog) pitShakenLog(c, { log:_lg }); else if(window.logFlow) logFlow(c, _lg);
     save(); closePop(); renderShaken();
     if(window.pitToast) pitToast(s.round?(s.round+'R にしました'):'ラウンドを未定にしました');
   };
@@ -829,7 +835,7 @@
     }) : null;
     if(!r) return;
     c.inspSchedule=r.insp;
-    if(r.log && window.logFlow) logFlow(c, r.log);
+    if(window.pitShakenLog) pitShakenLog(c, r); else if(r.log && window.logFlow) logFlow(c, r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); closePop(); renderShaken();
   };
 

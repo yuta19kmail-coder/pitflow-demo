@@ -474,6 +474,137 @@ w.pitDivisionColor = pitDivisionColor;
   }
   w.pitMaintSpanOn = pitMaintSpanOn;
 
+  /* ===================================================================
+     🏢🔴🔴 v2.187.0（棚卸し A-26・ゆうた決定 2026-10-15「B」）
+     **代車・社用車の整備の入庫と、社内車両の実績化を「画面から切り離した物差し」にした。**
+     -------------------------------------------------------------------
+     ◎なぜ＝MHS からも入庫・返車させる（PitFlow と全く同じ確かめ・同じ結果）。
+       前は確かめと書き込みが PitFlow の画面の中（maint-pit.js `_intakeGo`・intern-pit.js `pitInternReturn`）にあり、
+       MHS は写すか「PitFlow で開く」へ渡すしかなかった。写すと片方だけ古くなる（2026-08-15 の食い違いと同じ筋）。
+     ◎形＝**読むだけ・何も書かない純粋な関数**。読む物は ctx で渡す（PitFlow は state から、MHS は Firestore から）。
+       返すのは { ok, code, why, detail, ask, patch, logLines, audit }。
+       ・patch    … カードに書く欄（変えた欄だけ）。PitFlow はカードに当てて保存、MHS は pitPatch（update＋rev）
+       ・logLines … カードのフローに書く行（MHS は後ろに「／MHS」）
+       ・audit    … 操作ログ（pitAuditLogs）の行の配列 { action, kind, label }
+     🔴 PitFlow 本体（maint-pit.js・intern-pit.js）もこれを通す＝本体と MHS で答えが必ず同じ。
+     ⚠ MHS の借りる組（index.html loadPitShare の KEYS）には**足さない**（v1.65.0 の注意＝古い PitFlow を掴むと
+        借り物がまるごと写しに戻る）。MHS は使う時に「有るか」を見て、無ければ「PitFlow で開く」に落とす。
+     =================================================================== */
+  /* 🈳 v2.187.1 カードの状態の言葉＝**ここ1本**（views.js の statusLabel も借りる）。MHS には statusLabel が無いので、
+     物差し（pitInternReturnPlan など）が英語の状態名（workDone）をフローに書かないよう、ここで日本語にする */
+  var PIT_STATUS_JA = { reserved:'予約', check:'点検待ち', estim:'見積り中', contact:'連絡中', parts:'パーツ待ち', work:'作業待ち',
+                       workDone:'作業完了', returned:'返車完了', scrap:'廃車・乗替', outsource:'外注' };
+  w.PIT_STATUS_JA = PIT_STATUS_JA;
+  w.pitStatusJa = function (s) { return PIT_STATUS_JA[s] || String(s == null ? '' : s); };
+  var PIT_MAINT_WORK_LB = { shaken:'車検', '12pt':'12ヶ月点検', general:'一般（修理）', bp:'B.P' };
+  w.PIT_MAINT_WORK_LB = PIT_MAINT_WORK_LB;   /* maint-pit.js もこれを借りる（表は1本） */
+  function _ar(v){ return Array.isArray(v) ? v : []; }
+  function _tx(v){ return String(v == null ? '' : v).trim(); }
+  function _vehName(v){ return (v && (v.model || v.name)) || '（車種未登録）'; }
+  function _mdOf(ds){ var p = String(ds || '').split('-'); return p.length === 3 ? (+p[1]) + '/' + (+p[2]) : String(ds || ''); }
+  /* 代車・社用車 → 紐づけたお客様の車。**人が車両管理で結んだ custId / custVehId だけ**を見る（ナンバーで探さない）。
+     fleet-link.js の pitFleetLinkTarget もこれを通す（物差しは1本） */
+  function pitFleetTargetIn(fv, customers){
+    var cid = _tx(fv && fv.custId), vid = _tx(fv && fv.custVehId);
+    if (!cid || !vid) return null;
+    var cust = _ar(customers).filter(function (c) { return c && c.id === cid; })[0];
+    if (!cust) return null;
+    var veh = _ar(cust.vehicles).filter(function (x) { return x && x.id === vid; })[0];
+    if (!veh) return null;
+    return { cust: cust, veh: veh };
+  }
+  w.pitFleetTargetIn = pitFleetTargetIn;
+  /* 紐づけた相手が国産／輸入を持っている時だけ、その課（無ければ空＝人が選んだ課を巻き戻さない） */
+  function pitFleetLinkBoardIn(fv, customers){
+    var tg = pitFleetTargetIn(fv, customers);
+    var b = _tx(tg && tg.veh && tg.veh.boardId);
+    return (b === 'import' || b === 'default') ? b : '';
+  }
+  w.pitFleetLinkBoardIn = pitFleetLinkBoardIn;
+
+  /* 代車・社用車の整備カードの入庫（予約 → 点検待ち）。
+     ctx = { today:'YYYY-MM-DD', loaners:[], companyCars:[], customers:[]（紐づけ先だけでよい）, sid:'候補の鍵（省くと確定→1本目）' }
+     🔴 整備カードでない時は { skip:true }＝ふつうの入庫で進めてよい */
+  function pitMaintIntakePlan(c, ctx){
+    ctx = ctx || {};
+    if (!pitCardMaint(c)) return { ok: false, skip: true };
+    if (c.status !== 'reserved' || c.actualInAt){
+      return { ok: false, code: 'PF-3058', why: 'この枠はもう入庫しています',
+               detail: 'タスクボードにカードがあります。そちらから進めてください。' };
+    }
+    var sid = _tx(ctx.sid) || _tx(c.maintFixSid) || _tx((_ar(c.maintSpans)[0] || {}).sid);
+    if (!sid){
+      return { ok: false, code: 'PF-3066', why: 'この整備は、まだ日が決まっていません',
+               detail: '車両管理 ▸ 代車作業予定ボードで日を決めてから入庫させてください。\n'
+                     + '（代車・社用車の入庫は、作業予定ボード → 当日ビューの代車の行 の道を通します）' };
+    }
+    var sp = _ar(c.maintSpans).filter(function (x) { return x && x.sid === sid; })[0];
+    if (!sp) return { ok: false, code: 'PF-3060', why: 'この枠が見つかりません', detail: '画面を開き直してください。' };
+    var v = _ar(ctx.loaners).concat(_ar(ctx.companyCars)).filter(function (x) { return x && x.id === c.maintVehId; })[0];
+    if (!v) return { ok: false, code: 'PF-3055', why: 'この車両が見つかりません', detail: '' };
+    var td = _tx(ctx.today);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(td)) return { ok: false, code: 'PF-3082', why: '今日の日付が分かりません', detail: '' };
+    var own = pitFleetTargetIn(v, ctx.customers);
+    var wl = PIT_MAINT_WORK_LB[c.workType] || '整備';
+
+    /* ① その候補で確定させ、期間を実際の日に合わせる（完TELでもう一度縮む／伸びる） */
+    var spans = _ar(c.maintSpans).map(function (x) {
+      var y = {}; for (var k in x) if (Object.prototype.hasOwnProperty.call(x, k)) y[k] = x[k];
+      if (y.sid === sid){ y.from = td; if (!(y.to >= td)) y.to = td; }
+      return y;
+    });
+    var nsp = spans.filter(function (x) { return x.sid === sid; })[0];
+    var patch = { maintFixSid: sid, maintSpans: spans };
+    /* ② 代車マスタには何も書かない。結ばれている時は、そのお客様をカードに控えるだけ（お客様欄の名前は上書きしない） */
+    if (own && own.cust){
+      patch.customerId = own.cust.id;
+      if (own.veh && own.veh.karteNo) patch.karteNo = own.veh.karteNo;
+    }
+    /* 🏢 課は「紐づけた相手が国産／輸入を持っている時だけ」そろえ直す */
+    var lb = pitFleetLinkBoardIn(v, ctx.customers);
+    if (lb) patch.boardId = lb;
+    /* ③ カードは作らない。status を進めるだけ（ふつうの車と同じ階段） */
+    patch.status = 'check';
+    patch.intakeTbd = false;
+    patch.reserveDate = td;
+    patch.bookedAt = c.bookedAt || td;
+    patch.actualInAt = td;
+
+    /* 📝 ⑧ 前 → 後（状態・作業の期間・課・お客様の控え） */
+    var parts = ['予約 → 点検待ち', '入庫日 ' + td];
+    if (sp.from !== nsp.from || sp.to !== nsp.to) parts.push('作業の期間 ' + _mdOf(sp.from) + '〜' + _mdOf(sp.to) + ' → ' + _mdOf(nsp.from) + '〜' + _mdOf(nsp.to));
+    if (c.maintFixSid !== sid) parts.push('候補を確定');
+    if (patch.boardId && patch.boardId !== c.boardId) parts.push('課 ' + (c.boardId === 'import' ? '輸入' : '国産') + ' → ' + (patch.boardId === 'import' ? '輸入' : '国産'));
+    if (patch.customerId && patch.customerId !== c.customerId) parts.push('お客様の控えを結んだ（' + (_tx(own.cust.name) || '名前なし') + '）');
+    var line = '代車の整備で入庫した（' + parts.join('・') + '）';
+    return {
+      ok: true, code: '', why: '',
+      ask: { title: wl + '　' + _vehName(v), msg: 'この代車を入庫させますか？', ok: '入庫する',
+             detail: 'お客様＝自社（社内区分「代車」）。売上・完TEL・洗車・伝票はありません。\n'
+                   + (own ? ('顧客控え：' + (own.cust.name || '（名前なし）'))
+                          : '⚠ この車は顧客控えと紐づいていません（そのまま入庫できます）。\n　 車両管理 ▸ この車を開く ▸「顧客車両との紐づけ」で結べます。') },
+      patch: patch,
+      logLines: [line],
+      audit: [{ action: '代車を整備で入庫した', kind: 'in', label: _vehName(v) + ' / ' + wl + '　' + parts.join('・') }],
+      toast: '入庫しました → タスク「点検待ち」へ'
+    };
+  }
+  w.pitMaintIntakePlan = pitMaintIntakePlan;
+
+  /* 整備が実績に入った時の候補の片付け（残りの候補を消し、確定の期間を実際の終わりに合わせる）。純粋な関数。 */
+  function pitMaintCompleteSpans(c, endDay){
+    var keep = _ar(c && c.maintSpans).filter(function (x) { return x && x.sid === c.maintFixSid; }).map(function (x) {
+      var y = {}; for (var k in x) if (Object.prototype.hasOwnProperty.call(x, k)) y[k] = x[k];
+      return y;
+    });
+    if (keep[0]){
+      keep[0].to = endDay;
+      if (keep[0].to < keep[0].from) keep[0].to = keep[0].from;
+    }
+    return { spans: keep, gone: _ar(c && c.maintSpans).length - keep.length };
+  }
+  w.pitMaintCompleteSpans = pitMaintCompleteSpans;
+
   /* その日に出す整備カードを全部（PitFlow の当日ビューと MHS が同じ並びで使う）。
      ⚠ 並び＝確定が先・急ぎが先（見る人がまず知りたい順）。 */
   function pitMaintCardsOn(cards, ds){
@@ -1832,6 +1963,12 @@ w.pitDivisionColor = pitDivisionColor;
     return t.getFullYear() + '-' + q(t.getMonth() + 1) + '-' + q(t.getDate());
   }
 
+  /* 📝 v2.186.0（A-05）直す前の姿を1行に（「元は 10/14 午前（回送:大野／品川／2R）」） */
+  function _shkWas(date, slot, staff, staff2, staff2Note, officeName, round, note){
+    return '　元は ' + (_shkMD(date) || '日未定') + ' ' + _shkSlotT(slot)
+         + '（回送:' + (pitShakenStaffPair(staff, staff2, staff2Note, '', true) || '—') + '／' + (officeName || '陸運局未定')
+         + '／' + (round ? round + 'R' : 'R未定') + '）' + (note ? '／' + note : '');
+  }
   function pitShakenApply(insp, act, opt){
     opt = opt || {};
     if (PIT_SHAKEN_ACTS.indexOf(act) < 0) return null;   /* 知らない指示では何もしない */
@@ -1875,7 +2012,8 @@ w.pitDivisionColor = pitDivisionColor;
         return { insp: s, act: act,
                  log: '車検 不合格の記録を直した ' + _shkMD(r2.date) + ' ' + _shkSlotT(r2.slot)
                       + '（回送:' + (pitShakenStaffPair(r2.staff, r2.staff2, r2.staff2Note, '', true) || '—') + '／' + (r2.officeName || '陸運局未定')
-                      + '／' + (r2.round ? r2.round + 'R' : 'R未定') + '）' + (r2.note ? '／' + r2.note : '') };
+                      + '／' + (r2.round ? r2.round + 'R' : 'R未定') + '）' + (r2.note ? '／' + r2.note : '')
+                      + _shkWas(row.date, row.slot, row.staff, row.staff2, row.staff2Note, row.officeName, row.round, row.note || row.why) };
       }
       s.history.splice(ix, 1);
       /* 🔴 押し間違いを「押す前の姿」に戻す（ゆうた確定 2026-09-02）。
@@ -1906,6 +2044,8 @@ w.pitDivisionColor = pitDivisionColor;
       if (at3.date != null && String(at3.date) !== cd) return null;
       if (at3.slot != null && (at3.slot === 'pm' ? 'pm' : 'am') !== cs) return null;
       var p3 = opt.patch || {};
+      var _was3 = _shkWas(cd, cs, s.resultStaff, s.resultStaff2, s.resultStaff2Note, s.officeName, s.round, s.repassNote)
+                + (pitShakenIsRetry(s) ? '' : s.repass ? '・再検合格' : '・一発合格');
       if (p3.date != null && /^\d{4}-\d{2}-\d{2}$/.test(String(p3.date))) cd = String(p3.date);
       if (p3.slot != null) cs = (p3.slot === 'pm') ? 'pm' : 'am';
       s.resultDate = cd; s.resultSlot = cs; s.decided = cd; s.decidedSlot = cs;
@@ -1931,7 +2071,7 @@ w.pitDivisionColor = pitDivisionColor;
       return { insp: s, act: act,
                log: '車検 合格の記録を直した' + (retry3 ? '（再検で合格）' : s.repass ? '（再検合格）' : '（一発合格）') + ' ' + _shkMD(cd) + ' ' + _shkSlotT(cs)
                     + '（回送:' + (pitShakenStaffPair(s.resultStaff, s.resultStaff2, s.resultStaff2Note, '', true) || '—') + '／' + (s.officeName || '陸運局未定')
-                    + '／' + (s.round ? s.round + 'R' : 'R未定') + '）' + (s.repassNote ? '／' + s.repassNote : '') };
+                    + '／' + (s.round ? s.round + 'R' : 'R未定') + '）' + (s.repassNote ? '／' + s.repassNote : '') + _was3 };
     }
 
     var today = opt.today || _shkToday();
@@ -1993,11 +2133,15 @@ w.pitDivisionColor = pitDivisionColor;
       s.decided = ''; s.decidedSlot = ''; s.result = ''; s.resultDate = ''; s.resultSlot = '';
       log = '車検の予定を取り消し' + (d3 ? '（' + _shkMD(d3) + ' ' + _shkSlotT(sl3) + '）' : '');
     } else if (act === 'reopen'){
+      /* 📝 v2.186.0（A-05）済の中身（行った日・担当…）を消す前に控える */
+      var _was4 = (s.result === 'done')
+        ? _shkWas(s.resultDate || s.decided, s.resultSlot || s.decidedSlot, s.resultStaff, s.resultStaff2, s.resultStaff2Note, s.officeName, s.round, s.repassNote) + (s.repass ? '・再検合格' : '')
+        : '';
       s.result = ''; s.resultDate = ''; s.resultSlot = ''; s.resultStaff = '';
       s.resultStaff2 = ''; s.resultStaff2Note = '';
       /* 🔴 v2.56.0 **再検合格の印も一緒に落とす。**残すと「予定に戻したのに再検合格」が出る。 */
       s.repass = false; s.repassNote = '';
-      log = '車検を予定に戻した';
+      log = '車検を予定に戻した' + _was4;
     } else if (act === 'flip'){
       s.decidedSlot = (s.decidedSlot === 'pm') ? 'am' : 'pm';
       log = '車検の予定を' + _shkSlotT(s.decidedSlot) + 'に変更' + (s.decided ? '（' + _shkMD(s.decided) + '）' : '');
@@ -2016,6 +2160,19 @@ w.pitDivisionColor = pitDivisionColor;
     return { insp: s, log: log, act: act };
   }
   w.pitShakenApply = pitShakenApply;
+
+  /* 📝 v2.186.0（棚卸し A-05・⑧）**車検の操作の記録はここ1本。**フロー（カード）と操作ログ（pitAuditLogs）の両方。
+     ◎何が起きていた＝呼ぶ側5か所（card-view.js 3・shaken.js 2）は logFlow だけ＝操作ログに車検の操作が1件も無かった。
+     ⚠ 中身の「前 → 後」は pitShakenApply の log に入っている（直した・予定に戻した は「元は …」付き） */
+  function pitShakenLog(c, r){
+    if (!c || !r || !r.log) return;
+    try { if (w.logFlow) w.logFlow(c, r.log); } catch (e) {}
+    try {
+      if (w.pitLog) w.pitLog('車検の予定・記録を変更', { cardId: c.id, kind: 'shaken',
+        label: ((w.pitCustName ? w.pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + r.log });
+    } catch (e) {}
+  }
+  w.pitShakenLog = pitShakenLog;
 
   /* ══════════════════════════════════════════════════════════════════════════
      🅿 v2.54.0（ゆうた指定 2026-09-02）**暫定予定＝仮押さえ止まり。**

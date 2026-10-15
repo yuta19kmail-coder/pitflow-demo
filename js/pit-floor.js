@@ -522,7 +522,7 @@
     var data = JSON.stringify({ _type: 'pitflow-floorplan', savedAt: new Date().toISOString(), bays: bays(), floorPlan: fp() }, null, 2);
     var blob = new Blob([data], { type: 'application/json' });
     var url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = 'PIT配置図_' + new Date().toISOString().slice(0, 10) + '.json';
+    a.href = url; a.download = 'PIT配置図_' + (function(d){var p=function(n){return (n<10?'0':'')+n;};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());})(new Date()) + '.json';   /* v2.186.1 ファイル名の日付は日本時間 */
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }

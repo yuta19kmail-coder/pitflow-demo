@@ -143,7 +143,7 @@
     if (!res){                                        // 部品が無い時の保険
       /* 🔴 v1.132.0 予備の道でも**盤面の車を勝手に返車へ上げない**（本体＝return-slot.js と同じ決めごと）。
          上げてよいのは、すでに返車系にいる車（returnStage がある）だけ。 */
-      if (date !== undefined){ c.returnDate = date || ''; if (c.returnDate){ if (c.returnStage) c.returnStage='returnWait'; c.returnDateFinal=c.returnDate; } }
+      if (date !== undefined){ c.returnDate = date || ''; if (c.returnDate){ if (c.returnStage) c.returnStage='returnWait'; c.returnDateFinal=c.returnDate; } else if (c.status !== 'returned') c.returnDateFinal = null; }   /* v2.186.1（A-03 の残り）空にしたら確定返車日も空＝本体（return-slot.js）と同じ */
       if (time !== undefined) c.returnTime = (window._normTime ? _normTime(time||'') : (time||''));
       saveNow(); rerenderReturn(); return;
     }

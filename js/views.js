@@ -292,21 +292,8 @@ function toggleTheme(){
   if (_tt) _tt.innerHTML = (window.ico ? ico(next === 'dark' ? 'moon' : 'sun', 17) : '');
 }
 
-function statusLabel(s){
-  const map = {
-    reserved: '予約',
-    check:    '点検待ち',
-    estim:    '見積り中',
-    contact:  '連絡中',
-    parts:    'パーツ待ち',
-    work:     '作業待ち',
-    workDone: '作業完了',
-    returned: '返車完了',
-    scrap:    '廃車・乗替',
-    outsource:'外注',
-  };
-  return map[s] || s;
-}
+/* v2.187.1 状態の言葉の表は pit-share.js の PIT_STATUS_JA 1本（MHS が借りる物差し＝社内車両の実績化のフローも同じ言葉になる） */
+function statusLabel(s){ return window.pitStatusJa ? pitStatusJa(s) : s; }
 
 function statusColor(s){
   const map = {
@@ -524,6 +511,6 @@ function editBays(){    pitAlert('PIT枠の編集は次フェーズで実装予�
 function editLoaners(){ pitAlert('代車の編集は次フェーズで実装予定です', { code:'PF-0032' }); }
 /* ⚠ 月を送ったら、光らせていた1件は外す（別の月に居るものを光らせ続けない）。
    検索の語はそのまま＝月を送りながら探せる（v2.17.0） */
-function prevMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()-1); state.resultHit = null; renderResult(); }
-function nextMonth(){   state.resultMonth.setMonth(state.resultMonth.getMonth()+1); state.resultHit = null; renderResult(); }
+function prevMonth(){   state.resultMonth.setDate(1); state.resultMonth.setMonth(state.resultMonth.getMonth()-1); state.resultHit = null; renderResult(); }
+function nextMonth(){   state.resultMonth.setDate(1); state.resultMonth.setMonth(state.resultMonth.getMonth()+1); state.resultHit = null; renderResult(); }
 function closeMonth(){  pitAlert('月次集計締めは次フェーズで実装予定です', { code:'PF-0033' }); }

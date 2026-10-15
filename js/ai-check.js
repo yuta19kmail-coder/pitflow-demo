@@ -116,7 +116,7 @@
       };
     });
     return {
-      いつ: new Date().toISOString().slice(0, 10),
+      いつ: (function(d){var p=function(n){return (n<10?'0':'')+n;};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());})(new Date()),   /* v2.186.1 日本時間の今日（toISOString は朝9時前に前日） */
       うちの覚え: '過去の売上チェックリスト 2026-03〜2026-07（伝票864枚）から作ったもの',
       ことわりの意味: '持ち込み＝お客様が部品を持ってきた（売上は立たない）／'
                     + '部品サービス・工賃サービス＝こちらで無料にした',

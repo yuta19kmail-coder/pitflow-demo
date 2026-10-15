@@ -22,6 +22,61 @@ function _cardTitleHtml(card){
 
 /* mode: 'page'＝全画面（新規入庫予約） / 'modal'＝ポップアップ（各ビューから開く） */
 var _openSnap = null;   /* 🔴 v2.22.0 開いた時のカードの姿（編集の記録を作るため） */
+
+/* 📝🔴 v2.186.0（棚卸し A-02・⑧）**予約詳細で直した欄の「編集：…」は、書いたその場（保存と同じ1回）で残す。**
+   ◎何が起きていた＝記録は閉じた時（closeDetail）にしか書かれなかった。閉じる前に再読み込み・タブを閉じる・PC が落ちると、
+     **中身だけ変わって記録ゼロ**。閉じる時の保存が弾かれた時も記録だけ消えた。
+   ◎直し＝保存がサーバーへ出る直前（db-pit.js の pitBeforeFlush）に、控え（_openSnap）と見くらべてフローへ1行。
+     控えはその場で今の姿へ進める＝同じ変更を2度書かない。
+   ◎同じ欄を続けて直した時は**1行にまとめる**（打っている途中の 0.5 秒ごとに行が増えないように）＝
+     フローの最後の行が「いま直している欄の行」の時だけ、その行の「後」を書き換える（「前」は直し始めの値のまま）。
+   ◎操作ログ（pitAuditLogs）は1件ずつ書き換えられないので、ひと続きの直しが終わった時に1行
+     （別の欄へ移った・閉じた・別のカードを開いた・1分なにもしない）。 */
+var _editRun = null;
+function _editRunEnd(){
+  const r = _editRun; _editRun = null;
+  if (!r) return;
+  if (r.timer) clearTimeout(r.timer);
+  const ks = Object.keys(r.labels);
+  if (!ks.length || !window.pitLog) return;
+  const parts = ks.map(function (k) { return r.labels[k] + ' ' + r.from[k] + ' → ' + r.to[k]; });
+  try {
+    pitLog('予約を編集（' + parts.length + 'か所）', { cardId: r.cardId, kind: 'edit',
+      label: (window.pitCardTag ? pitCardTag(r.card) : '') + ' / ' + parts.join('、') });
+  } catch (e) {}
+}
+function _cardEditStep(){
+  if (!_editingCardId || !_openSnap || !window.pitCardDiff) return 0;
+  const c = state.cards.find(function (x) { return x.id === _editingCardId; });
+  if (!c || c._draft) return 0;
+  const ds = pitCardDiff(_openSnap, c);
+  if (!ds.length) return 0;
+  const keys = ds.map(function (d) { return d.key; }).sort().join('|');
+  const last = (Array.isArray(c.log) && c.log.length) ? c.log[c.log.length - 1] : null;
+  const r = _editRun;
+  if (r && r.cardId === c.id && r.keys === keys && ds.length === 1 && last && r.lastEntry === last){
+    const d = ds[0];
+    r.to[d.key] = d.to;
+    last.label = '編集：' + d.label + ' ' + r.from[d.key] + ' → ' + d.to;
+    last.at = Date.now();
+  } else {
+    _editRunEnd();
+    ds.forEach(function (d) { if (window.logFlow) logFlow(c, '編集：' + (window.pitCardDiffText ? pitCardDiffText(d) : d.label + ' ' + d.from + ' → ' + d.to)); });
+    const nr = { cardId: c.id, card: c, keys: keys, from: {}, to: {}, labels: {}, lastEntry: (c.log || [])[(c.log || []).length - 1] || null };
+    ds.forEach(function (d) { nr.from[d.key] = d.from; nr.to[d.key] = d.to; nr.labels[d.key] = d.label; });
+    _editRun = nr;
+  }
+  if (_editRun){
+    if (_editRun.timer) clearTimeout(_editRun.timer);
+    _editRun.timer = setTimeout(_editRunEnd, 60000);
+    if (_editRun.timer && _editRun.timer.unref) _editRun.timer.unref();
+  }
+  try { _openSnap = JSON.parse(JSON.stringify(c)); } catch (e) {}
+  return ds.length;
+}
+window.pitBeforeFlush = function(){ try { _cardEditStep(); } catch (e) { console.warn('[card-detail] 編集の記録でエラー（保存は続けます）', e); } };
+window.pitCardEditStep = _cardEditStep;   /* 見張り用 */
+window.pitCardEditRunEnd = _editRunEnd;
 function openCard(cardId, mode){
   const card = state.cards.find(c => c.id === cardId);
   if (!card) return;
@@ -29,6 +84,7 @@ function openCard(cardId, mode){
      見張り（保存を止める hold）をここでも外す＝置き去りにしない。
      ⚠ 中身は触らない。外す時に1回保存されるので、打ったものは残る。 */
   if (window.pitCardEditRelease) pitCardEditRelease();
+  try { _cardEditStep(); _editRunEnd(); } catch (e) {}   /* v2.186.0（A-02）前のカードの直しを締める */
   _editingCardId = cardId;
   /* 🔴 v2.22.0（ゆうた「予約カード内部の操作も履歴に残る？」→ 残っていなかった）
      **開いた時の姿を控える。** 閉じる時にこれと見くらべて、変わった欄を記録に残す。
@@ -98,7 +154,10 @@ function closeDetail(){
      ⚠ 見くらべるのは**人が入力する欄だけ**（pit-share.js の `pitCardDiff` 1本）。
         状態・フェーズはドラッグ側がすでに記録しているので入れない＝同じことが2回残らない。
      ⚠ ここが**唯一の出口**（「保存する」も「予約を編集」も、別の画面へ行く時も必ずここを通る）。 */
-  try { if (_c && _openSnap && window.pitLogCardEdit) pitLogCardEdit(_c, _openSnap); } catch (e) {}
+  /* 📝 v2.186.0（棚卸し A-02）書いたその場で残すようになった（_cardEditStep）。ここは残りを書き切って、操作ログの1行を締めるだけ */
+  try { _cardEditStep(); } catch (e) {}
+  try { _editRunEnd(); } catch (e) {}
+  try { if (_c && _openSnap && !window.pitCardDiff && window.pitLogCardEdit) pitLogCardEdit(_c, _openSnap); } catch (e) {}   /* 部品が無い時の保険 */
   _openSnap = null;
   if (_c && !_c._sample && window.upsertCustomerFromCard) upsertCustomerFromCard(_c);
   _editingCardId = null;

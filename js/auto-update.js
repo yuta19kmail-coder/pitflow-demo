@@ -21,6 +21,7 @@
      ・入力欄/選択/contenteditable にフォーカスが無い
      ・モーダル等が開いていない
      ・window.__appBusy が真でない（各アプリが重要操作中に立てられる任意のガード）
+     ・🆕 2026-10-15 埋め込みの窓（iframe）の中も同じに見る（窓の中の入力欄・窓・window.__appBusy）
      ・かつ「タブに戻った直後」または「60秒以上 操作が無いアイドル時」
        （＝打ち込み中の作業を巻き込まないタイミングだけで更新）
    ⚠ 更新は「同じ画面に戻る」＝ coreflow-nav.js が住所に画面名を持たせているアプリは、
@@ -62,18 +63,48 @@
         .catch(function () { return ''; });
     }
 
-    function isSafe() {
-      if (window.__appBusy) return false;
-      var ae = document.activeElement;
-      if (ae) {
-        var tag = (ae.tagName || '').toUpperCase();
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable) return false;
-      }
-      // よくあるモーダル/ダイアログが見えていれば避ける
-      var dlg = document.querySelector('[role="dialog"], .modal, #modal, .modal-backdrop, .overlay, .crop-box');
-      if (dlg && dlg.offsetParent !== null) return false;
-      return true;
+    /* 🆕 2026-10-15（棚卸し A-59）埋め込みの窓（iframe）の中も見る。
+       前は本体の画面しか見ておらず、StockFlow の料金表（price.html を埋め込み）で打ち込み中でも
+       「何もしていない」に見えて読み直し、打ちかけが消えた。
+       ・カーソルが窓の中にある時は、窓の中の入力欄・開いている窓・window.__appBusy まで見る（同じ住所の窓だけ。よそは見られない＝安全側で「使用中」）
+       ・窓の中で触った時も「操作あり」に数える（60秒アイドルの数え方） */
+    function busyIn(doc, win, depth) {
+      try {
+        if (win && win.__appBusy) return true;
+        var ae = doc.activeElement;
+        if (ae) {
+          var tag = (ae.tagName || '').toUpperCase();
+          if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable) return true;
+          if ((tag === 'IFRAME' || tag === 'FRAME') && depth < 3) {
+            var cd = null, cw = null;
+            try { cw = ae.contentWindow; cd = ae.contentDocument || (cw && cw.document); } catch (e) { return true; }
+            if (!cd) return true;
+            if (busyIn(cd, cw, depth + 1)) return true;
+          }
+        }
+        // よくあるモーダル/ダイアログが見えていれば避ける
+        var dlg = doc.querySelector('[role="dialog"], .modal, #modal, .modal-backdrop, .overlay, .crop-box');
+        if (dlg && dlg.offsetParent !== null) return true;
+      } catch (e) { return true; }
+      return false;
     }
+    function isSafe() { return !busyIn(document, window, 0); }
+    /* 埋め込みの窓の中の操作も「操作あり」に数える（同じ住所の窓だけ・1つの窓に1回だけ付ける） */
+    function watchFrames() {
+      try {
+        Array.prototype.forEach.call(document.querySelectorAll('iframe'), function (f) {
+          try {
+            var cd = f.contentDocument; if (!cd || cd.__cfAuMark) return;
+            cd.__cfAuMark = true;
+            ['keydown', 'pointerdown', 'touchstart', 'mousedown', 'input', 'wheel'].forEach(function (ev) {
+              cd.addEventListener(ev, markActive, { passive: true, capture: true });
+            });
+          } catch (e) {}
+        });
+      } catch (e) {}
+    }
+    document.addEventListener('load', function (e) { if (e.target && e.target.tagName === 'IFRAME') watchFrames(); }, true);
+    window.__AUTO_UPDATE.isSafe = isSafe;   /* 見張り（test_autoupdate_iframe.mjs）用。画面の動きには関係しない */
 
     function doReload() {
       if (reloading) return;
@@ -112,6 +143,7 @@
 
     setTimeout(poll, 8000); // 起動少し後に1回
     setInterval(function () {
+      watchFrames();                                                  // 後から開いた埋め込みの窓にも印を付ける
       maybePoll();                                                    // 🔴 1時間ごとに最新確認
       if (pending && (Date.now() - lastActive) > IDLE_MS) tryReload(); // 60秒アイドルで更新
     }, TICK_MS);

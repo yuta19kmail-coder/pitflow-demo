@@ -52,7 +52,11 @@
      ⚠ 判定は demo-pit.js の `pitIsDemo()` 1本を借りる（location.search をここで読み直さない）。
      ⚠ サンプルモードは全員が「管理」あつかい（auth-pit.js）なので isAdmin は素通りする。 */
   function isDemo()   { return !!(w.pitIsDemo && w.pitIsDemo()); }
-  function canShow()  { return (isCloud() || isDemo()) && isAdmin(); }
+  /* 🔴 v2.185.2（出す前の確認の指摘）**本番では出さない・動かさない。**
+     本番の初期化は立ち上げの時だけの物で、いまは全員の 7,000件超の記録を消す道でしかない。
+     しかも v2.185.0 から保存は「消す操作を通った物だけ消す」になり、本番で押しても何も消えないのに
+     「全員の画面からも消えます」と出ていた（言っている事と実物が違う）。＝デモ版（練習）だけにした。 */
+  function canShow()  { return isDemo() && !isCloud() && isAdmin(); }
 
   /* 🟠 デモ版と本番で**言い方だけ**変える。
      🔴 中身（消すもの・残すもの・「初期化」と打たせる関門）は変えない＝道を2本にしない。 */
@@ -189,6 +193,11 @@
 
   /* ---------- 実行 ---------- */
   w.pitRunReset = function () {
+    if (isCloud()) {
+      if (w.pitAlert) w.pitAlert('本番では初期化できません（デモ版だけ）', { code: 'PF-0014',
+        detail: '全員の記録を消す道なので止めています。消したいカード・車は1件ずつ消してください。' });
+      return;
+    }
     if (!canShow()) return;
     var inp = d.getElementById('pr-type');
     if (!inp || inp.value.trim() !== '初期化') return;

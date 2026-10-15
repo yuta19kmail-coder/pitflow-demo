@@ -597,9 +597,12 @@
     /* 名簿の書類の名前は uid とは限らない（招待から作った人）＝メールで引く。ダメなら uid */
     var em = user.email || '';
     var tries = [];
-    if (em) tries.push(function () { return col.where('email', '==', em).limit(1).get().then(function (s) { return s.empty ? null : s.docs[0].data(); }); });
-    if (em && normEmail(em) !== em) tries.push(function () { return col.where('email', '==', normEmail(em)).limit(1).get().then(function (s) { return s.empty ? null : s.docs[0].data(); }); });
-    tries.push(function () { return col.doc(user.uid).get().then(function (s) { return s.exists ? s.data() : null; }); });
+    /* 🔴 2026-10-15 同じメールが何件あっても**在籍中（active が false でない）を先に拾う**。在籍なししか無ければ読まない
+       （玄関の「外す」が在籍なしの印になった＝古い書類が先に当たると、見やすさ・英語・端末ごとの旗をそこから読んでいた。FDCore.findMember と同じ形） */
+    var live = function (s) { var hit = null; (s.docs || []).some(function (d) { var x = d.data() || {}; if (x.active !== false) { hit = x; return true; } return false; }); return hit; };
+    if (em) tries.push(function () { return col.where('email', '==', em).limit(20).get().then(live); });
+    if (em && normEmail(em) !== em) tries.push(function () { return col.where('email', '==', normEmail(em)).limit(20).get().then(live); });
+    tries.push(function () { return col.doc(user.uid).get().then(function (s) { var x = s.exists ? (s.data() || {}) : null; return x && x.active !== false ? x : null; }); });
     var i = 0;
     function next() { if (i >= tries.length) return Promise.resolve(null);
       return tries[i++]().then(function (m) { return m || next(); }, function () { return next(); }); }

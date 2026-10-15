@@ -210,6 +210,61 @@
     return out;
   }
   function newId() { return 'bn_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  /* 🔴 2026-10-15（S-18）配列（返信 replies・回覧の確認 doneByUids）は「1件足す／1件抜く」で書く。
+     save(note, info) の info に **ops**（{ 欄: {add: 値} または {remove: 値} }）と **fields**（ふつうの欄の名前）を付けて渡す。
+     アプリ側の保存はこれを使って、配列を丸ごと書かずに arrayUnion / arrayRemove で書く：
+        if (info && info.ops) ref.set(CFNoteBoard.rules.atomicPatch(note, info, firebase.firestore.FieldValue), { merge: true })
+     ⚠ 丸ごと書くと、2人がほぼ同時に返信・確認した時（寝かせたスマホからでも）、後の人が前の人の分を消す */
+  function atomicPatch(n, info, FV) {
+    var out = {};
+    ((info && info.fields) || []).forEach(function (k) { if (n && n[k] !== undefined) out[k] = n[k]; });
+    var ops = (info && info.ops) || {};
+    Object.keys(ops).forEach(function (k) {
+      var o = ops[k]; if (!o || !FV) return;
+      if (o.add !== undefined) out[k] = FV.arrayUnion(o.add);
+      else if (o.remove !== undefined) out[k] = FV.arrayRemove(o.remove);
+    });
+    return out;
+  }
+  /* 🔴 2026-10-15 書くところまで1本で（アプリの保存は、これを呼ぶだけでよい）。
+     ・「抜く」（remove）がある時は transaction で、**クラウドの今の配列から id で探して外す**。
+       ⚠ arrayRemove は保存されている物と1文字違わず同じ時しか消えない＝読み込みで形が変わっていると黙って消えず「消したのに戻る」。
+       id の無い古い返信だけ、中身（JSON）が同じ物を外す。
+     ・「足す」だけなら arrayUnion（transaction は要らない）。
+     ref＝付箋の書類 / extra＝一緒に書くふつうの欄（updatedAt など） / db＝runTransaction を持つ物 */
+  function applyOps(ref, n, info, FV, db, extra) {
+    var ops = (info && info.ops) || {};
+    var hasRemove = Object.keys(ops).some(function (k) { return ops[k] && ops[k].remove !== undefined; });
+    if (!hasRemove || !db || !db.runTransaction) {
+      return ref.set(Object.assign(atomicPatch(n, info, FV), extra || {}), { merge: true });
+    }
+    var plain = Object.assign(atomicPatch(n, { fields: (info && info.fields) || [] }, FV), extra || {});
+    return db.runTransaction(function (tx) {
+      return tx.get(ref).then(function (s) {
+        var cur = (s && s.exists) ? (s.data() || {}) : {};
+        var out = Object.assign({}, plain);
+        Object.keys(ops).forEach(function (k) {
+          var o = ops[k]; if (!o) return;
+          var arr = Array.isArray(cur[k]) ? cur[k].slice() : [];
+          if (o.remove !== undefined) {
+            var rm = o.remove, rid = (rm && typeof rm === 'object') ? rm.id : null;
+            arr = arr.filter(function (x) {
+              if (rid) return !(x && x.id === rid);
+              if (x && typeof x === 'object') return JSON.stringify(x) !== JSON.stringify(rm);
+              return x !== rm;
+            });
+          }
+          if (o.add !== undefined) {
+            var aid = (o.add && typeof o.add === 'object') ? o.add.id : null;
+            var dup = arr.some(function (x) { return aid ? (x && x.id === aid) : (x === o.add || JSON.stringify(x) === JSON.stringify(o.add)); });
+            if (!dup) arr.push(o.add);
+          }
+          out[k] = arr;
+        });
+        tx.set(ref, out, { merge: true });
+      });
+    });
+  }
 
   var rules = {
     HIDE_DAYS: HIDE_DAYS, ATTACH_DAYS: ATTACH_DAYS, KEEP_DAYS: KEEP_DAYS, DAY: DAY,
@@ -219,7 +274,7 @@
     isSecret: isSecret, secretFor: secretFor, canSee: canSee, isForMe: isForMe,
     patchDone: patchDone, patchUndone: patchUndone, patchArchive: patchArchive, patchCirculate: patchCirculate,
     searchNorm: searchNorm, matchNote: matchNote,
-    cleanForSave: cleanForSave, newId: newId
+    cleanForSave: cleanForSave, newId: newId, atomicPatch: atomicPatch, applyOps: applyOps
   };
 
   /* =====================================================
@@ -468,8 +523,12 @@
     if (!canMutate()) { toast('閲覧専用では操作できません'); return; }
     var p = patchCirculate(n, me());
     if (!p) { toast('自分が誰か分かりません（ログインし直してください）'); return; }
+    /* 🔴 S-18 確認は「自分を1人足す／抜く」で渡す（info.ops）。アプリの保存が配列を丸ごと書かずに済むように */
+    var asg0 = assignees(n), key0 = asg0.filter(function (u) { return isMine(u, me()); })[0] || myId();
+    var had = (Array.isArray(n.doneByUids) ? n.doneByUids : []).indexOf(key0) >= 0;
+    var info = { ops: { doneByUids: had ? { remove: key0 } : { add: key0 } }, fields: Object.keys(p).filter(function (k) { return k !== 'doneByUids'; }) };
     Object.assign(n, p);
-    return saveNote(n).then(function () {
+    return saveNote(n, info).then(function () {
       log(p.status === 'done' ? '回覧付箋「' + (n.title || '(無題)') + '」が全員確認済みになりました' : '回覧付箋「' + (n.title || '(無題)') + '」を確認しました');
       render();
     }).catch(function (e) { console.error(e); toast('保存できませんでした'); });
@@ -786,7 +845,7 @@
         formatText: function (t) { return fmt(t); },
         canWrite: function () { return canMutate(); },
         canDelete: function (r) { return !!(r && (isMine(r.uid, me()) || (A.canDeleteReply && call('canDeleteReply', r)))); },
-        save: function (n, done) { saveNote(n).then(function () { if (done) done(); }).catch(function (e) { console.error(e); toast('返信を保存できませんでした'); }); },
+        save: function (n, done, info) { saveNote(n, info).then(function () { if (done) done(); }).catch(function (e) { console.error(e); toast('返信を保存できませんでした'); }); },
         rerender: function () { render(); },
         toast: function (m) { toast(m); },
         ask: function (msg, cb) { ask(msg, { ok: '消す', danger: true }).then(function (y) { cb(!!y); }); }

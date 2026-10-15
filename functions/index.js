@@ -49,9 +49,13 @@ async function assertAdmin(uid, email) {
   const col = db.collection("companies").doc(COMPANY_ID).collection("portalMembers");
   let snap = await col.doc(uid).get();
   let m = snap.exists ? snap.data() : null;
-  if (!m && email) {
-    const q = await col.where("email", "==", String(email).toLowerCase()).limit(1).get();
-    if (!q.empty) m = q.docs[0].data();
+  /* 🔴 2026-10-15 同じメールの書類が何件あっても**在籍中の書類を先に**（玄関の「外す」が在籍なしの印になり、古い書類が残るため）。
+     uid の書類が在籍なしでも、同じメールの在籍中の書類があればそちら。在籍中が無ければ在籍なしのまま＝下で止める */
+  if ((!m || m.active === false) && email) {
+    const q = await col.where("email", "==", String(email).toLowerCase()).limit(10).get();
+    const hit = q.docs.find((d) => (d.data() || {}).active !== false);
+    if (hit) m = hit.data();
+    else if (!m && !q.empty) m = q.docs[0].data();
   }
   if (!m) throw new HttpsError("permission-denied", "名簿にありません。");
   if (m.active === false) throw new HttpsError("permission-denied", "在籍が無効です。");

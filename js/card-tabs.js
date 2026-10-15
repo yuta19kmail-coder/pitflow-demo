@@ -74,7 +74,8 @@ function cfFlowHtml(c){
       const _t = window.PitFlowLog ? PitFlowLog.atText(l) : fmtFlowTime(l.at);
       const _w = window.PitFlowLog ? PitFlowLog.byOf(l) : (l.staff || '');
       /* 🔴 工程の記録は label/text を持っていない＝titleOf を通さないと**見出しが空**になる */
-      const _x = window.PitFlowLog ? PitFlowLog.titleOf(l) : (l.label || '');
+      let _x = window.PitFlowLog ? PitFlowLog.titleOf(l) : (l.label || '');
+      if (l && l.deleted) _x = '〔消した〕' + _x;   /* v2.185.0（S-25）消した記録も残して見せる */
       h += _flowRow(_x, _t + (_w ? '　・　' + _w : ''), null);
     });
     if (c.returnDate)  h += _flowRow('返車予定', c.returnDate + (c.returnTime ? ' ' + c.returnTime : ''));
@@ -114,7 +115,7 @@ function cfFlowAddCustom(){
 }
 function cfFlowDel(i){
   const c = _flowCard(); if (!c || !window.PitFlowLog) return;
-  PitFlowLog.del(c.id, i);
+  if (window.pitFlowDel) pitFlowDel(c.id, i); else PitFlowLog.del(c.id, i);   /* v2.185.0 確認の1行→打ち消し線 */
 }
 window.cfFlowAdd = cfFlowAdd;
 window.cfFlowAddQuick = cfFlowAddQuick;

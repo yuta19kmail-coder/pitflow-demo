@@ -853,6 +853,8 @@ window.pitCleanupAutoVehEvents = function () {
   const keep = evs.filter(function (e) { return !!(e && e.maint); });
   if (keep.length === before) return false;
   state.fleetEvents = keep;
+  /* 🔴 v2.185.0 消す操作を通った印（これが無いと db-pit.js は delete を送らない） */
+  if (window.PitDB && PitDB.removed) PitDB.removed('fleetEvents', evs.filter(function (e) { return !(e && e.maint); }).map(function (e) { return e && e.id; }));
   try {
     if (window.pitLog) pitLog('前の仕組みの代車の予定（車検入庫・点検・リースアップ・その他）を片付けた（' + (before - keep.length) + '件）',
       { auto: true, kind: 'auto' });
@@ -1007,7 +1009,8 @@ function _fleetSubmitInner(){
   if (_fleetEditId){
     const f = _fleetFind(_fleetEditId);
     if (f){
-      if (f.kind !== kind){ const fromArr=f.kind==='loaner'?state.loaners:state.companyCars, toArr=kind==='loaner'?state.loaners:state.companyCars; fromArr.splice(fromArr.indexOf(f.v),1); toArr.push(f.v); }
+      if (f.kind !== kind){ const fromArr=f.kind==='loaner'?state.loaners:state.companyCars, toArr=kind==='loaner'?state.loaners:state.companyCars; fromArr.splice(fromArr.indexOf(f.v),1); toArr.push(f.v);
+        if (window.PitDB && PitDB.removed) PitDB.removed(f.kind==='loaner'?'loaners':'companyCars', f.v.id); }   /* 🔴 v2.185.0 元の入れ物から消す印 */
       f.v.name = (kind==='loaner'?'代車'+number:(model||f.v.name)); f.v.number = number; f.v.model = model; f.v.color = color; f.v.plate = plate;
       f.v.shakenDate = lease ? '' : shaken; delete f.v.tenkenDate;   /* 🏁 v2.106.0 リースは車検満了日なし */   /* 12ヶ月点検は持たない（自動計算） */
       f.v.height=height; f.v.width=width; f.v.length=length; f.v.category=category; f.v.seats=seats; f.v.etc=etc; f.v.navi=navi; f.v.iso=iso; f.v.camera=camera;
@@ -1257,7 +1260,14 @@ function fleetDelete(id){
     if (!yes) return;
     const arr = isLoaner ? state.loaners : state.companyCars;
     arr.splice(arr.indexOf(f.v), 1);
-    if (isLoaner) state.loanerAssigns = (state.loanerAssigns || []).filter(function(a){ return a.loanerId !== id; });
+    /* 🔴 v2.185.0 消す操作を通った印（これが無いと db-pit.js は delete を送らない） */
+    const 印 = function (k, ids) { if (window.PitDB && PitDB.removed) PitDB.removed(k, ids); };
+    印(isLoaner ? 'loaners' : 'companyCars', f.v.id);
+    if (isLoaner) {
+      印('loanerAssigns', (state.loanerAssigns || []).filter(function(a){ return a.loanerId === id; }).map(function(a){ return a.id; }));
+      state.loanerAssigns = (state.loanerAssigns || []).filter(function(a){ return a.loanerId !== id; });
+    }
+    印('fleetEvents', _flEvents().filter(function(e){ return e.vehicleId === id; }).map(function(e){ return e.id; }));
     state.fleetEvents = _flEvents().filter(function(e){ return e.vehicleId !== id; });
     if (_fleetEditId === id) _fleetEditId = null;
     if (window.PitDB) PitDB.save();

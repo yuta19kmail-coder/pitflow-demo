@@ -562,3 +562,11 @@ input.cv-fixinput[type=date]{ color-scheme:dark; }
 .cv-delpop-hard .cv-dpnote{ font-size:11.5px; color:var(--text2); background:rgba(239,68,68,.08);
   border:1px solid rgba(239,68,68,.25); border-radius:8px; padding:8px 10px; }
 .cv-delpop-hard .cv-dpnote b{ color:#ff9a9a; }
+
+/* 🔴 v2.185.0（棚卸し S-25）消したフローの記録＝消さずに打ち消し線・薄く（「済んだら消す」の決めごと） */
+.cv-frow.cv-fgone .cv-ft, .cv-frow.cv-fgone .cv-fd{ text-decoration:line-through; opacity:.55; }
+.cv-frow.cv-fgone .cv-fdot{ opacity:.4; }
+.cv-fundel{ flex:0 0 auto; align-self:center; background:transparent; border:1px solid var(--border); color:var(--text2); cursor:pointer; padding:1px 8px; border-radius:6px; font-size:11.5px; }
+.cv-fundel:hover{ background:var(--bg3); }
+.pf-ferow.pf-fegone .pf-fettl, .pf-ferow.pf-fegone .pf-febot{ text-decoration:line-through; opacity:.55; }
+.pf-fegonewho{ font-size:11px; color:var(--text3); margin-top:2px; }

@@ -59,6 +59,22 @@ function openCard(cardId, mode){
   }
 }
 
+/* 🔴 v2.185.0（棚卸し S-01）**開いている間にほかの端末（MHS・FlowDesk・別の PitFlow）がこのカードを直した時。**
+   db-pit.js は受け取ったカードを差し替えずに中身を入れ替える（＝この画面が握っている物は生きている）。
+   ここでは「開いた時の姿」（_openSnap）の、相手が変えた欄だけを今の値へ進める。
+   ＝閉じた時の「編集：…」に**相手の直しを自分の名前で書かない**。
+   ⚠ 既定値の下ごしらえ（pitCardEnsure）もやり直す（相手の文書に無い欄が抜けて、詳細の操作が止まらないように）。 */
+window.pitCardRemoteChanged = function (card, fields) {
+  if (!card || card.id !== _editingCardId) return;
+  try { if (window.pitCardEnsure) pitCardEnsure(card); } catch (e) {}
+  if (!_openSnap) return;
+  (fields || []).forEach(function (f) {
+    if (f === 'id') return;
+    if (card[f] === undefined) delete _openSnap[f];
+    else { try { _openSnap[f] = JSON.parse(JSON.stringify(card[f])); } catch (e) { _openSnap[f] = card[f]; } }
+  });
+};
+
 /* 🔴 v1.52.0 いま開いている入庫カードのID（customers.js が「新規予約が開いたか」を見るのに使う）。
    ⚠ 中身は返すだけ。ここから書き換えないこと。 */
 window.pitOpenCardId = function(){ return _editingCardId; };

@@ -97,4 +97,43 @@
     return Promise.resolve(v == null ? null : v);
   };
 
+  /* 📅 v2.185.0（棚卸し S-41）**日付を入れてもらう。** 戻り値＝'YYYY-MM-DD'／やめたら null。
+     ◎前は文字の欄（pitAskText）で受けてそのまま入れていた＝「10/20」は文字の大小比べで今日より前と見なされ
+       未入庫へ勝手に落ち、全角の「２０２６－１０－２０」はどのカレンダーにも出なくなっていた。
+     ◎いまは欄をカレンダー（type=date）にし、返ってきた字も形を確かめる。
+       全角・「/」区切り・1桁の月日は直して受ける。年の無い「10/20」など、形が分からない物は入れない（PF-1090）。
+     ⚠ 窓は共通部品（UI.prompt）を借り、開いた直後に欄だけカレンダーにしている（共通部品に type の指定が無いため） */
+  window.pitDateNorm = function (s) {
+    var t = String(s == null ? '' : s).trim()
+      .replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 0xFEE0); })
+      .replace(/[／\/．.－ー―‐]/g, '-');
+    var m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+    if (!m) return '';
+    var y = +m[1], mo = +m[2], d = +m[3];
+    var dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return '';
+    return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d;
+  };
+  window.pitAskDate = function (msg, value, opt) {
+    /* v2.185.1 共通部品の UI.prompt が {type:'date'} を受けるようになった＝それを渡す。
+       ⚠ 下の「開いた直後に欄を date に差し替える」は、配られた写し（js/ui-dialog.js）が古い時だけ効く予備 */
+    var p = window.pitAskText(msg, window.pitDateNorm(value) || '', Object.assign({}, opt || {}, { type: 'date' }));
+    setTimeout(function () {
+      try {
+        var i = document.getElementById('uid-in');
+        if (i && i.type !== 'date') { i.type = 'date'; i.value = window.pitDateNorm(value) || ''; }
+      } catch (e) {}
+    }, 0);
+    return p.then(function (v) {
+      if (v == null) return null;
+      var d = window.pitDateNorm(v);
+      if (!d) {
+        if (window.pitAlert) pitAlert('日付の形が違うので入れませんでした', { code: 'PF-1090',
+          detail: '「' + String(v) + '」\nカレンダーから日付を選んでください（2026-10-20 の形）。' });
+        return null;
+      }
+      return d;
+    });
+  };
+
 })();

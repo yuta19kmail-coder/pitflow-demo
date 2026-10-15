@@ -91,6 +91,11 @@
     try{ document.dispatchEvent(new CustomEvent('uid:close')); }catch(e){}
     r(val);
   }
+  /* 📅 2026-10-15 UI.prompt の入力の種類（opt.type）。例 UI.prompt('入庫日は？','2026-10-20',{type:'date'})
+     渡さない時・知らない種類の時は今までどおり text（今までの呼び方はそのまま動く）。
+     ⚠ 前は PitFlow が開いた直後に欄を date に差し替えていた（ask-pit.js pitAskDate） */
+  var IN_TYPES={text:1,date:1,time:1,'datetime-local':1,month:1,number:1,email:1,tel:1,url:1,search:1};
+  function inType(t){ t=String(t||'text').toLowerCase(); return IN_TYPES[t]?t:'text'; }
   function open(o){
     return new Promise(function(resolve){
       var ov=ensure(), card=document.getElementById('uid-card');
@@ -103,7 +108,7 @@
       if(isInput){
         h+= o.multiline
           ? '<textarea id="uid-in" placeholder="'+esc(o.placeholder||'')+'">'+esc(o.value||'')+'</textarea>'
-          : '<input type="text" id="uid-in" value="'+esc(o.value||'')+'" placeholder="'+esc(o.placeholder||'')+'">';
+          : '<input type="'+inType(o.type)+'" id="uid-in" value="'+esc(o.value||'')+'" placeholder="'+esc(o.placeholder||'')+'">';
       }
       h+='<div class="uid-b">';
       /* 🔢 2026-08-17 エラー番号。`code:'PF-1002'` を渡された時だけ出す（押すとコピー＝coreflow-errcode.js）。 */
@@ -120,7 +125,7 @@
         inp.onkeydown=function(ev){
           if(ev.key==='Enter'&&!(o.multiline&&!ev.ctrlKey&&!ev.metaKey)){ ev.preventDefault(); close(inp.value||''); }
         };
-        setTimeout(function(){ try{ inp.focus(); if(o.selectAll!==false)inp.select(); }catch(e){} },10);
+        setTimeout(function(){ try{ inp.focus(); var canSel=(inp.tagName==='TEXTAREA')||/^(text|search|tel|url)$/.test(inp.type||'text'); if(o.selectAll!==false&&canSel)inp.select(); }catch(e){} },10);
       } else {
         setTimeout(function(){ try{ document.getElementById('uid-ok').focus(); }catch(e){} },10);
       }

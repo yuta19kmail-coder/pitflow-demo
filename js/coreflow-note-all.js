@@ -147,20 +147,31 @@
   /* ---------- よその付箋を保存する ----------
      ⚠ **返信とチェックだけ**（編集・消去はアプリ側で止めている）。
      ⚠ 丸ごと上書きではなく merge。よそのアプリが持っている項目（期限・画像など）を消さないため。 */
-  function save(note, done) {
+  /* 🔴 2026-10-15（S-18）info.ops（返信・回覧の確認を1件足す／抜く）が来たら、配列を丸ごと書かずに
+     arrayUnion / arrayRemove で書く（CFNoteBoard.rules.atomicPatch）。来ない時（昔の呼び方）は今までどおり */
+  function save(note, done, info) {
     if (!note || !note.id) { if (done) done(); return; }
     var app = appOf(note);
     var col = COLS[app];
     var co = call(function () { return cfg.company(); }, null);
     if (!col || !co) { toast('保存できませんでした'); return; }
     var body = {};
-    ['replies', 'status', 'doneAt', 'doneByUid', 'doneByUids'].forEach(function (k) {
-      if (note[k] !== undefined) body[k] = note[k];
-    });
-    try {
-      if (w.fb && w.fb.serverTimestamp) body.updatedAt = w.fb.serverTimestamp();
-    } catch (e) {}
-    co.collection(col).doc(note.id).set(body, { merge: true })
+    var FV = null; try { FV = w.firebase.firestore.FieldValue; } catch (e) {}
+    var R = w.CFNoteBoard && w.CFNoteBoard.rules;
+    var stamp = {};
+    try { if (w.fb && w.fb.serverTimestamp) stamp.updatedAt = w.fb.serverTimestamp(); } catch (e) {}
+    var ref = co.collection(col).doc(note.id), job;
+    var dbx = (cfg.db ? call(function () { return cfg.db(); }, null) : null) || (w.fb && w.fb.db) || null;
+    if (info && info.ops && FV && R && R.applyOps) {
+      /* 🔴 消す（remove）は transaction で id から外す（arrayRemove の「1文字違うと消えない」を避ける） */
+      job = R.applyOps(ref, note, info, FV, dbx, stamp);
+    } else {
+      ['replies', 'status', 'doneAt', 'doneByUid', 'doneByUids'].forEach(function (k) {
+        if (note[k] !== undefined) body[k] = note[k];
+      });
+      job = ref.set(Object.assign(body, stamp), { merge: true });
+    }
+    job
       .then(function () { if (done) done(); })
       .catch(function (e) {
         console.error('[note-all] ' + col + ' の保存に失敗', e);

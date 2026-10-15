@@ -305,6 +305,21 @@
   }
   function setNow(ns){ var el = d.getElementById((ns || 'cv') + '-flow-when'); if (el) el.value = nowInput(); }
 
+  /* ---------- 直す・消すを操作ログへ（v2.185.0・棚卸し S-25） ----------
+     🔴 前は日時・担当・言葉の書き換えと消すが**どこにも残らなかった**＝フローそのものが後から黙って変えられた。
+        ⑧で「必ず残す」と決めた日付の「前 → 後」も、この道から跡形なく消せた。
+     ・直した＝操作ログに「前 → 後」
+     ・消す＝**消さずに打ち消し線**（deleted の印＋誰・いつ）。「戻す」で戻せる。操作ログにも残す
+     ・消せるのは手で足した記録だけ（自動の記録・工程の記録は、管理の人でも消せない） */
+  function isDeleted(e){ return !!(e && e.deleted); }
+  function opLog(c, what, e, more){
+    try {
+      if (w.pitLog) w.pitLog(what, { cardId: c.id, kind: 'flow',
+        label: (w.pitCardTag ? w.pitCardTag(c) : (c.resNo || '')) + ' / 「' + plainTitle(e) + '」' + (more ? '　' + more : '') });
+    } catch (err) {}
+  }
+  function plainTitle(e){ var t = String(titleOf(e) || '').replace(/<[^>]*>/g, '').trim(); return t.length > 40 ? t.slice(0, 40) + '…' : t; }
+
   /* ---------- 直す（設定権限のある人だけ） ---------- */
   function setAt(cardId, i, v){
     if (!canEdit()) return false;
@@ -312,7 +327,10 @@
     var e = c.log[i]; if (!e) return false;
     var t = new Date(String(v || '')).getTime();
     if (isNaN(t)) return false;
+    var _was = atText(e);
+    if (atMs(e) === t) return false;
     e.at = t;
+    opLog(c, 'フローの記録の日時を直した', e, _was + ' → ' + atText({ at: t }));
     /* 🔴 atTxt を持っている記録は、そちらも合わせて書き換える（画面が食い違うため） */
     if ('atTxt' in e) e.atTxt = atText({ at: t });
     /* 🔴 v1.58.0 工程の記録を直したら、**「◯日目」の起点も改める**（ゆうた指定）。
@@ -326,9 +344,12 @@
     var c = card(cardId); if (!c || !Array.isArray(c.log)) return false;
     var e = c.log[i]; if (!e) return false;
     v = String(v == null ? '' : v);
+    var _was = byOf(e);
+    if (_was === v) return false;
     /* もともと持っていたキーに合わせる（両方あれば両方） */
     if ('staff' in e || !('by' in e)) e.staff = v;
     if ('by' in e) e.by = v;
+    opLog(c, 'フローの記録の担当を直した', e, (_was || '（空）') + ' → ' + (v || '（空）'));   /* v2.185.0 S-25 */
     save(); repaint();
     return true;
   }
@@ -341,21 +362,40 @@
     /* 🔴 保存するのは言葉だけ＝タグは受け付けない */
     v = String(v == null ? '' : v).replace(/<[^>]*>/g, '').trim();
     if (!v) return false;
+    var _was = plainText(e);
+    if (_was === v) return false;
     if ('label' in e || !('text' in e)) e.label = v;
     if ('text' in e) e.text = v;
+    opLog(c, 'フローの記録の言葉を直した', e, '元「' + _was + '」');   /* v2.185.0 S-25 */
     save(); repaint();
     return true;
   }
+  /* 🔴 v2.185.0（S-25）**消さずに打ち消し線。** 手で足した記録だけ。自動の記録は管理の人でも消せない。
+     ⚠ 並びから抜かない＝ほかの端末が描いた番号もずれない（2台で別の行が消える穴もこれで塞がる）。 */
   function del(cardId, i){
     var c = card(cardId); if (!c || !Array.isArray(c.log)) return false;
-    var e = c.log[i]; if (!e) return false;
-    /* 手で足した記録は今までどおり誰でも消せる。自動の記録は設定権限のある人だけ。 */
-    if (!isManual(e) && !canEdit()) return false;
-    c.log.splice(i, 1);
-    /* 🔴 v1.58.0 工程の記録を消した時も起点を改める（1つ前の記録が起点になる） */
-    syncPhaseAt(c);
+    var e = c.log[i]; if (!e || isDeleted(e)) return false;
+    if (!isManual(e)) return false;
+    e.deleted = true; e.deletedAt = Date.now(); e.deletedBy = meName();
+    opLog(c, 'フローの記録を消した（打ち消し線で残す）', e);
     save(); repaint(); refreshViews();
     return true;
+  }
+  function undel(cardId, i){
+    var c = card(cardId); if (!c || !Array.isArray(c.log)) return false;
+    var e = c.log[i]; if (!e || !isDeleted(e)) return false;
+    delete e.deleted; delete e.deletedAt; delete e.deletedBy;
+    opLog(c, 'フローの記録の打ち消しを戻した', e);
+    save(); repaint(); refreshViews();
+    return true;
+  }
+  /* 押す前に1行の確認（画面から呼ぶ入口だけ。PitFlowLog.del は確認しない） */
+  function askDel(cardId, i){
+    var c = card(cardId); var e = c && Array.isArray(c.log) ? c.log[i] : null;
+    if (!e || !isManual(e) || isDeleted(e)) return;
+    var ask = w.pitAsk ? w.pitAsk('この記録を消しますか？', { ok: '消す', danger: true,
+      detail: '「' + plainTitle(e) + '」\n消した記録は打ち消し線で残り、「戻す」で戻せます。' }) : Promise.resolve(true);
+    ask.then(function (yes) { if (yes) del(cardId, i); });
   }
 
   /* ---------- 「アクションを記録」の見た目 ----------
@@ -416,16 +456,20 @@
       var e = r.e, i = r.i;
       var ttl = titleOf(e);
       var kind = isPhase(e) ? '工程' : (isManual(e) ? '手記録' : '自動');
-      h += '<div class="pf-ferow" data-i="' + i + '">';
+      var gone = isDeleted(e);
+      h += '<div class="pf-ferow' + (gone ? ' pf-fegone' : '') + '" data-i="' + i + '">';
       h += '<div class="pf-fetop"><span class="pf-fekind pf-fekind-' + (isManual(e) ? 'man' : 'auto') + '">' + esc(kind) + '</span>';
-      if (isPhase(e) || !isManual(e)){
+      if (isPhase(e) || !isManual(e) || gone){
         h += '<span class="pf-fettl">' + (w.icoText ? icoText(ttl) : esc(ttl)) + '</span>';
       } else {
         h += '<input class="pf-fin pf-fettlin" type="text" value="' + esc(plainText(e)) + '" title="記録の言葉"'
            + ' onchange="pitFlowSetText(\'' + esc(c.id) + '\',' + i + ',this.value)">';
       }
-      h += '<button type="button" class="pf-fedel" title="この記録を消す" onclick="pitFlowDel(\'' + esc(c.id) + '\',' + i + ')">' + (w.ico ? ico('trash', 15) : '×') + '</button>';
+      /* 🔴 v2.185.0（S-25）消せるのは手で足した記録だけ。消した記録は打ち消し線で残り「戻す」が出る */
+      if (gone) h += '<button type="button" class="pf-fedel" title="消した記録を戻す" onclick="pitFlowUndel(\'' + esc(c.id) + '\',' + i + ')">戻す</button>';
+      else if (isManual(e)) h += '<button type="button" class="pf-fedel" title="この記録を消す（打ち消し線で残る）" onclick="pitFlowDel(\'' + esc(c.id) + '\',' + i + ')">' + (w.ico ? ico('trash', 15) : '×') + '</button>';
       h += '</div>';
+      if (gone) h += '<div class="pf-fegonewho">' + esc('消した：' + (e.deletedBy || '') + ' ' + atText({ at: e.deletedAt })) + '</div>';
       h += '<div class="pf-febot">';
       h += '<label class="pf-fef"><span>日時</span><input class="pf-fin" type="datetime-local" value="' + esc(atInput(e)) + '"'
          + ' onchange="pitFlowSetAt(\'' + esc(c.id) + '\',' + i + ',this.value)"></label>';
@@ -446,7 +490,8 @@
   w.pitFlowSetAt   = function(id, i, v){ setAt(id, i, v); };
   w.pitFlowSetBy   = function(id, i, v){ setBy(id, i, v); };
   w.pitFlowSetText = function(id, i, v){ setText(id, i, v); };
-  w.pitFlowDel     = function(id, i){ del(id, i); };
+  w.pitFlowDel     = function(id, i){ askDel(id, i); };   /* v2.185.0 1行の確認→打ち消し線 */
+  w.pitFlowUndel   = function(id, i){ undel(id, i); };
 
   w.PitFlowLog = {
     QUICK: QUICK,
@@ -454,7 +499,7 @@
     atMs: atMs, atText: atText, atInput: atInput, nowInput: nowInput,
     byOf: byOf, textOf: textOf, titleOf: titleOf, plainText: plainText, isPhase: isPhase, isManual: isManual,
     add: add, addQuick: addQuick, addCustom: addCustom,
-    setAt: setAt, setBy: setBy, setText: setText, del: del,
+    setAt: setAt, setBy: setBy, setText: setText, del: del, undel: undel, isDeleted: isDeleted,
     addHtml: addHtml, editHtml: editHtml, repaint: repaint
   };
   console.log('[flow-pit] ready（フローの足す／直す）');

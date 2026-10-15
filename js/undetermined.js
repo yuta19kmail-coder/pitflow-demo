@@ -307,7 +307,7 @@ window.pitUndSetIntake = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
   /* 🔵 v1.75.0 ブラウザ純正の prompt をやめてアプリ内の入力ダイアログ（pitAskText）に。 */
-  pitAskText('入庫日を入れてください（例 2026-06-20）', c.reserveDate || ymd(new Date()), { ok:'入れる' }).then(function (d) {
+  pitAskDate('入庫日を入れてください', c.reserveDate || ymd(new Date()), { ok:'入れる' }).then(function (d) {   /* v2.185.0 S-41 カレンダーで受け、形を確かめる */
     if (!d) return;
     const _in0 = c.reserveDate || '';
     c.reserveDate = String(d).trim();
@@ -426,7 +426,7 @@ window.pitUndRestoreGo = function(id, forced){
 window.pitUndComplete = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
-  pitAskText('完TEL！ 返車日を入れてください（例 2026-06-20）', c.returnDate || ymd(new Date()), { ok:'入れる' }).then(function (d) {
+  pitAskDate('完TEL！ 返車日を入れてください', c.returnDate || ymd(new Date()), { ok:'入れる' }).then(function (d) {   /* v2.185.0 S-41 カレンダーで受け、形を確かめる */
     if (!d) return;
     /* 🔴 v2.183.0 返車日は唯一の入口（return-slot.js）を通す。
        ⚠ 前はここだけ returnDate を直に書いていて、**確定返車日（returnDateFinal）が古いまま残った**

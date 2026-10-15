@@ -79,9 +79,12 @@
     var m = me();
     return !!(reply && reply.uid && m && reply.uid === m);      /* 既定＝自分の返信だけ */
   }
-  function save(note, done) {
+  /* 🔴 2026-10-15（S-18）3つ目に info＝{ ops: { replies: {add: 返信} または {remove: 返信} } } を渡す。
+     アプリの保存は、これがあれば配列を丸ごと書かずに arrayUnion / arrayRemove で書く（CFNoteBoard.rules.atomicPatch）。
+     ⚠ 丸ごと書くと、2人がほぼ同時に返信した時・寝かせたスマホで返信した時に、相手の返信が消える */
+  function save(note, done, info) {
     if (!cfg.save) { if (done) done(); return; }
-    try { cfg.save(note, function () { if (done) done(); }); }
+    try { cfg.save(note, function () { if (done) done(); }, info || null); }
     catch (e) { console.error('[note-reply] 保存に失敗', e); toast('返信を保存できませんでした'); }
   }
 
@@ -192,11 +195,12 @@
     if (!note) { toast('この付箋が見つかりませんでした'); return; }
     if (!canWrite(note)) { toast('この付箋には返信できません'); return; }
     if (!Array.isArray(note.replies)) note.replies = [];
-    note.replies.push({ id: newReplyId(), uid: me() || null, text: text.slice(0, MAX), at: Date.now() });
+    var rep = { id: newReplyId(), uid: me() || null, text: text.slice(0, MAX), at: Date.now() };
+    note.replies.push(rep);
     if (ta) ta.value = '';
     if (el) el.classList.remove('is-open');
     dragOn();
-    save(note, function () { rerender(); });
+    save(note, function () { rerender(); }, { ops: { replies: { add: rep } } });
   }
 
   /* Ctrl+Enter（⌘+Enter）で送る／Esc でやめる。⚠ ただの Enter は改行のまま（本文が1行で切れないように） */
@@ -216,7 +220,7 @@
     var go = function (yes) {
       if (!yes) return;
       note.replies = note.replies.filter(function (x) { return x && x.id !== replyId; });
-      save(note, function () { rerender(); });
+      save(note, function () { rerender(); }, { ops: { replies: { remove: r } } });
     };
     if (cfg.ask) cfg.ask('この返信を消しますか？', go);
     else go(true);

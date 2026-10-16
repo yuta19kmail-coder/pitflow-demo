@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.189.2"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.190.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -133,7 +133,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.189.2</div>
+    <div class="login-ver">v2.190.0</div>
   </div>
 </div>
 
@@ -147,7 +147,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver" data-cf-ver>v2.189.2</span>
+    <span class="ver" data-cf-ver>v2.190.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -746,6 +746,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script src="js/coreflow-trace.js?v=2d78b18e"></script><!-- 🔎 調査の記録（CFTrace・全アプリ共通・_shared から配布）。firestore の直後・アプリの js より前に読む。画面には何も出さない。練習モード（PIT_CLOUD=false）では送らない -->
 <script src="js/coreflow-date.js?v=1a84d23c"></script><!-- 📅 CFDate＝日本時間の日付（C-02・_shared が本体） -->
+<script src="js/coreflow-member.js?v=78be8d1b"></script><!-- 👤 CFMember＝使えるか・役の判定（C-03・_shared が本体） -->
 <script src="js/coreflow-log.js?v=28e4156c"></script><!-- 📝 CFLog＝操作ログの共通の形（C-04・_shared が本体） -->
 <script src="js/coreflow-trash.js?v=47ad6c27"></script><!-- 🗑 CFTrash＝全アプリ共通のゴミ箱（C-05・_shared が本体） -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script><!-- 📎 v2.110.0 付箋の画像・PDF をファイル置き場へ（共通部品 coreflow-note-board.js が使う） -->
@@ -851,7 +852,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/loaner.js?v=90"></script>
 <script src="js/maint-pit.js?v=32"></script><!-- 🔧 v2.44.0 代車作業予定ボード（月の目標＋飛び地の候補＋警告）。loaner-free.js より後ろ・fleet.js より前 -->
 <script src="js/fleet.js?v=55"></script>
-<script src="js/auth-pit.js?v=18"></script>
+<script src="js/auth-pit.js?v=19"></script>
 <script src="js/members-pit.js?v=19"></script>
 <script src="js/oplog-pit.js?v=9"></script>
 <script src="js/news-pit.js?v=49"></script>

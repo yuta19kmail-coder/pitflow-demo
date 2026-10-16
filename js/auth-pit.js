@@ -161,12 +161,16 @@
 
   /* 入室できるか（CoreFlowで「PitFlow＝使える」がオンの人だけ。マスターは常に可） */
   function canUse(m) {
+    /* 👤 2026-10-16（棚卸し C-03・ゆうた決定「メンバー管理の画面の通りに」）入れるか・役は CFMember 1本（通知・FlowDesk・FlowGo・ダッシュボードと同じ） */
+    if (window.CFMember) return CFMember.canUse(m, 'pitflow');
     if (m.master === true) return true;
     return !!(m.pitflow && m.pitflow.on === true);
   }
   /* PitFlow の中の権限（管理／メンバー）。メンバーの設定を触れるのは管理だけ。 */
   function isAdminRole(m) {
     if (!m) return false;
+    /* 👤 v2.190.0（C-03・ゆうた決定）PitFlow の管理者は PitFlow の役（管理）で決める。メンバー管理の「管理者」の印は含めない */
+    if (window.CFMember) return CFMember.isAppAdmin(m, 'pitflow');
     if (m.master === true || m.admin === true) return true;
     return !!(m.pitflow && m.pitflow.role === '管理');
   }

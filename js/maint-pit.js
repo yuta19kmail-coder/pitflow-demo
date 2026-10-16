@@ -849,20 +849,30 @@
     if (!c) return;
     w.pitAsk('この予定を取り下げますか？', { code:'PF-3052', title:'作業予定の取り下げ', danger:true, ok:'取り下げる',
       detail:(WORK_LB[c.workType] || '整備') + '　' + (c.maintYm || '') + '\n' + memoOf(c)
-           + '\n\n候補も一緒に消えます。カードごと無くなり、元に戻せません。' })
+           + '\n\n候補も一緒に消えます。カードはゴミ箱に入ります（90日・戻すのはゆうただけ）。' })
       .then(function(yes){
         if (!yes) return;
         var lb = (WORK_LB[c.workType]||'') + ' ' + (c.maintYm||'');
+        /* 🗑 v2.189.2（棚卸し C-05）先にゴミ箱へ写す。写せなければ消さない（PF-0065） */
+        return (w.pitTrashCopy ? w.pitTrashCopy('pitCards', c, '代車の作業予定　' + lb + '　' + memoOf(c), '整備予定の取り下げ') : Promise.resolve(false))
+          .then(function(){ maintDropNow(c, lb); }, function(e){
+            console.error('[PitFlow] ゴミ箱に入れられませんでした（取り下げていません）', e);
+            if (w.pitToast) w.pitToast('ゴミ箱に入れられなかったので、取り下げていません（通信を確かめて、もう一度）', 'PF-0065');
+          });
+      });
+  };
+  function maintDropNow(c, lb){
+    {
         /* ⚠ 代車の予定も外す（ふつうのカードの消去と同じ道・v1.154.0） */
         if (w.pitLoanerReleaseForCard) w.pitLoanerReleaseForCard(c.id, '整備予定の取り下げ');
         w.state.cards = arr(w.state.cards).filter(function(x){ return x.id !== c.id; });
         if (w.PitDB && w.PitDB.removed) w.PitDB.removed('cards', c.id);   /* 🔴 v2.185.0 消す操作を通った印（これが無いと delete を送らない） */
         saveCards();
-        try { if (w.pitLog) w.pitLog('代車の作業予定を取り下げた（カードを消去）', { kind:'delete', label:lb }); } catch(e){}
+        try { if (w.pitLog) w.pitLog('代車の作業予定を取り下げた（カードを消去・ゴミ箱へ）', { kind:'delete', cardId: c.id, label:lb }); } catch(e){}
         if (w.renderFleet) w.renderFleet();
         if (w.state && w.state.currentView && w.showView) w.showView(w.state.currentView);
-      });
-  };
+    }
+  }
 
   /* ==================================================================
      整備カードを1枚作る（**ここ1か所だけ**）

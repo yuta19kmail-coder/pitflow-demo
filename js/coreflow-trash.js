@@ -24,7 +24,7 @@
    ========================================================= */
 (function (root) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var KEEP_DAYS = 90, DAY = 86400000, MAX_BYTES = 900000;
   var G = root || (typeof globalThis !== 'undefined' ? globalThis : {});
 
@@ -65,7 +65,10 @@
       purgeAfter: at + KEEP_DAYS * DAY
     };
   }
-  function idOf(o) { return (String(o.col || (o.ref && o.ref.parent && o.ref.parent.id) || 'x') + '__' + String(o.docId || (o.ref && o.ref.id) || 'x') + '__' + (o.at || Date.now())).replace(/\//g, '_'); }
+  /* v1.1.0（2026-10-16）ゴミ箱の行の名前は「入れ物__番号」に決める（時刻を付けない）。
+     ＝ルールが「この書類はゴミ箱に入っているか」を名前で確かめられる（pitCards・予定・当番・ルーティンは、入っていない物は消せない）。
+     ⚠ 戻した物をもう一度消すと、同じ行を上書きする（前に消した時の行は操作ログに残っている） */
+  function idOf(o) { return (String(o.col || (o.ref && o.ref.parent && o.ref.parent.id) || 'x') + '__' + String(o.docId || (o.ref && o.ref.id) || 'x')).replace(/\//g, '_'); }
   function put(tb, co, o) {
     if (!o.at) o.at = Date.now();
     var ref = co.collection('trash').doc(idOf(o));

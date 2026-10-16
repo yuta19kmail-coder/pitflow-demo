@@ -57,19 +57,23 @@
     if (!e) return null;
     var v = e.at;
     if (typeof v === 'number' && isFinite(v)) return v;
+    if (typeof e.atMs === 'number' && isFinite(e.atMs)) return e.atMs;   /* v2.188.0 年の分かる時刻を一緒に持つ記録 */
     var s = String(v == null ? '' : v).trim();
     if (!s) s = String(e.atTxt || '').trim();
     if (!s) return null;
     if (/^\d+$/.test(s)) return +s;
-    var t = new Date(s).getTime();
-    if (!isNaN(t)) return t;
-    /* 'M/D HH:MM' ＝ 年が入っていない古い書き方。今年として読む。 */
+    /* 📅 v2.188.0（棚卸し A-08・C-02）年の無い 'M/D HH:MM' を先に読む＝今年。ただし今より先なら去年。
+       前は new Date(s) を先に試していて、'10/15 10:00' が **2001年** になっていた（下の「今年として読む」に一度も来ていなかった） */
+    if (w.CFDate){ var r = CFDate.toMs(s); if (r != null) return r; }
     var m = s.match(/^(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
     if (m){
-      var y = new Date().getFullYear();
+      var now = new Date(), y = now.getFullYear();
       var dt = new Date(y, +m[1] - 1, +m[2], +(m[3] || 0), +(m[4] || 0), 0, 0);
+      if (dt.getTime() > now.getTime() + 86400000) dt.setFullYear(y - 1);
       if (!isNaN(dt.getTime())) return dt.getTime();
     }
+    var t = new Date(s).getTime();
+    if (!isNaN(t)) return t;
     return null;
   }
   /* 画面に出す時刻の文字（M/D HH:MM） */

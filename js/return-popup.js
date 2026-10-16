@@ -452,7 +452,7 @@
         else { c.returnDate = rd; c.returnTime = t || ''; }
         c.returnDateFinal = rd;
         /* ☎ 完TEL日（ログ）は上の1本ですでに記録済み。ここで書き写さない（v1.185.0） */
-        if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd0=new Date(); c.coverCall.at=(dd0.getMonth()+1)+'/'+dd0.getDate(); } }
+        if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd0=new Date(); c.coverCall.at=(dd0.getMonth()+1)+'/'+dd0.getDate(); c.coverCall.atMs=dd0.getTime(); } }
         c.status = 'returned';
         /* 🛡 v2.9.0 保険＝返車しても実績に乗せない（入金日を入れた時に乗る）。
            🔴 判定も書き込みも `insurance-pit.js` の1本。ここで `workSpecials` を見ない。
@@ -478,7 +478,7 @@
            空にするのは入口（pitReturnSetDateTime）がやる。ここで前の日を拾い直さない。 */
         c.returnDateFinal = d || null;
         /* ☎ 完TEL日（ログ）は上の1本ですでに記録済み。ここで書き写さない（v1.185.0） */
-        if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd=new Date(); c.coverCall.at=(dd.getMonth()+1)+'/'+dd.getDate(); } }
+        if (c.coverCall && typeof c.coverCall === 'object'){ c.coverCall.done = true; if(!c.coverCall.at){ var dd=new Date(); c.coverCall.at=(dd.getMonth()+1)+'/'+dd.getDate(); c.coverCall.atMs=dd.getTime(); } }
         /* 📝 v2.186.0（⑧）前の返車日・確定返車日もフローと操作ログの両方に残す */
         var _was = (_rs && (_rs.dFrom || _rs.tFrom)) ? (_rs.dFrom || '未定') + (_rs.tFrom ? ' ' + _rs.tFrom : '') : '';
         var _wasF = (_rs && _rs.fFrom) ? '・確定返車日 ' + _rs.fFrom + ' → なし' : '';

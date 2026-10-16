@@ -289,7 +289,7 @@
       if (a === 'save') {
         var blob = new Blob([JSON.stringify(report(), null, 1)], { type: 'application/json' });
         var aa = d.createElement('a'); aa.href = URL.createObjectURL(blob);
-        aa.download = 'PitFlow測定_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json';
+        aa.download = 'PitFlow測定_' + (window.CFDate ? CFDate.fileStamp() : new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')) + '.json';   /* 📅 C-02 日本時間 */
         d.body.appendChild(aa); aa.click(); aa.remove();
       }
       if (a === 'clear') { P.events.length = 0; P.frames.length = 0; P.stalls.length = 0; P.pitSlow.length = 0; P.link.length = 0; P.pit = {}; T0 = Date.now(); P.startedAt = new Date().toISOString(); try { performance.clearResourceTimings(); } catch (e2) {} paint(); }

@@ -2572,8 +2572,33 @@
     renderCardView(_c, 'md-body-modal');
   };
 
+  /* 🗑 v2.189.0（棚卸し C-05・ゆうた決定 2026-10-16）**消去＝ゴミ箱へ。**ゴミ箱は CoreFlow の中に1つ・見る／戻すはゆうただけ・90日でサーバーが消す。
+     先にクラウドの今の中身をゴミ箱へ写し、入ったのを確かめてから今までどおり消す（入らなければ消さない＝PF-0065）。
+     ⚠ まだ一度もクラウドに上がっていないカード（作った直後）は、手元の中身を写す */
+  function cvTrashCopy(c){
+    var co = window.fb.company(), ref = co.collection('pitCards').doc(String(c.id));
+    var nm = ((window.pitCustName?pitCustName(c):c.customer) || '（名前なし）') + ' 様' + (c.car ? ' / ' + c.car : '') + (c.resNo ? '　[' + c.resNo + ']' : '');
+    return ref.get({ source: 'server' }).then(function(s){
+      var data = s.exists ? s.data() : JSON.parse(JSON.stringify(c));
+      var b = window.fb.db.batch();
+      CFTrash.put(b, co, { app:'pitflow', col:'pitCards', ref: ref, data: data, name: nm, from: 'PitFlow', reason: 'カードの消去' });
+      return b.commit();
+    });
+  }
   window.cvDeleteCard = function(){
-    if(!_c) return; const idx = state.cards.findIndex(c=>c.id===_c.id);
+    if(!_c) return;
+    var c0 = _c;
+    if (window.CFTrash && window.PIT_CLOUD && window.fb && window.fb.db && typeof window.fb.company === 'function'){
+      cvTrashCopy(c0).then(function(){ cvDeleteCardNow(c0); }).catch(function(e){
+        console.error('[PitFlow] ゴミ箱に入れられませんでした（消していません）', e);
+        if (window.pitToast) pitToast('ゴミ箱に入れられなかったので、消していません（通信を確かめて、もう一度）', 'PF-0065');
+      });
+      return;
+    }
+    cvDeleteCardNow(c0);
+  };
+  function cvDeleteCardNow(_c){
+    const idx = state.cards.findIndex(c=>c.id===_c.id);
     /* 🔴 v1.154.0 カードを消す時も代車の予定を外す。
        ＝残すと**持ち主のいない予定**が代車カレンダーに居座り、外す道がなくなる（返却済みは触らない）。 */
     if (window.pitLoanerReleaseForCard) pitLoanerReleaseForCard(_c.id, 'カードの消去');
@@ -2592,14 +2617,14 @@
         (_c.amountFinal!=null && _c.amountFinal!=='') ? '確定金額 ' + _y(_c.amountFinal) : '',
         _c.returnDateFinal ? '確定返車日 ' + _c.returnDateFinal : ''
       ].filter(Boolean).join('・');
-      pitLog('予約カードを消去', { kind:'delete', cardId: _c.id,
+      pitLog(window.CFTrash && window.PIT_CLOUD ? '予約カードを消去（ゴミ箱へ・90日）' : '予約カードを消去', { kind:'delete', cardId: _c.id,
         label: (_c.resNo? '['+_c.resNo+'] ':'') + (_n? _n+' 様':'') + (_c.car? ' / '+_c.car:'') + '　' + _det });
     }
     if(idx>=0) state.cards.splice(idx,1);
     if (window.PitDB && PitDB.removed) PitDB.removed('cards', _c.id);   /* 🔴 v2.185.0 消す操作を通った印（これが無いと delete を送らない） */
     cvCloseDel();
     if(window.closeDetail) closeDetail(); else save();
-  };
+  }
 
   /* 🗑🗑 v2.47.0（ゆうた報告 2026-08-31「消去できない」）**消去が1度も通っていなかった。**
      ◎なにが起きていたか（v1.136.0 で2枚にした日から、全部のカードで）

@@ -2059,7 +2059,7 @@
        （前は返車済みの時だけ＝_archLog。預かり中に押した分はどこにも残らなかった） */
     var _cFrom = (group === 'call' && _aFrom == null) ? _archVal('call') : null;
     el.parentNode.querySelectorAll('.cv-chip').forEach(function(s){s.classList.remove('on');}); el.classList.add('on');
-    if(group==='call'){ _c.coverCall.done = (val==='done'); if(_c.coverCall.done && !_c.coverCall.at){ const d=new Date(); _c.coverCall.at = (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); _c.coverCall.staff = (window.pitFlowMe?pitFlowMe():''); } }   /* 🔴 v1.55.0 ここも同じ死んだ変数を見ていて、ずっと空だった */
+    if(group==='call'){ _c.coverCall.done = (val==='done'); if(_c.coverCall.done && !_c.coverCall.at){ const d=new Date(); _c.coverCall.at = (d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()); _c.coverCall.atMs = d.getTime(); /* 📅 v2.188.0（棚卸し A-08）年の分かる時刻も持つ。'M/D HH:MM' は今までの読み手のために残す */ _c.coverCall.staff = (window.pitFlowMe?pitFlowMe():''); } }   /* 🔴 v1.55.0 ここも同じ死んだ変数を見ていて、ずっと空だった */
     else if(group==='wash'){ _c.needWash = (val==='1'); }
     else if(group==='handover'){ _c.handover = val; }
     /* 🔴 v2.13.3 画面で灰色にするだけにしない。**書き込む所でも同じ物差しで止める。** */
@@ -2567,7 +2567,7 @@
   window.cvMovePhase = function(status){
     if(!_c) return; _c.status = status;
     if(!Array.isArray(_c.log)) _c.log=[];
-    const d=new Date(); _c.log.push({ text:(window.statusLabel?statusLabel(status):status)+' に移動', at:(d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()), by:(window.pitFlowMe?pitFlowMe():'') });
+    const d=new Date(); _c.log.push({ text:(window.statusLabel?statusLabel(status):status)+' に移動', at:(d.getMonth()+1)+'/'+d.getDate()+' '+pad(d.getHours())+':'+pad(d.getMinutes()), atMs:d.getTime(), by:(window.pitFlowMe?pitFlowMe():'') });
     save(); closeAllPop();
     renderCardView(_c, 'md-body-modal');
   };

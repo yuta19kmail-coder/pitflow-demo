@@ -1256,8 +1256,20 @@ function fleetDelete(id){
     return;
   }
   pitAsk('「' + f.v.name + '」を削除しますか？',
-         { danger:true, ok:'削除する', detail:'一度も貸していない車両なので、消しても記録は残りません。' }).then(function(yes){
+         { danger:true, ok:'削除する', detail:'一度も貸していない車両です。ゴミ箱に入ります（90日・戻すのはゆうただけ）。' }).then(function(yes){
     if (!yes) return;
+    /* 🗑 v2.189.2（棚卸し C-05）先にゴミ箱へ写す。写せなければ消さない（PF-0065）。前は記録も残らなかった＝操作ログにも1行 */
+    const col = isLoaner ? 'pitLoaners' : 'pitCompanyCars';
+    return (window.pitTrashCopy ? pitTrashCopy(col, f.v, (isLoaner ? '代車　' : '社用車　') + (f.v.name || ''), (isLoaner ? '代車' : '社用車') + 'の削除') : Promise.resolve(false))
+      .then(function(){ fleetDeleteNow(f, isLoaner, id); }, function(e){
+        console.error('[PitFlow] ゴミ箱に入れられませんでした（消していません）', e);
+        if (window.pitToast) pitToast('ゴミ箱に入れられなかったので、消していません（通信を確かめて、もう一度）', 'PF-0065');
+      });
+  });
+}
+function fleetDeleteNow(f, isLoaner, id){
+  {
+    try { if (window.pitLog) pitLog((isLoaner ? '代車' : '社用車') + 'を削除（ゴミ箱へ）', { kind: 'loaner', label: (f.v.name || '') + (f.v.plate ? '　' + f.v.plate : '') }); } catch (e) {}
     const arr = isLoaner ? state.loaners : state.companyCars;
     arr.splice(arr.indexOf(f.v), 1);
     /* 🔴 v2.185.0 消す操作を通った印（これが無いと db-pit.js は delete を送らない） */
@@ -1272,7 +1284,7 @@ function fleetDelete(id){
     if (_fleetEditId === id) _fleetEditId = null;
     if (window.PitDB) PitDB.save();
     renderFleet();
-  });
+  }
 }
 
 /* ===================================================================

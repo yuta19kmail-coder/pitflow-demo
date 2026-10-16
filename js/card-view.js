@@ -2575,15 +2575,23 @@
   /* 🗑 v2.189.0（棚卸し C-05・ゆうた決定 2026-10-16）**消去＝ゴミ箱へ。**ゴミ箱は CoreFlow の中に1つ・見る／戻すはゆうただけ・90日でサーバーが消す。
      先にクラウドの今の中身をゴミ箱へ写し、入ったのを確かめてから今までどおり消す（入らなければ消さない＝PF-0065）。
      ⚠ まだ一度もクラウドに上がっていないカード（作った直後）は、手元の中身を写す */
-  function cvTrashCopy(c){
-    var co = window.fb.company(), ref = co.collection('pitCards').doc(String(c.id));
-    var nm = ((window.pitCustName?pitCustName(c):c.customer) || '（名前なし）') + ' 様' + (c.car ? ' / ' + c.car : '') + (c.resNo ? '　[' + c.resNo + ']' : '');
+  /* 🗑 v2.189.2 PitFlow の「消す」の共通の入口（カードの消去・整備予定の取り下げ・代車／社用車の削除）。
+     クラウドの今の中身をゴミ箱へ写す（まだ上がっていない物は手元の中身）。写せたら resolve＝呼ぶ側が今までどおり消す。
+     ゴミ箱の部品が無い・見本（クラウドなし）の時は何もしないで resolve（今までどおり消せる） */
+  window.pitTrashReady = function(){ return !!(window.CFTrash && window.PIT_CLOUD && window.fb && window.fb.db && typeof window.fb.company === 'function'); };
+  window.pitTrashCopy = function(col, obj, name, reason){
+    if (!window.pitTrashReady()) return Promise.resolve(false);
+    var co = window.fb.company(), ref = co.collection(col).doc(String(obj.id));
     return ref.get({ source: 'server' }).then(function(s){
-      var data = s.exists ? s.data() : JSON.parse(JSON.stringify(c));
+      var data = s.exists ? s.data() : JSON.parse(JSON.stringify(obj));
       var b = window.fb.db.batch();
-      CFTrash.put(b, co, { app:'pitflow', col:'pitCards', ref: ref, data: data, name: nm, from: 'PitFlow', reason: 'カードの消去' });
-      return b.commit();
+      CFTrash.put(b, co, { app:'pitflow', col: col, ref: ref, data: data, name: name, from: 'PitFlow', reason: reason });
+      return b.commit().then(function(){ return true; });
     });
+  };
+  function cvTrashCopy(c){
+    var nm = ((window.pitCustName?pitCustName(c):c.customer) || '（名前なし）') + ' 様' + (c.car ? ' / ' + c.car : '') + (c.resNo ? '　[' + c.resNo + ']' : '');
+    return window.pitTrashCopy('pitCards', c, nm, 'カードの消去');
   }
   window.cvDeleteCard = function(){
     if(!_c) return;

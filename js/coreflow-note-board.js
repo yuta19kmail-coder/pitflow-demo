@@ -737,18 +737,19 @@
       return Promise.resolve();
     }
     var img = root.child(n.id + '.jpg'), pdf = root.child(n.id + '.pdf');
-    var del = function (ref) { return ref.delete().catch(function () {}); };
-    if (!a.file) return Promise.all([del(img), del(pdf)]).then(function () { n.imageURL = ''; n.pdfURL = ''; n.pdfName = ''; });
+    /* 🗑 2026-10-16（棚卸し C-05 で見つけた穴・A-16 と同じ考え）**外す・差し替える時に、ファイルの実物をその場で消さない。**
+       前は消していた＝下の決まり（添付を消すのはサーバーだけ・済から3か月）と食い違い、古い写しを持つ別の端末が
+       添付の行を書き戻すと「開けない添付」になった。置き場の名前は付箋ごとに決まっている（{付箋}.jpg／.pdf）＝
+       付け直せば同じ名前で上書き・残った物は済から3か月でサーバー（note-retention）が消す */
+    if (!a.file) { n.imageURL = ''; n.pdfURL = ''; n.pdfName = ''; return Promise.resolve(); }
     if (a.kind === 'pdf') {
       return pdf.put(a.file, { contentType: 'application/pdf' }).then(function () { return pdf.getDownloadURL(); }).then(function (url) {
-        var had = n.imageURL; n.pdfURL = url; n.pdfName = a.name || 'PDF'; n.imageURL = '';
-        return (had && /^https?:/.test(had)) ? del(img) : null;
+        n.pdfURL = url; n.pdfName = a.name || 'PDF'; n.imageURL = '';
       });
     }
     return resizeBlob(a.file, 1200, 0.85).then(function (b) { return img.put(b, { contentType: 'image/jpeg' }); })
       .then(function () { return img.getDownloadURL(); }).then(function (url) {
-        var had = n.pdfURL; n.imageURL = url; n.pdfURL = ''; n.pdfName = '';
-        return had ? del(pdf) : null;
+        n.imageURL = url; n.pdfURL = ''; n.pdfName = '';
       });
   }
   /* 🔴 2026-09-26 付箋を消す道が無くなったので、添付を消すのもサーバー（済から3か月）だけ */

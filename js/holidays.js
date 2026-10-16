@@ -53,8 +53,21 @@
     }
   }
 
-  const at = fromCache();          // キャッシュは即利用
-  if (Date.now() - at > MAX_AGE) refresh();   // 古ければ裏で更新
+  /* 📅 2026-10-16（棚卸し C-02）**取り方は CFDate.holidays 1本。**ここは今までの名前（Holidays.name／is／map）の入口だけ。
+     祝日の取り方が4通り（ここ・MHS・ダッシュボードのMHS・CoreBoard）＝控えも4つあったのを寄せた。
+     ⚠ CFDate（js/coreflow-date.js）をこれより前に読むこと。無い時だけ今までの取り方で動く */
+  if (window.CFDate && CFDate.holidays) {
+    var CH = CFDate.holidays, first = true;
+    H.name = function (s) { return CH.name(s); };
+    H.is = function (s) { return CH.is(s); };
+    Object.defineProperty(H, 'map', { get: function () { return CH.map; } });
+    Object.defineProperty(H, 'loaded', { get: function () { return CH.loaded; } });
+    CH.onLoad(function () { if (!first) rerender(); });   /* 控えから読めた分（すぐ返る）は描き直さない＝取り直せた時だけ */
+    first = false;
+  } else {
+    const at = fromCache();          // キャッシュは即利用
+    if (Date.now() - at > MAX_AGE) refresh();   // 古ければ裏で更新
+  }
 
   window.Holidays = H;
 })();

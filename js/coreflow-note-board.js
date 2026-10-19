@@ -302,7 +302,8 @@
   }
   function me() { return meList(call('me')); }
   function myId() { return me()[0] || null; }
-  function toast(m) { if (A && A.toast) call('toast', m); }
+  /* 🔢 2026-10-17 第2引数＝共通部品のエラー番号（CO-〇〇〇〇・台帳＝errcode-co.js）。番号がある時は共通のトースト（UI.toast）へ直に出す＝アプリの受け口が番号を落としても消えない（棚卸し C-10 第2回） */
+  function toast(m, c) { if (c && window.UI && window.UI.toast) { window.UI.toast(m, { code: c }); return; } if (A && A.toast) call('toast', m); }
   function ask(msg, opt) {
     if (A && A.ask) { var r = call('ask', msg, opt || {}); if (r && r.then) return r; return Promise.resolve(!!r); }
     if (w.UI && typeof w.UI.confirm === 'function') return w.UI.confirm(msg, opt || {}).then(function (y) { return !!y; });   /* 🔴 素の UI と書かない（StockFlow の const UI を指してしまう・2026-10-08） */
@@ -510,19 +511,19 @@
     var n = find(id); if (!n) return;
     Object.assign(n, patchDone(n, me()));
     return saveNote(n).then(function () { log('付箋「' + (n.title || '(無題)') + '」を済にしました'); render(); })
-      .catch(function (e) { console.error(e); toast('保存できませんでした'); });
+      .catch(function (e) { console.error(e); toast('保存できませんでした', 'CO-1001'); });
   }
   function markUndone(id) {
     var n = find(id); if (!n) return;
     Object.assign(n, patchUndone(n));
     return saveNote(n).then(function () { log('付箋「' + (n.title || '(無題)') + '」を未済に戻しました'); render(); })
-      .catch(function (e) { console.error(e); toast('保存できませんでした'); });
+      .catch(function (e) { console.error(e); toast('保存できませんでした', 'CO-1001'); });
   }
   function circulate(id) {
     var n = find(id); if (!n) return;
-    if (!canMutate()) { toast('閲覧専用では操作できません'); return; }
+    if (!canMutate()) { toast('閲覧専用では操作できません', 'CO-1002'); return; }
     var p = patchCirculate(n, me());
-    if (!p) { toast('自分が誰か分かりません（ログインし直してください）'); return; }
+    if (!p) { toast('自分が誰か分かりません（ログインし直してください）', 'CO-1004'); return; }
     /* 🔴 S-18 確認は「自分を1人足す／抜く」で渡す（info.ops）。アプリの保存が配列を丸ごと書かずに済むように */
     var asg0 = assignees(n), key0 = asg0.filter(function (u) { return isMine(u, me()); })[0] || myId();
     var had = (Array.isArray(n.doneByUids) ? n.doneByUids : []).indexOf(key0) >= 0;
@@ -531,19 +532,19 @@
     return saveNote(n, info).then(function () {
       log(p.status === 'done' ? '回覧付箋「' + (n.title || '(無題)') + '」が全員確認済みになりました' : '回覧付箋「' + (n.title || '(無題)') + '」を確認しました');
       render();
-    }).catch(function (e) { console.error(e); toast('保存できませんでした'); });
+    }).catch(function (e) { console.error(e); toast('保存できませんでした', 'CO-1001'); });
   }
   /* 🗂 アーカイブにする（2026-09-26「消去」の代わり）。戻せるので確認は出さない */
   function archiveNote(id) {
     var n = find(id); if (!n) return;
-    if (!canArchive(n)) { toast(foreign(n) ? 'よそのアプリの付箋は、そのアプリでアーカイブしてください' : 'この付箋はアーカイブできません'); return; }
+    if (!canArchive(n)) { toast(foreign(n) ? 'よそのアプリの付箋は、そのアプリでアーカイブしてください' : 'この付箋はアーカイブできません', foreign(n) ? 'CO-1005' : 'CO-1006'); return; }
     if (isArchived(n)) return;
     Object.assign(n, patchArchive(n, me()));
     return saveNote(n).then(function () {
       log('付箋「' + (n.title || bodyOf(n).slice(0, 20) || '(無題)') + '」をアーカイブしました');
       toast('アーカイブしました（「アーカイブ済付箋」から戻せます）');
       render();
-    }).catch(function (e) { console.error(e); toast('アーカイブできませんでした'); });
+    }).catch(function (e) { console.error(e); toast('アーカイブできませんでした', 'CO-1007'); });
   }
 
   /* 🗂 アーカイブ済付箋（済から3日たった物＋アーカイブにした物）。件数は出さない・上に検索BOX */
@@ -594,10 +595,10 @@
   function openEditor(id, opt) {
     if (!A) return;
     opt = opt || {};
-    if (!canMutate()) { toast('閲覧専用では作れません'); return; }
+    if (!canMutate()) { toast('閲覧専用では作れません', 'CO-1003'); return; }
     var n = id ? find(id) : null;
-    if (id && !n) { toast('付箋が見つかりません'); return; }
-    if (n && !canEdit(n)) { toast(foreign(n) ? 'よそのアプリの付箋は、そのアプリで直してください' : 'この付箋は直せません'); return; }
+    if (id && !n) { toast('付箋が見つかりません', 'CO-1008'); return; }
+    if (n && !canEdit(n)) { toast(foreign(n) ? 'よそのアプリの付箋は、そのアプリで直してください' : 'この付箋は直せません', foreign(n) ? 'CO-1010' : 'CO-1011'); return; }
     if (n && n.autoSource && A.onAutoEdit && call('onAutoEdit', n)) return;
     var targets = A.postTargets || null;
     ED = {
@@ -757,10 +758,10 @@
   function onFile(input) {
     var f = input && input.files && input.files[0]; if (!f || !ED) return;
     var isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
-    if (isPdf && !/pdf/.test((A.attach && A.attach.accept) || '')) { toast('画像ファイルを選んでください'); input.value = ''; return; }
-    if (f.size > MAX_FILE) { toast('ファイルが大きすぎます（10MBまで）'); input.value = ''; return; }
-    if (isPdf && !A.attach.upload && !storageRoot(ED.app)) { toast('PDF はいまは付けられません（ファイル置き場につながっていません）'); input.value = ''; return; }
-    if (!isPdf && !/^image\//.test(f.type)) { toast('画像ファイルを選んでください'); input.value = ''; return; }
+    if (isPdf && !/pdf/.test((A.attach && A.attach.accept) || '')) { toast('画像ファイルを選んでください', 'CO-1015'); input.value = ''; return; }
+    if (f.size > MAX_FILE) { toast('ファイルが大きすぎます（10MBまで）', 'CO-1016'); input.value = ''; return; }
+    if (isPdf && !A.attach.upload && !storageRoot(ED.app)) { toast('PDF はいまは付けられません（ファイル置き場につながっていません）', 'CO-1012'); input.value = ''; return; }
+    if (!isPdf && !/^image\//.test(f.type)) { toast('画像ファイルを選んでください', 'CO-1015'); input.value = ''; return; }
     ED.att = { changed: true, file: f, kind: isPdf ? 'pdf' : 'image', name: f.name || '', data: '', imageURL: '', pdfURL: '', pdfName: '' };
     if (isPdf) { edRender(); return; }
     var rd = new FileReader();
@@ -784,11 +785,11 @@
     if (!ED) return;
     edPull();
     var title = String(ED.title || '').trim(), body = String(ED.body || '').trim();
-    if (!title && !body) { toast('タイトルか本文のどちらかは入力してください'); return; }
+    if (!title && !body) { toast('タイトルか本文のどちらかは入力してください', 'CO-1017'); return; }
     var btn = d.getElementById('cfnb-ed-save'); if (btn) btn.disabled = true;
     var isNew = !ED.id;
     var n = isNew ? null : find(ED.id);
-    if (!isNew && !n) { toast('対象の付箋が見つかりません'); if (btn) btn.disabled = false; return; }
+    if (!isNew && !n) { toast('対象の付箋が見つかりません', 'CO-1009'); if (btn) btn.disabled = false; return; }
     if (isNew) {
       n = { id: (A.newId ? call('newId', ED.app) : null) || newId(), createdAt: Date.now(), authorUid: myId(), status: 'open',
             doneByUids: [], replies: [], imageURL: '', pdfURL: '', pdfName: '',
@@ -807,7 +808,7 @@
       log((isNew ? '付箋を追加しました：' : '付箋を更新しました：') + (title || body.slice(0, 20)));
       closeOverlay('cfnb-editor'); ED = null; render();
     }).catch(function (e) {
-      console.error('[note-board] save', e); toast((e && e.userMsg) || '保存できませんでした（添付を付けた時は、ファイルの大きさと通信を確かめてください）');
+      console.error('[note-board] save', e); toast((e && e.userMsg) || '保存できませんでした（添付を付けた時は、ファイルの大きさと通信を確かめてください）', 'CO-1013');
       if (btn) btn.disabled = false;
     });
   }
@@ -846,7 +847,7 @@
         formatText: function (t) { return fmt(t); },
         canWrite: function () { return canMutate(); },
         canDelete: function (r) { return !!(r && (isMine(r.uid, me()) || (A.canDeleteReply && call('canDeleteReply', r)))); },
-        save: function (n, done, info) { saveNote(n, info).then(function () { if (done) done(); }).catch(function (e) { console.error(e); toast('返信を保存できませんでした'); }); },
+        save: function (n, done, info) { saveNote(n, info).then(function () { if (done) done(); }).catch(function (e) { console.error(e); toast('返信を保存できませんでした', 'CO-1014'); }); },
         rerender: function () { render(); },
         toast: function (m) { toast(m); },
         ask: function (msg, cb) { ask(msg, { ok: '消す', danger: true }).then(function (y) { cb(!!y); }); }

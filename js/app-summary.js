@@ -495,8 +495,32 @@
   }
   window._pitflowSummaryBuild = build;   // 見張り・確認用（書き込みはしない）
 
+  /* 🏭 v2.193.0（棚卸し C-08 第4段 4b・ゆうた「変わった時＋1時間ごと」）**概況はサーバーが作る**（summary-server.js がこの build を借りる）。
+     前は開いている端末が10分ごとに書いていた＝誰も開かないと古い・開いた端末の版で揺れる。端末からは書かない */
+  var SERVER_OWNS = true;
+  /* 🛟 v2.193.1 保険：サーバーの印（appSummaries/pitflow の server.checkedAt）が40分より古い＝サーバーが止まっている時だけ、今までどおり端末が書く。
+     ＝サーバーが作れなくなっても、概況と通知のもとが止まらない（feed-facts.js も同じ見方を借りる） */
+  var SERVER_STALE_MS = 40 * 60 * 1000;
+  function serverFresh() {
+    try {
+      var cid = window.fb.currentCompanyId || window.COMPANY_ID || 'kobayashi_motors';
+      return window.fb.db.collection('companies').doc(cid).collection('appSummaries').doc(KEY).get().then(function (d) {
+        var sv = d && d.exists ? ((d.data() || {}).server || null) : null;
+        var t = sv ? (+sv.checkedAt || +sv.at || 0) : 0;
+        return !!t && (Date.now() - t) < SERVER_STALE_MS;
+      }).catch(function () { return true; });   /* 読めない時は書かない（サーバーに任せる） */
+    } catch (e) { return Promise.resolve(true); }
+  }
+  window._pitSummaryServerFresh = serverFresh;
   function publish() {
     if (!(window.fb && window.fb.db && window.fb.currentUser) || window.PIT_CLOUD !== true) return;
+    if (SERVER_OWNS) {
+      serverFresh().then(function (fresh) { if (!fresh) { console.warn('[appSummary:pitflow] サーバーの概況が古い＝この端末が書きます'); publishNow(); } });
+      return;
+    }
+    publishNow();
+  }
+  function publishNow() {
     try {
       var doc = build(); if (!doc) return;
       doc.updatedAt = window.fb.serverTimestamp ? window.fb.serverTimestamp() : firebase.firestore.FieldValue.serverTimestamp();

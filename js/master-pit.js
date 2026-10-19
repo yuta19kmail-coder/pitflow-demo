@@ -165,7 +165,7 @@
   w.pitMasterSave = function(print){
     if (!M || !admin()) return;
     var r = checks(M);
-    if (r.stop.length){ if (w.pitToast) w.pitToast('まだ保存できません（下の赤い所を直してください）'); return; }
+    if (r.stop.length){ if (w.pitToast) w.pitToast('まだ保存できません（下の赤い所を直してください）', 'PF-3083'); return; }
     var go = w.pitAsk ? w.pitAsk('この内容で保存しますか？', {
       ok:'保存してカードにする',
       detail: (MODE === 'fix' ? '・いまあるカードを、この内容で上書きします' : '・新しいカードを作ります')
@@ -196,7 +196,7 @@
       if (!t(M.returnDate)) M.returnDate = M.returnDateFinal;
       M.returnTbd = false; M.bayId = null; M.baySlot = null; M.testDrive = false;
       var r = checks(M);
-      if (r.stop.length){ render(); if (w.pitToast) w.pitToast('まだ保存できません（下の赤い所を直してください）'); return; }
+      if (r.stop.length){ render(); if (w.pitToast) w.pitToast('まだ保存できません（下の赤い所を直してください）', 'PF-3083'); return; }
       _save(false, true);
     });
   };

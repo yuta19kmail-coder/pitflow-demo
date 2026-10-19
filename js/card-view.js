@@ -2829,7 +2829,7 @@
       staff: staff, staff2: _s2.staff2, staff2Note: _s2.staff2Note, office: s.office||'', officeName: s.officeName||'',
       round: s.round||0, note: _note, today: _isoToday()
     }) : null;
-    if(!_r){ if(window.pitToast) pitToast('記録できませんでした（PF-記録）'); return; }
+    if(!_r){ if(window.pitToast) pitToast('記録できませんでした', 'PF-7001'); return; }   /* 🔢 2026-10-17 前は台帳に無い「PF-記録」を文に埋め込んでいた（棚卸し C-10 第3回） */
     _c.inspSchedule = _r.insp;
     if(window.pitShakenLog) pitShakenLog(_c, _r); else if(_r.log && window.logFlow) logFlow(_c, _r.log);  /* v2.186.0 フローと操作ログの両方（A-05） */
     save(); cvShClose(); renderCardView(_c,'md-body-modal');

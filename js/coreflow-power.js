@@ -133,15 +133,15 @@
       /* 「決めた人だけ更新」の名簿一覧（2026-08-29） */
       '.cf-power-find{width:calc(100% - 8px);margin:4px;padding:7px 10px;border-radius:9px;font-family:inherit;font-size:12.5px;',
       '  border:1px solid var(--border,#2a2f3a);background:var(--bg3,#1f232c);color:var(--text,#e7eaf0)}',
-      '.cf-power-find:focus{outline:none;border-color:var(--accent,#3b82f6)}',
+      '.cf-power-find:focus{outline:none;border-color:var(--cf-app,var(--accent,#3b82f6))}',
       '.cf-power-list{max-height:min(46vh,320px);overflow:auto;overscroll-behavior:contain}',
       '.cf-power-empty{padding:12px 11px;font-size:12px;color:var(--text3,#79839a);font-weight:700}',
       '.cf-power-av{width:22px;height:22px;flex:0 0 22px;border-radius:50%;overflow:hidden;display:inline-flex;',
       '  align-items:center;justify-content:center;font-size:10.5px;font-weight:800;color:#0e1117;background:#26314a}',
       '.cf-power-av img{width:100%;height:100%;object-fit:cover;display:block}',
       '.cf-power-note{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:100000;',
-      '  background:var(--bg2,#171a21);color:var(--text,#e7eaf0);border:1px solid var(--border2,var(--border,#2a2f3a));',
-      '  border-left:3px solid var(--red,#ef4444);border-radius:10px;padding:11px 16px;font-size:13px;font-weight:700;',
+      '  background:#15181e;color:#eef1f5;border:1px solid rgba(255,255,255,.10);',
+      '  border-left:4px solid var(--cf-app,#94a3b8);border-radius:10px;padding:11px 16px;font-size:13px;font-weight:700;',
       '  box-shadow:0 14px 40px rgba(0,0,0,.5);max-width:min(92vw,460px)}'
     ].join('');
     (d.head || d.documentElement).appendChild(s);
@@ -388,7 +388,15 @@
   }
 
   /* ---------- 合図の見張り ---------- */
-  var _seen = null, _watching = false;
+  var _seen = null, _watching = false, _unsub = null, _deniedFor = '';
+  /* 🔐 2026-10-17（棚卸し C-11）ログインしている人の uid（Firebase のログインそのものを見る）。
+     前は**ログインを待たずに**4秒ごとに張り直していて、ログイン前・名簿に無い人は読みに行っては断られ続けていた */
+  function authUid() {
+    try {
+      var a = (w.fb && w.fb.auth && w.fb.auth.currentUser) || (w.firebase && w.firebase.apps && w.firebase.apps.length && w.firebase.auth && w.firebase.auth().currentUser);
+      return (a && a.uid) || meUid();
+    } catch (e) { return meUid(); }
+  }
   var _reloaded = false;            /* ③ 1回の読み込みで読み直すのは1回まで */
   var _waitT = 0, _waitSince = 0;   /* ④ 打ち込み中は待つ（最大60秒） */
   var _WAIT_MAX = 60000, _WAIT_TICK = 2000;
@@ -434,10 +442,11 @@
   }
   function watch() {
     if (_watching) return;
+    var u = authUid(); if (!u || _deniedFor === u) return;     /* 🔐 ログイン前は読みに行かない・断られた人は張り直さない（ログインし直したらもう一度） */
     var c = cid(); if (!w.fb || !w.fb.db || !c) return;
     _watching = true;
     try {
-      w.fb.db.collection('companies').doc(c).collection('settings').doc('forceReload')
+      _unsub = w.fb.db.collection('companies').doc(c).collection('settings').doc('forceReload')
         .onSnapshot(function (snap) {
           var v = (snap && snap.exists) ? (snap.data() || {}) : null;
           var at = v ? String(v.at || '') : '';
@@ -456,7 +465,7 @@
           var 対象 = String(v.app || '');
           if (対象 !== 'all' && 対象 !== appKey()) return;
           読み直しを予約する();
-        }, function (e) { console.warn('[power] 強制更新の見張りを張れませんでした', e); _watching = false; });
+        }, function (e) { console.warn('[power] 強制更新の見張りを張れませんでした', e); _watching = false; _unsub = null; if (e && e.code === 'permission-denied') _deniedFor = u; });
     } catch (e) { _watching = false; }
   }
 
@@ -552,8 +561,21 @@
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', start);
   else start();
-  /* ログインが済んでから会社が決まるアプリがあるので、見張りは何度か試す */
-  setInterval(function () { if (!_watching) watch(); }, 4000);
+  /* 🔐 2026-10-17（棚卸し C-11）ログインの知らせで張る・ログアウトで外す（見やすさの部品 coreflow-a11y.js と同じ待ち方） */
+  function onAuth(user) {
+    if (!user) { if (_unsub) { try { _unsub(); } catch (e) {} } _unsub = null; _watching = false; _seen = null; _deniedFor = ''; return; }
+    if (_deniedFor && _deniedFor !== user.uid) _deniedFor = '';
+    watch();
+  }
+  (function hookAuth(n) {
+    try {
+      if (w.firebase && w.firebase.apps && w.firebase.apps.length && w.firebase.auth) { w.firebase.auth().onAuthStateChanged(onAuth); return; }
+      if (w.fb && w.fb.auth && typeof w.fb.auth.onAuthStateChanged === 'function') { w.fb.auth.onAuthStateChanged(onAuth); return; }
+    } catch (e) {}
+    if (n < 120) setTimeout(function () { hookAuth(n + 1); }, 500);      /* Firebase の準備を最大1分待つ */
+  })(0);
+  /* ログインが済んでから会社が決まるアプリがあるので、ログインしている時だけ何度か試す（ログイン前は何もしない） */
+  setInterval(function () { if (!_watching && authUid()) watch(); }, 4000);
 
   /* 見張り（テスト）から触る継ぎ目。ふつうは使わない。 */
   /* 🔴 外から呼べる入口。PitFlow の設定ページの「全端末を今すぐ更新する」がこれを呼ぶ。

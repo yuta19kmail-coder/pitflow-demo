@@ -55,7 +55,8 @@
   var _busy = false;
 
   function call(fn, dflt) { try { return fn(); } catch (e) { console.warn('[note-all]', e); return dflt; } }
-  function toast(m) { if (cfg.toast) call(function () { return cfg.toast(m); }); }
+  /* 🔢 2026-10-17 第2引数＝共通部品のエラー番号（CO-〇〇〇〇・台帳＝errcode-co.js）。番号がある時は共通のトースト（UI.toast）へ直に出す＝アプリの受け口が番号を落としても消えない（棚卸し C-10 第2回） */
+  function toast(m, c) { if (c && window.UI && window.UI.toast) { window.UI.toast(m, { code: c }); return; } if (cfg.toast) call(function () { return cfg.toast(m); }); }
   function fire()   { if (cfg.onChange) call(function () { return cfg.onChange(); }); }
   function others() { return ORDER.filter(function (a) { return a !== cfg.self && COLS[a]; }); }
 
@@ -117,7 +118,7 @@
         if (_on) fire();
       }, function (e) {
         console.warn('[note-all] ' + COLS[app] + ' の購読に失敗', e);
-        toast(LABEL[app] + 'の付箋を読めませんでした');
+        toast(LABEL[app] + 'の付箋を読めませんでした', 'CO-1022');
       });
       _unsubs.push(un);
     });
@@ -126,7 +127,7 @@
 
   function on() {
     if (_on) return;
-    if (!available()) { toast('この画面ではまとめて表示できません'); return; }
+    if (!available()) { toast('この画面ではまとめて表示できません', 'CO-1023'); return; }
     if (_busy) return;
     _busy = true;
     _on = true;
@@ -154,7 +155,7 @@
     var app = appOf(note);
     var col = COLS[app];
     var co = call(function () { return cfg.company(); }, null);
-    if (!col || !co) { toast('保存できませんでした'); return; }
+    if (!col || !co) { toast('保存できませんでした', 'CO-1001'); return; }
     var body = {};
     var FV = null; try { FV = w.firebase.firestore.FieldValue; } catch (e) {}
     var R = w.CFNoteBoard && w.CFNoteBoard.rules;
@@ -175,7 +176,7 @@
       .then(function () { if (done) done(); })
       .catch(function (e) {
         console.error('[note-all] ' + col + ' の保存に失敗', e);
-        toast(LABEL[app] + 'の付箋を保存できませんでした');
+        toast(LABEL[app] + 'の付箋を保存できませんでした', 'CO-1024');
       });
   }
 

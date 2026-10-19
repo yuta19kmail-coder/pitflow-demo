@@ -162,8 +162,15 @@
   window._pitFeedFactsBuild = build;   // 見張り・確認用（書き込みはしない）
 
   var lastJson = '', lastAt = 0;
-  function publish(force) {
+  /* 🏭 v2.193.0（棚卸し C-08 第4段 4b）**通知のもとはサーバーが作る**（summary-server.js がこの build を借りる）。端末からは書かない */
+  var SERVER_OWNS = true;
+  function publish(force, serverStale) {
     if (!(window.fb && window.fb.db && window.fb.currentUser && window.fb.currentMember && window.fb.currentMember.id) || window.PIT_CLOUD !== true) return;
+    /* 🛟 v2.193.1 サーバーが止まっている時（概況の server の印が40分より古い）だけ、今までどおり端末が書く */
+    if (SERVER_OWNS && !serverStale) {
+      if (typeof window._pitSummaryServerFresh === 'function') window._pitSummaryServerFresh().then(function (fresh) { if (!fresh) publish(force, true); });
+      return;
+    }
     try {
       var doc = build(); if (!doc) return;
       var json = JSON.stringify(doc), now = Date.now();

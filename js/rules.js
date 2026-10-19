@@ -364,6 +364,7 @@
      🔴 v1.110.0 第2引数＝エラー番号（PF-0412）。渡すと末尾に押せる札が付く。
         ⚠ 付けるのは「通らなかった」時だけ。成功のお知らせには付けない（errcode-pit.js の決めごと）。 */
   window.pitToast = function (msg, code) {
+    /* 🔔 2026-10-17 共通のトースト（ui-dialog.js UI.toast＝黒地＋アプリの色の線・エラーは押すまで残る）へ回す。下は UI が無い時の保険 */ if(window.UI&&window.UI.toast){window.UI.toast(msg,code?{code:code}:null);return;}
     let el = document.getElementById('pit-toast');
     if (!el) {
       el = document.createElement('div');

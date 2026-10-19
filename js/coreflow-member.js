@@ -23,7 +23,7 @@
    ========================================================= */
 (function (root) {
   'use strict';
-  var VERSION = '1.0.0';
+  var VERSION = '1.1.0';
   var APPS = ['carflow', 'stockflow', 'pitflow', 'mhs', 'coremembers', 'coretools', 'coretemplate', 'coreboard', 'corenote'];
   /* 画面（メンバー管理）がまだ保存されていない人に出している初めの値。🔴 画面と同じ（ポータル loadMembers がここを使う） */
   var DEFAULTS = {
@@ -68,10 +68,26 @@
     return appOf(m, app).role || (DEFAULTS[app] ? DEFAULTS[app](m).role : '');
   }
   function isAppAdmin(m, app) { var r = role(m, app); return !!r && (isMaster(m) || (ADMIN[app] || []).indexOf(r) >= 0); }
-  function name(m, kind) {
+  /* 名前。kind＝'full'（名簿の名前）・'surname'（苗字）・'call'（呼び名＝CoreMembers の dispName）・'first'（下の名前）。
+     core＝その人の CoreMembers の1件（あれば呼び名・下の名前に使う）。v1.1.0（C-03 第2段）
+     ⚠ 34個ある各アプリの名前の関数は、そのファイルを触る時にここへ寄せる（一度に書き換えない＝見た目が変わる所があるため） */
+  function name(m, kind, core) {
     var full = String((m && (m.name || m.gname)) || '').trim();
-    if (kind === 'surname') return full.split(/[\s　]+/)[0] || full;
+    var parts = full.split(/[\s　]+/).filter(Boolean);
+    if (kind === 'surname') return (core && String(core.lastName || '').trim()) || parts[0] || full;
+    if (kind === 'call') return (core && String(core.dispName || '').trim()) || parts[0] || full;
+    if (kind === 'first') return (core && String(core.firstName || '').trim()) || parts[1] || full;
     return full;
+  }
+  /* 本人↔名簿の橋（userPrefs/{uid}.memberId）。ルール（_pmLinked）が「この人はこの名簿の人」と分かる元。
+     入口で名簿の人が分かったら必ず書く（A-51）。書けなくても入室は止めない（今までの各アプリと同じ） */
+  function bridge(db, cid, user, m) {
+    try {
+      if (!db || !cid || !user || !user.uid || !m || !m.id) return Promise.resolve(false);
+      return db.collection('companies').doc(String(cid)).collection('userPrefs').doc(user.uid)
+        .set({ memberId: String(m.id), memberEmail: String(m.email || user.email || '').toLowerCase() }, { merge: true })
+        .then(function () { return true; }, function (e) { try { console.warn('[CFMember] 本人↔名簿の橋を書けませんでした', e && e.code); } catch (x) {} return false; });
+    } catch (e) { return Promise.resolve(false); }
   }
   function photo(m) {
     var p = m && (m.photo || m.photoURL || m.customPhotoURL);
@@ -79,7 +95,7 @@
   }
 
   var CFMember = { VERSION: VERSION, APPS: APPS, TOP: TOP, ADMIN: ADMIN,
-    appOf: appOf, canUse: canUse, role: role, isAppAdmin: isAppAdmin, isActive: isActive, isMaster: isMaster, canManageMembers: canManageMembers, name: name, photo: photo };
+    appOf: appOf, canUse: canUse, role: role, isAppAdmin: isAppAdmin, isActive: isActive, isMaster: isMaster, canManageMembers: canManageMembers, name: name, photo: photo, bridge: bridge };
   if (typeof module === 'object' && module.exports) module.exports = CFMember;
   if (root) root.CFMember = CFMember;
 })(typeof window !== 'undefined' ? window : null);

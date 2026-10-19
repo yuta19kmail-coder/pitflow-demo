@@ -111,8 +111,11 @@
       reloading = true;
       var t = document.createElement('div');
       t.textContent = '🆕 最新版に更新します…';
-      t.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:2147483647;'
-        + 'background:#7c3aed;color:#fff;padding:10px 18px;border-radius:999px;'
+      /* 🎨 2026-10-17 前は紫（StockFlow の色）の決め打ちで、全アプリで紫が出ていた（ゆうた指摘・棚卸し C-10）。
+         いまは共通のトースト（ui-dialog.js UI.toast）と同じ＝黒地＋左にアプリの色（--cf-app）の縦線 */
+      t.style.cssText = 'position:fixed;left:50%;bottom:var(--cf-toast-bottom,24px);transform:translateX(-50%);z-index:2147483647;'
+        + 'background:#15181e;color:#eef1f5;padding:9px 14px 9px 13px;border-radius:10px;'
+        + 'border:1px solid rgba(255,255,255,.10);border-left:4px solid var(--cf-app,#94a3b8);'
         + 'font:600 14px -apple-system,BlinkMacSystemFont,"Segoe UI","Yu Gothic Medium","Meiryo",sans-serif;'
         + 'box-shadow:0 6px 20px rgba(0,0,0,.28)';
       (document.body || document.documentElement).appendChild(t);
@@ -148,4 +151,53 @@
       if (pending && (Date.now() - lastActive) > IDLE_MS) tryReload(); // 60秒アイドルで更新
     }, TICK_MS);
   } catch (e) { /* 自動更新が失敗しても本体には一切影響させない */ }
+})();
+
+/* ============================================================
+   🔴 2026-10-18 「戻る」で復元したページのデータベースの線を確かめる（全アプリ共通）
+   ------------------------------------------------------------
+   スマホでアプリから別のアプリを同じタブで開いて「戻る」と、ブラウザは止めておいた前のページを
+   そのまま復元する（bfcache）。その間に端末の保存場所の線が切られていると、Firestore は
+   「The client has already been terminated.」で以後の書き込みを全部断る（画面は普通に見える）。
+   調査の記録：FlowGo（iPhone）10/18 06:38・08:31＝通知の「済」も保存されなかった／玄関（PC）10/17 22:51。
+   ① 復元で戻ったら、データベースに軽く1回聞く。死んでいたら読み込み直す（生きていれば何もしない＝入力中の物を消さない）
+   ② 死んだ線のエラーに当たったら、1回だけ読み込み直して「もう一度操作してください」と出す（20秒は繰り返さない）
+   ⚠ FlowGo は自分の m.js で同じことをする（ここは読まない）。失敗しても本体には一切影響させない。
+   ============================================================ */
+(function () {
+  try {
+    var KEY = 'cf_revive_at', MSG = 'cf_revive_msg', GAP_MS = 20000;
+    function dead(m) { return /client has already been terminated|AsyncQueue is already failed/i.test(String(m || '')); }
+    function revive(why) {
+      try {
+        if (Date.now() - (+sessionStorage.getItem(KEY) || 0) < GAP_MS) return;   /* 読み込み直しの繰り返しを止める */
+        sessionStorage.setItem(KEY, String(Date.now()));
+        sessionStorage.setItem(MSG, '1');
+      } catch (e) {}
+      try { console.warn('[auto-update] データベースの線が切れていたので読み込み直します', why); } catch (e) {}
+      location.reload();
+    }
+    function probe() {
+      try {
+        var fbase = window.firebase;
+        if (!fbase || !fbase.apps || !fbase.apps.length || !fbase.firestore) return;
+        var p = fbase.firestore().collection('_cf').doc('_alive').get({ source: 'cache' });
+        if (p && p.catch) p.catch(function (e) { if (dead(e && (e.message || e))) revive('bfcache'); });
+      } catch (e) { if (dead(e && (e.message || e))) revive('bfcache'); }
+    }
+    window.addEventListener('pageshow', function (e) { if (e && e.persisted) probe(); });
+    window.addEventListener('error', function (e) { if (dead((e && e.message) || (e && e.error && e.error.message))) revive('error'); });
+    window.addEventListener('unhandledrejection', function (e) { var r = e && e.reason; if (dead(r && (r.message || r))) revive('rejection'); });
+    /* 読み込み直した後に1回だけ知らせる（押した操作は保存されていないので、もう一度押してもらう） */
+    var told = false;
+    function tell() {
+      if (told) return; told = true;
+      try { if (sessionStorage.getItem(MSG) !== '1') return; sessionStorage.removeItem(MSG); } catch (e) { return; }
+      setTimeout(function () {
+        try { if (window.UI && window.UI.toast) window.UI.toast('接続を立て直しました。もう一度操作してください'); } catch (e) {}
+      }, 1500);
+    }
+    if (document.readyState === 'complete') tell(); else window.addEventListener('load', tell);
+    window.__CF_REVIVE = { dead: dead, gapMs: GAP_MS };   /* 見張り用。画面の動きには関係しない */
+  } catch (e) { /* 失敗しても本体には一切影響させない */ }
 })();

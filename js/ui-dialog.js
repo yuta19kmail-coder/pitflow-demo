@@ -43,16 +43,16 @@
       '#uid-card input[type=text],#uid-card textarea{width:100%;background:var(--bg3,#1d242e);border:1px solid var(--border,rgba(255,255,255,.12));',
       '          color:var(--text,#e6edf3);border-radius:9px;padding:9px 11px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box}',
       '#uid-card textarea{min-height:96px;resize:vertical;line-height:1.6}',
-      '#uid-card input[type=text]:focus,#uid-card textarea:focus{border-color:var(--uid-acc,var(--acc,#94a3b8))}',
+      '#uid-card input[type=text]:focus,#uid-card textarea:focus{border-color:var(--cf-app,var(--uid-acc,var(--acc,#94a3b8)))}',
       '#uid-card .uid-b{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}',
       '#uid-card .uid-b button{border:1px solid var(--border,rgba(255,255,255,.14));background:var(--bg3,#1d242e);color:var(--text,#e6edf3);',
       '          border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit}',
-      '#uid-card .uid-b button:hover{border-color:var(--uid-acc,var(--acc,#94a3b8))}',
+      '#uid-card .uid-b button:hover{border-color:var(--cf-app,var(--uid-acc,var(--acc,#94a3b8)))}',
       /* 🎨 2026-09-24 決定ボタンはアプリ色（ゆうた指定）。各アプリの index.html で --uid-acc／--uid-accd を1行指定する。
          --acc／--accd は他の共通部品も使うので、ダイアログ専用の --uid-* を先に見る。
          昔は無い時の色が CoreNote のピンク決め打ちで、6アプリがピンクになっていた。いまは無い時＝中立のグレー。
          --uid-pri-fg＝決定ボタンの文字色（ポータルの白寄りグレーは濃い文字にする） */
-      '#uid-card .uid-b button.pri{background:var(--uid-accd,var(--accd,#475569));border-color:var(--uid-accd,var(--accd,#475569));color:var(--uid-pri-fg,#fff)}',
+      '#uid-card .uid-b button.pri{background:var(--cf-app-d,var(--uid-accd,var(--accd,#475569)));border-color:var(--cf-app-d,var(--uid-accd,var(--accd,#475569)));color:var(--cf-app-fg,var(--uid-pri-fg,#fff))}',
       '#uid-card .uid-b button.pri:hover{filter:brightness(1.12)}',
       '#uid-card .uid-b button.danger{background:#dc2626;border-color:#dc2626;color:#fff}',
       '#uid-card .uid-b button.danger:hover{filter:brightness(1.12)}',
@@ -140,8 +140,89 @@
     ev.stopPropagation();
   },true);
 
+  /* 🔔 2026-10-17 共通のトースト（棚卸し C-10・ゆうた決定）
+     前は約20通り（アプリの色で塗る／黒っぽい／自動更新だけ紫）で、エラーも2〜3秒で消えて番号を控えられなかった。
+     🔴 見た目＝**黒地＋左にアプリの色の縦線**（色は画面の --cf-app）。エラー＝**赤い線＋番号を右下に＋押すまで残る**。
+     使い方：UI.toast('保存しました')
+             UI.toast('保存できませんでした', {code:'PF-0002'})   … code があればエラー（押すまで残る・番号は押すとコピー）
+             UI.toast('止めました', {err:true})                  … 番号なしのエラー（同じく押すまで残る）
+             UI.toast('消しました', {action:'元に戻す', onAction:fn, ms:5000})
+     位置は画面の --cf-toast-bottom（下のバーがあるアプリは上げる）。ふつうの知らせは1つずつ入れ替わり、エラーは最大3つ積む。 */
+  var TBOX=null, TNORM=null, TNORM_T=0;
+  function tcss(){
+    if(document.getElementById('uid-toast-style'))return;
+    var st=document.createElement('style'); st.id='uid-toast-style';
+    st.textContent=[
+      '#uid-toasts{position:fixed;left:50%;bottom:var(--cf-toast-bottom,24px);transform:translateX(-50%);z-index:99500;',
+      '  display:flex;flex-direction:column-reverse;align-items:center;gap:8px;pointer-events:none;width:max-content;max-width:min(92vw,520px)}',
+      '.uid-t{pointer-events:auto;box-sizing:border-box;max-width:100%;background:#15181e;color:#eef1f5;',
+      '  border:1px solid rgba(255,255,255,.10);border-left:4px solid var(--cf-app,#94a3b8);border-radius:10px;',
+      '  padding:9px 14px 9px 13px;font-size:13px;font-weight:600;line-height:1.55;box-shadow:0 10px 30px rgba(0,0,0,.38);',
+      '  display:flex;align-items:flex-start;gap:10px;font-family:inherit;animation:uid-tin .16s ease-out;cursor:default}',
+      '@keyframes uid-tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}',
+      '.uid-t.out{opacity:0;transform:translateY(6px);transition:opacity .18s,transform .18s}',
+      '.uid-t .uid-tm{flex:1 1 auto;min-width:0;white-space:pre-wrap;word-break:break-word;display:flex;flex-direction:column}',
+      '.uid-t .uid-tm .cf-ec{align-self:flex-end;margin-top:2px;color:#9aa4b2}',
+      '.uid-t.err{border-left-color:#ef4444;cursor:pointer}',
+      '.uid-t .uid-tx{flex:0 0 auto;border:0;background:transparent;color:#9aa4b2;font-size:15px;line-height:1;padding:2px 0 0;cursor:pointer;font-family:inherit}',
+      '.uid-t .uid-tx:hover{color:#fff}',
+      '.uid-t .uid-ta{flex:0 0 auto;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;border-radius:7px;',
+      '  padding:3px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;align-self:center}',
+      '.uid-t .uid-ta:hover{border-color:var(--cf-app,#94a3b8)}'
+    ].join('');
+    (document.head||document.documentElement).appendChild(st);
+  }
+  function tbox(){
+    tcss();
+    if(TBOX&&document.body&&document.body.contains(TBOX))return TBOX;
+    TBOX=document.createElement('div'); TBOX.id='uid-toasts'; TBOX.setAttribute('aria-live','polite');
+    (document.body||document.documentElement).appendChild(TBOX);
+    return TBOX;
+  }
+  function tdrop(el){
+    if(!el||!el.parentNode)return;
+    el.classList.add('out');
+    setTimeout(function(){ try{ if(el.parentNode)el.parentNode.removeChild(el); }catch(e){} },190);
+    if(el===TNORM)TNORM=null;
+  }
+  function toast(msg,opt){
+    if(typeof opt==='string')opt={code:opt};
+    opt=opt||{};
+    var box=tbox(), isErr=!!(opt.code||opt.err);
+    var el=document.createElement('div'); el.className='uid-t'+(isErr?' err':'');
+    el.setAttribute('role',isErr?'alert':'status');
+    var m=document.createElement('div'); m.className='uid-tm';
+    var tx=document.createElement('span'); tx.textContent=String(msg==null?'':msg); m.appendChild(tx);
+    if(opt.code){
+      var ec;
+      if(window.CFErr&&window.CFErr.el)ec=window.CFErr.el(opt.code);
+      else{ ec=document.createElement('span'); ec.className='cf-ec'; ec.setAttribute('data-ec',opt.code); ec.setAttribute('role','button'); ec.title='押すと番号をコピーします'; ec.textContent='error：'+opt.code; }
+      m.appendChild(ec);
+    }
+    el.appendChild(m);
+    if(opt.action){
+      var a=document.createElement('button'); a.type='button'; a.className='uid-ta'; a.textContent=opt.action;
+      a.onclick=function(ev){ ev.stopPropagation(); tdrop(el); try{ if(opt.onAction)opt.onAction(); }catch(e){} };
+      el.appendChild(a);
+    }
+    if(isErr){
+      var x=document.createElement('button'); x.type='button'; x.className='uid-tx'; x.setAttribute('aria-label','閉じる'); x.textContent='×';
+      el.appendChild(x);
+      el.addEventListener('click',function(){ tdrop(el); });   /* 番号を押した時はコピーだけ（coreflow-errcode.js が先に受けて止める） */
+      var errs=box.querySelectorAll('.uid-t.err:not(.out)'); if(errs.length>=3)tdrop(errs[0]);
+      box.appendChild(el);
+    } else {
+      if(TNORM)tdrop(TNORM);
+      clearTimeout(TNORM_T);
+      TNORM=el; box.appendChild(el);
+      TNORM_T=setTimeout(function(){ tdrop(el); }, opt.ms>0?opt.ms:2400);
+    }
+    return { el:el, close:function(){ tdrop(el); } };
+  }
+
   window.UI={
     isOpen:function(){ return !!CUR; },
+    toast:toast,
     prompt:function(title,value,opt){ opt=opt||{}; opt.kind='prompt'; opt.title=title; opt.value=(value==null?'':value); return open(opt); },
     confirm:function(title,opt){ opt=opt||{}; opt.kind='confirm'; opt.title=title; return open(opt); },
     alert:function(title,opt){ opt=opt||{}; opt.kind='alert'; opt.title=title; opt.cancel=false; opt.ok=opt.ok||'OK'; return open(opt); },

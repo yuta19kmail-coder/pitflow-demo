@@ -23,6 +23,7 @@
   var _tt;
   /* 🔴 v1.110.0 第2引数＝エラー番号（PF-0412）。pitToast と同じ決めごと。 */
   function showToast(msg, code) {
+    /* 🔔 2026-10-17 共通のトースト（ui-dialog.js UI.toast＝黒地＋アプリの色の線・エラーは押すまで残る）へ回す。下は UI が無い時の保険 */ if(window.UI&&window.UI.toast){window.UI.toast(msg,code?{code:code}:null);return;}
     var t = document.getElementById('pf-toast');
     if (!t) { t = document.createElement('div'); t.id = 'pf-toast'; t.className = 'pf-toast'; document.body.appendChild(t); }
     t.textContent = msg;

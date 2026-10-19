@@ -65,7 +65,8 @@
 
   function getNote(id) { return cfg.getNote ? call(function () { return cfg.getNote(id); }) : null; }
   function me()        { return cfg.getMe   ? call(function () { return cfg.getMe(); })   : null; }
-  function toast(m, c) { if (cfg.toast) call(function () { return cfg.toast(m, c); }); }
+  /* 🔢 2026-10-17 第2引数＝共通部品のエラー番号（CO-〇〇〇〇・台帳＝errcode-co.js）。番号がある時は共通のトースト（UI.toast）へ直に出す＝アプリの受け口が番号を落としても消えない（棚卸し C-10 第2回） */
+  function toast(m, c) { if (c && window.UI && window.UI.toast) { window.UI.toast(m, { code: c }); return; } if (cfg.toast) call(function () { return cfg.toast(m, c); }); }
   function rerender()  { if (cfg.rerender) call(function () { return cfg.rerender(); }); }
   function fmt(t)      { return cfg.formatText ? cfg.formatText(t || '') : esc(t || ''); }
   function avatar(uid, px) {
@@ -85,7 +86,7 @@
   function save(note, done, info) {
     if (!cfg.save) { if (done) done(); return; }
     try { cfg.save(note, function () { if (done) done(); }, info || null); }
-    catch (e) { console.error('[note-reply] 保存に失敗', e); toast('返信を保存できませんでした'); }
+    catch (e) { console.error('[note-reply] 保存に失敗', e); toast('返信を保存できませんでした', 'CO-1014'); }
   }
 
   function newReplyId() {
@@ -190,10 +191,10 @@
     var el = box(noteId, ev);
     var ta = el && el.querySelector('.cfr-ta');
     var text = ((ta && ta.value) || '').replace(/\s+$/, '');
-    if (!text.trim()) { toast('返信を入力してください'); if (ta) ta.focus(); return; }
+    if (!text.trim()) { toast('返信を入力してください', 'CO-1020'); if (ta) ta.focus(); return; }
     var note = getNote(noteId);
-    if (!note) { toast('この付箋が見つかりませんでした'); return; }
-    if (!canWrite(note)) { toast('この付箋には返信できません'); return; }
+    if (!note) { toast('この付箋が見つかりませんでした', 'CO-1018'); return; }
+    if (!canWrite(note)) { toast('この付箋には返信できません', 'CO-1019'); return; }
     if (!Array.isArray(note.replies)) note.replies = [];
     var rep = { id: newReplyId(), uid: me() || null, text: text.slice(0, MAX), at: Date.now() };
     note.replies.push(rep);
@@ -216,7 +217,7 @@
     var r = null, i;
     for (i = 0; i < note.replies.length; i++) { if (note.replies[i] && note.replies[i].id === replyId) { r = note.replies[i]; break; } }
     if (!r) return;
-    if (!canDelete(r)) { toast('自分の返信だけ消せます'); return; }
+    if (!canDelete(r)) { toast('自分の返信だけ消せます', 'CO-1021'); return; }
     var go = function (yes) {
       if (!yes) return;
       note.replies = note.replies.filter(function (x) { return x && x.id !== replyId; });

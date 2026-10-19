@@ -157,7 +157,7 @@
     + '.cf-a11y button{display:inline-flex;align-items:center;gap:5px;padding:0 10px;margin:0;border:0;border-right:1px solid var(--border2,var(--border,#333650));border-radius:0;background:none;color:var(--text2,var(--t2,#9fa8c7));font-weight:700;font-size:13px;line-height:1;font-family:inherit;cursor:pointer;white-space:nowrap;height:auto;min-width:0;box-shadow:none}'
     + '.cf-a11y button:last-child{border-right:0}'
     + '.cf-a11y button:hover{background:var(--bg4,rgba(127,127,127,.18));color:var(--text,var(--t1,#e8eaf6))}'
-    + '.cf-a11y button[aria-pressed="true"]{background:var(--brand,var(--acc,var(--accent,#26a269)));color:#fff}'
+    + '.cf-a11y button[aria-pressed="true"]{background:var(--cf-app,var(--brand,var(--acc,var(--accent,#26a269))));color:#fff}'
     + '.cf-a11y .dot{width:8px;height:8px;border-radius:50%;border:1.5px solid currentColor;flex:none;box-sizing:border-box}'
     + '.cf-a11y button[aria-pressed="true"] .dot{background:#fff;border-color:#fff}'
     + '@media (max-width:759px){.cf-a11y{display:none!important}}'
@@ -174,7 +174,7 @@
     + ':root:root[data-cf-kukkiri="light"]{--text:#05080c!important;--text1:#05080c!important;--text2:#111821!important;--text3:#111821!important;--t1:#05080c!important;--t2:#111821!important;--t3:#111821!important;--border:#8e99ab!important;--border2:#76839a!important}'
     /* ③ 拡大鏡 */
     + '#cf-mag{box-sizing:border-box;position:fixed;left:0;top:0;width:' + LENS_W + 'px;height:' + LENS_H + 'px;z-index:2147483646;pointer-events:none;'
-    + 'border:3px solid var(--brand,var(--acc,var(--accent,#26a269)));border-radius:12px;overflow:hidden;background:var(--bg,#0f1117);'
+    + 'border:3px solid var(--cf-app,var(--brand,var(--acc,var(--accent,#26a269))));border-radius:12px;overflow:hidden;background:var(--bg,#0f1117);'
     + 'box-shadow:0 10px 34px rgba(0,0,0,.55),0 0 0 1px rgba(0,0,0,.4);display:none}'
     + '#cf-mag iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none;background:transparent}'
     + '#cf-mag .cf-mag-tip{position:absolute;right:6px;top:5px;font-weight:700;font-size:11px;line-height:1;font-family:sans-serif;color:#fff;background:rgba(0,0,0,.6);padding:3px 6px;border-radius:5px}'

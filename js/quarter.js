@@ -1449,7 +1449,7 @@
       }).catch(function () { U.busy = ''; if (w.renderInspect) renderInspect(); });
     }).catch(function (e) {
       U.busy = '';
-      if (w.pitToast) pitToast('残してある結果を読めませんでした：' + s(e && e.message ? e.message : e));
+      if (w.pitToast) pitToast('残してある結果を読めませんでした：' + s(e && e.message ? e.message : e), 'PF-0066');
       if (w.renderInspect) renderInspect();
     });
   };
@@ -1493,7 +1493,7 @@
       if (w.renderInspect) renderInspect();
     }).catch(function (e) {
       U.busy = ''; U.listBusy = false; if (U.list == null) U.list = [];
-      if (w.pitToast) pitToast('クォーターを組み直せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.pitToast) pitToast('クォーターを組み直せませんでした：' + s(e && e.message ? e.message : e), 'PF-0067');
       if (w.renderInspect) renderInspect();
     });
   };
@@ -1541,7 +1541,7 @@
       if (w.renderInspect) renderInspect();
     }).catch(function (e) {
       U.busy = '';
-      if (w.pitToast) pitToast('クォーターを組み直せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.pitToast) pitToast('クォーターを組み直せませんでした：' + s(e && e.message ? e.message : e), 'PF-0067');
       if (w.renderInspect) renderInspect();
     });
     return true;
@@ -1577,7 +1577,7 @@
     if (el) el.classList.remove('over');
     var dt = ev && ev.dataTransfer;
     var f = (dt && dt.files && dt.files[0]) || null;
-    if (!f){ if (w.pitToast) pitToast('ファイルが受け取れませんでした'); return; }
+    if (!f){ if (w.pitToast) pitToast('ファイルが受け取れませんでした', 'PF-0068'); return; }
     if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'){
       var U0 = Q();
       U0.err = '「' + f.name + '」は PDF ではありません。整備ソフトから出した売上チェックリストPDFを入れてください。';
@@ -1776,7 +1776,7 @@
       Q().marks = w._pitQMarks || [];
       if (w.renderInspect) renderInspect();
     }).catch(function (e) {
-      if (w.pitToast) pitToast(s(e && e.message ? e.message : e));
+      if (w.pitToast) pitToast(s(e && e.message ? e.message : e), 'PF-0069');
     });
   };
 
@@ -1843,11 +1843,11 @@
                + '円／直す ' + d.直す件数 + '件' });
       });
       /* 🔴 残せなかったものがあれば黙らない（「残った」と思わせない） */
-      if (bad.length && w.pitToast) pitToast('結果を残せなかったQがあります：' + s(bad[0].エラー));
+      if (bad.length && w.pitToast) pitToast('結果を残せなかったQがあります：' + s(bad[0].エラー), 'PF-0070');
       if (w.renderInspect) renderInspect();
     }).catch(function (e) {
       U.savedAt = '';
-      if (w.pitToast) pitToast('結果は残せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.pitToast) pitToast('結果は残せませんでした：' + s(e && e.message ? e.message : e), 'PF-0071');
       if (w.renderInspect) renderInspect();
     });
   }
@@ -1921,7 +1921,7 @@
       if (w.renderInspect) renderInspect();
     }).catch(function (e) {
       U.savedAt = '';
-      if (w.pitToast) pitToast('結果は残せませんでした：' + s(e && e.message ? e.message : e));
+      if (w.pitToast) pitToast('結果は残せませんでした：' + s(e && e.message ? e.message : e), 'PF-0071');
     });
   }
 })(window);

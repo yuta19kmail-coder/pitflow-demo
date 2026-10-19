@@ -21,7 +21,7 @@
   const ME_KEY = 'pitflow_bn_me';
   const DEF_LABELS = { red: '緊急', orange: '今日中', yellow: '今週中', green: '連絡', blue: '余裕' };
 
-  function _toast(msg) { if (window.pitToast) pitToast(msg); }
+  function _toast(msg, code) { if (window.pitToast) pitToast(msg, code); }   /* 🔢 2026-10-17 第2引数＝エラー番号（前は文に「（PF-0002）」を埋め込んでいて押せなかった） */
   /* 🔴 **書く用**＝PitFlow 自身の付箋の配列。ここに よその付箋を混ぜないこと（push/splice の相手） */
   function _notes() { if (!Array.isArray(state.boardNotes)) state.boardNotes = []; return state.boardNotes; }
   /* 🔴 **読む用**＝画面に出す全部（まとめて表示がONなら よそのアプリの付箋も混ざる） */
@@ -94,7 +94,7 @@
          ⚠ 古い写し（applyOps が無い）は atomicPatch を merge で書く（さらに無ければ上の PitDB.save＝丸ごと） */
       const p = R.applyOps ? R.applyOps(ref, note, info, FV, fb.db, extra)
                            : ref.set(Object.assign(R.atomicPatch(note, info, FV), extra), { merge: true });
-      Promise.resolve(p).catch(function (e) { console.error('[board-notes] 付箋の保存に失敗', e); _toast('付箋を保存できませんでした（PF-0002）'); });
+      Promise.resolve(p).catch(function (e) { console.error('[board-notes] 付箋の保存に失敗', e); _toast('付箋を保存できませんでした', 'PF-0002'); });
       PitDB.sentFields('boardNotes', note, ((info && info.fields) || []).concat(Object.keys(info.ops || {})));
       PitDB.save();                                  /* ほかに直した欄があれば、それだけ送る */
       return true;

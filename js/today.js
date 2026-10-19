@@ -376,10 +376,17 @@ window.pitTodaySaveDt = function(id, isReturn){
     c.returnDate = d; c.returnTime = t;
   }
   else {
-    /* 📝 v2.183.0 入庫の日時変更は前は**どこにも残らなかった** */
-    const _in0 = window.pitDtText ? pitDtText(c.reserveDate, c.reserveTime) : '';
-    c.reserveDate = d; c.reserveTime = t; if (d) c.intakeTbd = false;
-    if (window.pitLogDateChange) pitLogDateChange(c, '入庫の予定', _in0, pitDtText(c.reserveDate, c.reserveTime), { kind: 'in', note: '当日ビューの日時変更' });
+    /* 📝 v2.183.0 入庫の日時変更は前は**どこにも残らなかった**
+       🔗 2026-10-17（C-07 第2段）書く中身と言葉は pit-share.js の pitReserveDatePlan 1本（MHS・見る所3つも借りる） */
+    const pl = window.pitReserveDatePlan ? pitReserveDatePlan(c, d, t) : null;
+    if (pl && pl.ok){
+      Object.keys(pl.patch).forEach(function(k){ c[k] = pl.patch[k]; });
+      if (pl.flow && window.logFlow) logFlow(c, pl.flow);
+      if (pl.audit && window.pitLog) pitLog(pl.audit.action, { cardId: c.id, kind: pl.audit.kind,
+        label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + pl.audit.detail });
+    } else {
+      c.reserveDate = d; c.reserveTime = t; if (d) c.intakeTbd = false;
+    }
   }
   if (window.PitDB) PitDB.save();
   pitTodayActionClose();
@@ -402,48 +409,26 @@ window.pitTodayCancel = function(id, isReturn){
      ⚠ 30日たって自動でアーカイブされる時には、一緒に消える（そこまで来たらもう戻らない）。
      ⚠ v1.154.0 はここで自動で外していた。**わざと戻した。** */
   const _lo = (!isReturn && window.pitLoanerPlanOf) ? pitLoanerPlanOf(c.id) : { n: 0, text: '' };
-  const ask = isReturn
-    ? pitAsk('返車予定をキャンセルして「返車・未定」へ戻しますか？', { danger:true, ok:'戻す' })
-    : pitAsk('この入庫予約をキャンセルしますか？', { danger:true, ok:'キャンセルする',
-              detail:'「未入庫」リストに残り、1ヶ月後に自動でアーカイブされます。'
-                     + (_lo.n ? '\n※ 代車の予定（' + _lo.text + '）は**そのまま残ります**。'
-                              + '外すときは未入庫の一覧の「代車予定クリア」から' : '') });
-  ask.then(function(yes){ if (yes) _go(); });
+  /* 🔗 2026-10-17（棚卸し C-07）何を書くかは pit-share.js の計画（pitReturnCancelPlan／pitNoShowCancelPlan）1本。
+     MHS・FlowDesk 系も同じ計画を借りる＝PitFlow がマスター（ゆうた決定）。ここは「聞く・当てる・残す」だけ */
+  const _pl = isReturn
+    ? (window.pitReturnCancelPlan ? pitReturnCancelPlan(c) : null)
+    : (window.pitNoShowCancelPlan ? pitNoShowCancelPlan(c, { today: ymd(new Date()), loaner: _lo }) : null);
+  if (!_pl || !_pl.ok){ if (window.pitToast) pitToast((_pl && _pl.why) || 'キャンセルの決めごとが読めませんでした（画面を開き直してください）', 'PF-1091'); return; }
+  pitAsk(_pl.ask.msg, { danger:true, ok:_pl.ask.ok, detail:_pl.ask.detail || undefined })
+    .then(function(yes){ if (yes) _go(); });
 
   function _go(){
-  if (isReturn){
-    /* 🔴 v1.65.0 `returnTbd` は v1.60.0 で廃止した旧フラグ。日付を空にすれば「返車日未定」に戻る。
-       書き込みは唯一の入口（pitReturnSetDateTime）を通す。 */
-    const _ret0 = window.pitDtText ? pitDtText(c.returnDate, c.returnTime) : '';   /* 📝 v2.183.0 消した日を残す */
-    let _rs = null;
-    if (window.pitReturnSetDateTime) _rs = pitReturnSetDateTime(c, '', '');   /* v2.186.0 確定返車日も入口で空になる（A-03） */
-    else { c.returnDate = ''; c.returnTime = ''; c.returnDateFinal = null; }
-    const _tx = '返車予定キャンセル（未定へ）' + (_ret0 ? '　元は ' + _ret0 : '')
-              + ((_rs && _rs.fFrom) ? '・確定返車日 ' + _rs.fFrom + ' → なし' : '');
-    if (window.logFlow) logFlow(c, _tx);
-    /* 📝 v2.186.0（⑧）フローだけでなく操作ログにも */
-    if (window.pitLog) pitLog('返車予定をキャンセル', { cardId: c.id, kind: 'out',
-      label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + _tx });
-  } else {
-    c.status = 'cancelled';
-    /* 🔴 v1.139.0（ゆうた確定）**自動の未入庫と同じ印を立てる。**
-       ◎なにが起きていた
-         自動（入庫日を過ぎた）は `noShow=true` を立てるのに、**ここだけ立てていなかった**。
-         同じ「未入庫」BOXに並ぶのに印が違う＝**手で押したのか自動なのか、あとから見分けられない**。
-       🔴 意味はどちらも「**来なかった**」で同じ（窓にも「未入庫リストに残る」と書いてある）。
-          人が決めた「予約キャンセル」（`cancelled=true`）とは**別物**なので、そちらとは混ぜない。 */
-    c.noShow = true;
-    c.noShowAt = c.noShowAt || ymd(new Date());
-    c.cancelledAt = ymd(new Date());
-    /* 🔄 v1.155.0 代車の予定は**外さない**（人が未入庫の一覧で決める）。何が残っているかはフローに書く。 */
-    if (window.logFlow) logFlow(c, 'キャンセル（来店なし）'
-      + (_lo.n ? '（代車の予定はそのまま：' + _lo.text + '）' : ''));
-  }
+  /* 計画の欄を当てる（null＝空にする）。⚠ 返車の欄は計画の中で唯一の入口（pitReturnSetDateTime）を通してある */
+  Object.keys(_pl.patch).forEach(function(k){ c[k] = _pl.patch[k]; });
+  if (window.logFlow) logFlow(c, _pl.flow);
+  /* 📝 v2.186.0（⑧）返車キャンセルは前から操作ログあり。🔴 2026-10-17 来店なしキャンセルも残す（前は PitFlow 本体だけ残していなかった） */
+  if (window.pitLog) pitLog(_pl.audit.action, { cardId: c.id, kind: _pl.audit.kind,
+    label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + _pl.audit.detail });
   if (window.PitDB) PitDB.save();
   pitTodayActionClose();
   renderToday();
-  if (window.pitToast) pitToast(isReturn ? '返車・未定へ戻しました'
-    : ('未入庫へ移しました' + (_lo.n ? '（代車の予定はそのまま）' : '')));
+  if (window.pitToast) pitToast(_pl.toast);
   }
 };
 window.pitTodayActionClose = function(){
@@ -472,14 +457,16 @@ window.pitTodayCheckIn = function(id){
   _pitTodayCheckInGo(c);
 };
 function _pitTodayCheckInGo(c){
-  c.status = 'check';
-  if (!c.actualInAt) c.actualInAt = ymd(new Date());   // 実入庫日
-  if (window.logFlow && typeof statusLabel === 'function') logFlow(c, '入庫（点検待ちへ）');
+  /* 🔗 2026-10-17（C-07 第2段）書く中身は pit-share.js の pitCheckInPlan 1本（MHS・見る所3つも借りる） */
+  const pl = window.pitCheckInPlan ? pitCheckInPlan(c, { today: ymd(new Date()) }) : null;
+  if (!pl || !pl.ok){ if (window.pitToast) pitToast((pl && pl.why) || '入庫の決めごとが読めませんでした（画面を開き直してください）', 'PF-1092'); return; }
+  Object.keys(pl.patch).forEach(function(k){ c[k] = pl.patch[k]; });
+  if (window.logFlow) logFlow(c, pl.flow);
   if (window.PitDB) PitDB.save();
   pitTodayActionClose();
   renderToday();
-  if (window.pitLog) pitLog('入庫済みにした', { cardId: c.id, kind: 'in', label: ((window.pitCustName?pitCustName(c):c.customer)? (window.pitCustName?pitCustName(c):c.customer)+' 様':'') + (c.car? ' / '+c.car:'') });
-  if (window.pitToast) pitToast('入庫済み → タスク「点検待ち」へ移動しました');
+  if (window.pitLog) pitLog(pl.audit.action, { cardId: c.id, kind: pl.audit.kind, label: ((window.pitCustName?pitCustName(c):c.customer)? (window.pitCustName?pitCustName(c):c.customer)+' 様':'') + (c.car? ' / '+c.car:'') });
+  if (window.pitToast) pitToast(pl.toast);
 }
 /* 返車済み：実績へ。completedAtを今日に・売上を確定値で固める
    🔴🔴 v1.137.0（ゆうた確定・2026-08-18）**押す前に1枚聞く。**
@@ -495,21 +482,12 @@ window.pitTodayReturn = function(id){
   const c = state.cards.find(x => x.id === id);
   if (!c) return;
   if (!_todReturnGate(c)) return;
-  const _amt = (c.amountFinal != null && c.amountFinal !== '')
-      ? c.amountFinal
-      : (window.pitFinalAmountOf ? pitFinalAmountOf(c) : 0);
-  const _yen = '¥' + Number(_amt || 0).toLocaleString();
+  /* 🔗 2026-10-17（C-07 第2段）窓の文・金額は pit-share.js の pitReturnDonePlan 1本（MHS・見る所3つも同じ窓） */
+  const _pl = window.pitReturnDonePlan ? pitReturnDonePlan(c, { today: ymd(new Date()) }) : null;
   const _nm  = ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様'
              + (c.car ? ' / ' + c.car : '');
-  const _md  = (function(){ const d = new Date(); return (d.getMonth()+1) + '/' + d.getDate(); })();
-  const ask = (window.UI && UI.confirm)
-    ? UI.confirm('返車済みにして、実績（確定売上）に固めますか？', {
-        title: '返車済みにする',
-        detail: _nm + '　　確定売上 ' + _yen + '\n\n'
-              + '・' + _md + ' の実績として数えます（実績カレンダー・月次の売上・メカの配分）\n'
-              + '・お客様の来店履歴に残ります\n'
-              + '🔴 ここから先はアーカイブです。戻せるのは管理者だけです',
-        ok: '返車済みにする', cancel: 'やめる' })
+  const ask = (window.UI && UI.confirm && _pl && _pl.ok)
+    ? UI.confirm(_pl.ask.msg, { title: _pl.ask.title, detail: _nm + '　　' + _pl.ask.detail, ok: _pl.ask.ok, cancel: 'やめる' })
     : Promise.resolve(true);
   ask.then(function(yes){ if (yes) _pitTodayReturnGo(c); });
 };
@@ -531,25 +509,17 @@ function _pitTodayReturnGo(c){
        ここから返すと、金額も完TELも触らない代わりに**残りの整備の候補も消えなかった**。
      🔴 中身は intern-pit.js の `pitInternReturn` 1本。ここに書き写さない。 */
   if (window.pitInternReturn && pitInternReturn(c)) return;
-  const t = ymd(new Date());
-  c.status = 'returned';
-  c.returnDate = c.returnDate || t;
-  /* 🛡 v2.9.0 保険＝返車しても実績に乗せない（入金日を入れた時に乗る）。
-     🔴 物差しも書き込みも `insurance-pit.js` の1本。完TELポップアップと**同じ1行**。 */
-  if (!(window.pitInsOnReturn && pitInsOnReturn(c, t))) c.completedAt = t;   // 実績カレンダーはこの日付で表示
-  /* 🔴 v1.64.0 拾う順番を完TELのポップアップ（return-popup.js）と揃えた＝**確定→受注→見積→概算**。
-     ここだけ概算しか見ていなかったので、クイック受注で人が打った受注金額が捨てられていた。
-     ⚠ 「いくらの車か」を2か所が別々に決めない。 */
-  /* 🔴 v1.103.0 拾う順番（確定→受注→見積→概算）は pit-share.js の1本。ここに書き写さない。 */
-  if (c.amountFinal == null || c.amountFinal === ''){
-    c.amountFinal = window.pitFinalAmountOf ? pitFinalAmountOf(c) : 0;   // 売上を固める
-  }
-  if (window.logFlow && typeof statusLabel === 'function') logFlow(c, '返車完了（実績へ）');
+  /* 🔗 2026-10-17（C-07 第2段）書く中身（状態・返車日・実績日・保険・金額の拾い方）は pit-share.js の pitReturnDonePlan 1本。
+     前はここと insurance-pit.js の onReturn で組み立て、MHS・見る所3つは写しを持っていた */
+  const pl = window.pitReturnDonePlan ? pitReturnDonePlan(c, { today: ymd(new Date()) }) : null;
+  if (!pl || !pl.ok){ if (window.pitToast) pitToast((pl && pl.why) || '返車の決めごとが読めませんでした（画面を開き直してください）', pl && pl.code); return; }
+  Object.keys(pl.patch).forEach(function(k){ c[k] = pl.patch[k]; });
+  if (window.logFlow) logFlow(c, pl.flow);
   if (window.PitDB) PitDB.save();
   pitTodayActionClose();
   renderToday();
-  if (window.pitLog) pitLog('返車済みにした（実績へ）', { cardId: c.id, kind: 'out', label: ((window.pitCustName?pitCustName(c):c.customer)? (window.pitCustName?pitCustName(c):c.customer)+' 様':'') + (c.car? ' / '+c.car:'') + (c.amountFinal? ' / ¥'+Number(c.amountFinal).toLocaleString():'') });
-  if (window.pitToast) pitToast('返車済み → 実績（確定売上）に固めました');
+  if (window.pitLog) pitLog(pl.audit.action, { cardId: c.id, kind: pl.audit.kind, label: ((window.pitCustName?pitCustName(c):c.customer)? (window.pitCustName?pitCustName(c):c.customer)+' 様':'') + (c.car? ' / '+c.car:'') + (pl.audit.detail? ' / '+pl.audit.detail:'') });
+  if (window.pitToast) pitToast(pl.toast);
 }
 window._pitTodayReturnGo = _pitTodayReturnGo;   /* テスト用（窓を通さずに固める道） */
 

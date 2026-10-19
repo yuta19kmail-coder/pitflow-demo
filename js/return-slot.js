@@ -432,20 +432,29 @@
      ⚠ 完TELの記録を上で書いた時（res.完TEL）は書かない＝同じ操作が2行にならないように（v1.185.0 の決めごと）。
      --------------------------------------------------------------- */
   function _dtText(d, t){ return (d ? d : '未定') + (t ? ' ' + t : ''); }
-  function pitReturnLogChange(c, res){
-    if (!c || !res || res.完TEL) return false;
+  /* 🔗 2026-10-17（C-07）言葉を作るのはここ1本＝PitFlow 本体（下の pitReturnLogChange）と、MHS・見る所3つが借りる計画
+     （pit-share.js の pitReturnDatePlan）が同じ1行を残す。何も動いていなければ null */
+  function pitReturnChangeText(c, res){
+    if (!c || !res) return null;
     var dtMoved = (res.dFrom !== res.dTo) || (res.tFrom !== res.tTo);
-    if (!res.moved && !dtMoved) return false;
+    if (!res.moved && !dtMoved) return null;
     var change = dtMoved ? _dtText(res.dFrom, res.tFrom) + ' → ' + _dtText(res.dTo, res.tTo) : '';
     /* v2.186.0（A-03）確定返車日も一緒に外した時は、その前の日も残す */
     if (change && res.fFrom) change += '・確定返車日 ' + res.fFrom + ' → なし';
     var label = (res.moved && res.after)
       ? '返車の予定を更新 → ' + pitReturnPlaceLabel(res.after) + (change ? '（' + change + '）' : (c.returnDate ? '（' + _dtText(c.returnDate, c.returnTime) + '）' : ''))
       : '返車の予定を変更 ' + change;
-    if (window.logFlow) logFlow(c, label);
+    return { flow: label, detail: (change || pitReturnPlaceLabel(res.after)) };
+  }
+  window.pitReturnChangeText = pitReturnChangeText;
+  function pitReturnLogChange(c, res){
+    if (!c || !res || res.完TEL) return false;
+    var tx = pitReturnChangeText(c, res);
+    if (!tx) return false;
+    if (window.logFlow) logFlow(c, tx.flow);
     try {
       if (window.pitLog) pitLog('返車の予定を変更', { cardId: c.id, kind: 'out',
-        label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + (change || pitReturnPlaceLabel(res.after)) });
+        label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + tx.detail });
     } catch (e) {}
     return true;
   }

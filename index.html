@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.190.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.194.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
 <link rel="manifest" href="manifest.json?v=1">
 <meta name="theme-color" content="#1f7a4d">
-<link rel="stylesheet" href="css/coreflow-ui.css?v=756022d3"><!-- 見た目の基準（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
+<link rel="stylesheet" href="css/coreflow-ui.css?v=f17ef997"><!-- 見た目の基準（全アプリ共通・_shared から配られたコピー。他より先に読む） -->
 <link rel="stylesheet" href="css/base.css?v=12">
 <link rel="stylesheet" href="css/layout.css?v=12">
 <link rel="stylesheet" href="css/views.css?v=64">
@@ -110,6 +110,7 @@
 <script src="js/coreflow-auth-gate.js?v=a5cec0e0"></script>
 <!-- 🔴 「Google でログイン」ボタンの見た目（全アプリ共通・本体は _shared）。色はボタンの data-cf-login で決まる -->
 <script src="js/coreflow-login-btn.js?v=1ee736d7"></script>
+<style>/* 🎨 2026-10-17 このアプリの色＝共通部品（トースト・確認の窓・見やすさ・強制更新・チェック箱）は全部これを見る（棚卸し C-10・ゆうた「トーストの色を全部そろえて」）。PitFlow＝緑（テーマで濃さが変わる） */:root{--cf-app:var(--acc);--cf-app-d:var(--accd);}</style>
 </head>
 <body>
 
@@ -133,7 +134,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.190.0</div>
+    <div class="login-ver">v2.194.0</div>
   </div>
 </div>
 
@@ -147,7 +148,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver" data-cf-ver>v2.190.0</span>
+    <span class="ver" data-cf-ver>v2.194.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -745,8 +746,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script src="js/coreflow-trace.js?v=2d78b18e"></script><!-- 🔎 調査の記録（CFTrace・全アプリ共通・_shared から配布）。firestore の直後・アプリの js より前に読む。画面には何も出さない。練習モード（PIT_CLOUD=false）では送らない -->
+<script src="js/coreflow-user.js?v=4e5e1ce2"></script><!-- 👤 ヘッダー右の自分（写真＋フルネーム・全アプリ共通・_shared が本体）。🔴 2026-10-18 ログインより前に読む（後ろだとログインが先に終わって CFUser が無く、起動が止まることがあった＝MHS 10/17） -->
 <script src="js/coreflow-date.js?v=1a84d23c"></script><!-- 📅 CFDate＝日本時間の日付（C-02・_shared が本体） -->
-<script src="js/coreflow-member.js?v=78be8d1b"></script><!-- 👤 CFMember＝使えるか・役の判定（C-03・_shared が本体） -->
+<script src="js/coreflow-member.js?v=a8134197"></script><!-- 👤 CFMember＝使えるか・役の判定（C-03・_shared が本体） -->
 <script src="js/coreflow-log.js?v=28e4156c"></script><!-- 📝 CFLog＝操作ログの共通の形（C-04・_shared が本体） -->
 <script src="js/coreflow-trash.js?v=47ad6c27"></script><!-- 🗑 CFTrash＝全アプリ共通のゴミ箱（C-05・_shared が本体） -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script><!-- 📎 v2.110.0 付箋の画像・PDF をファイル置き場へ（共通部品 coreflow-note-board.js が使う） -->
@@ -803,9 +805,9 @@ window.PIT_DEMO = true;</script>
 <script src="js/sample-reservations.js?v=33"></script>
 <script src="js/dashboard.js?v=23"></script>
 <script src="js/parking.js?v=9"></script>
-<script src="js/coreflow-note-reply.js?v=70700abc"></script><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
-<script src="js/coreflow-note-all.js?v=d326fe4b"></script><!-- 📎 付箋のまとめて表示（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
-<script src="js/coreflow-note-board.js?v=5832f157"></script><!-- 📌 付箋ボード本体（全アプリ共通・_shared から配布）。board-notes.js より **前** に読む -->
+<script src="js/coreflow-note-reply.js?v=94e92236"></script><!-- 📝 付箋の返信（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
+<script src="js/coreflow-note-all.js?v=91650578"></script><!-- 📎 付箋のまとめて表示（全アプリ共通・_shared から配布）。board-notes.js より **前** に読むこと -->
+<script src="js/coreflow-note-board.js?v=208487c8"></script><!-- 📌 付箋ボード本体（全アプリ共通・_shared から配布）。board-notes.js より **前** に読む -->
 <script src="js/board-notes.js?v=18"></script>
 <script src="js/search.js?v=21"></script>
 <script src="js/insurance-pit.js?v=1"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
@@ -813,7 +815,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/maintdash.js?v=6"></script>
 <script src="js/sales-visit.js?v=4"></script><!-- 🔍 v2.59.0 来店属性（売上ビューの5つ目のタブ）。**sales-date.js（売上日）と sales-count.js より後ろ／sales.js より前** -->
 <script src="js/analytics-pit.js?v=4"></script><!-- 📊 v2.143.0 分析用の書き出し（Claude が読む表）。画面は持たない＝毎晩サーバーがこのファイルを読み込んで呼ぶ。MINI のまとめ方・伝票の原価はここ1本（sales-ai が借りる）ので sales-ai.js より前 -->
-<script src="js/sales-ai.js?v=19"></script><!-- 🤖 v2.132.0 売上ビューの「AIレポート」＝月締めのあとに AI が書く月次レポート。sales.js（pitSalesMonthCollect）・quarter-*（締めの判定）を借りる -->
+<script src="js/sales-ai.js?v=21"></script><!-- 🤖 v2.132.0 売上ビューの「AIレポート」＝月締めのあとに AI が書く月次レポート。sales.js（pitSalesMonthCollect）・quarter-*（締めの判定）を借りる -->
 <script src="js/sales.js?v=41"></script><!-- 🆕 v2.145.0 保険・社員は集計の外（参考の別枠）・一覧PDF --><!-- 🆕 v2.124.0 課別＝積み上げの階段・課の目標の縦線（pitSalesDivTarget）／🆕 v2.123.0 collectMonth を app-summary.js（売上ボード）へ貸す -->
 <script src="js/sales-print.js?v=15"></script><!-- 🆕 v2.145.0 一覧PDF（A4白黒）／v2.146.0 返車と金額の種類 --><!-- v2.124.0 紙は課別がメイン（フロント別をやめた） -->
 <script src="js/shaken-line.js?v=5"></script><!-- 🔍 v2.58.0 車検ライン（作業サマリーの2つ目のタブ）。mech-summary より前に読む -->
@@ -873,17 +875,16 @@ window.PIT_DEMO = true;</script>
 <script src="js/help-content.js?v=67"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=30"></script>
-<script src="js/app-summary.js?v=6"></script><!-- v2.124.0 課の目標は pitSalesDivTarget を借りる／📡 v2.108.0 CoreFlow のダッシュボードへ概況を配る（mydash.js の物差しを借りる＝mydash.js より後ろ）／v2.121.0 最短入庫日の日付と3週間の空き（FlowDesk 用）／v2.123.0 売上ボード（salesBoard・自分のフロント成績） -->
-<script src="js/feed-facts.js?v=4"></script><!-- 🔔 v2.111.0 FlowDesk の通知のもと（入庫・返車の時間過ぎ・長期預かり・売上）をサーバーだけが読む所へ置く（mydash.js の物差しを借りる＝mydash.js より後ろ） -->
+<script src="js/app-summary.js?v=8"></script><!-- v2.124.0 課の目標は pitSalesDivTarget を借りる／📡 v2.108.0 CoreFlow のダッシュボードへ概況を配る（mydash.js の物差しを借りる＝mydash.js より後ろ）／v2.121.0 最短入庫日の日付と3週間の空き（FlowDesk 用）／v2.123.0 売上ボード（salesBoard・自分のフロント成績） -->
+<script src="js/feed-facts.js?v=6"></script><!-- 🔔 v2.111.0 FlowDesk の通知のもと（入庫・返車の時間過ぎ・長期預かり・売上）をサーバーだけが読む所へ置く（mydash.js の物差しを借りる＝mydash.js より後ろ） -->
 <script src="js/main.js?v=12"></script>
-<script src="js/auto-update.js?v=34a26e2b"></script>
-  <script src="js/coreflow-user.js?v=4e5e1ce2"></script><!-- 👤 ヘッダー右の自分（写真＋フルネーム・全アプリ共通・_shared が本体） -->
-  <script src="js/coreflow-power.js?v=757b3fde"></script><!-- ⏻ 電源ボタン（全アプリ共通・_shared が本体） -->
-  <script src="js/coreflow-a11y.js?v=b89ccbcb"></script><!-- 👓 見やすさ（全アプリ共通・_shared から配布）。電源の後 -->
-  <script src="js/coreflow-en.js?v=2fa30ac1" data-dict="js/coreflow-en-dict.js?v=b17b1f26"></script><!-- 🌐 2026-10-12 英語表示（メンバー管理の「英語表示」の人だけ。バージョンのバッジ／F2 で英語）。見やすさの後 -->
+<script src="js/auto-update.js?v=5fec4b3d"></script>
+  <script src="js/coreflow-power.js?v=672ecd85"></script><!-- ⏻ 電源ボタン（全アプリ共通・_shared が本体） -->
+  <script src="js/coreflow-a11y.js?v=e74e8e37"></script><!-- 👓 見やすさ（全アプリ共通・_shared から配布）。電源の後 -->
+  <script src="js/coreflow-en.js?v=2fa30ac1" data-dict="js/coreflow-en-dict.js?v=bdf8dfba"></script><!-- 🌐 2026-10-12 英語表示（メンバー管理の「英語表示」の人だけ。バージョンのバッジ／F2 で英語）。見やすさの後 -->
 
 
-<script src="js/ui-dialog.js?v=6c36e00e"></script><!-- アプリ内ダイアログ（全アプリ共通・_shared から配布）。配られていたのに読み込みが抜けていた -->
+<script src="js/ui-dialog.js?v=7ee165b6"></script><!-- アプリ内ダイアログ（全アプリ共通・_shared から配布）。配られていたのに読み込みが抜けていた -->
 <script src="js/ask-pit.js?v=5"></script><!-- 🔵 v1.75.0 「聞く・知らせる」の入口1本（pitAlert / pitAsk / pitAskText）。ブラウザ純正の alert・confirm・prompt はここ以外で使わない -->
 <script src="js/blank-cards.js?v=8"></script><!-- 空の予約カードを残さない（settings.js / views.js / card-detail.js より後ろ） -->
 <script src="js/reset-pit.js?v=5"></script><!-- 本番データの初期化／デモ版の「まっさらにする」（settings.js より後ろ） -->

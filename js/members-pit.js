@@ -523,6 +523,9 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onchange の '…' は jsq・顔写真の src は https:/blob:/data:image/ だけ） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  function _okSrc(u) { return /^(https:|blob:|data:image\/)/i.test(String(u == null ? '' : u).trim()); }
 
   function renderMembers() {
     var box = document.getElementById('members-body');
@@ -596,7 +599,7 @@
         ? s.divisions.map(function (id) { return '<span class="mb-div">' + esc(window.pitDivLabel(id)) + '</span>'; }).join('')
         : (s.isSelf ? '<span class="mb-div">1課・2課 共通</span>' : '<span class="mb-div is-none">未所属</span>');
       h += '<tr data-mid="' + esc(s.id) + '">'
-        + '<td class="mb-c-name"><span class="mb-av">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="">' : esc((s.name || '？').slice(0, 2))) + '</span>'
+        + '<td class="mb-c-name"><span class="mb-av">' + (s.photo && _okSrc(s.photo) ? '<img src="' + esc(s.photo) + '" alt="">' : esc((s.name || '？').slice(0, 2))) + '</span>'
         + '<span class="mem-nm">' + esc(s.name)
         + ((s.realName && s.realName !== s.name) ? '<small class="mb-real">' + esc(s.realName) + '</small>' : '')
         + '</span>'
@@ -606,11 +609,11 @@
         + '</td>'
         + '<td class="mb-c-div" title="' + esc((s.deptNames || []).join('／')) + '">' + dv + '</td>'
         + '<td class="mb-c-ck"><input type="checkbox"' + (s.front ? ' checked' : '') + dis
-        + ' onchange="pitMbSet(\'' + esc(s.id) + '\',\'front\',this.checked)"></td>'
+        + ' onchange="pitMbSet(\'' + jsq(s.id) + '\',\'front\',this.checked)"></td>'
         + '<td class="mb-c-ck"><input type="checkbox"' + (s.reception ? ' checked' : '') + dis
-        + ' onchange="pitMbSet(\'' + esc(s.id) + '\',\'reception\',this.checked)"></td>'
+        + ' onchange="pitMbSet(\'' + jsq(s.id) + '\',\'reception\',this.checked)"></td>'
         + '<td class="mb-c-ck"><input type="checkbox"' + (s.mech ? ' checked' : '') + dis
-        + ' onchange="pitMbSet(\'' + esc(s.id) + '\',\'mech\',this.checked)"></td>'
+        + ' onchange="pitMbSet(\'' + jsq(s.id) + '\',\'mech\',this.checked)"></td>'
         + '</tr>';
     });
 

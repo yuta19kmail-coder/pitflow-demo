@@ -23,7 +23,10 @@ function _mdNoSale(c){ return !!(window.pitCardNoSale && pitCardNoSale(c)); }
 function _mdDone(c){   return !_mdNoSale(c) && (c.status === 'workDone' || c.status === 'returned'); }
 function _mdInShop(c){ return !_mdNoSale(c) && ['check','estim','contact','parts','work'].indexOf(c.status) >= 0; }
 function _mdPd(s){ const p = String(s||'').split('-'); return new Date(+p[0], (+p[1])-1, +p[2]); }
-function _mdEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _mdEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（_mdEsc を5記号に・jsq / pitHex の予備の定義＝本体は pit-share.js） */
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _mdEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 function _mdMan(n){ return (Math.round(n/1000)/10).toLocaleString() + '万'; }
 function _mdYen(n){ return '¥' + Math.round(n).toLocaleString(); }
 
@@ -101,8 +104,8 @@ function renderMaintDash(){
   h += '<div class="md-courses">';
   divs.forEach(function(d){
     const x = calc[d.id];
-    h += '<div class="md-course" style="--cc:' + d.color + '">';
-    h += '<div class="md-course-head"><span class="md-course-pill" style="background:' + d.color + '">' + d.label + '</span><span class="md-course-team">' + (teamName[d.id] || '') + '</span></div>';
+    h += '<div class="md-course" style="--cc:' + pitHex(d.color, '#888') + '">';
+    h += '<div class="md-course-head"><span class="md-course-pill" style="background:' + pitHex(d.color, '#888') + '">' + _mdEsc(d.label) + '</span><span class="md-course-team">' + (teamName[d.id] || '') + '</span></div>';
     h += '<div class="md-course-grid">';
     h += '<div class="md-cell"><div class="md-cell-l">今月 上げた</div><div class="md-cell-v"><b>' + x.mC + '</b>台</div><div class="md-cell-a">' + _mdMan(x.mA) + '円</div></div>';
     h += '<div class="md-cell"><div class="md-cell-l">今週 上げた</div><div class="md-cell-v"><b>' + x.wC + '</b>台</div><div class="md-cell-a">' + _mdMan(x.wA) + '円</div></div>';
@@ -122,12 +125,12 @@ function renderMaintDash(){
       const c = o.c;
       const d = divs.find(function(x){ return x.id === _mdCourse(c); }) || { label:'', color:'#888' };
       const sev = o.held >= longN*2 ? ' md-sev2' : '';
-      h += '<div class="md-alert-row' + sev + '" onclick="openCard(\'' + c.id + '\',\'page\')">';
+      h += '<div class="md-alert-row' + sev + '" onclick="openCard(\'' + jsq(c.id) + '\',\'page\')">';
       h += '<div class="md-alert-days"><b>' + o.held + '</b><span>日</span></div>';
       /* 🔴 v1.162.0 お名前は pitCustSurname の1本（漢字が無ければカナ）。ここは漢字だけ＝カナのお客様は空欄だった。 */
       h += '<div class="md-alert-main"><div class="md-alert-car">' + _mdEsc(c.car || '車両') + ' <span class="md-alert-cust">' + _mdEsc((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '') + '</span></div>'
          + '<div class="md-alert-sub">' + _mdEsc(c.plate || '') + ' ・ ' + _mdEsc(c.menu || '') + '</div></div>';
-      h += '<div class="md-alert-tags"><span class="md-alert-div" style="background:' + d.color + '">' + d.label + '</span>'
+      h += '<div class="md-alert-tags"><span class="md-alert-div" style="background:' + pitHex(d.color, '#888') + '">' + _mdEsc(d.label) + '</span>'
          /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
          + '<span class="md-alert-st" style="color:' + statusColor(c.status) + ';border-color:' + statusColor(c.status) + '">' + (window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</span></div>';
       h += '</div>';

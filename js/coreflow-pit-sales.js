@@ -458,7 +458,7 @@
   function _refNoCountHtml(moS, moE){
     var txt = window.pitInternCountText ? pitInternCountText(_refNoCount(moS, moE)) : '';
     if (!txt) return '';
-    return '<div class="sv-refnc"><i data-ic=info data-ics=14></i> ' + txt
+    return '<div class="sv-refnc"><i data-ic=info data-ics=14></i> ' + esc(txt)
          + '<span>売上には入っていません（実績ビューの「非カウント一覧」で見られます）</span></div>';
   }
 
@@ -1087,7 +1087,7 @@
     var bw=pw/12, barW=bw*0.6;
     var s='<svg class="sv-chart" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><line class="sv-grid" x1="'+padL+'" y1="'+Y(0)+'" x2="'+(W-padR)+'" y2="'+Y(0)+'"/>';
     for(var i=0;i<12;i++){ var cx=padL+bw*i+bw/2, mm=mon[i], yb=Y(0);
-      [['shaken',WGROUPS[0].color],['12pt',WGROUPS[1].color],['general',WGROUPS[2].color]].forEach(function(pair){ var v=mm[pair[0]]; if(v<=0)return; var hgt=Y(0)-Y(v); yb-=hgt; s+='<rect x="'+(cx-barW/2).toFixed(1)+'" y="'+yb.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hgt.toFixed(1)+'" fill="'+pair[1]+'"><title>'+SLOT[i]+'月 '+wtLabel(pair[0])+' '+man(v)+'</title></rect>'; });
+      [['shaken',WGROUPS[0].color],['12pt',WGROUPS[1].color],['general',WGROUPS[2].color]].forEach(function(pair){ var v=mm[pair[0]]; if(v<=0)return; var hgt=Y(0)-Y(v); yb-=hgt; s+='<rect x="'+(cx-barW/2).toFixed(1)+'" y="'+yb.toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hgt.toFixed(1)+'" fill="'+pair[1]+'"><title>'+SLOT[i]+'月 '+esc(wtLabel(pair[0]))+' '+man(v)+'</title></rect>'; });   /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（作業タイプの名前は設定で変えられる） */
       s+='<text class="sv-xlab" x="'+cx.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+SLOT[i]+'</text>';
     }
     s+='</svg>'; return s;

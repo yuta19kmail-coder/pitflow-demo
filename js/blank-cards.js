@@ -92,7 +92,8 @@
   }
   w.pitIsBlankCard = isBlank;
 
-  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に） */
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   function confirmBox(msg, opt) {
     if (w.UI && w.UI.confirm) return w.UI.confirm(msg, opt || {});
     return Promise.resolve(w.confirm(msg + (opt && opt.detail ? '\n\n' + opt.detail : '')));
@@ -177,7 +178,7 @@
           title: '書きかけの予約',
           detail: '保存せずに閉じたぶんです（' + (when.getMonth() + 1) + '/' + when.getDate() + ' ' +
                   ('0' + when.getHours()).slice(-2) + ':' + ('0' + when.getMinutes()).slice(-2) + '）' +
-                  (who ? '／お客様：' + esc(who) : '') +
+                  (who ? '／お客様：' + who : '') +   /* 確認の窓（ui-dialog.js）が自分で esc する＝ここで通すと二重になる */
                   '。「新しく作る」を選ぶと、この書きかけは捨てます。',
           ok: '続きから開く', cancel: '新しく作る'
         }).then(function (yes) {

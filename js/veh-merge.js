@@ -32,7 +32,9 @@
   'use strict';
 
   function t(x){ return String(x == null ? '' : x).trim(); }
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に・onclick の id は jsq） */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function num(x){ var n = Number(String(x==null?'':x).replace(/[^0-9.-]/g,'')); return isFinite(n)?n:0; }
   function norm(s){ return String(s==null?'':s).replace(/\s+/g,'').toLowerCase(); }
   function custs(){ return (w.state && state.customers) || []; }
@@ -301,7 +303,7 @@
   function _carRow(v){
     var n = (_st.主 === v.id) ? 1 : (_st.サブ === v.id ? 2 : 0);
     var arc = (w.PitArchive ? PitArchive.vehSelfArchived(v) : !!v.archived);
-    return '<button class="vm-car' + (n ? ' on' + n : '') + '" onclick="PitVehMerge.tap(\'' + esc(v.id) + '\')">'
+    return '<button class="vm-car' + (n ? ' on' + n : '') + '" onclick="PitVehMerge.tap(\'' + jsq(v.id) + '\')">'
          + '<span class="vm-no">' + (n === 1 ? '①' : (n === 2 ? '②' : '')) + '</span>'
          + '<span class="vm-pplate">' + esc(t(v.plate) || (v.perVisit ? '都度車両変動' : 'ナンバーなし')) + '</span>'
          + '<span class="vm-pcar">' + esc(((v.maker ? v.maker + ' ' : '') + (v.car || '')).trim() || '—') + '</span>'
@@ -372,9 +374,9 @@
           var 選 = _st.欄[r.k] || r.既定;
           h += '<div class="vm-row"><div class="vm-rl">' + esc(r.l)
              + (r.種類 === '空埋め' ? '<span class="vm-rt">①が空</span>' : '') + '</div>'
-             + '<button class="vm-opt' + (選==='main'?' on':'') + '" onclick="PitVehMerge.setField(\'' + esc(r.k) + '\',\'main\')">'
+             + '<button class="vm-opt' + (選==='main'?' on':'') + '" onclick="PitVehMerge.setField(\'' + jsq(r.k) + '\',\'main\')">'
              + '<i>①</i>' + esc(r.主 || '（空）') + '</button>'
-             + '<button class="vm-opt' + (選==='sub'?' on':'') + '" onclick="PitVehMerge.setField(\'' + esc(r.k) + '\',\'sub\')">'
+             + '<button class="vm-opt' + (選==='sub'?' on':'') + '" onclick="PitVehMerge.setField(\'' + jsq(r.k) + '\',\'sub\')">'
              + '<i>②</i>' + esc(r.サブ || '（空）') + '</button></div>';
         });
         h += '</div>';
@@ -401,7 +403,7 @@
            + (x.記録.ナンバー ? '<span class="vm-ptag">' + esc(x.記録.ナンバー) + '</span>' : '')
            + '<span class="vm-logsub">' + esc(_when(x.記録.at)) + (x.記録.by ? '　' + esc(x.記録.by) : '')
            + '　伝票' + (x.記録.伝票 || []).length + '・カード' + (x.記録.カード || []).length + '</span></div>'
-           + (canR ? '<button class="vm-undo" onclick="PitVehMerge.undoAsk(\'' + esc(x.記録.id) + '\')">取り消す</button>'
+           + (canR ? '<button class="vm-undo" onclick="PitVehMerge.undoAsk(\'' + jsq(x.記録.id) + '\')">取り消す</button>'
                    : '<span class="vm-lock">管理者だけ</span>')
            + '</div>';
       });

@@ -29,7 +29,8 @@
 (function (w, d) {
   'use strict';
 
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に） */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
   function norm(s){ return String(s||'').replace(/\s+/g,'').replace(/[ァ-ヶ]/g,function(ch){return String.fromCharCode(ch.charCodeAt(0)-0x60);}).toLowerCase(); }
   function custs(){ if(!Array.isArray(w.state&&state.customers)) state.customers=[]; return state.customers; }
   function findCust(id){ return custs().find(function(x){ return x && x.id===id; })||null; }

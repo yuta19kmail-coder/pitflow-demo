@@ -256,7 +256,9 @@ window.pitVehLabel = function (v, kind) {
   return ((num !== '' ? String(num) : '') + (num !== '' && model ? ' ' : '') + model) || (v.name || '');
 };
 
-function _loEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+function _loEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（_loEsc を5記号に・onclick の '…' は jsq。予備の定義＝本体は pit-share.js） */
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _loEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
 
 /* 代車の装備/寸法が未設定のときの初期化。
    🔴 v1.80.0 **本番（クラウド保存）では、装備と寸法に勝手な数字を入れない。**
@@ -778,7 +780,7 @@ function loRebuild(days){
     const body = model
       ? '<div class="lo-model">' + _loEsc(model) + '</div><div class="lo-no">' + _loEsc(num) + '</div>'
       : '<div class="lo-model lo-model-none">' + _loEsc(num) + '</div><div class="lo-no lo-no-sub">車種未登録</div>';
-    h += '<div class="lo-cell lo-head' + emgCls + '" data-loid="' + l.id + '" title="' + _loEsc((model ? model + ' ' : '') + '（' + num + '）') + '">' + emgTag + body + '</div>';
+    h += '<div class="lo-cell lo-head' + emgCls + '" data-loid="' + _loEsc(l.id) + '" title="' + _loEsc((model ? model + ' ' : '') + '（' + num + '）') + '">' + emgTag + body + '</div>';
   });
   grid.insertAdjacentHTML('beforeend', h);
   _loCount = 0;
@@ -835,12 +837,12 @@ function _loRenderDays(start, n){
        + '<span class="lo-dtxt">'
        + (d.getDate() === 1 ? '<div class="lo-month">' + (d.getMonth()+1) + '月</div>' : '')
        + (d.getMonth()+1) + '/' + d.getDate() + ' <span>' + '日月火水木金土'[dow] + '</span>'
-       + (hol ? '<div class="lo-hol">' + hol + '</div>' : '')
-       + (calNote ? '<div class="lo-closed-tag' + (isClosed ? '' : ' cal-soft') + '">' + calNote + '</div>' : '')
+       + (hol ? '<div class="lo-hol">' + _loEsc(hol) + '</div>' : '')
+       + (calNote ? '<div class="lo-closed-tag' + (isClosed ? '' : ' cal-soft') + '">' + _loEsc(calNote) + '</div>' : '')
        + '</span></div>';
 
     ls.forEach(function(l){
-      let attrs = ' data-lo="' + l.id + '" data-ld="' + dStr + '"';
+      let attrs = ' data-lo="' + _loEsc(l.id) + '" data-ld="' + dStr + '"';
       /* 🧩 v2.42.0 その日に何が乗っているかは **loaner-free.js の部品1本**に聞く。
          この画面が本流（マスター）だが、**読み方まで自前で持つ必要は無い。**
          🔴 **保険の写し（部品が無い時の自前の読み方）は置かない。**置いた瞬間それが古くなる側になる。
@@ -916,7 +918,7 @@ function _loRenderDays(start, n){
         if (hold.fromDate === dStr){
           /* 2日以上押さえている時は、下に余白があるのでメモを2行まで出す（1日だけなら1行） */
           const wide = (hold.toDate > hold.fromDate) ? ' lo-hold-w' : '';
-          hv += '<span class="lo-hold-tag' + wide + (_loHitA(hold) ? ' lo-hit' : '') + '" title="' + _loEsc(hold.memo || '仮押さえ') + '" onclick="loHoldMenu(event,\'' + hold.id + '\')">'
+          hv += '<span class="lo-hold-tag' + wide + (_loHitA(hold) ? ' lo-hit' : '') + '" title="' + _loEsc(hold.memo || '仮押さえ') + '" onclick="loHoldMenu(event,\'' + jsq(hold.id) + '\')">'
               + '<span class="lo-hold-k">仮</span><span class="lo-hold-memo">' + _loEsc(hold.memo || '仮押さえ') + '</span></span>';
         }
       }
@@ -966,21 +968,21 @@ function _loRenderDays(start, n){
         const isDup = dupN > 1;
         const isBad = (confSet && confSet.has(a.id)) || isDup;
         const isChg = _loAssignChanged(a);
-        const hoverAttr = compact ? (' onmouseenter="loInfoHover(this,\'' + (a.id || '') + '\')" onmouseleave="loInfoHide()"') : '';
+        const hoverAttr = compact ? (' onmouseenter="loInfoHover(this,\'' + jsq((a.id || '')) + '\')" onmouseleave="loInfoHide()"') : '';
         h += '<div class="lo-cell lo-bk' + (isStart ? ' bk-start' : '') + (isEnd ? ' bk-end' : '') + (single ? ' bk-single' : '') + (compact ? ' bk-compact' : ' bk-full') + (fixed ? ' lo-fixed' : '') + (returned ? ' lo-returned' : '') + (isToday ? ' lo-today' : '') + (isBad?' lo-bad':(isChg?' lo-chg':'')) + (isDup?' lo-dup':'') + evCls + hCls + dayMods + '"' + attrs
            + ' style="--lo-team:' + teamColor + '">' + dayBg + '<i class="lo-fill"></i>' + gh;
         /* 🔴 二重貸しの日は「2」の印を出す（押すと何と重なっているかを出す） */
         if (isDup){
           h += '<span class="lo-dupmark" title="この日は貸出が ' + dupN + ' 件重なっています"'
-             + ' onclick="event.stopPropagation();loShowDup(\'' + l.id + '\',\'' + dStr + '\')">' + dupN + '</span>';
+             + ' onclick="event.stopPropagation();loShowDup(\'' + jsq(l.id) + '\',\'' + jsq(dStr) + '\')">' + dupN + '</span>';
         }
         if (isStart){
-          h += '<span class="lo-badge ' + (compact ? 'mini' : 'full') + (hand ? ' lo-handoff' : '') + (isChg?' chg':'') + (isKari ? ' lo-kari' : '') + (_loHitA(a) ? ' lo-hit' : '') + '"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '"' + (card ? ' data-card-id="' + card.id + '"' : '') + ' onclick="loBadgeMenu(event,\'' + (a.id || '') + '\')"' + hoverAttr + '>' + labelHtml + '</span>';
+          h += '<span class="lo-badge ' + (compact ? 'mini' : 'full') + (hand ? ' lo-handoff' : '') + (isChg?' chg':'') + (isKari ? ' lo-kari' : '') + (_loHitA(a) ? ' lo-hit' : '') + '"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + _loEsc(a.id || '') + '"' + (card ? ' data-card-id="' + _loEsc(card.id) + '"' : '') + ' onclick="loBadgeMenu(event,\'' + jsq((a.id || '')) + '\')"' + hoverAttr + '>' + labelHtml + '</span>';
         }
         if (isEnd && !single){
           /* 🔴 v1.94.0 終端の▼は CSS の三角（.lo-end::after）で描く＝茎と地続きにするため。
              ⚠ 中にアイコンを入れない。入れると線のV字が戻って、また先が浮いて見える。 */
-          h += '<span class="lo-end"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + (a.id || '') + '" title="下へドラッグで返却日を伸ばせます"></span>';
+          h += '<span class="lo-end"' + (returned ? '' : ' draggable="true"') + ' data-aid="' + _loEsc(a.id || '') + '" title="下へドラッグで返却日を伸ばせます"></span>';
         }
         /* 🔧 整備の縦バーは貸出の日にも引く（＝重なっていることが目で分かる）。
            ⚠ 札は貸出の札が出る日には出さない（重ねない）。 */
@@ -989,7 +991,7 @@ function _loRenderDays(start, n){
         /* 🅿 v2.40.0 仮押さえの日は `.lo-free` を付けない
            ＝ドラッグの範囲選択に入らない（押したら「解除」の窓が開く）。 */
         h += '<div class="lo-cell ' + (hold ? 'lo-hold' : 'lo-free') + (isToday ? ' lo-today' : '') + evCls + hCls + dayMods + '"' + attrs
-           + (hold ? ' onclick="loHoldMenu(event,\'' + hold.id + '\')"' : '') + '>' + dayBg + gh + ov + hv + mtLine + mtTag + '</div>';
+           + (hold ? ' onclick="loHoldMenu(event,\'' + jsq(hold.id) + '\')"' : '') + '>' + dayBg + gh + ov + hv + mtLine + mtTag + '</div>';
       }
     });
   }
@@ -1241,8 +1243,8 @@ function _loRenderDraftBar(){
   const chips = changed.map(function(a){
     const o = _loDraftOrig[a.id], ib = bad.has(a.id);
     return '<span class="lod-chip' + (ib?' bad':'') + '"><b>' + _loEsc(_loAssignLabel(a)) + '</b> '
-      + _loName(o.loanerId) + ' ' + _loMD(o.fromDate) + '→' + _loName(a.loanerId) + ' ' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate)
-      + '<i onclick="loDraftUndoOne(\'' + a.id + '\')"><i data-ic=close data-ics=16></i></i></span>';
+      + _loEsc(_loName(o.loanerId)) + ' ' + _loMD(o.fromDate) + '→' + _loEsc(_loName(a.loanerId)) + ' ' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate)
+      + '<i onclick="loDraftUndoOne(\'' + jsq(a.id) + '\')"><i data-ic=close data-ics=16></i></i></span>';
   }).join('');
   const hasBad = bad.size > 0;
   host.style.display = 'block';
@@ -1402,15 +1404,15 @@ window.loBadgeMenu = function(ev, aid){
   const carTxt = card ? (card.car || '') : (a.car || '');
   const ret = !!a.returned;
   let h = '<div class="lo-bpop-h">' + _loEsc(nm) + ' 様' + (carTxt ? ' <small>' + _loEsc(carTxt) + '</small>' : '') + (ret ? ' <small>（返却済）</small>' : '') + '</div>';
-  if (card) h += '<button class="lo-bpop-b" onclick="loBadgeDetail(\'' + aid + '\')"><i data-ic=clipboard data-ics=16></i> 予約詳細を見る</button>';
-  if (!ret) h += '<button class="lo-bpop-b" onclick="loReturnStart(\'' + aid + '\')"><i data-ic=check data-ics=16></i> 返却を確定する</button>';
-  else h += '<button class="lo-bpop-b" onclick="loUnreturn(\'' + aid + '\')">↩ 返却を取り消す</button>';
+  if (card) h += '<button class="lo-bpop-b" onclick="loBadgeDetail(\'' + jsq(aid) + '\')"><i data-ic=clipboard data-ics=16></i> 予約詳細を見る</button>';
+  if (!ret) h += '<button class="lo-bpop-b" onclick="loReturnStart(\'' + jsq(aid) + '\')"><i data-ic=check data-ics=16></i> 返却を確定する</button>';
+  else h += '<button class="lo-bpop-b" onclick="loUnreturn(\'' + jsq(aid) + '\')">↩ 返却を取り消す</button>';
   /* 🔴 v1.143.0（ゆうた指定 2026-08-19）**返却済み（グレー）の貸出には出さない。**
      🗣「アーカイブと同じで、返却済みの代車は何がなんでも不可侵的に残すイメージ」
      ⚠ v1.142.0 まではここが `ret` の分岐の**外**にあり、返却済みの札からも押せた。
         押すと**いつ誰にどの代車を貸したかの記録が丸ごと消えていた。**
      ⚠ ボタンを消すだけにしない＝`loCancelLoaner` の中でも同じ条件で止めている。 */
-  if (!ret) h += '<button class="lo-bpop-b danger" onclick="loCancelLoaner(\'' + aid + '\')"><i data-ic=ban data-ics=16></i> この予約の代車をキャンセル</button>';
+  if (!ret) h += '<button class="lo-bpop-b danger" onclick="loCancelLoaner(\'' + jsq(aid) + '\')"><i data-ic=ban data-ics=16></i> この予約の代車をキャンセル</button>';
   _loBadgePopOpen(h);
 };
 /* 省スペース表示のホバー＝代車カレンダーのフルサイズ札（3行カード）をそのまま上に重ねて表示 */
@@ -1477,7 +1479,7 @@ window.loReturnStart = function(aid){
   const h = '<div class="lo-bpop-h">返却日を確定</div>'
     + '<label class="lo-bpop-f">返却日<input type="date" id="lo-ret-date" value="' + today + '"></label>'
     + '<div class="lo-bpop-note">返却した代車はアーカイブ（薄い色）になり、動かせなくなります（あとで取り消し可）。</div>'
-    + '<div class="lo-bpop-foot"><button class="lo-bpop-b" onclick="loBadgeMenu(null,\'' + aid + '\')">← 戻る</button><button class="lo-bpop-b primary" onclick="loReturnConfirm(\'' + aid + '\')">確定する</button></div>';
+    + '<div class="lo-bpop-foot"><button class="lo-bpop-b" onclick="loBadgeMenu(null,\'' + jsq(aid) + '\')">← 戻る</button><button class="lo-bpop-b primary" onclick="loReturnConfirm(\'' + jsq(aid) + '\')">確定する</button></div>';
   _loBadgePopOpen(h);
 };
 window.loReturnConfirm = function(aid){
@@ -1690,7 +1692,7 @@ window.loAddManualBlock = function(prefill){
   const today = ymd(new Date());
   const from0 = prefill.from || today, to0 = prefill.to || today;
   const opts = _loFiltered().filter(function(l){ return !l.emergency; })
-    .map(function(l){ const sel = (prefill.loId && l.id === prefill.loId) ? ' selected' : ''; return '<option value="' + l.id + '"' + sel + '>' + _loEsc((String(l.name||'').replace('代車','')) + ' ' + (l.model||'')) + '</option>'; }).join('');
+    .map(function(l){ const sel = (prefill.loId && l.id === prefill.loId) ? ' selected' : ''; return '<option value="' + _loEsc(l.id) + '"' + sel + '>' + _loEsc((String(l.name||'').replace('代車','')) + ' ' + (l.model||'')) + '</option>'; }).join('');
   _loModalOpen(
     '<h3 class="lo-modal-h"><i data-ic=car data-ics=16></i> 予約以外で代車を貸出</h3>'
     + '<label class="lo-modal-f">代車<select id="lmb-lo">' + opts + '</select></label>'
@@ -1699,7 +1701,7 @@ window.loAddManualBlock = function(prefill){
     /* 🔴 v1.80.0 車種の入力欄を足した。
        ⚠ 札を出す側は前から車種を出そうとしていたのに、入れる場所が無く**必ず空**だった。 */
     + '<label class="lo-modal-f">お客様の車（任意）<input id="lmb-car" placeholder="例：アクア"></label>'
-    + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="lmb-from" value="' + from0 + '"></label><label class="lo-modal-f">まで<input type="date" id="lmb-to" value="' + to0 + '"></label></div>'
+    + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="lmb-from" value="' + _loEsc(from0) + '"></label><label class="lo-modal-f">まで<input type="date" id="lmb-to" value="' + _loEsc(to0) + '"></label></div>'
     + '<div class="lo-modal-foot"><button onclick="loCloseModal()">キャンセル</button><button class="primary" onclick="loSaveManualBlock()">登録</button></div>'
   );
 };
@@ -1820,8 +1822,8 @@ window.loPickFree = function(loId, from, to){
   const per = (from === to) ? _loMD(from) : (_loMD(from) + '〜' + _loMD(to));
   _loBadgePopOpen(
     '<div class="lo-bpop-h">' + _loEsc(_loName(loId)) + ' <small>' + per + '</small></div>'
-    + '<button class="lo-bpop-b" onclick="loHoldFromPick(\'' + loId + '\',\'' + from + '\',\'' + to + '\')"><span class="lo-hold-k">仮</span> 仮押さえ</button>'
-    + '<button class="lo-bpop-b" onclick="loLendFromPick(\'' + loId + '\',\'' + from + '\',\'' + to + '\')"><i data-ic=car data-ics=16></i> 予約以外で代車を貸出</button>'
+    + '<button class="lo-bpop-b" onclick="loHoldFromPick(\'' + jsq(loId) + '\',\'' + jsq(from) + '\',\'' + jsq(to) + '\')"><span class="lo-hold-k">仮</span> 仮押さえ</button>'
+    + '<button class="lo-bpop-b" onclick="loLendFromPick(\'' + jsq(loId) + '\',\'' + jsq(from) + '\',\'' + jsq(to) + '\')"><i data-ic=car data-ics=16></i> 予約以外で代車を貸出</button>'
     + '<div class="lo-bpop-note">仮押さえ＝お客様の登録はせず、ひとことメモだけで枠を押さえます。</div>'
   );
 };
@@ -1838,14 +1840,14 @@ window.loAddHold = function(prefill){
   const loId  = (cur && cur.loanerId) || prefill.loId || '';
   const memo0 = (cur && cur.memo) || '';
   const opts = _loFiltered().filter(function(l){ return !l.emergency; })
-    .map(function(l){ const sel = (loId && l.id === loId) ? ' selected' : ''; return '<option value="' + l.id + '"' + sel + '>' + _loEsc((String(l.name||'').replace('代車','')) + ' ' + (l.model||'')) + '</option>'; }).join('');
+    .map(function(l){ const sel = (loId && l.id === loId) ? ' selected' : ''; return '<option value="' + _loEsc(l.id) + '"' + sel + '>' + _loEsc((String(l.name||'').replace('代車','')) + ' ' + (l.model||'')) + '</option>'; }).join('');
   _loModalOpen(
     '<h3 class="lo-modal-h"><span class="lo-hold-k">仮</span> ' + (cur ? '仮押さえを直す' : '仮押さえ') + '</h3>'
     + '<label class="lo-modal-f">代車<select id="lhd-lo">' + opts + '</select></label>'
     + '<label class="lo-modal-f">ひとことメモ<input id="lhd-memo" maxlength="40" placeholder="例：田中様の車検で押さえ" value="' + _loEsc(memo0) + '"></label>'
-    + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="lhd-from" value="' + from0 + '"></label><label class="lo-modal-f">まで<input type="date" id="lhd-to" value="' + to0 + '"></label></div>'
+    + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="lhd-from" value="' + _loEsc(from0) + '"></label><label class="lo-modal-f">まで<input type="date" id="lhd-to" value="' + _loEsc(to0) + '"></label></div>'
     + '<div class="lo-modal-note">この期間は、新規予約や最短入庫日からも<b>埋まっている</b>ものとして扱われます。お客様・車の登録はしません。</div>'
-    + '<div class="lo-modal-foot"><button onclick="loCloseModal()">キャンセル</button><button class="primary" onclick="loSaveHold(\'' + (cur ? cur.id : '') + '\')">' + (cur ? '直す' : '押さえる') + '</button></div>'
+    + '<div class="lo-modal-foot"><button onclick="loCloseModal()">キャンセル</button><button class="primary" onclick="loSaveHold(\'' + jsq((cur ? cur.id : '')) + '\')">' + (cur ? '直す' : '押さえる') + '</button></div>'
   );
   setTimeout(function(){ const el = document.getElementById('lhd-memo'); if (el) el.focus(); }, 30);
 };
@@ -1897,8 +1899,8 @@ window.loHoldMenu = function(ev, id){
   _loBadgePopOpen(
     '<div class="lo-bpop-h"><span class="lo-hold-k">仮</span> 仮押さえ <small>' + _loEsc(_loName(a.loanerId)) + '　' + _loMD(a.fromDate) + '〜' + _loMD(a.toDate) + '</small></div>'
     + '<div class="lo-bpop-note">' + _loEsc(a.memo || '（メモなし）') + '</div>'
-    + '<button class="lo-bpop-b" onclick="loHoldEdit(\'' + id + '\')"><i data-ic=clipboard data-ics=16></i> メモ・期間を直す</button>'
-    + '<button class="lo-bpop-b danger" onclick="loReleaseHold(\'' + id + '\')"><i data-ic=ban data-ics=16></i> 仮押さえを解除する</button>'
+    + '<button class="lo-bpop-b" onclick="loHoldEdit(\'' + jsq(id) + '\')"><i data-ic=clipboard data-ics=16></i> メモ・期間を直す</button>'
+    + '<button class="lo-bpop-b danger" onclick="loReleaseHold(\'' + jsq(id) + '\')"><i data-ic=ban data-ics=16></i> 仮押さえを解除する</button>'
   );
 };
 window.loHoldEdit = function(id){ _loBadgePopClose(); loAddHold({ id:id }); };
@@ -1920,7 +1922,7 @@ window.loReleaseHold = function(id){
 /* 🚨 緊急車両を追加（社用車から選ぶ or 手入力）＝一番左に列・返車で消える（履歴は残す） */
 window.loAddEmergency = function(){
   const today = ymd(new Date());
-  const cc = (state.companyCars || []).map(function(c){ return '<option value="' + c.id + '">' + _loEsc((c.model||c.name||'社用車') + (c.plate?(' '+c.plate):'')) + '</option>'; }).join('');
+  const cc = (state.companyCars || []).map(function(c){ return '<option value="' + _loEsc(c.id) + '">' + _loEsc((c.model||c.name||'社用車') + (c.plate?(' '+c.plate):'')) + '</option>'; }).join('');
   _loModalOpen(
     '<h3 class="lo-modal-h"><i data-ic=warn data-ics=16></i> 緊急車両を追加</h3>'
     + '<label class="lo-modal-f">車両<select id="lem-src" onchange="loEmgSrc()"><option value="">― 社用車から選ぶ ―</option>' + cc + '<option value="__manual__">＋ 手入力する</option></select></label>'

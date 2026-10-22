@@ -40,7 +40,9 @@
     { ic: 'calendar',  label: '日程を調整' }
   ];
 
-  function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に・onclick の '…' は jsq） */
+  function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function pad(n){ return String(n).padStart(2, '0'); }
   function card(id){ return (w.state && state.cards || []).find(function(x){ return x && x.id === id; }) || null; }
 
@@ -425,13 +427,13 @@
     h += '<div class="pf-flowquick">';
     QUICK.forEach(function(q, i){
       var qi = (w.ico ? ico(q.ic, q.size || 16) : '');
-      h += '<button type="button" class="pf-flowchip cf-flowchip" onclick="pitFlowQuick(\'' + esc(c.id) + '\',' + i + ',\'' + ns + '\')">' + qi + ' ' + esc(q.label) + '</button>';
+      h += '<button type="button" class="pf-flowchip cf-flowchip" onclick="pitFlowQuick(\'' + jsq(c.id) + '\',' + i + ',\'' + ns + '\')">' + qi + ' ' + esc(q.label) + '</button>';
     });
     h += '</div>';
     h += '<div class="pf-flowcustom">';
     h += '<input id="' + ns + '-flow-input" class="pf-fin" placeholder="その他（自由入力）例：代車の件で連絡待ち" '
-       + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();pitFlowCustom(\'' + esc(c.id) + '\',\'' + ns + '\');}">';
-    h += '<button type="button" class="pf-flowaddbtn" onclick="pitFlowCustom(\'' + esc(c.id) + '\',\'' + ns + '\')">＋ 追加</button>';
+       + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();pitFlowCustom(\'' + jsq(c.id) + '\',\'' + ns + '\');}">';
+    h += '<button type="button" class="pf-flowaddbtn" onclick="pitFlowCustom(\'' + jsq(c.id) + '\',\'' + ns + '\')">＋ 追加</button>';
     h += '</div>';
     h += '</div>';
     return h;
@@ -467,17 +469,17 @@
         h += '<span class="pf-fettl">' + (w.icoText ? icoText(ttl) : esc(ttl)) + '</span>';
       } else {
         h += '<input class="pf-fin pf-fettlin" type="text" value="' + esc(plainText(e)) + '" title="記録の言葉"'
-           + ' onchange="pitFlowSetText(\'' + esc(c.id) + '\',' + i + ',this.value)">';
+           + ' onchange="pitFlowSetText(\'' + jsq(c.id) + '\',' + i + ',this.value)">';
       }
       /* 🔴 v2.185.0（S-25）消せるのは手で足した記録だけ。消した記録は打ち消し線で残り「戻す」が出る */
-      if (gone) h += '<button type="button" class="pf-fedel" title="消した記録を戻す" onclick="pitFlowUndel(\'' + esc(c.id) + '\',' + i + ')">戻す</button>';
-      else if (isManual(e)) h += '<button type="button" class="pf-fedel" title="この記録を消す（打ち消し線で残る）" onclick="pitFlowDel(\'' + esc(c.id) + '\',' + i + ')">' + (w.ico ? ico('trash', 15) : '×') + '</button>';
+      if (gone) h += '<button type="button" class="pf-fedel" title="消した記録を戻す" onclick="pitFlowUndel(\'' + jsq(c.id) + '\',' + i + ')">戻す</button>';
+      else if (isManual(e)) h += '<button type="button" class="pf-fedel" title="この記録を消す（打ち消し線で残る）" onclick="pitFlowDel(\'' + jsq(c.id) + '\',' + i + ')">' + (w.ico ? ico('trash', 15) : '×') + '</button>';
       h += '</div>';
       if (gone) h += '<div class="pf-fegonewho">' + esc('消した：' + (e.deletedBy || '') + ' ' + atText({ at: e.deletedAt })) + '</div>';
       h += '<div class="pf-febot">';
       h += '<label class="pf-fef"><span>日時</span><input class="pf-fin" type="datetime-local" value="' + esc(atInput(e)) + '"'
-         + ' onchange="pitFlowSetAt(\'' + esc(c.id) + '\',' + i + ',this.value)"></label>';
-      h += '<label class="pf-fef"><span>担当</span><select class="pf-fin" onchange="pitFlowSetBy(\'' + esc(c.id) + '\',' + i + ',this.value)">'
+         + ' onchange="pitFlowSetAt(\'' + jsq(c.id) + '\',' + i + ',this.value)"></label>';
+      h += '<label class="pf-fef"><span>担当</span><select class="pf-fin" onchange="pitFlowSetBy(\'' + jsq(c.id) + '\',' + i + ',this.value)">'
          + staffOpts(byOf(e)) + '</select></label>';
       if (e.amount != null && e.amount !== ''){
         h += '<span class="pf-feamt">' + esc(e.amountKind || '') + ' ¥' + Number(e.amount).toLocaleString() + '</span>';

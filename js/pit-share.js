@@ -35,6 +35,26 @@
 (function (w) {
   'use strict';
 
+  /* 🛡 v2.200.0（外部監査 2026-10-21 SEC-07・PitFlow 分）**HTML に値を入れる時の3つの部品＝ここが本体。**
+     ・pitEsc(x) … 本文・"…" の属性に入れる値。5記号（& < > " '）を逃がす
+     ・jsq(x)    … onclick="f('…')" の '…' に入れる値。\ と ' を逃がしてから pitEsc（_shared\coreflow-note-board.js と同じ形）
+                   ⚠ 先に esc した値を入れない（二重になる）。元の値を入れる
+     ・pitHex(c, d) … style に入れる色。#16進（3〜8桁）だけ通す。それ以外は d（無ければ空）
+     ⚠ textContent・トースト・確認の窓・操作ログ・LINE の文には通さない（&amp; が見えてしまう）。
+     ⚠ 各ファイルが自前の esc を持つ作り＝単独で読まれる見張りのために、使うファイルの頭に予備の定義を置いてよい
+        （if (typeof jsq !== 'function') { var jsq = … }）。 */
+  function pitEsc(x){
+    return String(x == null ? '' : x).replace(/[&<>"']/g, function (m) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m];
+    });
+  }
+  function pitJsq(x){ return pitEsc(String(x == null ? '' : x).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
+  function pitHex(c, d){ var s = String(c == null ? '' : c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s) ? s : (d == null ? '' : d); }
+  w.pitEsc = pitEsc;
+  if (typeof w.jsq !== 'function') w.jsq = pitJsq;
+  w.pitJsq = pitJsq;
+  w.pitHex = pitHex;
+
   /* ---- 差し込み口（借りる側が自分の持ち物を渡す） ---- */
   var HOOK = {
     divisions: function () { return (w.state && Array.isArray(w.state.divisions)) ? w.state.divisions : []; },
@@ -1085,19 +1105,21 @@ w.pitDivisionColor = pitDivisionColor;
     var id = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
     return ((w.state && w.state.workTypes) || []).find(function (x) { return x.id === id; });
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（作業タイプの色＝pitHex・onclick の id＝pitJsq）。
+     ⚠ opt.sideBefore / opt.onclick / opt.tail は呼ぶ側が組んだ HTML（そのまま通す） */
   function pitMonthRow(c, opt){
     if (!c) return '';
     opt = opt || {};
     var wt = pitMonthRowWt(c);
     var side = (opt.sideBefore || '')
              + (c.needLoaner ? '<span class="rme-loaner">代</span>' : '')
-             + (wt ? '<span class="rme-wt" style="color:' + wt.color + '">' + esc(wt.label) + '</span>' : '');
+             + (wt ? '<span class="rme-wt" style="color:' + pitHex(wt.color) + '">' + esc(wt.label) + '</span>' : '');
     var nm = (w.pitCustSurname ? w.pitCustSurname(c) : (c.customer || '')) || '（未入力）';
     return '<div class="rml-ev' + (opt.cls ? ' ' + opt.cls : '') + (c.urgent ? ' urgent' : '') + '"'
          + ' draggable="' + (opt.drag === false ? 'false' : 'true') + '"'
          + ' data-card-id="' + esc(c.id) + '"'
          + ' style="border-left-color:' + pitTeamColor(c) + '"'
-         + ' onclick="' + (opt.onclick || ('openDetail(\'' + esc(c.id) + '\')')) + '">'
+         + ' onclick="' + (opt.onclick || ('openDetail(\'' + pitJsq(c.id) + '\')')) + '">'
          + (opt.time === false ? '' : '<b>' + esc(opt.time || '--:--') + '</b> ')
          + esc(nm) + ' 様' + (c.car ? ' ' + esc(c.car) : '')
          + (side ? '<span class="rml-side">' + side + '</span>' : '')

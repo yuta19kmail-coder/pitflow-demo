@@ -121,10 +121,12 @@ function dashEarliestIntake(team, kind, today, holdOverride, opt){
    1日1列：日付／国産車／輸入車。セルは「埋まり/枠」＋ 可・終了・超過（黒）・休 のシンプル4種。
    右端近くまでスクロールすると30日ずつ継ぎ足し（初期60日・件数はその場で計算） */
 window._dashCalN = window._dashCalN || 60;
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（休みの名前・理由は MHS のカレンダーや設定から来る文字） */
+var pitEsc = (typeof window.pitEsc === 'function') ? window.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
 
 function _dashCalCell(team, tgt, base, ds){
   const eff = window.pitEffective ? pitEffective(ds, tgt, base) : { value: base, closed: null, rules: [] };
-  if (eff.closed) return '<div class="drc-c drc-closed" title="' + eff.closed + '＝受付なし">休</div>';
+  if (eff.closed) return '<div class="drc-c drc-closed" title="' + pitEsc(eff.closed) + '＝受付なし">休</div>';
   const cnt = dashIntake(team, ds);
   const capEff = eff.value;
   if (capEff <= 0) return '<div class="drc-c drc-end"title="ルールで受付停止">停</div>';
@@ -147,7 +149,7 @@ function _dashCalCols(from, to, today, tStr){
     const isClosed = (window.PitCal ? PitCal.isClosed(ds) : false);
     const cls = (d.getDay() === 0 || hol) ? ' red' : (d.getDay() === 6 ? ' sat' : '');
     g += '<div class="drc-col' + (ds === tStr ? ' today' : '') + '">';
-    g += '<div class="drc-h'+ cls + (isClosed ? ' closed' : '') + '" title="'+ (calNote || hol || '') + '">'+ (d.getMonth()+1) + '/'+ d.getDate() + '<br>'+ '日月火水木金土'[d.getDay()] + (ds === tStr ? '・今日': (calNote ? '・' + calNote : '')) + '</div>';
+    g += '<div class="drc-h'+ cls + (isClosed ? ' closed' : '') + '" title="'+ pitEsc(calNote || hol || '') + '">'+ (d.getMonth()+1) + '/'+ d.getDate() + '<br>'+ '日月火水木金土'[d.getDay()] + (ds === tStr ? '・今日': (calNote ? '・' + pitEsc(calNote) : '')) + '</div>';
     g += _dashCalCell('default', 'capDefault', capD, ds);
     g += _dashCalCell('import',  'capImport',  capI, ds);
     g += '</div>';

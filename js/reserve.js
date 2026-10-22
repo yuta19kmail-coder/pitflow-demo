@@ -2,6 +2,10 @@
    reserve.js
    予約ビュー（当日／週／月／2ヶ月）
    ======================================== */
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（cardHtml・週/月のミニカード・作業の色・暦の札）。部品の本体は pit-share.js（下は単独で読まれた時の予備） */
+var pitEsc = (typeof window.pitEsc === 'function') ? window.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); };
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return pitEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
 function renderReserve(){
   renderReserveNav();
@@ -65,9 +69,9 @@ function renderReserveDay(){
   html += '<div style="font-size:13px;color:var(--text2);">';
   /* 🔴 v1.90.0 休み＝赤／短縮＝オレンジ／特別営業＝緑（PitCal.tone） */
   const dayTone = (window.PitCal && PitCal.tone) ? PitCal.tone(dateStr) : (isClosed ? 'closed' : '');
-  if (dayNote) html += '<span class="cal-note ' + dayTone + '"><i data-ic=' + (isClosed ? 'ban' : 'clock') + ' data-ics=14></i> ' + dayNote + '</span>　';
+  if (dayNote) html += '<span class="cal-note ' + dayTone + '"><i data-ic=' + (isClosed ? 'ban' : 'clock') + ' data-ics=14></i> ' + pitEsc(dayNote) + '</span>　';
   const holDay = (window.Holidays && Holidays.name(dateStr)) || null;
-  if (holDay) html += '<span class="hol-badge"><i data-ic=flag data-ics=16></i> ' + holDay + '</span>　';
+  if (holDay) html += '<span class="hol-badge"><i data-ic=flag data-ics=16></i> ' + pitEsc(holDay) + '</span>　';
   html += '受付 ' + PitCal.openTime(dateStr) + ' 〜 ' + PitCal.cutoffTime(dateStr) + '　／　予約 ' + todays.length + ' 件';
   html += '</div></div>';
 
@@ -118,7 +122,7 @@ function renderReserveDay(){
 /* v1.34.0 slotHH（その行の「時」）を渡すと、**その行とぴったり同じ時刻でない場合だけ**時刻を出す。
    ＝「朝一」「09:30」「08:00（9時の行に寄せた分）」が、どれか分かるようにするため。 */
 function weekMiniCard(c, slotHH, isRet){
-  const at = (window.escAttr ? escAttr : function(s){ return String(s==null?'':s); });
+  const at = (window.escAttr ? escAttr : pitEsc);
   /* 🔴 v1.150.0 返車時間が無い車を**入庫時刻で代用しない**（言葉は return-slot.js の1本） */
   const _tv = String((isRet ? (window.pitReturnTimeText ? pitReturnTimeText(c) : (c.returnTime || ''))
                             : c.reserveTime) || '').trim();
@@ -136,16 +140,16 @@ function weekMiniCard(c, slotHH, isRet){
   if (c.needLoaner) badges += '<span class="rwk-lo" title="代車">代</span>';
   wts.slice(0, 3).forEach(function(id){
     const w = state.workTypes.find(x => x.id === id);
-    if (w) badges += '<span class="rwk-wb" style="background:' + w.color + '22;color:' + w.color + ';border-color:' + w.color + '66;">' + at(w.label) + '</span>';
+    if (w){ const _wc = pitHex(w.color); badges += '<span class="rwk-wb"' + (_wc ? ' style="background:' + _wc + '22;color:' + _wc + ';border-color:' + _wc + '66;"' : '') + '>' + at(w.label) + '</span>'; }
   });
   const staff = c.frontStaff || c.staff || '';
   const _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
   /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
   const _stf = (window.pitStaffShort ? pitStaffShort(staff) : (window.pitSurname ? pitSurname(staff) : staff));
-  let h = '<div class="rwk-card' + (c.codeRed ? ' rwk-claim' : '') + (_pend ? ' is-retpend' : '') + '" draggable="' + (_pend ? 'false' : 'true') + '" data-card-id="' + c.id + '" onclick="openDetail(\'' + c.id + '\')" style="border-left-color:' + teamColor + ';">';
+  let h = '<div class="rwk-card' + (c.codeRed ? ' rwk-claim' : '') + (_pend ? ' is-retpend' : '') + '" draggable="' + (_pend ? 'false' : 'true') + '" data-card-id="' + at(c.id) + '" onclick="openDetail(\'' + jsq(c.id) + '\')" style="border-left-color:' + teamColor + ';">';
   h += '<div class="rwk-r">' + (_showT ? '<span class="rwk-t">' + at(_tv) + '</span>' : '')
-     + '<span class="rwk-name">' + _nm + ' 様</span><span class="rwk-badges">' + badges + '</span></div>';
-  h += '<div class="rwk-r"><span class="rwk-car">' + (c.car || '') + '</span>' + (_stf ? '<span class="rwk-front">' + at(_stf) + '</span>' : '') + '</div>';
+     + '<span class="rwk-name">' + at(_nm) + ' 様</span><span class="rwk-badges">' + badges + '</span></div>';
+  h += '<div class="rwk-r"><span class="rwk-car">' + at(c.car || '') + '</span>' + (_stf ? '<span class="rwk-front">' + at(_stf) + '</span>' : '') + '</div>';
   h += '</div>';
   return h;
 }
@@ -175,10 +179,10 @@ function renderReserveWeek(){
     html += '<div class="reserve-week-head' + (isToday ? ' today' : '') + (isClosed ? ' closed' : '') + (hol ? ' holiday' : '') + '">';
     html += '<span class="dow">' + dow + '</span>';
     html += '<span class="day">' + (d.getMonth()+1) + '/' + d.getDate() + '</span>';
-    if (hol) html += '<span class="hol" title="' + hol + '">' + hol + '</span>';
+    if (hol) html += '<span class="hol" title="' + pitEsc(hol) + '">' + pitEsc(hol) + '</span>';
     /* 🔴 v1.90.0 色は PitCal.tone 1本（休み=赤／短縮=オレンジ／特別営業=緑）。
        ⚠ 週ビューは**札だけ・マスは塗らない**（ゆうた指定）。 */
-    if (calNote) html += '<span class="cal-chip ' + calTone + '" title="' + calNote + '">' + calNote + '</span>';
+    if (calNote) html += '<span class="cal-chip ' + calTone + '" title="' + pitEsc(calNote) + '">' + pitEsc(calNote) + '</span>';
     html += '</div>';
   });
 
@@ -288,8 +292,8 @@ function _rmlRows(from, to){
     const calTone = (PitCal.tone ? PitCal.tone(ds) : (isClosed ? 'closed' : ''));
     html += '<div class="rml-row' + (isClosed ? ' closed' : '') + (calTone === 'short' ? ' calshort' : '') + '">';
     html += '<div class="rml-date' + dCls + '">' + (d.getMonth()+1) + '/' + d.getDate() + '<span>' + '日月火水木金土'[dow] + (ds === todayStr ? '・今日' : '') + '</span>'
-         + (hol ? '<span class="rml-hol"><i data-ic=flag data-ics=16></i>' + hol + '</span>' : '')
-         + (calNote ? '<span class="rml-hol rml-cal ' + calTone + '">' + calNote + '</span>' : '') + '</div>';
+         + (hol ? '<span class="rml-hol"><i data-ic=flag data-ics=16></i>' + pitEsc(hol) + '</span>' : '')
+         + (calNote ? '<span class="rml-hol rml-cal ' + calTone + '">' + pitEsc(calNote) + '</span>' : '') + '</div>';
     html += '<div class="rml-cards" data-drop="reserveDate" data-drop-val="' + ds + '">';
     if (!cardsOfDay.length){
       html += '<span class="rml-empty">' + (isClosed ? '休' : '—') + '</span>';
@@ -374,8 +378,8 @@ function monthGridCells(refDate){
     html += '<div class="reserve-month-cell' + (isToday ? ' today' : '') + (isClosed ? ' closed' : '') + (calTone === 'short' ? ' calshort' : '') + (hol ? ' holiday' : '') + dowClass + '" data-drop="reserveDate" data-drop-val="' + dateStr + '"'
          + ' onclick="if(!event.target.closest(\'.reserve-month-event\'))pitReserveDayPopup(\'' + dateStr + '\',\'reserve\')">';
     html += '<div class="day-num">' + dd + '</div>';
-    if (hol) html += '<div class="hol-name" title="' + hol + '">' + hol + '</div>';
-    if (calNote) html += '<div class="cal-chip ' + calTone + '" title="' + calNote + '">' + calNote + '</div>';
+    if (hol) html += '<div class="hol-name" title="' + pitEsc(hol) + '">' + pitEsc(hol) + '</div>';
+    if (calNote) html += '<div class="cal-chip ' + calTone + '" title="' + pitEsc(calNote) + '">' + pitEsc(calNote) + '</div>';
     visible.forEach(c => {
       const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';   // 国産緑/輸入ピンク
       const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
@@ -383,11 +387,11 @@ function monthGridCells(refDate){
       const wt = state.workTypes.find(w => w.id === _wid);
       let side = '';
       if (c.needLoaner) side += '<span class="rme-loaner">代</span>';   // 並び＝代→作業
-      if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
-      html += '<div class="reserve-month-event' + (c.urgent ? ' urgent' : '') + '" draggable="true" data-card-id="' + c.id + '"';
+      if (wt) side += '<span class="rme-wt" style="color:' + pitHex(wt.color) + '">' + pitEsc(wt.label) + '</span>';
+      html += '<div class="reserve-month-event' + (c.urgent ? ' urgent' : '') + '" draggable="true" data-card-id="' + pitEsc(c.id) + '"';
       if (!c.urgent) html += ' style="border-left-color:' + teamColor + '"';
-      html += ' onclick="event.stopPropagation();openDetail(\'' + c.id + '\')">';
-      html += '<span class="rme-txt">' + nm + ' 様' + (c.car ? ' ' + c.car : '') + '</span>';   // 時間なし・苗字＋様・…省略
+      html += ' onclick="event.stopPropagation();openDetail(\'' + jsq(c.id) + '\')">';
+      html += '<span class="rme-txt">' + pitEsc(nm) + ' 様' + (c.car ? ' ' + pitEsc(c.car) : '') + '</span>';   // 時間なし・苗字＋様・…省略
       if (side) html += '<span class="rme-side">' + side + '</span>';   // 右側＝代車＋作業(色付き)
       if (c.tentative) html += '<span class="kari-edge" title="仮予約">仮</span>';   // 仮は右端に小さく（v0.100.1）
       if (window.pitApprovalBadge) html += pitApprovalBadge(c, 'edge');                // 🔵 v1.74.0 承認待ちの「承」
@@ -500,7 +504,7 @@ function cardHtml(c, opts){
     const wts = (Array.isArray(c.workTypes) && c.workTypes.length)
       ? c.workTypes : (c.workType ? [c.workType] : []);
     // 右上＝左から：代車（ある時）→ 当/待（ある時・預かりは出さない）→ 作業内容（一番右固定）
-    const at = (window.escAttr ? escAttr : function(s){ return String(s==null?'':s); });
+    const at = (window.escAttr ? escAttr : pitEsc);
     let top = _pendBadge;   /* 🆕 v1.149.0 未完はいちばん左（いちばん先に目に入る場所） */
     if (c.needLoaner){
       /* 🔴 v1.82.0 返ってきたかは loaner-free.js に聞く（ここで日付を引き算しない）。
@@ -520,8 +524,8 @@ function cardHtml(c, opts){
       }
     }
     if (dt && (c.dropType2 || dt.id === 'wait' || dt.id === 'sameDay')){
-      top += (window.pitDropBadges ? pitDropBadges(c, function(o){ const dc = DROP_COLOR[o.id] || 'var(--text2)'; return '<span class="pcm-drop" style="background:' + dc + '22;color:' + dc + ';border-color:' + dc + '66;">' + o.label + '</span>'; })
-                                   : '<span class="pcm-drop">' + dt.label + '</span>');
+      top += (window.pitDropBadges ? pitDropBadges(c, function(o){ const dc = DROP_COLOR[o.id] || 'var(--text2)'; return '<span class="pcm-drop" style="background:' + dc + '22;color:' + dc + ';border-color:' + dc + '66;">' + at(o.label) + '</span>'; })
+                                   : '<span class="pcm-drop">' + at(dt.label) + '</span>');
     }
     /* 🏷 v2.51.0（A-3・ゆうた 2026-09-01）**他の作業タイプがある時は出さない印**を先に外す。
        🔴 **CSSで隠さない。描く前に外す。**隠すと「幅は食っているのに見えない」という別の崩れになる。
@@ -539,15 +543,16 @@ function cardHtml(c, opts){
       if (w){ const _cd = ((id==='coat1y'||id==='coat3m') && c.coatingDone) ? ' pcm-done' : '';   // コーティング完了＝済
         /* 🏷 v2.51.0（A-5）B.P＋保険＝保険板金／一般＋保証＝保証修理。表は pit-share.js の1本 */
         const _lb = window.pitWtLabel ? pitWtLabel(c, id, _M) : w.label;
-        top += '<span class="pcm-wt' + _cd + '" style="background:' + w.color + '22;color:' + w.color + ';border-color:' + w.color + '66;">' + _lb + '</span>'; }
+        const _wc = pitHex(w.color);
+        top += '<span class="pcm-wt' + _cd + '"' + (_wc ? ' style="background:' + _wc + '22;color:' + _wc + ';border-color:' + _wc + '66;"' : '') + '>' + at(_lb) + '</span>'; }
     });
     const staff = c.frontStaff || c.staff || '';
     const placed = !!(opts.kanban && c.bayId && window.PitPip && PitPip.isOpen());   // PITボード(PiP)が開いている時だけグレーアウト（閉じてる時は普通表示）
     // PITカードと同じ2行構成：上=客名＋様／車種、右上=内容・代車、右下=担当。名前/車種はホバーでフル表示
     // 看板内はカード自体をドロップ先(reorder)にして同フェーズ内の並び替えに対応
-    var _reorderAttr = opts.kanban ? (' data-drop="reorder" data-drop-val="' + c.id + '"') : '';
-    const _clickC = opts.onClick ? opts.onClick : ("openDetail('" + c.id + "')");
-    let h = '<div class="pit-card pcm' + (c.codeRed ? ' pcm-claim' : '') + (c.resNo ? ' pcm-tab' : '') + (placed ? ' pcm-placed' : '') + (c.tentative ? ' is-tentative' : '') + _pendCls + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="' + _pendDrag + '" data-card-id="' + c.id + '"' + _reorderAttr + ' onclick="' + _clickC + '" style="border-left-color:' + teamColor + ';">';
+    var _reorderAttr = opts.kanban ? (' data-drop="reorder" data-drop-val="' + at(c.id) + '"') : '';
+    const _clickC = opts.onClick ? opts.onClick : ("openDetail('" + jsq(c.id) + "')");
+    let h = '<div class="pit-card pcm' + (c.codeRed ? ' pcm-claim' : '') + (c.resNo ? ' pcm-tab' : '') + (placed ? ' pcm-placed' : '') + (c.tentative ? ' is-tentative' : '') + _pendCls + (window.pitApprovalCardCls ? pitApprovalCardCls(c) : '') + '" draggable="' + _pendDrag + '" data-card-id="' + at(c.id) + '"' + _reorderAttr + ' onclick="' + _clickC + '" style="border-left-color:' + teamColor + ';">';
     h += (c.resNo ? '<div class="pcm-ear" style="border-left-color:' + (c.codeRed ? '#ef4444' : teamColor) + (c.codeRed ? ';border-top-color:#ef4444' : '') + '">' + at(c.resNo) + '</div><i class="pcm-ear-slide"></i>' : '');
     /* 耳の右の上辺のタブ＝車両注意（左/M/T/車高/土禁）＋ 🆕 v2.51.0 検切（赤・この予約だけ）
        🔴 中身も言い方も **pit-share.js の `pitCardTabs` 1本**（車検予定・ホバー・予約詳細と同じ）。
@@ -557,7 +562,7 @@ function cardHtml(c, opts){
     var _ct = (window.pitCardTabs ? pitCardTabs(c, { narrow:true })
                                   : (window.pitCarCautions ? pitCarCautions(c) : []).map(function(x){ return { label:x }; }));
     if (_ct.length) h += '<div class="pcm-cau">' + _ct.map(function(o){
-      return '<span class="pcm-caut' + (o.exp ? ' pcm-caut-exp' : '') + '">' + o.label + '</span>'; }).join('') + '</div>';
+      return '<span class="pcm-caut' + (o.exp ? ' pcm-caut-exp' : '') + '">' + at(o.label) + '</span>'; }).join('') + '</div>';
     /* 名前・車種・担当の title は撤去（ホバー情報カード card-hover.js で全文表示するため二重ツールチップを防ぐ） */
     var _nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
     /* 🔴 v1.104.0 自社（小林モータース）は狭い枠だと入らないので「コバモ」（pit-share.js の1本） */
@@ -566,10 +571,10 @@ function cardHtml(c, opts){
     var _kn = c.tentative ? '<span class="kari-name" title="仮予約">仮</span>' : '';
     /* 🔵 v1.74.0 承認待ちは「様」のすぐ後ろに「承」（仮と同じ置き場所・色ちがい） */
     _kn += (window.pitApprovalBadge ? pitApprovalBadge(c, 'name') : '');
-    h += '<div class="pcm-r"><span class="pcm-nm2"><span class="pcm-name">' + _nm + '</span><span class="pcm-sama">様</span>' + _kn + '</span><span class="pcm-badges">' + top + '</span></div>';
+    h += '<div class="pcm-r"><span class="pcm-nm2"><span class="pcm-name">' + at(_nm) + '</span><span class="pcm-sama">様</span>' + _kn + '</span><span class="pcm-badges">' + top + '</span></div>';
     // 完TEL待ち以降（returnStage）で洗車対象なら、担当の左に洗車バッジ（洗車完了＝済スタンプ）
     var _washB = (c.returnStage && c.needWash) ? '<span class="pcm-wash' + (c.washSalesDone?' pcm-done':'') + '" title="洗車対象">洗車</span>' : '';
-    h += '<div class="pcm-r"><span class="pcm-car">' + (c.car || '') + '</span>' + _washB + (_stf ? '<span class="pcm-front">' + _stf + '</span>' : '') + '</div>';
+    h += '<div class="pcm-r"><span class="pcm-car">' + at(c.car || '') + '</span>' + _washB + (_stf ? '<span class="pcm-front">' + at(_stf) + '</span>' : '') + '</div>';
     // 外注フェーズ＝外注先名(＋メモ)＋そのフェーズに入ってからの日数ラベル
     if (c.status === 'outsource'){
       /* 🔴 v1.58.0 起点は**フローの記録**（pitPhaseStartMs）。写しを直接見ない。 */

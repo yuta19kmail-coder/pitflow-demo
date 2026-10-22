@@ -55,6 +55,9 @@
   'use strict';
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq・担当の色は pitHex） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   function man(n){ var m = (+n||0)/10000; return (Math.abs(m)>=100 ? Math.round(m) : Math.round(m*10)/10).toLocaleString() + '万'; }
   /* 走った時刻（時:分:秒）。⚠ 秒まで出す＝1分の間に2回押しても、変わったと分かる */
   function hhmm(iso){
@@ -412,7 +415,7 @@
         var fs = byRule[rid], r0 = fs[0], lv = levelOf(r0.level), ct = catOf(r0.cat);
         var open = (UI.open[rid] !== false);       /* 既定は開いておく（見落とさないように） */
         h += '<section class="ins-g' + (open ? '' : ' shut') + '" style="--ins-c:' + lv.color + '">'
-           +   '<div class="ins-g-h" onclick="pitInspectOpen(\'' + rid + '\')">'
+           +   '<div class="ins-g-h" onclick="pitInspectOpen(\'' + jsq(rid) + '\')">'
            +     '<span class="ins-g-lv">' + esc(lv.label) + '</span>'
            /* 🔢 v1.178.0 規則の記号。1件ごとの番号の**頭と同じ字**なので、
               「F05-483102 の話だな」と規則までたどり着ける。 */
@@ -439,10 +442,10 @@
           fs.slice(0, cap).forEach(function (f) { h += row(f); });
           h += '</div>';
           if (fs.length > cap){
-            h += '<button class="ins-more" onclick="pitInspectAll(\'' + rid + '\')">'
+            h += '<button class="ins-more" onclick="pitInspectAll(\'' + jsq(rid) + '\')">'
                +   'ほか ' + (fs.length - cap) + '件を出す</button>';
           } else if (UI.all[rid] && fs.length > ROWS_CAP){
-            h += '<button class="ins-more" onclick="pitInspectAll(\'' + rid + '\')">上の ' + ROWS_CAP + '件だけにする</button>';
+            h += '<button class="ins-more" onclick="pitInspectAll(\'' + jsq(rid) + '\')">上の ' + ROWS_CAP + '件だけにする</button>';
           }
         }
         h += '</section>';
@@ -540,7 +543,7 @@
     var badge = '';
     if (f.kind === 'card'){
       badge = f.staff
-        ? '<span class="ins-who-st" style="--ins-s:' + (f.staffColor || 'var(--text3)') + '">' + esc(f.staff) + '</span>'
+        ? '<span class="ins-who-st" style="--ins-s:' + pitHex(f.staffColor, 'var(--text3)') + '">' + esc(f.staff) + '</span>'
         : '<span class="ins-who-st none">担当なし</span>';
       if (f.staff2) badge += '<span class="ins-who-st2">車検 ' + esc(f.staff2) + '</span>';
       else if (f.cat === 'shaken') badge += '<span class="ins-who-st2 none">車検担当なし</span>';
@@ -559,7 +562,7 @@
           画面で作り直すと、書き出しの番号と食い違う日が来る。 */
     var noBtn = f.no
       ? '<button class="ins-no" title="押すと番号をコピーします"'
-        + ' onclick="pitInspectCopyNo(\'' + esc(f.no) + '\')">' + esc(f.no) + '</button>'
+        + ' onclick="pitInspectCopyNo(\'' + jsq(f.no) + '\')">' + esc(f.no) + '</button>'
       : '';
 
     var h = '<div class="ins-row' + (f.mark ? ' done' : '') + '">'
@@ -576,8 +579,8 @@
        ・出す／出さないは inspect-fix.js の表が決める（欄が1つに決まらない規則には出ない）
        ⚠ 確定金額・確定日は小窓の中で「🔒 管理のみ」になる（表が持っている） */
     var canFix = window.pitFixFieldsFor ? (window.pitFixFieldsFor(f) || []).length : 0;
-    if (canFix) h += '<button class="ins-fixb" onclick="pitFixOpen(\'' + esc(f.key) + '\')">ここを直す</button>';
-    if (f.kind === 'card' && f.refId) h += '<button class="ins-open" onclick="pitInspectGo(\'' + esc(f.refId) + '\')">開く</button>';
+    if (canFix) h += '<button class="ins-fixb" onclick="pitFixOpen(\'' + jsq(f.key) + '\')">ここを直す</button>';
+    if (f.kind === 'card' && f.refId) h += '<button class="ins-open" onclick="pitInspectGo(\'' + jsq(f.refId) + '\')">開く</button>';
     if (f.kind === 'veh')             h += '<button class="ins-open" onclick="showView(\'fleet\')">車両管理</button>';
     /* 🔴🔴 v1.173.0（ゆうた指定）**「確認した（合っている）」は要判断の規則にだけ出す。**
        ＝ 抜け・矛盾（金額が空・日付が空・状態が食い違う）には**絶対に出さない**＝直すしかない。
@@ -586,7 +589,7 @@
       if (m.judge && !f.judge) return;
       h += '<button class="ins-mk' + (f.mark === m.id ? ' on' : '') + (m.judge ? ' judge' : '') + '"'
          +   ' title="' + esc(markNote(m, f)) + '"'
-         +   ' onclick="pitInspectMarkUI(\'' + esc(f.key) + '\',\'' + m.id + '\')">' + esc(markLabel(m, f)) + '</button>';
+         +   ' onclick="pitInspectMarkUI(\'' + jsq(f.key) + '\',\'' + jsq(m.id) + '\')">' + esc(markLabel(m, f)) + '</button>';
     });
     h += '</div></div>';
     return h;

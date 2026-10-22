@@ -47,6 +47,8 @@
   function t(v){ return String(v == null ? '' : v).trim(); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq） */
+  var jsq = (typeof w.jsq === 'function') ? w.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function st(){ return w.state || {}; }
   function admin(){ try { return !!(w.pitIsAdmin && w.pitIsAdmin()); } catch(e){ return false; } }
   function num(v){ var n = Number(String(v == null ? '' : v).replace(/[^0-9.-]/g, '')); return isFinite(n) ? n : 0; }
@@ -480,7 +482,7 @@
           + ' onchange="pitMasterTime(this.value)"><div class="ms-tq">';
     (w.PIT_TIME_QUICK || []).forEach(function(x){
       h += '<button type="button" class="ms-tqb' + (cur === x.label ? ' on' : '') + '"'
-         + ' onclick="pitMasterTime(\'' + esc(x.label) + '\')">' + esc(x.label) + '</button>';
+         + ' onclick="pitMasterTime(\'' + jsq(x.label) + '\')">' + esc(x.label) + '</button>';
     });
     return h + '</div></div>';
   }
@@ -505,7 +507,7 @@
     if (!hit.length) return '<div class="ms-hint">見つかりませんでした。</div>';
     return hit.map(function(c){
       var stx = w.pitCardStatusText ? w.pitCardStatusText(c) : t(c.status);
-      return '<div class="ms-cand' + (M && c.id === M.id ? ' on' : '') + '" onclick="pitMasterPickCard(\'' + esc(c.id) + '\')">'
+      return '<div class="ms-cand' + (M && c.id === M.id ? ' on' : '') + '" onclick="pitMasterPickCard(\'' + jsq(c.id) + '\')">'
         + '<div class="ms-cl"><b>' + esc(t(c.customer) || t(c.kana) || '（無名）') + '</b>'
         + '<span>' + esc(t(c.plate) || 'ナンバーなし') + '　' + esc(t(c.car)) + '</span></div>'
         + '<div class="ms-cr">' + esc(t(c.resNo)) + '　' + esc(stx) + '　' + esc(t(c.reserveDate)) + '</div></div>';
@@ -533,7 +535,7 @@
         if (!v) return;
         h += chip(!!(PICK && PICK.veh && PICK.veh.id === v.id),
           (t(v.plate) || 'ナンバーなし') + '　' + t(v.maker) + ' ' + t(v.car),
-          "pitMasterPickCust('" + esc(cu.id) + "','" + esc(v.id) + "')");
+          "pitMasterPickCust('" + jsq(cu.id) + "','" + jsq(v.id) + "')");
       });
       return h + '</div>';
     }).join('');

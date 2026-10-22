@@ -20,14 +20,16 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
     });
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（作業タイプの色＝pitHex・id と値＝esc） */
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
   function numIn(id, val, min, max) {
-    return '<input type="number" class="ps-in ps-num" id="' + id + '" value="' + val + '"'
+    return '<input type="number" class="ps-in ps-num" id="' + esc(id) + '" value="' + esc(val) + '"'
       + ' min="' + min + '" max="' + max + '" onchange="pitSettingsApply()">';
   }
 
   function floatIn(id, val, min, max) {
-    return '<input type="number" class="ps-in ps-num" id="' + id + '" value="' + val + '"'
+    return '<input type="number" class="ps-in ps-num" id="' + esc(id) + '" value="' + esc(val) + '"'
       + ' min="' + min + '" max="' + max + '" step="0.1" onchange="pitSettingsApply()">';
   }
 
@@ -113,7 +115,7 @@
     h += '<div class="ps-est2">';
     h += '<div class="ps-est2-head"><span class="ps-est2-name"></span><span class="ps-est2-cell">国産</span><span class="ps-est2-cell">輸入</span></div>';
     (state.workTypes || []).forEach(function (w) {
-      h += '<div class="ps-est2-row"><span class="ps-est2-name"><span class="ps-est-tag" style="background:' + w.color + '"></span>' + esc(w.label) + '</span>'
+      h += '<div class="ps-est2-row"><span class="ps-est2-name"><span class="ps-est-tag" style="background:' + pitHex(w.color, '#64748b') + '"></span>' + esc(w.label) + '</span>'
          + '<span class="ps-est2-cell">' + numIn('ps-est-' + w.id + '-def', estD[w.id] != null ? estD[w.id] : (estD._default != null ? estD._default : 5), 0, 60) + '<span class="ps-unit">日</span></span>'
          + '<span class="ps-est2-cell">' + numIn('ps-est-' + w.id + '-imp', estI[w.id] != null ? estI[w.id] : (estI._default != null ? estI._default : 5), 0, 60) + '<span class="ps-unit">日</span></span></div>';
     });
@@ -135,7 +137,7 @@
     h += '<div class="ps-est2 ps-est2-money">';
     h += '<div class="ps-est2-head"><span class="ps-est2-name"></span><span class="ps-est2-cell">国産</span><span class="ps-est2-cell">輸入</span></div>';
     (state.workTypes || []).forEach(function (w) {
-      h += '<div class="ps-est2-row"><span class="ps-est2-name"><span class="ps-est-tag" style="background:' + w.color + '"></span>' + esc(w.label) + '</span>'
+      h += '<div class="ps-est2-row"><span class="ps-est2-name"><span class="ps-est-tag" style="background:' + pitHex(w.color, '#64748b') + '"></span>' + esc(w.label) + '</span>'
          + '<span class="ps-est2-cell">' + numIn('ps-eam-' + w.id + '-def', eamD[w.id] != null ? eamD[w.id] : (eamD._default != null ? eamD._default : 100000), 0, 9999999) + '<span class="ps-unit">円</span></span>'
          + '<span class="ps-est2-cell">' + numIn('ps-eam-' + w.id + '-imp', eamI[w.id] != null ? eamI[w.id] : (eamI._default != null ? eamI._default : 100000), 0, 9999999) + '<span class="ps-unit">円</span></span></div>';
     });

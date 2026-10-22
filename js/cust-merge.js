@@ -23,7 +23,10 @@
   'use strict';
 
   function t(x){ return String(x == null ? '' : x).trim(); }
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に・onclick の id は jsq・href は https だけ） */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  function safeHref(u){ u=String(u==null?'':u).trim(); return /^https?:\/\//i.test(u)?u:''; }
   function norm(s){ return String(s==null?'':s).replace(/\s+/g,'').replace(/[ァ-ヶ]/g,function(ch){ return String.fromCharCode(ch.charCodeAt(0)-0x60); }).toLowerCase(); }
   function custs(){ return (w.state && state.customers) || []; }
   function cards(){ return (w.state && state.cards) || []; }
@@ -233,7 +236,7 @@
     if(st==='ng') return '<span class="um-pill">LINE NG</span>';
     if(st==='ok'){
       var no = _lstepNo(c.lstepId);
-      var url = (w.pitLstepUrl && t(c.lstepId)) ? pitLstepUrl(c.lstepId) : '';
+      var url = (w.pitLstepUrl && t(c.lstepId)) ? safeHref(pitLstepUrl(c.lstepId)) : '';
       if(url) return '<a class="um-pill ok um-lstep" href="' + esc(url) + '" target="_blank" rel="noopener" '
                    + 'onclick="event.stopPropagation()" title="Lステップを開く">Lステップ' + (no?(' '+esc(no)):'') + '</a>';
       return '<span class="um-pill ok">LINE 登録済' + (no?('（'+esc(no)+'）'):'') + '</span>';
@@ -297,7 +300,7 @@
         var nm = ((v.maker?v.maker+' ':'')+(v.car||'')).trim();
         return (t(v.plate)||(v.perVisit?'都度車両変動':'ナンバーなし')) + (nm?('・'+nm):'');
       }).join('／') + (vs.length>2?('　ほか'+(vs.length-2)+'台'):'');
-      h += '<button class="um-row"' + (済?' disabled title="もう片方で選ばれています"':'') + ' onclick="PitCustMerge.pick(' + n + ',\'' + esc(c.id) + '\')">'
+      h += '<button class="um-row"' + (済?' disabled title="もう片方で選ばれています"':'') + ' onclick="PitCustMerge.pick(' + n + ',\'' + jsq(c.id) + '\')">'
          + '<b>' + esc(disp(c)) + '</b><span class="um-sub">' + esc(t(c.kana)) + '　' + esc(primaryTel(c) || 'TELなし')
          + ((c.oldNames||[]).length?('　旧：'+esc(c.oldNames.join('／'))):'') + '</span>'
          + '<span class="um-sub2">' + esc(車 || '車の登録なし') + '</span></button>';
@@ -363,8 +366,8 @@
           var 選 = _st.欄[r.k] || r.既定;
           h += '<div class="vm-row"><div class="vm-rl">' + esc(r.l)
              + (r.種類==='空埋め'?'<span class="vm-rt">①が空</span>':'') + '</div>'
-             + '<button class="vm-opt' + (選==='main'?' on':'') + '" onclick="PitCustMerge.setField(\'' + esc(r.k) + '\',\'main\')"><i>①</i>' + esc(r.主||'（空）') + '</button>'
-             + '<button class="vm-opt' + (選==='sub'?' on':'') + '" onclick="PitCustMerge.setField(\'' + esc(r.k) + '\',\'sub\')"><i>②</i>' + esc(r.サブ||'（空）') + '</button></div>';
+             + '<button class="vm-opt' + (選==='main'?' on':'') + '" onclick="PitCustMerge.setField(\'' + jsq(r.k) + '\',\'main\')"><i>①</i>' + esc(r.主||'（空）') + '</button>'
+             + '<button class="vm-opt' + (選==='sub'?' on':'') + '" onclick="PitCustMerge.setField(\'' + jsq(r.k) + '\',\'sub\')"><i>②</i>' + esc(r.サブ||'（空）') + '</button></div>';
         });
         h += '</div>';
       } else {
@@ -397,7 +400,7 @@
         h += '<div class="vm-log"><div class="vm-logmain"><b>' + esc(disp(x.主)) + '</b> ← ' + esc(x.記録.fromName||'')
            + '<span class="vm-logsub">' + dt.getFullYear()+'/'+(dt.getMonth()+1)+'/'+dt.getDate()+' '+p2(dt.getHours())+':'+p2(dt.getMinutes())
            + (x.記録.by?('　'+esc(x.記録.by)):'') + '　車' + (x.記録.車||[]).length + '台・カード' + (x.記録.カード||[]).length + '件</span></div>'
-           + (canR ? '<button class="vm-undo" onclick="PitCustMerge.undoAsk(\'' + esc(x.記録.id) + '\')">取り消す</button>'
+           + (canR ? '<button class="vm-undo" onclick="PitCustMerge.undoAsk(\'' + jsq(x.記録.id) + '\')">取り消す</button>'
                    : '<span class="vm-lock">管理者だけ</span>') + '</div>';
       });
       h += '</div>';

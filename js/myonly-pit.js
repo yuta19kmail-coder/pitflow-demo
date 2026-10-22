@@ -119,7 +119,7 @@
     var lb = boardLabel(c.boardId);
     if (!lb) return html;
     return String(html).replace('<div class="pit-card pcm',
-      '<div data-xboard="' + lb + '" class="pit-card pcm kb-xboard');
+      '<div data-xboard="' + esc(lb) + '" class="pit-card pcm kb-xboard');   /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（ボードの名前は設定で変えられる） */
   }
 
   /* ---------- 🔴 v1.69.0 列の中身の組み立て（ゆうた指定） ----------

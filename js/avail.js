@@ -13,8 +13,11 @@
 /* 簡易エスケープ（顧客名・車種にHTML特殊文字が入っても崩れないように） */
 function _avEsc(s){
   return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（_avEsc を5記号に・jsq / pitHex の予備の定義＝本体は pit-share.js） */
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _avEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
 /* 入庫1行（読み取り専用・クリックで予約詳細） */
 function _availRow(c){
@@ -34,7 +37,8 @@ function _availRow(c){
   let workTag = '';
   wts.slice(0, 2).forEach(function (id) {
     const w = (state.workTypes || []).find(function (x) { return x.id === id; });
-    if (w) workTag += '<span class="av-it-work' + ((w.label || '').length >= 4 ? ' long' : '') + '" style="background:' + w.color + '20;color:' + w.color + ';border-color:' + w.color + ';">' + _avEsc(w.label) + '</span>';
+    const _wc = w ? pitHex(w.color) : '';
+    if (w) workTag += '<span class="av-it-work' + ((w.label || '').length >= 4 ? ' long' : '') + '" style="' + (_wc ? 'background:' + _wc + '20;color:' + _wc + ';border-color:' + _wc + ';' : '') + '">' + _avEsc(w.label) + '</span>';
   });
   // 添え物タグ（他の予約ビュー・当日ビューと同じ tag-side の配色に合わせる）
   let side = '';
@@ -49,8 +53,8 @@ function _availRow(c){
   if (c.consult)    side += '<span class="tag-side consult">相談</span>';
   if (c.needLoaner) side += '<span class="tag-side loaner">代車</span>';
 
-  let h = '<div class="av-it' + (c.urgent ? ' urgent' : '') + '" style="--team:' + teamColor + '" onclick="pitOpenCardDetail(\'' + c.id + '\')" title="クリックで予約詳細">';
-  h += '<div class="av-it-time">' + (time || '—') + '</div>';
+  let h = '<div class="av-it' + (c.urgent ? ' urgent' : '') + '" style="--team:' + teamColor + '" onclick="pitOpenCardDetail(\'' + jsq(c.id) + '\')" title="クリックで予約詳細">';
+  h += '<div class="av-it-time">' + (time ? _avEsc(time) : '—') + '</div>';
   h += '<div class="av-it-main">';
   h += '<div class="av-it-head"><span class="av-it-name">' + _avEsc(name) + '</span>' + (done ? '<span class="av-it-done">入庫済</span>' : '') + '</div>';
   if (c.car) h += '<div class="av-it-car">' + _avEsc(c.car) + '</div>';

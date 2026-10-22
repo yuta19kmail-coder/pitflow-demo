@@ -107,6 +107,8 @@
      🔴 部品の差し込み口 badgeHtml に「🔗 予約番号・お客様・車種」のボタンを足す。押すとそのカードを開く。
      ⚠ 部品には書き足さない（リンク先＝PitFlow のカードは PitFlow だけの事情）。 */
   function _esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function _linkCard(n) {
     if (!n || !(n.linkCardId || n.linkResNo)) return null;
     const cards = (window.state && state.cards) || [];
@@ -117,7 +119,7 @@
     if (!n || _foreign(n) || !(n.linkLabel || n.linkResNo)) return '';
     const ic = (typeof window.ic === 'function') ? window.ic('link', '🔗', 13) : '🔗';
     return `<button type="button" class="bn-link" title="この車のカードを開く"
-      onclick="event.stopPropagation();pitOpenNoteLink('${_esc(n.id)}')">${ic}<span>${_esc(n.linkLabel || n.linkResNo)}</span></button>`;
+      onclick="event.stopPropagation();pitOpenNoteLink('${jsq(n.id)}')">${ic}<span>${_esc(n.linkLabel || n.linkResNo)}</span></button>`;
   }
   window.pitOpenNoteLink = function (id) {
     const n = _notes().find(x => x && x.id === id);

@@ -4,6 +4,10 @@
    v0.107.0：件数が増えても枠が伸びないよう、1日最大3件＋「+N件」表示。枠クリックでその日の全実績をポップアップ。
    実績＝作業完了日(completedAt)に「作業完了 or 返車済み」になったカード。
    ======================================== */
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（月の枠の名前・作業の色・id・祝日の札）。部品の本体は pit-share.js（下は単独で読まれた時の予備） */
+var pitEsc = (typeof window.pitEsc === 'function') ? window.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); };
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return pitEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
 /* ===================================================================
    🔢🔢 v2.6.0（ゆうた案）実績ビューは **2段**。ボタン1つで入れ替える。
@@ -129,7 +133,7 @@ window.pitResultHitGo = function(id){
 
 function _rsMark(t, words){
   return window.pitSearchMark ? pitSearchMark(t == null ? '' : t, words || [])
-                              : escAttr(t == null ? '' : t);
+                              : pitEsc(t == null ? '' : t);
 }
 function _rsMonthPrefix(){
   return state.resultMonth.getFullYear() + '-' + String(state.resultMonth.getMonth() + 1).padStart(2, '0');
@@ -162,13 +166,13 @@ function _resultHitsHtml(){
     var wt = (state.workTypes || []).find(function(w){ return w.id === _wid; });
     var _in = window.pitInternLabel ? pitInternLabel(c) : '';
     var side = _in ? '<span class="rme-wt rme-intern">' + escAttr(_in) + '</span>'
-                   : (wt ? '<span class="rme-wt" style="color:' + wt.color + '">' + escAttr(wt.label) + '</span>' : '');
+                   : (wt ? '<span class="rme-wt" style="color:' + pitHex(wt.color) + '">' + escAttr(wt.label) + '</span>' : '');
     var w = (window.pitSearchWhere && window.pitCardFields) ? pitSearchWhere(pitCardFields(c), R.words) : [];
     var where = w.length
       ? '<span class="rs-where">' + w.map(function(o){ return escAttr(o.label) + (o.as ? ' ' + escAttr(o.as) : ''); }).join('・') + '</span>'
       : '';
     h += '<button class="rs-hit' + (String(x.date).indexOf(pre) === 0 ? ' now' : '')
-       + (state.resultHit === c.id ? ' sel' : '') + '" onclick="pitResultHitGo(\'' + escAttr(c.id) + '\')">'
+       + (state.resultHit === c.id ? ' sel' : '') + '" onclick="pitResultHitGo(\'' + jsq(c.id) + '\')">'
        + '<span class="rs-d">' + (+dd[1]) + '/' + (+dd[2]) + '<em>(' + dow + ')</em></span>'
        + '<span class="rs-n">' + _rsMark(nm, R.words) + ' 様</span>'
        + (c.car ? '<span class="rs-c">' + _rsMark(c.car, R.words) + '</span>' : '')
@@ -272,7 +276,7 @@ function _resultMonthCells(y, mo, opt){
          + (dayHit ? ' rs-day' : '') + (dayOne ? ' rs-day-one' : '') + '"'
          + ' onclick="if(!event.target.closest(\'.reserve-month-event\'))pitResultDayPopup(\'' + dateStr + '\')">';
     html += '<div class="day-num">' + dd + '</div>';
-    if (hol) html += '<div class="hol-name" title="' + hol + '">' + hol + '</div>';
+    if (hol) html += '<div class="hol-name" title="' + pitEsc(hol) + '">' + pitEsc(hol) + '</div>';
 
     visible.forEach(function(c){
       const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';   // 国産緑/輸入ピンク
@@ -283,12 +287,12 @@ function _resultMonthCells(y, mo, opt){
       let side = '';
       /* 🏢 v2.6.0 社内車両は区分の名前（中古／代車車検／内部）を出す＝何の車か一目で分かる */
       const _in = window.pitInternLabel ? pitInternLabel(c) : '';
-      if (_in) side += '<span class="rme-wt rme-intern">' + _in + '</span>';
-      else if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
+      if (_in) side += '<span class="rme-wt rme-intern">' + pitEsc(_in) + '</span>';
+      else if (wt) side += '<span class="rme-wt" style="color:' + pitHex(wt.color) + '">' + pitEsc(wt.label) + '</span>';
       const evHit = _ids[c.id] ? ' rs-ev' : '';
       const evOne = (_one === c.id) ? ' rs-ev-one' : '';
-      html += '<div class="reserve-month-event' + evHit + evOne + '" data-card-id="' + c.id + '" style="border-left-color:' + teamColor + '"'
-           + ' onclick="event.stopPropagation();openDetail(\'' + c.id + '\')">';
+      html += '<div class="reserve-month-event' + evHit + evOne + '" data-card-id="' + pitEsc(c.id) + '" style="border-left-color:' + teamColor + '"'
+           + ' onclick="event.stopPropagation();openDetail(\'' + jsq(c.id) + '\')">';
       /* 🔎 v2.17.0 当たった字を塗る（塗るのは元の字・v1.176.0）。語が無ければ今までどおりの見た目 */
       html += '<span class="rme-txt">' + _rsMark(nm, _words) + ' 様' + (c.car ? ' ' + _rsMark(c.car, _words) : '') + '</span>';   // 苗字＋様＋車種（…省略）
       if (side) html += '<span class="rme-side">' + side + '</span>';   // 右＝作業(色付き)
@@ -332,7 +336,7 @@ window.pitResultDayPopup = function(dateStr){
   const body = _lit.length
     ? _lit.map(function(c){
         const one = (typeof cardHtml === 'function') ? cardHtml(c, { compact: true })
-          : ('<div>' + ((window.pitCustName ? pitCustName(c) : (c.customer || '')) || '') + '</div>');
+          : ('<div>' + pitEsc((window.pitCustName ? pitCustName(c) : (c.customer || '')) || '') + '</div>');
         return _hit[c.id] ? ('<div class="pdp-hit">' + one + '</div>') : one;
       }).join('')
     : '<div class="pdp-empty">実績はありません</div>';

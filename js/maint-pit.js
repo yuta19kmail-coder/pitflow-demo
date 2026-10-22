@@ -32,7 +32,10 @@
 (function (w) {
   'use strict';
 
-  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]; }); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に・onclick の '…' は jsq・色は pitHex。予備の定義＝本体は pit-share.js） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   function arr(v){ return Array.isArray(v) ? v : []; }
   function today(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
   function ymOf(ds){ return String(ds || '').slice(0, 7); }
@@ -528,8 +531,8 @@
       + '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>'
       + '</div><div class="mb-act">'
       + (r.level === 'done'
-          ? '<button class="vh-btn mb-done" onclick="flLeaseArchive(\'' + v.id + '\')"><i data-ic=box data-ics=16></i> 予定通りリースアップでアーカイブ</button>'
-          : '<button class="vh-btn" onclick="flMaintGoto(\'' + v.id + '\',\'' + ymOf(r.end) + '\')">' + (r.fixed ? '日ビューで見る' : '日を決める') + '</button>')
+          ? '<button class="vh-btn mb-done" onclick="flLeaseArchive(\'' + jsq(v.id) + '\')"><i data-ic=box data-ics=16></i> 予定通りリースアップでアーカイブ</button>'
+          : '<button class="vh-btn" onclick="flMaintGoto(\'' + jsq(v.id) + '\',\'' + jsq(ymOf(r.end)) + '\')">' + (r.fixed ? '日ビューで見る' : '日を決める') + '</button>')
       + '</div></div>';
   }
 
@@ -592,7 +595,7 @@
         h += '<span class="mb-due">満了 ' + esc(p.dueDate) + '</span>';
         var dd = daysBetween(td, p.dueDate);
         h += '<span>' + (dd >= 0 ? ('あと' + dd + '日') : ((-dd) + '日超過')) + '</span>';
-        if (p.openFrom) h += '<span>受けられる期間 ' + md(p.openFrom) + '〜' + md(p.openTo) + '</span>';
+        if (p.openFrom) h += '<span>受けられる期間 ' + esc(md(p.openFrom)) + '〜' + esc(md(p.openTo)) + '</span>';
       } else {
         h += '<span class="mb-due">' + esc(ymText(p.months[0])) + ' の予定</span>';
         if (p.slipped) h += '<span>→</span><span class="mb-due">' + esc(ymText(p.ym)) + ' へ繰り越し</span>';
@@ -609,10 +612,10 @@
             候補（置き直すのが軽い）とは重さが違うので、**候補は聞かない／確定は聞く**で分けている。
          🔴 **入庫したあとは出さない。**（もうタスクボードにカードがある＝ここで消す話ではない） */
       if (r.fixed){
-        h += '<span class="mb-chip fixed">' + md(r.fixed.fromDate) + '〜' + md(r.fixed.toDate) + ' で確定'
+        h += '<span class="mb-chip fixed">' + esc(md(r.fixed.fromDate)) + '〜' + esc(md(r.fixed.toDate)) + ' で確定'
            + ((r.fixed.started || r.doneReady) ? ''
               : '<button type="button" class="mb-x" title="この確定を取り消す" aria-label="この確定を取り消す"'
-                + ' onclick="event.stopPropagation();flMaintDelRecAsk(\'' + r.fixed.id + '\')">×</button>')
+                + ' onclick="event.stopPropagation();flMaintDelRecAsk(\'' + jsq(r.fixed.id) + '\')">×</button>')
            + '</span>';
       }
       /* 🔴 v2.68.0（ゆうた指定 2026-09-05）**候補の横に小さい × を付けた。**
@@ -627,12 +630,12 @@
       r.candidates.forEach(function(c){
         var gone = c.toDate < td;
         h += '<span class="mb-chip' + (gone ? ' gone' : '') + '" title="' + esc(c.fromDate + '〜' + c.toDate) + '">'
-           + md(c.fromDate) + (c.fromDate === c.toDate ? '' : ('〜' + md(c.toDate)))
+           + esc(md(c.fromDate)) + (c.fromDate === c.toDate ? '' : ('〜' + esc(md(c.toDate))))
            + '<button type="button" class="mb-x" title="この候補だけ取り消す" aria-label="この候補だけ取り消す"'
-           + ' onclick="event.stopPropagation();flMaintDelRec(\'' + c.id + '\')">×</button>'
+           + ' onclick="event.stopPropagation();flMaintDelRec(\'' + jsq(c.id) + '\')">×</button>'
            + '</span>';
       });
-      if (!r.fixed) h += '<span class="mb-chip add" onclick="flMaintGoto(\'' + r.vehicleId + '\',\'' + p.ym + '\')">＋ 候補を置く</span>';
+      if (!r.fixed) h += '<span class="mb-chip add" onclick="flMaintGoto(\'' + jsq(r.vehicleId) + '\',\'' + jsq(p.ym) + '\')">＋ 候補を置く</span>';
       h += '</span></div>';
 
       /* 3行目＝作業内容（依頼事項）
@@ -644,19 +647,19 @@
       h += '<div class="mb-line mb-menu"><span>内容</span>'
          + (_mn ? '<span class="mb-menu-t" title="' + esc(_mn) + '">' + esc(_mn.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean).join(' ／ ')) + '</span>'
                 : '<span class="mb-menu-t none">まだ入っていません</span>')
-         + (r.doneReady ? '' : '<span class="mb-chip add" onclick="flMaintEdit(\'' + r.vehicleId + '\',\'' + r.groupId + '\')">✎ ' + (_mn ? '直す' : '入れる') + '</span>')
+         + (r.doneReady ? '' : '<span class="mb-chip add" onclick="flMaintEdit(\'' + jsq(r.vehicleId) + '\',\'' + jsq(r.groupId) + '\')">✎ ' + (_mn ? '直す' : '入れる') + '</span>')
          + '</div>';
 
       if (r.msg) h += '<div class="mb-msg ' + r.msgCls + '">' + esc(r.msg) + '</div>';
       h += '</div><div class="mb-act">'
         /* 🖨 v2.166.0（ゆうた指定 2026-10-11）表紙を印刷＝代車用の書式（cover-print.js の pitPrintFleetCover）。
            ⚠ 実績に入った行（完了する待ち）には出さない＝もう紙は回っている */
-        + (r.doneReady ? '' : '<button class="vh-btn" onclick="flMaintCover(\'' + r.vehicleId + '\',\'' + r.groupId + '\')"><i data-ic=printer data-ics=16></i> 表紙を印刷</button>')
+        + (r.doneReady ? '' : '<button class="vh-btn" onclick="flMaintCover(\'' + jsq(r.vehicleId) + '\',\'' + jsq(r.groupId) + '\')"><i data-ic=printer data-ics=16></i> 表紙を印刷</button>')
         /* 🔴 v2.53.0 実績に入ったら、ここが「完了する」に変わる（日を決める・取り下げは出さない） */
         + (r.doneReady
-            ? '<button class="vh-btn mb-done" onclick="flMaintFinish(\'' + (r.card && r.card.id) + '\')"><i data-ic=check data-ics=16></i> 完了する</button>'
-            : ((r.fixed ? '' : '<button class="vh-btn" onclick="flMaintGoto(\'' + r.vehicleId + '\',\'' + p.ym + '\')">日を決める</button>')
-             + (p.manualId ? '<button class="vh-btn mb-del" onclick="flMaintDrop(\'' + p.manualId + '\')">取り下げ</button>' : '')))
+            ? '<button class="vh-btn mb-done" onclick="flMaintFinish(\'' + jsq((r.card && r.card.id)) + '\')"><i data-ic=check data-ics=16></i> 完了する</button>'
+            : ((r.fixed ? '' : '<button class="vh-btn" onclick="flMaintGoto(\'' + jsq(r.vehicleId) + '\',\'' + jsq(p.ym) + '\')">日を決める</button>')
+             + (p.manualId ? '<button class="vh-btn mb-del" onclick="flMaintDrop(\'' + jsq(p.manualId) + '\')">取り下げ</button>' : '')))
         + '</div></div>';
     });
     h += '</div></div>';
@@ -676,7 +679,7 @@
     var vs = vehicles().filter(function(v){ return !v.retired || v.id === pick; });
     /* 🔴 v2.67.0（ゆうた「数字をカット、代車名だけで」）**番号は出さない。** */
     var opts = vs.map(function(v){
-      return '<option value="' + v.id + '"' + (v.id === pick ? ' selected' : '') + '>' + esc(vehName(v)) + '</option>';
+      return '<option value="' + esc(v.id) + '"' + (v.id === pick ? ' selected' : '') + '>' + esc(vehName(v)) + '</option>';
     }).join('');
     var yms = []; for (var i = 0; i < 7; i++){ var y = ymAdd(ymOf(td), i); yms.push('<option value="' + y + '">' + y.replace('-', '年') + '月</option>'); }
     _mbaWork = '';
@@ -717,10 +720,11 @@
       var it = arr(w.state && w.state.workTypes).filter(function(x){ return x.id === id; })[0]
              || { id:id, label:(WORK_LB[id] || id) };
       var on = (_mbaWork === id);
-      var st = it.color ? (on ? ('background:' + it.color + ';color:#fff;border-color:' + it.color + ';')
-                              : ('border-color:' + it.color + ';color:' + it.color + ';')) : '';
+      var _ic = pitHex(it.color);
+      var st = _ic ? (on ? ('background:' + _ic + ';color:#fff;border-color:' + _ic + ';')
+                         : ('border-color:' + _ic + ';color:' + _ic + ';')) : '';
       return '<button type="button" class="cf-chip' + (on ? ' active' : '') + '" style="' + st + '"'
-           + ' onclick="flMaintPickWork(\'' + id + '\')">' + esc(it.label || id) + '</button>';
+           + ' onclick="flMaintPickWork(\'' + jsq(id) + '\')">' + esc(it.label || id) + '</button>';
     }).join('');
   }
   w.flMaintPickWork = function(id){
@@ -792,7 +796,7 @@
       + '</div>'
       + '</div>'
       + '<div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
-      + '<button class="primary" onclick="flMaintEditSave(\'' + vehId + '\',\'' + gid + '\')">保存</button></div>'
+      + '<button class="primary" onclick="flMaintEditSave(\'' + jsq(vehId) + '\',\'' + jsq(gid) + '\')">保存</button></div>'
     );
     if (w.WorkContent){
       try { w.WorkContent.setHost('mba-body'); if (w.WorkContent.mount) w.WorkContent.mount(); } catch(e){}
@@ -1004,15 +1008,15 @@
     /* 🏁 v2.106.0 リース車両＝この日をリースアップ日に確定（2ヶ月前より手前でも、分かっていれば入れられる） */
     var lv = vehOf(vehId);
     if (lv && lv.lease){
-      h += '<button class="lo-bpop-b" onclick="flLeaseFix(\'' + vehId + '\',\'' + ds + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flLeaseFix(\'' + jsq(vehId) + '\',\'' + jsq(ds) + '\')">'
          + '<span class="mb-dot lease"></span>🏁 <b>' + esc(md(ds)) + ' をリースアップ日に確定</b><small>'
          + (lv.leaseUpFixed ? ('いまの確定 ' + esc(md(lv.leaseUpFixed)) + ' を置きかえます')
                             : ('暫定 ' + esc(lv.leaseUp ? ymText(String(lv.leaseUp).slice(0, 7)) : '未入力') + ' → 確定にします')) + '</small></button>';
     }
     ps.forEach(function(r){
-      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'candidate\',\'\',\'' + r.work + '\',\'' + to + '\',\'' + r.plan.ym + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + jsq(r.groupId) + '\',\'' + jsq(vehId) + '\',\'' + jsq(ds) + '\',\'candidate\',\'\',\'' + jsq(r.work) + '\',\'' + jsq(to) + '\',\'' + jsq(r.plan.ym) + '\')">'
          + '<span class="mb-dot"></span>🔧 ' + esc(r.workLabel) + ' の<b>候補</b>を置く<small>この期間のどこかでやる、の提示</small></button>';
-      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + r.groupId + '\',\'' + vehId + '\',\'' + ds + '\',\'fixed\',\'\',\'' + r.work + '\',\'' + to + '\',\'' + r.plan.ym + '\')">'
+      h += '<button class="lo-bpop-b" onclick="flMaintPlace(\'' + jsq(r.groupId) + '\',\'' + jsq(vehId) + '\',\'' + jsq(ds) + '\',\'fixed\',\'\',\'' + jsq(r.work) + '\',\'' + jsq(to) + '\',\'' + jsq(r.plan.ym) + '\')">'
          + '<span class="mb-dot fixed"></span>🔧 ' + esc(r.workLabel) + ' を<b>ここで確定</b><small>枠を押さえる（代車は貸せなくなる）</small></button>';
     });
     if (!ps.length){
@@ -1032,8 +1036,8 @@
     var lb = (mode === 'fixed') ? '確定' : '候補';
     _modal(
       '<h3 class="lo-modal-h">🔧 整備の' + lb + (cur ? 'を直す' : 'を置く') + '</h3>'
-      + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="mbp-from" value="' + from + '"></label>'
-      + '<label class="lo-modal-f">まで<input type="date" id="mbp-to" value="' + to + '"></label></div>'
+      + '<div class="lo-modal-row"><label class="lo-modal-f">から<input type="date" id="mbp-from" value="' + esc(from) + '"></label>'
+      + '<label class="lo-modal-f">まで<input type="date" id="mbp-to" value="' + esc(to) + '"></label></div>'
       + '<div class="lo-modal-note">'
       + (mode === 'fixed'
           ? '<b>確定</b>＝この期間は代車を貸せなくなります（枠を押さえます）。'
@@ -1041,7 +1045,7 @@
             + '「代車ありの最短入庫日」の案内からは外れます。')
       + '</div>'
       + '<div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
-      + '<button class="primary" onclick="flMaintPlaceSave(\'' + gid + '\',\'' + vehId + '\',\'' + mode + '\',\'' + (recId || '') + '\',\'' + (work || (cur && cur.work) || '') + '\',\'' + (ym || (cur && cur.ym) || '') + '\')">'
+      + '<button class="primary" onclick="flMaintPlaceSave(\'' + jsq(gid) + '\',\'' + jsq(vehId) + '\',\'' + jsq(mode) + '\',\'' + jsq((recId || '')) + '\',\'' + jsq((work || (cur && cur.work) || '')) + '\',\'' + jsq((ym || (cur && cur.ym) || '')) + '\')">'
       + (cur ? '直す' : '置く') + '</button></div>'
     );
   };
@@ -1102,11 +1106,11 @@
     var r = recs().filter(function(x){ return x.id === recId; })[0];
     if (!r) return;
     var isC = (r.stage || 'candidate') === 'candidate';
-    _pop('<div class="lo-bpop-h">🔧 ' + esc(WORK_LB[r.work] || '整備') + ' <small>' + md(r.fromDate) + '〜' + md(r.toDate)
+    _pop('<div class="lo-bpop-h">🔧 ' + esc(WORK_LB[r.work] || '整備') + ' <small>' + esc(md(r.fromDate)) + '〜' + esc(md(r.toDate))
         + '（' + (isC ? '候補' : '確定') + '）</small></div>'
-      + (isC ? '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintFix(\'' + recId + '\')"><span class="mb-dot fixed"></span>この枠で確定する</button>' : '')
-      + '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintPlace(\'' + r.groupId + '\',\'' + r.vehicleId + '\',\'' + r.fromDate + '\',\'' + (r.stage||'candidate') + '\',\'' + recId + '\',\'' + (r.work||'') + '\',\'\',\'' + (r.ym||'') + '\')">期間を直す</button>'
-      + '<button class="lo-bpop-b danger" onclick="flMaintPopClose();flMaintDelRec(\'' + recId + '\')">この' + (isC ? '候補' : '確定') + 'を取り消す</button>');
+      + (isC ? '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintFix(\'' + jsq(recId) + '\')"><span class="mb-dot fixed"></span>この枠で確定する</button>' : '')
+      + '<button class="lo-bpop-b" onclick="flMaintPopClose();flMaintPlace(\'' + jsq(r.groupId) + '\',\'' + jsq(r.vehicleId) + '\',\'' + jsq(r.fromDate) + '\',\'' + jsq((r.stage||'candidate')) + '\',\'' + jsq(recId) + '\',\'' + jsq((r.work||'')) + '\',\'\',\'' + jsq((r.ym||'')) + '\')">期間を直す</button>'
+      + '<button class="lo-bpop-b danger" onclick="flMaintPopClose();flMaintDelRec(\'' + jsq(recId) + '\')">この' + (isC ? '候補' : '確定') + 'を取り消す</button>');
   };
   w.flMaintFix = function(recId){
     var hit = spanOf(recId);
@@ -1213,7 +1217,7 @@
       var span = md(x.rec.fromDate) + '〜' + md(x.rec.toDate);
       var note = x.fixed ? (span + ' で確定') : ('候補 ' + span);
       h += '<div class="today-row tod-maint' + (x.urgent ? ' is-urgent' : '') + '"'
-         + ' onclick="pitMaintTodayTap(\'' + x.rec.id + '\')" style="--team:' + MAINT_COLOR + '">'
+         + ' onclick="pitMaintTodayTap(\'' + jsq(x.rec.id) + '\')" style="--team:' + MAINT_COLOR + '">'
          + '<div class="tr-time">終日</div>'
          + '<div class="tr-front is-div" style="background:' + MAINT_COLOR + '" title="自社の代車">代車</div>'
          + '<div class="tr-main">'
@@ -1232,7 +1236,7 @@
          +   '<div class="tr-tag-slot"></div>'
          +   '<div class="tr-tag-slot tr-tag-work">'
          +     (wt ? '<span class="tag-work' + (wt.label.length >= 4 ? ' long' : '')
-                   + '" style="background:' + wt.color + '20;color:' + wt.color + ';border-color:' + wt.color + ';">'
+                   + '" style="' + (pitHex(wt.color) ? 'background:' + pitHex(wt.color) + '20;color:' + pitHex(wt.color) + ';border-color:' + pitHex(wt.color) + ';' : '') + '">'
                    + esc(wt.label) + '</span>' : '')
          +   '</div>'
          + '</div>'
@@ -1260,21 +1264,21 @@
       '<div class="ta-head"><b>自社代車</b>　' + esc(vehName(v))
         + (v.plate ? '<span class="ta-plate">' + esc(v.plate) + '</span>' : '')
         + '<div class="ta-sub">🔧 ' + esc(WORK_LB[r.work] || '整備')
-        + (wt ? '' : '') + '・' + (r.stage === 'fixed' ? span + ' で確定' : '候補 ' + span + ' のうち今日')
+        + (wt ? '' : '') + '・' + esc(r.stage === 'fixed' ? span + ' で確定' : '候補 ' + span + ' のうち今日')
         + (r.urgent ? '　<span class="ret-pend ret-pend-row">急ぎ</span>' : '') + '</div></div>'
-      + '<button class="ta-btn primary" onclick="pitMaintIntake(\'' + recId + '\')">'
+      + '<button class="ta-btn primary" onclick="pitMaintIntake(\'' + jsq(recId) + '\')">'
         + '<b><i data-ic=download data-ics=16></i> 入庫済みにする</b>'
         + '<span>タスクボードにカードが起きます（社内区分「代車」）</span></button>'
       /* 🔴 v2.63.0（ゆうた確定 2026-09-05「詳細を見るをカードに向ける」）
          ここからカードが開けなかったので、**確定した予定の中身を当日ビューから確認できなかった**
          （確定すると未定タブの代車BOXからも消えるため、検索以外に道が無かった）。 */
-      + '<button class="ta-btn" onclick="pitMaintDetailFromToday(\'' + recId + '\')">'
+      + '<button class="ta-btn" onclick="pitMaintDetailFromToday(\'' + jsq(recId) + '\')">'
         + '<b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b>'
         + '<span>カードを開いて確認・編集</span></button>'
-      + '<button class="ta-btn" onclick="pitMaintGotoFromToday(\'' + recId + '\')">'
+      + '<button class="ta-btn" onclick="pitMaintGotoFromToday(\'' + jsq(recId) + '\')">'
         + '<b><i data-ic=calendar data-ics=16></i> 車両管理で見る</b>'
         + '<span>日ビューで、この車の枠を見る・直す</span></button>'
-      + '<button class="ta-btn danger" onclick="pitMaintSkip(\'' + recId + '\')">'
+      + '<button class="ta-btn danger" onclick="pitMaintSkip(\'' + jsq(recId) + '\')">'
         + '<b><i data-ic=ban data-ics=16></i> 今日はやらない</b>'
         + '<span>この日ぶんだけ消えます（次の候補日を待ちます・未入庫には溜めません）</span></button>'
       + '<button class="ta-cancel" onclick="pitTodayActionClose()">閉じる</button>');
@@ -1446,7 +1450,7 @@
       h += '<div class="lo-modal-note">この作業には満了日がありません。日付は動きません。</div>';
     }
     h += '</div><div class="lo-modal-foot"><button onclick="flMaintClose()">キャンセル</button>'
-       + '<button class="primary" onclick="flMaintFinishSave(\'' + c.id + '\')">完了する</button></div>';
+       + '<button class="primary" onclick="flMaintFinishSave(\'' + jsq(c.id) + '\')">完了する</button></div>';
     _modal(h);
   };
 

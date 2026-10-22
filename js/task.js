@@ -2,13 +2,16 @@
    task.js
    タスクビュー（看板：列ごとにカードが並ぶ）
    ======================================== */
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（ボードの名前・列の名前・id）。部品の本体は pit-share.js（下は単独で読まれた時の予備） */
+var pitEsc = (typeof window.pitEsc === 'function') ? window.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); };
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return pitEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
 
 function renderTask(){
   const tabs = document.getElementById('board-tabs');
   if (tabs){
     tabs.innerHTML = state.boards.map(b =>
       '<div class="board-tab' + (b.id === state.currentBoardId ? ' active' : '') + '"' +
-      ' onclick="switchBoard(\'' + b.id + '\')">' + b.name + '</div>'
+      ' onclick="switchBoard(\'' + jsq(b.id) + '\')">' + pitEsc(b.name) + '</div>'
     ).join('');
   }
 
@@ -90,12 +93,12 @@ function _renderKanban(board, cols){
     if (col.side)     colClass += ' side';
     const stage = stageColor(col.id);
     let html = '<div class="' + colClass + '" style="--stage:' + stage + ';">';
-    html += '<div class="kanban-col-head"><span>' + icoE(col.icon) + '</span><span>' + col.name + '</span><span class="count">' + inCol.length + '</span></div>';
+    html += '<div class="kanban-col-head"><span>' + icoE(col.icon) + '</span><span>' + pitEsc(col.name) + '</span><span class="count">' + inCol.length + '</span></div>';
     if (hasTD){
       const main = inCol.filter(c => !c.testDrive);
       const td   = inCol.filter(c => c.testDrive);
       const mainAll = ownAll.filter(c => !c.testDrive);
-      html += '<div class="kanban-col-body" data-drop="status" data-drop-val="' + col.id + '">';
+      html += '<div class="kanban-col-body" data-drop="status" data-drop-val="' + pitEsc(col.id) + '">';
       /* v1.36.0 区切りライン（board-line.js）をカードのあいだに挟む。無ければ今までどおり。 */
       html += main.length
         ? _body(main, mainAll, { kanban:true, compact:true })
@@ -103,14 +106,14 @@ function _renderKanban(board, cols){
       html += '</div>';
       // 試運転を「選ぶ」2枠（上＝通常/無タイトル・下＝🚗試運転）。どちらに落とすかで試運転の要否が直感的に分かる
       html += '<div class="kanban-td2">';
-      html += '<div class="kanban-td2-box kanban-td2-normal" data-drop="status" data-drop-val="' + col.id + '"><div class="kanban-td2-ph">ここにドラッグ</div></div>';
-      html += '<div class="kanban-td2-box kanban-td2-test' + (td.length ? ' has' : '') + '" data-drop="testdrive" data-drop-val="' + col.id + '">';
+      html += '<div class="kanban-td2-box kanban-td2-normal" data-drop="status" data-drop-val="' + pitEsc(col.id) + '"><div class="kanban-td2-ph">ここにドラッグ</div></div>';
+      html += '<div class="kanban-td2-box kanban-td2-test' + (td.length ? ' has' : '') + '" data-drop="testdrive" data-drop-val="' + pitEsc(col.id) + '">';
       html += '<div class="kanban-td2-lb"><i data-ic=car data-ics=16></i> 試運転</div>';
       html += td.length ? td.map(c => _card(c, { kanban:true, compact:true })).join('') : '<div class="kanban-td2-ph">ここにドラッグ</div>';
       html += '</div>';
       html += '</div>';
     } else {
-      html += '<div class="kanban-col-body" data-drop="status" data-drop-val="' + col.id + '">';
+      html += '<div class="kanban-col-body" data-drop="status" data-drop-val="' + pitEsc(col.id) + '">';
       html += inCol.length
         ? _body(inCol, ownAll, { kanban: !col.side, compact:true })
         : (_body([], ownAll, { kanban: !col.side, compact:true }) + '<div class="kanban-empty">なし</div>');

@@ -10,12 +10,15 @@
   function pad(n){ return (n<10?'0':'')+n; }
   function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の id は jsq・data-card-id は esc・課の色は pitHex） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   /* 🔴 v1.108.0 名前・車名・色・車検の判定は pit-share.js の物差し1本（車検予定ボードと同じ答え）。
      ⚠ ここだけ独自だったせいで、カナだけのお客様が「（未入力）」になり、
         課の色を「輸入車ならピンク」と車から逆算していた。 */
   function surname(c){ return (window.pitCustSurname?pitCustSurname(c):(c.customer||''))||'（未入力）'; }
   function carLabel(c){ return window.pitCarLabel?pitCarLabel(c):((c.car||c.maker||c.plate||'').toString()); }
-  function team(c){ return window.pitDivisionColor?pitDivisionColor(c):'#1db97a'; }
+  function team(c){ return pitHex(window.pitDivisionColor?pitDivisionColor(c):'') || '#1db97a'; }
   function isShaken(c){ return window.pitIsShaken?pitIsShaken(c):false; }
   function ins(c){ return c.inspSchedule||{}; }
   /* 🚫 v1.165.0（ゆうた指定）**行っていない日は斜線で塗る。**
@@ -67,7 +70,7 @@
     if(!res.length) return h+'<div class="skl-note">該当する記録はありません。日付（例 7/16 や 2026-07）・車種・お客様名・担当者などで検索できます。</div>';
     h+='<div class="skl-results">';
     res.forEach(function(r){ var d=new Date(r.iso+'T00:00:00'); var _car=carLabel(r.c);
-      h+='<div class="skl-res-row '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'">'
+      h+='<div class="skl-res-row '+r.result+'" data-card-id="'+esc(r.c.id)+'" onclick="openDetail(\''+jsq(r.c.id)+'\')" style="border-left-color:'+team(r.c)+'">'
         +'<span class="skl-res-date">'+d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate()+'<small>('+DOW[d.getDay()]+')</small></span>'
         +'<span class="skl-ap '+r.slot+'">'+(r.slot==='pm'?'PM':'AM')+'</span>'
         +'<span class="skl-res-nm">'+esc(surname(r.c))+'様</span>'
@@ -120,7 +123,7 @@
         /* 🔴 祝日は日付を日曜と同じ赤に。＝**火曜なのに斜線**の理由が、字を出さなくても伝わる
              （ゆうた指定「理由の字は自社の休みの時だけ」なので、色で分かるようにする）。 */
         + '<div class="skl-dh"><span class="skl-d '+(off.kind==='holiday'?'holi':(w===0?'sun':w===6?'sat':''))+'">'+d.getDate()+'</span>'+offTag+(arr.length?'<span class="skl-cnt">'+arr.length+'</span>':'')+'</div>'
-        + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+r.c.id+'" onclick="openDetail(\''+r.c.id+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?(r.repass?'再検合格':'済'):'不合格')+' '+(r.slot==='pm'?'PM':'AM')+(staffTxt(r)?' / '+esc(staffTxt(r,true)):'')+(r.note?' / '+esc(r.note):'')+'">'
+        + arr.map(function(r){ var _car=carLabel(r.c); return '<div class="skl-chip '+r.result+'" data-card-id="'+esc(r.c.id)+'" onclick="openDetail(\''+jsq(r.c.id)+'\')" style="border-left-color:'+team(r.c)+'" title="'+esc(surname(r.c))+'様 '+esc(_car)+' / '+(r.result==='done'?(r.repass?'再検合格':'済'):'不合格')+' '+(r.slot==='pm'?'PM':'AM')+(staffTxt(r)?' / '+esc(staffTxt(r,true)):'')+(r.note?' / '+esc(r.note):'')+'">'
             + '<div class="skl-r1"><span class="skl-ap '+r.slot+'">'+(r.slot==='pm'?'PM':'AM')+'</span>'
             + '<span class="skl-nm">'+esc(surname(r.c))+'様</span>'
             + '<span class="skl-rt'+(r.repass?' rp':'')+'">'+(r.result==='done'?(r.repass?'再合':'済'):'不合')+'</span></div>'

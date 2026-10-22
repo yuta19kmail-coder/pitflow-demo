@@ -17,6 +17,8 @@
    ======================================== */
 (function (w, d) {
   'use strict';
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（つながらない理由の文字） */
+  var pitEsc = (typeof w.pitEsc === 'function') ? w.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
 
   var _state = 'idle';       // idle | saving | recv | offline | error | local
   var _lastAt = 0;           // 最後に同期できた時刻
@@ -101,7 +103,7 @@
       }
       bar.innerHTML = '<b>サーバーとつながっていません。</b>' +
         'この画面は<b>古いかもしれません</b>。直した内容もまだ全員に届いていません。' +
-        '<span class="plb-sub">つなぎ直しています…' + (why ? '（' + String(why) + '）' : '') + '</span>';
+        '<span class="plb-sub">つなぎ直しています…' + (why ? '（' + pitEsc(String(why)) + '）' : '') + '</span>';
     },
     set: function (s) { _state = s; paint(); },
     refresh: paint

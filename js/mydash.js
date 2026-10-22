@@ -19,6 +19,9 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の id は jsq・作業の色は pitHex・日付の生の出し）。部品の本体は pit-share.js（下は単独で読まれた時の予備） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   function teamOf(c) { return c && c.boardId === 'import' ? 'import' : 'default'; }
   /* 🔴 v2.21.1 左ラインの色は pit-share.js の `pitTeamColor` 1本（ここで色を書かない） */
   function teamColor(c) { return window.pitTeamColor ? pitTeamColor(c) : (teamOf(c) === 'import' ? '#ec4899' : '#1db97a'); }
@@ -58,7 +61,7 @@
   function wtChip(c) {
     var id = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes[0] : c.workType;
     var w = (state.workTypes || []).find(function (x) { return x.id === id; });
-    return w ? '<span class="md-wt" style="color:' + w.color + '">' + esc(w.label) + '</span>' : '';
+    return w ? '<span class="md-wt" style="color:' + pitHex(w.color) + '">' + esc(w.label) + '</span>' : '';
   }
   function daysAgo(dateStr) {
     if (!dateStr) return null;
@@ -102,12 +105,12 @@
       (sub ? '<div class="md-sub">' + sub + '</div>' : '') + '</div>';
   }
   function rowCard(id, main, right, rcls) {
-    var oc = id ? ' onclick="event.stopPropagation();openDetail(\'' + esc(id) + '\')"' : '';
+    var oc = id ? ' onclick="event.stopPropagation();openDetail(\'' + jsq(id) + '\')"' : '';
     return '<div class="md-row md-int' + (id ? ' md-click' : '') + '"' + oc + '>' +
       '<span class="md-row-m">' + main + '</span>' + (right ? '<span class="md-row-r ' + (rcls || '') + '">' + right + '</span>' : '') + '</div>';
   }
   function bigCard(id, l1, l2, color) {
-    var oc = id ? ' onclick="event.stopPropagation();openDetail(\'' + esc(id) + '\')"' : '';
+    var oc = id ? ' onclick="event.stopPropagation();openDetail(\'' + jsq(id) + '\')"' : '';
     return '<div class="md-card md-int md-click" style="border-left-color:' + (color || 'var(--brand,#26a269)') + '"' + oc + '>' +
       '<div class="md-c1">' + l1 + '</div>' + (l2 ? '<div class="md-c2">' + l2 + '</div>' : '') + '</div>';
   }
@@ -146,7 +149,7 @@
      ========================================================= */
   function cpLim(sz) { return sz === 's' ? 3 : sz === 'm' ? 8 : sz === 'l' ? 16 : 40; }
   function cp(id, inner, hot) {
-    var oc = id ? ' onclick="event.stopPropagation();openDetail(\'' + esc(id) + '\')"' : '';
+    var oc = id ? ' onclick="event.stopPropagation();openDetail(\'' + jsq(id) + '\')"' : '';
     return '<span class="md-cp' + (id ? ' md-int md-click' : '') + (hot ? ' hot' : '') + '"' + oc + '>' + inner + '</span>';
   }
   function cpT(t) { return t ? '<span class="md-cp-t">' + esc(t) + '</span>' : ''; }          /* 時刻・日付 */
@@ -435,8 +438,8 @@
   function thxRow(c, sub) {
     var on = thxSent(c);
     return '<div class="md-row md-int md-click thx-row' + (on ? ' on' : '') + '"'
-      + ' onclick="event.stopPropagation();openDetail(\'' + esc(c.id) + '\')">'
-      + '<span class="thx-cb' + (on ? ' on' : '') + '" onclick="event.stopPropagation();mydThanksToggle(\'' + esc(c.id) + '\')">'
+      + ' onclick="event.stopPropagation();openDetail(\'' + jsq(c.id) + '\')">'
+      + '<span class="thx-cb' + (on ? ' on' : '') + '" onclick="event.stopPropagation();mydThanksToggle(\'' + jsq(c.id) + '\')">'
       + (on ? '✓' : '') + '</span>'
       + '<span class="md-row-m">' + esc(nm(c)) + ' 様 ' + esc(carOf(c))
       + (sub ? '<i class="thx-sub">' + esc(sub) + '</i>' : '') + '</span>'
@@ -516,7 +519,7 @@
   function rpCar(c) {
     return window.pitMonthRow
       ? pitMonthRow(c, { cls: 'rp-car md-int', drag: false, time: false,
-                         onclick: "event.stopPropagation();openDetail('" + esc(c.id) + "')" })
+                         onclick: "event.stopPropagation();openDetail('" + jsq(c.id) + "')" })
       : '';
   }
   function rpCalHtml(sz) {
@@ -635,7 +638,7 @@
   function insRow(g, nameLim) {
     var one = (g.items.length === 1) ? g.items[0] : null;
     var oc = (one && one.kind === 'card' && one.refId)
-      ? "event.stopPropagation();openDetail('" + esc(one.refId) + "')"
+      ? "event.stopPropagation();openDetail('" + jsq(one.refId) + "')"
       : "event.stopPropagation();mydGo('inspect')";
     var lim = nameLim || 3;
     var names = g.items.slice(0, lim).map(insWho).filter(Boolean).join('・');
@@ -876,7 +879,7 @@
         if (sz === 's') return kpi(list.length, '件', man(sum) + ' 未回収', list.length ? 'pk' : 'g');
         if (!list.length) return empty('入金待ちはありません');
         return '<div class="md-inline">' + kpi(amtVal(sum), amtUnit(sum), '売掛 ' + list.length + '件', 'pk') + '</div>' +
-          '<div class="md-list" style="margin-top:8px">' + list.slice(0, sz === 'l' ? 10 : 4).map(function (c) { return rowCard(c.id, esc(nm(c)) + ' ' + esc(carOf(c)) + (c.returnDate ? '（' + (window.fmtMD ? fmtMD(c.returnDate) : c.returnDate) + '返）' : ''), yen(amt(c)), 'amt'); }).join('') + '</div>' + (sz === 'l' ? openFoot('return', '返車') : '');
+          '<div class="md-list" style="margin-top:8px">' + list.slice(0, sz === 'l' ? 10 : 4).map(function (c) { return rowCard(c.id, esc(nm(c)) + ' ' + esc(carOf(c)) + (c.returnDate ? '（' + esc(window.fmtMD ? fmtMD(c.returnDate) : c.returnDate) + '返）' : ''), yen(amt(c)), 'amt'); }).join('') + '</div>' + (sz === 'l' ? openFoot('return', '返車') : '');
       },
       more: function () { return openFoot('return', '返車'); }
     },
@@ -1080,14 +1083,14 @@
         var mRecs = recs.filter(function (r) { return (r.iso || '').indexOf(pre) === 0; });
         var doneN = mRecs.filter(function (r) { return r.result === 'done'; }).length, reN = mRecs.filter(function (r) { return r.result === 'recheck'; }).length;
         if (sz === 's') return kpi(doneN, '台', '今月 済・不合格 ' + reN, 'g');
-        if (sz === 'm') return '<div class="md-tiny">直近の車検実績</div><div class="md-list">' + (recs.length ? recs.slice(0, 5).map(function (r) { return rowCard(r.c.id, (window.fmtMD ? fmtMD(r.iso) : r.iso) + ' ' + esc(nm(r.c)), r.result === 'done' ? '済' : '不合格', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>';
+        if (sz === 'm') return '<div class="md-tiny">直近の車検実績</div><div class="md-list">' + (recs.length ? recs.slice(0, 5).map(function (r) { return rowCard(r.c.id, esc(window.fmtMD ? fmtMD(r.iso) : r.iso) + ' ' + esc(nm(r.c)), r.result === 'done' ? '済' : '不合格', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>';
         if (sz === 'l') {
           var by = {}; mRecs.forEach(function (r) { if (r.result === 'done' && r.staff) by[r.staff] = (by[r.staff] || 0) + 1; });
           var arr = Object.keys(by).map(function (k) { return { n: k, v: by[k] }; }).sort(function (a, b) { return b.v - a.v; });
           return '<div class="md-inline">' + kpi(doneN, '台', '今月 済', 'g') + kpi(reN, '件', '今月 不合格', reN ? 'o' : 'g') + '</div>' +
             '<div class="md-tiny" style="margin-top:8px">担当別（今月・済）</div><div class="md-list">' + (arr.length ? arr.map(function (x) { return rowCard(null, esc(x.n), x.v + '台', 'tag'); }).join('') : empty('実績なし')) + '</div>' + openFoot('shakenlog', '車検履歴');
         }
-        return '<div class="md-scroll md-scroll-tall">' + (recs.length ? recs.slice(0, 40).map(function (r) { return rowCard(r.c.id, (window.fmtMD ? fmtMD(r.iso) : r.iso) + '　' + esc(nm(r.c)) + ' ' + esc(carOf(r.c)) + (r.staff ? '（' + esc(r.staff) + '）' : ''), r.result === 'done' ? '済' : '不合格', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>' + openFoot('shakenlog', '車検履歴');
+        return '<div class="md-scroll md-scroll-tall">' + (recs.length ? recs.slice(0, 40).map(function (r) { return rowCard(r.c.id, esc(window.fmtMD ? fmtMD(r.iso) : r.iso) + '　' + esc(nm(r.c)) + ' ' + esc(carOf(r.c)) + (r.staff ? '（' + esc(r.staff) + '）' : ''), r.result === 'done' ? '済' : '不合格', r.result === 'done' ? 'tag gn' : 'tag rd'); }).join('') : empty('履歴はまだありません')) + '</div>' + openFoot('shakenlog', '車検履歴');
       },
       more: function () { return openFoot('shakenlog', '車検履歴'); }
     },
@@ -1102,7 +1105,7 @@
         var list = pickResultMonth();
         var sum = list.reduce(function (a, c) { return a + amt(c); }, 0);
         if (sz === 's') return kpi(list.length, '台', man(sum), 'g');
-        if (sz === 'm') { var rec = list.slice().sort(function (a, b) { return (b.completedAt || '').localeCompare(a.completedAt || ''); }); return '<div class="md-inline">' + kpi(list.length, '台', '当月 完成', 'g') + '</div><div class="md-list" style="margin-top:8px">' + (rec.length ? rec.slice(0, 5).map(function (c) { return rowCard(c.id, (window.fmtMD ? fmtMD(c.completedAt) : c.completedAt) + ' ' + esc(nm(c)) + ' ' + esc(carOf(c)), wtChip(c)); }).join('') : empty('当月の実績はまだありません')) + '</div>'; }
+        if (sz === 'm') { var rec = list.slice().sort(function (a, b) { return (b.completedAt || '').localeCompare(a.completedAt || ''); }); return '<div class="md-inline">' + kpi(list.length, '台', '当月 完成', 'g') + '</div><div class="md-list" style="margin-top:8px">' + (rec.length ? rec.slice(0, 5).map(function (c) { return rowCard(c.id, esc(window.fmtMD ? fmtMD(c.completedAt) : c.completedAt) + ' ' + esc(nm(c)) + ' ' + esc(carOf(c)), wtChip(c)); }).join('') : empty('当月の実績はまだありません')) + '</div>'; }
         var cells = window._resultMonthCells ? _resultMonthCells(C.y, C.m) : '';
         return '<div class="md-inline">' + kpi(list.length, '台', '当月完成 / ' + man(sum), 'g') + '</div><div class="md-embed' + (sz === 'xl' ? ' md-embed-tall' : '') + '"><div class="reserve-month md-month">' + cells + '</div></div>' + openFoot('result', '実績');
       },
@@ -1201,7 +1204,7 @@
         if (sz === 'm') return chips;
         if (!list.length) return chips + empty('アクティブなタスクはありません');
         var sorted = list.slice().sort(function (a, b) { return TASK_ACTIVE.indexOf(a.status) - TASK_ACTIVE.indexOf(b.status); });
-        return chips + '<div class="md-list" style="margin-top:8px">' + sorted.slice(0, 12).map(function (c) { return rowCard(c.id, esc(nm(c)) + ' ' + esc(carOf(c)), TASK_LABEL[c.status] || c.status, 'tag'); }).join('') + '</div>';
+        return chips + '<div class="md-list" style="margin-top:8px">' + sorted.slice(0, 12).map(function (c) { return rowCard(c.id, esc(nm(c)) + ' ' + esc(carOf(c)), esc(TASK_LABEL[c.status] || c.status), 'tag'); }).join('') + '</div>';
       }, more: function (sz, item) { return openFoot(teamHintView(item), 'タスクボード'); }
     },
     p_return: {
@@ -1463,7 +1466,7 @@
       }
       var bodyHtml, moreHtml = '';
       if (def.shortcut) {
-        bodyHtml = '<div class="md-sc md-int" onclick="event.stopPropagation();mydGo(\'' + it.view + '\'' + (it.range ? ",'" + it.range + "'" : '') + ')"><span class="md-sc-ic">' + icoE(it.icon || '🔗') + '</span><span class="md-sc-l">' + esc(it.label || '') + '</span><span class="md-sc-go">開く →</span></div>';
+        bodyHtml = '<div class="md-sc md-int" onclick="event.stopPropagation();mydGo(\'' + jsq(it.view) + '\'' + (it.range ? ",'" + jsq(it.range) + "'" : '') + ')"><span class="md-sc-ic">' + icoE(it.icon || '🔗') + '</span><span class="md-sc-l">' + esc(it.label || '') + '</span><span class="md-sc-go">開く →</span></div>';
       } else {
         /* 🔴 v1.85.0 見せ方は3つ。数字／中身（チップ）／両方。
            ⚠ 「両方」の数字は **必ず小サイズの形（kpi）** を使うこと。

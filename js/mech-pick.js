@@ -74,6 +74,8 @@
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した＝onclick の '…' は jsq */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function ic(n){ return '<i data-ic=' + n + ' data-ics=16></i>'; }
   function cardOf(id){ return (window.state && state.cards || []).find(function(x){ return x && x.id === id; }) || null; }
 
@@ -182,14 +184,14 @@
     /* 🔴 いちばん左に「なし」。押すと入っている人は全部外れる（もう一度押すと未入力に戻る）。 */
     h += '<button type="button" class="cf-mchip cf-mnone' + (none ? ' on' : '') + '"'
       +  ' title="この車には該当者が居ません（忘れではない、と記録します）"'
-      +  ' onclick="PitMechPick.none(\'' + esc(ns) + '\',\'' + esc(c.id) + '\',\'' + role + '\')">なし</button>';
+      +  ' onclick="PitMechPick.none(\'' + jsq(ns) + '\',\'' + jsq(c.id) + '\',\'' + jsq(role) + '\')">なし</button>';
     opts.forEach(function (n){
       var k = co.cnt[n] || 0;
       /* ✅ v2.73.0 1人1枠の役では、入っている人はもう一度押すと**外れる**（×2 にはならない）。
          だから `full`（これ以上増やせない）で押せなくしてはいけない＝戻せなくなる。 */
       var full = (!def.once && arr.length >= MAX && !k);
-      var call = "PitMechPick.tap('" + esc(ns) + "','" + esc(c.id) + "','" + role + "','" + esc(n) + "')";
-      var offc = "event.stopPropagation();PitMechPick.off('" + esc(ns) + "','" + esc(c.id) + "','" + role + "','" + esc(n) + "')";
+      var call = "PitMechPick.tap('" + jsq(ns) + "','" + jsq(c.id) + "','" + jsq(role) + "','" + jsq(n) + "')";
+      var offc = "event.stopPropagation();PitMechPick.off('" + jsq(ns) + "','" + jsq(c.id) + "','" + jsq(role) + "','" + jsq(n) + "')";
       /* 🔴 v1.174.0 人のチップには目印を付ける（`cf-mperson`）。
          ＝ いちばん左に「なし」が入ったので、**「最初のチップ＝人」ではなくなった**。
          　 見た目のクラス（cf-mchip）で人を拾うと、見張りも操作も1つずれる（実際に試験が落ちた）。 */

@@ -287,7 +287,7 @@ window.PIT_NEWS = [
   title: '入庫バッジの意味が、押す前に読めるようになりました',
   body: function () {
     var esc = function (v) { return String(v == null ? '' : v)
-      .replace(/[&<>]/g, function (m) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]; }); };
+      .replace(/[&<>"']/g, function (m) { return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]; }); };   /* 🛡 v2.200.0 SEC-07 5記号に */
     var G = (window.pitBadgeGroups ? window.pitBadgeGroups() : []);
     var h = '<p>新規予約と、予約詳細から入る編集の画面で、'
           + '<b>バッジにマウスを乗せるとその印の意味が出ます</b>。押す前に確かめられます。</p>'
@@ -1627,6 +1627,8 @@ window.PIT_NEWS = [
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function cloud() { return window.PIT_CLOUD && window.fb && window.fb.ready && window.fb.currentUser; }
   function myUid() { return cloud() ? window.fb.currentUser.uid : null; }
 
@@ -1851,7 +1853,7 @@ window.PIT_NEWS = [
       var rd = isRead(a);
       var open = (window._nwOpen === a.id);
       h += '<article class="nw-item ' + (rd ? 'is-read' : 'is-unread') + (open ? ' is-open' : '') + '">'
-        + '<div class="nw-h" onclick="pitNewsToggle(\'' + esc(a.id) + '\')">'
+        + '<div class="nw-h" onclick="pitNewsToggle(\'' + jsq(a.id) + '\')">'
         + '<span class="nw-dot"></span>'
         + (a.version ? '<span class="nw-ver">v' + esc(a.version) + '</span>' : '')
         + '<span class="nw-t">' + esc(a.title) + '</span>'
@@ -1861,7 +1863,7 @@ window.PIT_NEWS = [
         + '<div class="nw-body"' + (open ? '' : ' style="display:none"') + '>' + BODY(a)
         + '<div class="nw-foot">'
         + (rd ? '<span class="nw-done"><i data-ic=check data-ics=15></i> 確認済み</span>'
-              : '<button type="button" class="nw-ok2" onclick="pitNewsConfirm(\'' + esc(a.id) + '\')">確認する（OK）</button>')
+              : '<button type="button" class="nw-ok2" onclick="pitNewsConfirm(\'' + jsq(a.id) + '\')">確認する（OK）</button>')
         + '</div></div></article>';
     });
     h += '</div>';

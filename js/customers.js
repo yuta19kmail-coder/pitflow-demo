@@ -11,11 +11,15 @@
    ◎履歴：その人の全車両ナンバーに一致する入庫カードを時系列表示。
    ======================================== */
 (function () {
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に・onclick の id は jsq・色は pitHex・href は https だけ） */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
+  function safeHref(u){ u=String(u==null?'':u).trim(); return /^https?:\/\//i.test(u)?u:''; }
   function norm(s){ return (s||'').replace(/\s+/g,'').replace(/[ァ-ヶ]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0x60)).toLowerCase(); }
   function list(){ if(!Array.isArray(state.customers)) state.customers=[]; return state.customers; }
   function courseLabel(div){ const d=(state.divisions||[]).find(x=>x.id===div); return d?d.label:''; }
-  function courseColorOf(div){ const d=(state.divisions||[]).find(x=>x.id===div); return (d&&d.color)?d.color:'#64748b'; }
+  function courseColorOf(div){ const d=(state.divisions||[]).find(x=>x.id===div); return (d&&d.color)?pitHex(d.color,'#64748b'):'#64748b'; }
   /* 区分(国産/輸入)＝boardIdの色、課(1課/2課)＝divisionの色。両者は独立（国産車を2課が担当 等もある） */
   function teamInfo(v){
     const course=courseLabel(v && v.division);
@@ -572,7 +576,7 @@
       const t=e.v?teamInfo(e.v):{label:'',color:'#64748b'};
       const tag=t.label?(' <i style="color:'+t.color+'">●</i>'+esc(t.label)):'';
       const vtxt=e.v?(mk(vehLabel(e.v))+(e.v.plate?' / '+mk(e.v.plate):'')):'（車両なし）';
-      return '<button type="button" class="cf-recall-item" onclick="custPick(\''+e.cust.id+'\',\''+(e.v?e.v.id:'')+'\')">'+
+      return '<button type="button" class="cf-recall-item" onclick="custPick(\''+jsq(e.cust.id)+'\',\''+jsq(e.v?e.v.id:'')+'\')">'+
         '<b>'+mk(custDispName(e.cust)||'(無名)')+'</b> <span>'+vtxt+tag+'</span>'+where(e.cust,e.v)+'</button>';
     }).join('');
     box.style.display='block';
@@ -674,7 +678,7 @@
          '<option value="default"'+(_filters.board==='default'?' selected':'')+'>国産車</option>'+
          '<option value="import"'+(_filters.board==='import'?' selected':'')+'>輸入車</option></select>'+
        '<select class="cust-fsel" onchange="custSetFilter(\'div\',this.value)"><option value="">課：すべて</option>'+
-         (state.divisions||[]).map(d=>'<option value="'+d.id+'"'+(_filters.div===d.id?' selected':'')+'>'+esc(d.label)+'</option>').join('')+'</select>'+
+         (state.divisions||[]).map(d=>'<option value="'+esc(d.id)+'"'+(_filters.div===d.id?' selected':'')+'>'+esc(d.label)+'</option>').join('')+'</select>'+
        '<select class="cust-fsel" onchange="custSetFilter(\'front\',this.value)">'+opt(_distinctVeh('frontStaff'),_filters.front,'担当：すべて')+'</select>'+
        '<select class="cust-fsel" onchange="custSetFilter(\'maker\',this.value)">'+opt(_distinctVeh('maker'),_filters.maker,'メーカー：すべて')+'</select>'+
        /* 🔵 v2.36.0（ゆうた指定）**件数の下に「お客様をまとめる」**。
@@ -711,7 +715,7 @@
         const first=vi===0, last=vi===vs.length-1;
         const t=teamInfo(v||{});
         const pillC=(s,col)=>s?'<span class="ct-pill" style="background:'+col+'22;color:'+col+';border-color:'+col+'66">'+esc(s)+'</span>':'—';
-        h+='<tr class="'+(last?'ct-rb':'ct-norb')+(first?'':' ct-cont')+' ct-clickrow" onclick="custOpen(\''+cust.id+'\')" title="顧客詳細を開く">'+
+        h+='<tr class="'+(last?'ct-rb':'ct-norb')+(first?'':' ct-cont')+' ct-clickrow" onclick="custOpen(\''+jsq(cust.id)+'\')" title="顧客詳細を開く">'+
            '<td class="ct-name">'+(first?esc(custDispName(cust)||'(無名)'):'')+'</td>'+
            '<td class="ct-mut">'+(first?esc(cust.kana||'—'):'')+'</td>'+
            '<td>'+(v?esc(v.maker||'—'):'—')+'</td>'+
@@ -728,9 +732,9 @@
               ⚠ Lステップが有る人と無い人で新規予約の位置がガタつかないよう、
                  無い人にも**同じ幅の空きマス**を置いて位置を固定する。 */
            '<td class="ct-act"><div class="ct-actrow">'+
-             '<button class="ct-b ct-bnew" onclick="event.stopPropagation();custNewReserveFor(\''+cust.id+'\',\''+((v&&v.id)||'')+'\')" title="この車で新規予約">🆕 新規予約</button>'+
+             '<button class="ct-b ct-bnew" onclick="event.stopPropagation();custNewReserveFor(\''+jsq(cust.id)+'\',\''+jsq((v&&v.id)||'')+'\')" title="この車で新規予約">🆕 新規予約</button>'+
              ((first && (cust.lineStatus||'')==='ok' && (cust.lstepId||'').trim() && window.pitLstepUrl)
-               ? '<a class="ct-licon" href="'+esc(pitLstepUrl(cust.lstepId))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Lステップを開く">L</a>'
+               ? '<a class="ct-licon" href="'+esc(safeHref(pitLstepUrl(cust.lstepId)))+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Lステップを開く">L</a>'
                : '<span class="ct-licon-none" aria-hidden="true"></span>')+
            '</div></td>'+
            '</tr>';
@@ -836,7 +840,7 @@
 
   /* ===== 編集（人＋連絡先＋車両） ===== */
   function _boardSel(v){ return '<select class="ce-board"><option value="">—</option><option value="default"'+(v==='default'?' selected':'')+'>国産</option><option value="import"'+(v==='import'?' selected':'')+'>輸入</option></select>'; }
-  function _divSel(v){ return '<select class="ce-div"><option value="">—</option>'+(state.divisions||[]).map(d=>'<option value="'+d.id+'"'+(v===d.id?' selected':'')+'>'+esc(d.label)+'</option>').join('')+'</select>'; }
+  function _divSel(v){ return '<select class="ce-div"><option value="">—</option>'+(state.divisions||[]).map(d=>'<option value="'+esc(d.id)+'"'+(v===d.id?' selected':'')+'>'+esc(d.label)+'</option>').join('')+'</select>'; }
   function _frontSel(v){ return '<select class="ce-front"><option value="">—</option>'+frontStaffList().map(n=>'<option value="'+esc(n)+'"'+(v===n?' selected':'')+'>'+esc(n)+'</option>').join('')+'</select>'; }
   /* ══════════════════════════════════════════════════════════════════════════
      🚗 v2.114.0（ゆうた指定 2026-09-14）**車両の修正画面を新規予約とそろえた。**
@@ -898,7 +902,7 @@
     // LINE（新規予約欄と同じ：未案内/LINE NG/登録済＋Lステップ番号）
     const lineOpts=[['','未案内'],['ng','LINE NG'],['ok','登録済']].map(function(o){ return '<option value="'+o[0]+'"'+(((cust.lineStatus||'')===o[0])?' selected':'')+'>'+o[1]+'</option>'; }).join('');
     const ceIsOk=((cust.lineStatus||'')==='ok');
-    const ceUrl=(ceIsOk && (cust.lstepId||'').trim() && window.pitLstepUrl)?pitLstepUrl(cust.lstepId):'';
+    const ceUrl=(ceIsOk && (cust.lstepId||'').trim() && window.pitLstepUrl)?safeHref(pitLstepUrl(cust.lstepId)):'';
     h+='<div class="ce-sec">LINE</div><div class="ce-line">'+
        '<select id="ce-line-status" class="ce-line-sel" onchange="custEditSyncLine()">'+lineOpts+'</select>'+
        '<input id="ce-lstep" class="ce-line-id" value="'+esc(cust.lstepId||'')+'" placeholder="Lステップ番号 / URL貼付OK（登録済のとき）" oninput="custEditSyncLine()"'+(ceIsOk?'':' style="display:none"')+'>'+
@@ -926,7 +930,7 @@
          '</div>';
     });
     h+='</div><button class="ce-add" onclick="custEditAddVehicle()">＋ 車両を追加</button>';
-    h+='</div><div class="cm-foot"><button class="cm-cancel" onclick="custCloseModal()">キャンセル</button><button class="cm-save" onclick="custSaveEdit(\''+cust.id+'\')">保存</button></div>';
+    h+='</div><div class="cm-foot"><button class="cm-cancel" onclick="custCloseModal()">キャンセル</button><button class="cm-save" onclick="custSaveEdit(\''+jsq(cust.id)+'\')">保存</button></div>';
     openModal(h, 'ce-box');
     _bindEditPlates();
   }
@@ -1019,7 +1023,7 @@
     if(!sel||!inp||!link) return;
     const ok=sel.value==='ok';
     inp.style.display=ok?'':'none';
-    const url=(ok && inp.value.trim() && window.pitLstepUrl)?pitLstepUrl(inp.value.trim()):'';
+    const url=(ok && inp.value.trim() && window.pitLstepUrl)?safeHref(pitLstepUrl(inp.value.trim())):'';
     if(url){ link.href=url; link.style.display=''; }
     else { link.removeAttribute('href'); link.style.display='none'; }
   };
@@ -1092,7 +1096,7 @@
     const _wts = (window.pitCardWorkTypes ? pitCardWorkTypes(c) : []);
     const wt = _wts[0] || null;
     const wl = _wts.length ? _wts.map(function(x){ return x.label; }).join('＋') : '—';
-    const wc = wt ? wt.color : '#64748b';
+    const wc = wt ? pitHex(wt.color) : '#64748b';
     /* 🔴 状態の言葉は pit-share.js の `pitCardStatusText` 1本 */
     const st = (window.pitCardStatusText) ? pitCardStatusText(c)
              : ((typeof statusLabel === 'function') ? statusLabel(c.status) : (c.status||''));
@@ -1171,19 +1175,19 @@
                                      : function(n){ return '<i data-ic='+n+' data-ics=14></i> '; };
     let h = '';
     if (opt.hist){
-      h += '<button class="cd-b" onclick="event.stopPropagation();custHistory(\''+opt.hist.custId+'\',\''+esc(opt.hist.vehId||'')+'\',\''+esc(c.id)+'\')">'
+      h += '<button class="cd-b" onclick="event.stopPropagation();custHistory(\''+jsq(opt.hist.custId)+'\',\''+jsq(opt.hist.vehId||'')+'\',\''+jsq(c.id)+'\')">'
          +   ic('clock') + '履歴</button>';
     }
     if (c.status === 'reserved'){
-      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoReserveDate(\''+esc(c.reserveDate||'')+'\')">'
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoReserveDate(\''+jsq(c.reserveDate||'')+'\')">'
          +   ic('calendar') + '予約表</button>';
     } else if (c.status === 'returned' && !isNS){
       /* 🔎 v2.17.0 カードidも渡す＝飛んだ先でその日とそのカードが光る（探し直さなくていい） */
-      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoResultMonth(\''+esc(c.returnDate||c.reserveDate||'')+'\',\''+esc(c.id)+'\')">'
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitGotoResultMonth(\''+jsq(c.returnDate||c.reserveDate||'')+'\',\''+jsq(c.id)+'\')">'
          +   ic('chart') + '実績ボード</button>';
     }
     if (opt.detail){
-      h += '<button class="cd-b" onclick="event.stopPropagation();pitOpenCardDetail(\''+esc(c.id)+'\')">'
+      h += '<button class="cd-b" onclick="event.stopPropagation();pitOpenCardDetail(\''+jsq(c.id)+'\')">'
          +   ic('file') + '予約詳細</button>';
     }
     return h;
@@ -1296,7 +1300,7 @@
        ⚠ 窓は顧客詳細と**同じ器**なので、✕ を押すと顧客詳細ごと閉じてしまう（＝戻れない）。
        ⚠ カードから直接開いた道（お客様が引けない `_hist.only`）では出さない。押しても戻る先が無い。 */
     let h = '<div class="cm-head">'
-      + ((cust && !_hist.only) ? '<button class="ch-back" onclick="custOpen(\''+cust.id+'\')" title="顧客詳細へ戻る"><i data-ic=left data-ics=15></i> 顧客詳細へ戻る</button>' : '')
+      + ((cust && !_hist.only) ? '<button class="ch-back" onclick="custOpen(\''+jsq(cust.id)+'\')" title="顧客詳細へ戻る"><i data-ic=left data-ics=15></i> 顧客詳細へ戻る</button>' : '')
       + '<i data-ic=clock data-ics=16></i> 作業履歴 '
       + '<span class="cm-sub">'+esc((cust?custDispName(cust):(_hist.名||''))||'(無名)')+'</span>'
       + '<button class="cm-x" onclick="custCloseModal()"><i data-ic=close data-ics=16></i></button></div>';
@@ -1331,12 +1335,12 @@
                               return w.length ? w.map(function(x){ return x.label; }).join('＋') : '—'; })();
       const 色 = r.den ? '#64748b'
                : (function(){ const w=(window.pitCardWorkTypes?pitCardWorkTypes(r.c):[]);
-                              return w[0] ? w[0].color : '#64748b'; })();
+                              return w[0] ? pitHex(w[0].color) : '#64748b'; })();
       const 金 = r.den ? ('¥'+Number(r.den.金額||0).toLocaleString())
                : (_cardCancelled(r.c) ? 'キャンセル' : _cardNoSale(r.c) ? '売上なし'
                  : ((r.c.amountFinal!=null&&r.c.amountFinal!=='') ? ('¥'+Number(r.c.amountFinal).toLocaleString())
                  : ((r.c.estAmount!=null&&r.c.estAmount!=='') ? ('¥'+Number(r.c.estAmount).toLocaleString()) : '—')));
-      h += '<button class="ch-ix'+(on?' on':'')+'" onclick="custHistGo(\''+esc(r.id)+'\')">'
+      h += '<button class="ch-ix'+(on?' on':'')+'" onclick="custHistGo(\''+jsq(r.id)+'\')">'
          +   '<span class="ch-ix-d">'+esc(日)+'</span>'
          +   '<span class="ch-ix-a">'+esc(金)+'</span>'
          +   '<span class="ch-ix-w" style="background:'+色+'">'+esc(名)+'</span>'
@@ -1530,7 +1534,7 @@
     if(st==='ng') return '<span class="cd-pill mut">LINE NG</span>';
     if(st==='ok'){
       var id=((o&&o.lstepId)||'').trim();
-      var url=(id&&window.pitLstepUrl)?pitLstepUrl(id):'';
+      var url=(id&&window.pitLstepUrl)?safeHref(pitLstepUrl(id)):'';
       return url?'<a class="cd-pill green cd-line-link" href="'+esc(url)+'" target="_blank" rel="noopener" draggable="true" onclick="event.stopPropagation()"><i data-ic=link data-ics=16></i> Lステップ</a>':'<span class="cd-pill green">LINE登録済</span>';
     }
     return '';
@@ -1543,7 +1547,7 @@
     if(st==='ng'){ main='LINE NG'; lab='LINE'; }
     else {
       var id=((o&&o.lstepId)||'').trim();
-      var url=(id&&window.pitLstepUrl)?pitLstepUrl(id):'';
+      var url=(id&&window.pitLstepUrl)?safeHref(pitLstepUrl(id)):'';
       main=url?'<a class="cd-pill green cd-line-link" href="'+esc(url)+'" target="_blank" rel="noopener" draggable="true" onclick="event.stopPropagation()" title="Lステップを開く"><i data-ic=link data-ics=16></i> Lステップ</a>':'LINE登録済';
       lab='LINE / Lステップ';
     }
@@ -1636,14 +1640,14 @@
        /* 🔴 v1.49.1（ゆうた指定）アーカイブ／戻すは**右上に小さいアイコンだけ**。
           ⚠ ふだん押すものではないので、編集ボタンと同じ大きさで並べない。
           ⚠ 何のボタンか分かるよう title を必ず付ける（アイコンだけなので）。 */
-       '<div class="cd-acts"><button class="cd-btn" onclick="custEdit(\''+cust.id+'\')"><i data-ic=pencil data-ics=16></i> 編集</button>'+
+       '<div class="cd-acts"><button class="cd-btn" onclick="custEdit(\''+jsq(cust.id)+'\')"><i data-ic=pencil data-ics=16></i> 編集</button>'+
        /* 🚗 v2.31.0 車をまとめる（ふだん押すものではないので、アイコンだけ・title 必須） */
-       (_mergeOK?'<button class="cd-ico cd-ico-merge" title="車をまとめる（同じ車が2件に分かれている時）" aria-label="車をまとめる" onclick="PitVehMerge.open(\''+cust.id+'\')"><i data-ic=link data-ics=15></i></button>':'')+
+       (_mergeOK?'<button class="cd-ico cd-ico-merge" title="車をまとめる（同じ車が2件に分かれている時）" aria-label="車をまとめる" onclick="PitVehMerge.open(\''+jsq(cust.id)+'\')"><i data-ic=link data-ics=15></i></button>':'')+
        (_archived(cust)
          ? ((window.PitArchive&&PitArchive.canRestore())
-             ? '<button class="cd-ico cd-ico-restore" title="アーカイブから戻す" aria-label="アーカイブから戻す" onclick="custRestore(\''+cust.id+'\')"><i data-ic=undo data-ics=15></i></button>'
+             ? '<button class="cd-ico cd-ico-restore" title="アーカイブから戻す" aria-label="アーカイブから戻す" onclick="custRestore(\''+jsq(cust.id)+'\')"><i data-ic=undo data-ics=15></i></button>'
              : '<span class="cd-ico cd-ico-lock" title="戻せるのは管理者だけです" aria-label="戻せるのは管理者だけです"><i data-ic=lock data-ics=15></i></span>')
-         : '<button class="cd-ico cd-ico-arch" title="この顧客をアーカイブする" aria-label="この顧客をアーカイブする" onclick="custArchive(\''+cust.id+'\')"><i data-ic=box data-ics=15></i></button>')+
+         : '<button class="cd-ico cd-ico-arch" title="この顧客をアーカイブする" aria-label="この顧客をアーカイブする" onclick="custArchive(\''+jsq(cust.id)+'\')"><i data-ic=box data-ics=15></i></button>')+
        '</div></div>';
     // ヘッダー
     /* 🔴 v1.49.0 アーカイブ済みの顧客は、開いた時にひと目で分かるように帯を出す */
@@ -1675,7 +1679,7 @@
     /* 🔴 v1.52.0（ゆうた指定）車の追加はここから＝新設した「顧客・車両の登録」画面を開く。
        ⚠ 顧客がアーカイブ済みの時は出さない（片付けた人に車を足す操作は要らない）。 */
     h+='<div class="cd-sec"><div class="cd-sech"><div class="cd-sect"><i data-ic=car data-ics=16></i> 車両 <span class="cd-cnt">'+vehicles.length+'台</span></div>'+
-       (_archived(cust)?'':'<button class="cd-btn cd-addveh" onclick="custAddVehicleFor(\''+cust.id+'\')"><i data-ic=plus data-ics=15></i> 車両を追加</button>')+
+       (_archived(cust)?'':'<button class="cd-btn cd-addveh" onclick="custAddVehicleFor(\''+jsq(cust.id)+'\')"><i data-ic=plus data-ics=15></i> 車両を追加</button>')+
        '</div>';
     if(vehicles.length){
       h+='<div class="cd-vehs">';
@@ -1693,10 +1697,10 @@
         const canR  = !(window.PitArchive) || PitArchive.canRestore();
         /* 🔴 v1.49.1 車のアーカイブ／戻すも**カードの右上に小さいアイコンだけ**（ゆうた指定） */
         const vIco = vSelf
-          ? (canR ? '<button class="cd-vico cd-vico-restore" title="アーカイブから戻す" aria-label="アーカイブから戻す" onclick="event.stopPropagation();custVehRestore(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=undo data-ics=14></i></button>'
+          ? (canR ? '<button class="cd-vico cd-vico-restore" title="アーカイブから戻す" aria-label="アーカイブから戻す" onclick="event.stopPropagation();custVehRestore(\''+jsq(cust.id)+'\',\''+jsq(v.id||'')+'\')"><i data-ic=undo data-ics=14></i></button>'
                   : '<span class="cd-vico cd-vico-lock" title="戻せるのは管理者だけです" aria-label="戻せるのは管理者だけです"><i data-ic=lock data-ics=14></i></span>')
           : (_archived(cust) ? ''
-                  : '<button class="cd-vico cd-vico-arch" title="この車をアーカイブする" aria-label="この車をアーカイブする" onclick="event.stopPropagation();custVehArchive(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=box data-ics=14></i></button>');
+                  : '<button class="cd-vico cd-vico-arch" title="この車をアーカイブする" aria-label="この車をアーカイブする" onclick="event.stopPropagation();custVehArchive(\''+jsq(cust.id)+'\',\''+jsq(v.id||'')+'\')"><i data-ic=box data-ics=14></i></button>');
         /* 🔴 v1.52.0 都度車両変動の車は、ナンバーの代わりに印を出し、車種は「毎回入力」と伝える */
         const pv = isPerVisit(v);
         /* 🔗 v2.62.0（ゆうた指定 2026-09-05）**この車を代車・自社車両として使っているか。**
@@ -1724,8 +1728,8 @@
            /* 🚗 v2.2.0 車体番号。クォーターチェックが伝票から入れたもの（手でも直せる） */
            /* 🚗 v2.11.0（ゆうた「車体番号の記載が小さい」）ラベルを付けて、読める大きさにした */
            ((v.vin||'').trim()?'<div class="cd-vvin"><i>車体番号</i>'+esc(v.vin.trim())+'</div>':'')+
-           '<div class="cd-vacts"><span class="cd-vb" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')"><i data-ic=clock data-ics=16></i> 履歴</span>'+
-           (vArc ? '' : '<span class="cd-vb go" onclick="custNewReserveFor(\''+cust.id+'\',\''+(v.id||'')+'\')">🆕 この車で新規予約</span>')+
+           '<div class="cd-vacts"><span class="cd-vb" onclick="custHistory(\''+jsq(cust.id)+'\',\''+jsq(v.id||'')+'\')"><i data-ic=clock data-ics=16></i> 履歴</span>'+
+           (vArc ? '' : '<span class="cd-vb go" onclick="custNewReserveFor(\''+jsq(cust.id)+'\',\''+jsq(v.id||'')+'\')">🆕 この車で新規予約</span>')+
            '</div>'+
            '</div>';
       });
@@ -1750,7 +1754,7 @@
         const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
         const wt=_wts[0]||null;
         const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
-        const wc=wt?wt.color:'#64748b';
+        const wc=wt?pitHex(wt.color):'#64748b';
         const st=(window.pitCardStatusText)?pitCardStatusText(c):(c.status||'');
         /* 金額はまだ確定していない＝**概算だと分かるように書く**（¥だけ並べると確定に見える） */
         const est=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal)
@@ -1769,7 +1773,7 @@
         const menuTxt=c.menu?esc(String(c.menu).split('\n')[0]):'';
         /* 日付＝もう入っていれば実入庫日、まだなら予約日。どちらの日かが分かるように札を付ける */
         const dt=String(c.actualInAt||'').trim()?{d:c.actualInAt,l:'入庫'}:{d:c.reserveDate||'',l:'予約'};
-        h+='<div class="cd-hrow clickable cd-now" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
+        h+='<div class="cd-hrow clickable cd-now" onclick="pitOpenCardDetail(\''+jsq(c.id)+'\')" title="クリックで予約詳細">'+
            '<div class="cd-hdt"><span class="cd-hdl">'+dt.l+'</span>'+esc(dt.d||'日付未定')+
              (c.resNo?'<span class="cd-hres">'+esc(c.resNo)+'</span>':'')+'</div>'+
            '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+
@@ -1798,7 +1802,7 @@
         const _wts=(window.pitCardWorkTypes?pitCardWorkTypes(c):[]);
         const wt=_wts[0]||null;
         const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
-        const wc=wt?wt.color:'#64748b';
+        const wc=wt?pitHex(wt.color):'#64748b';
         const amt=(c.amountFinal!=null&&c.amountFinal!=='')?Number(c.amountFinal):(c.estAmount!=null&&c.estAmount!==''?Number(c.estAmount):null);
         /* 🔴 v1.99.0（ゆうた確定）売上なしは **¥0 ではなく「売上なし」**と書く。
            0円と書くと「金額の入れ忘れ」と見分けがつかないため。 */
@@ -1836,7 +1840,7 @@
         if(_cardNoSale(c)||_cardCancelled(c)) tags+='<span class="cd-htag st nosale">'+esc(_statusLbl(c))+'</span>';
         /* この行の車＝ナンバーで引く（履歴ボタンの飛び先） */
         const _hv=(cust.vehicles||[]).find(function(x){ return x&&isRealPlate(x.plate)&&norm(x.plate)===norm(c.plate||''); });
-        h+='<div class="cd-hrow clickable" onclick="pitOpenCardDetail(\''+esc(c.id)+'\')" title="クリックで予約詳細">'+
+        h+='<div class="cd-hrow clickable" onclick="pitOpenCardDetail(\''+jsq(c.id)+'\')" title="クリックで予約詳細">'+
            '<div class="cd-hdt">'+esc(_doneDate(c)||'日付未定')+
              (c.resNo?'<span class="cd-hres">'+esc(c.resNo)+'</span>':'')+'</div>'+
            '<div class="cd-hwt" style="background:'+wc+'">'+esc(wl)+'</div>'+
@@ -1874,15 +1878,15 @@
              '<div class="cd-asub"><i data-ic=box data-ics=14></i> '+esc(window.PitArchive?PitArchive.noteOf(v):'アーカイブ済み')+'</div>'+
            '</div>'+
            '<div class="cd-aacts">'+
-             '<button class="cd-ab" onclick="custHistory(\''+cust.id+'\',\''+(v.id||'')+'\')" title="この車の来店履歴を見る"><i data-ic=clock data-ics=15></i> 履歴</button>'+
+             '<button class="cd-ab" onclick="custHistory(\''+jsq(cust.id)+'\',\''+jsq(v.id||'')+'\')" title="この車の来店履歴を見る"><i data-ic=clock data-ics=15></i> 履歴</button>'+
              /* 🔴 v2.32.1（2026-08-30 実機で見つけた穴）
                 **統合でまとめた車に「戻す」を出さない。**
                 「戻す」はアーカイブの印を外すだけなので、押すと**統合した印（`mergedInto`）が残ったまま車が生き返る**
                 ＝一覧には出るのに履歴の引き当てからは外れる、という食い違いになる。
                 戻す道は**統合を取り消す（🔗の窓の中・管理者だけ）1本**。ここでは道案内だけ出す。 */
              ((window.pitVehMerged && pitVehMerged(v))
-               ? '<button class="cd-ab" onclick="PitVehMerge.open(\''+cust.id+'\')" title="この車は統合でまとめたもの。戻すときは「車をまとめる」の窓から統合を取り消します"><i data-ic=link data-ics=15></i> 統合の記録へ</button>'
-               : (canR ? '<button class="cd-ab cd-ab-restore" onclick="custVehRestore(\''+cust.id+'\',\''+(v.id||'')+'\')" title="アーカイブから戻す"><i data-ic=undo data-ics=15></i> 戻す</button>'
+               ? '<button class="cd-ab" onclick="PitVehMerge.open(\''+jsq(cust.id)+'\')" title="この車は統合でまとめたもの。戻すときは「車をまとめる」の窓から統合を取り消します"><i data-ic=link data-ics=15></i> 統合の記録へ</button>'
+               : (canR ? '<button class="cd-ab cd-ab-restore" onclick="custVehRestore(\''+jsq(cust.id)+'\',\''+jsq(v.id||'')+'\')" title="アーカイブから戻す"><i data-ic=undo data-ics=15></i> 戻す</button>'
                        : '<span class="cd-ab cd-ab-lock" title="戻せるのは管理者だけです"><i data-ic=lock data-ics=15></i></span>'))+
            '</div>'+
            '</div>';

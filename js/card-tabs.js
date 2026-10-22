@@ -31,7 +31,8 @@ function fmtFlowTime(ms){
    🔴 v1.42.0 の教訓：そこに **HTML（<i data-ic=…>）を書かないこと**。
       ボタンの文字もフローの記録も esc() を通るので、書くと**タグが文字のまま画面に出る**
       （CoreTemplate v1.15.1 と同じ落とし穴）。印は `ic`（アイコン名）で持ち、**描く時に線画へ**。 */
-function _flowEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した＝5記号（' も逃がす） */
+function _flowEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 /* タイムライン1行。delIdx を渡すと ✕（手動記録の削除）が付く。 */
 function _flowRow(title, detail, delIdx){
   /* 🔴 v1.42.0 すでに保存されている記録には、古い作りのせいで <i data-ic=…> の文字が
@@ -80,7 +81,7 @@ function cfFlowHtml(c){
     });
     if (c.returnDate)  h += _flowRow('返車予定', c.returnDate + (c.returnTime ? ' ' + c.returnTime : ''));
     /* 🔴 v1.164.0 カードの状態の言葉は pit-share.js の pitCardStatusText 1本（予約キャンセル／未入庫を言い分ける） */
-    h += '<div class="cf-flowrow now"><span class="cf-flowdot"></span><div class="cf-flowmain"><div class="cf-flowt">現在：' + (window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</div></div></div>';
+    h += '<div class="cf-flowrow now"><span class="cf-flowdot"></span><div class="cf-flowmain"><div class="cf-flowt">現在：' + _flowEsc(window.pitCardStatusText ? pitCardStatusText(c) : statusLabel(c.status)) + '</div></div></div>';
     h += '</div>';
   }
 

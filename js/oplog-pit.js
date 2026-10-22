@@ -33,6 +33,8 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function nowStr(d) {
     d = d || new Date();
     var p = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -205,7 +207,7 @@
           + '<span class="op-user">' + esc(e.userName) + '</span>'
           + '<span class="op-act">' + esc(e.action) + '</span>'
           + '<span class="op-label">' + (e.cardId
-              ? '<a href="javascript:void(0)" onclick="pitOpenCardDetail(\'' + esc(e.cardId) + '\')">' + esc(_rw(e.label)) + '</a>'
+              ? '<a href="javascript:void(0)" onclick="pitOpenCardDetail(\'' + jsq(e.cardId) + '\')">' + esc(_rw(e.label)) + '</a>'
               : esc(_rw(e.label))) + '</span>'
           + '</div>';
       });

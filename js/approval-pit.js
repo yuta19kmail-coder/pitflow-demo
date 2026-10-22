@@ -34,6 +34,9 @@
    ======================================== */
 (function () {
   'use strict';
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq） */
+  var pitEsc = (typeof window.pitEsc === 'function') ? window.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return pitEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
 
   function pending(c){ return !!(c && c.approvalPending); }
   window.pitApprovalPending = pending;
@@ -157,8 +160,8 @@
       + '<div class="cv-apt">この予約は承認待ちです</div>'
       + '<div class="cv-apnote">内容を確認して、問題なければ承認してください。承認すると印が取れて、ふつうの予約になります（承認待ちBOXからも消えます）。</div>'
       + '<div class="cv-apacts">'
-      +   '<button type="button" class="cv-apok" onclick="pitApproveCard(\'' + c.id + '\', true)"><i data-ic=printer data-ics=16></i> 承認して印刷して保存</button>'
-      +   '<button type="button" class="cv-apsub" onclick="pitApproveCard(\'' + c.id + '\', false)"><i data-ic=check data-ics=16></i> 承認のみ（刷らない）</button>'
+      +   '<button type="button" class="cv-apok" onclick="pitApproveCard(\'' + jsq(c.id) + '\', true)"><i data-ic=printer data-ics=16></i> 承認して印刷して保存</button>'
+      +   '<button type="button" class="cv-apsub" onclick="pitApproveCard(\'' + jsq(c.id) + '\', false)"><i data-ic=check data-ics=16></i> 承認のみ（刷らない）</button>'
       +   '<span class="cv-apwho">承認した人の名前はフローに残ります</span>'
       + '</div></div>';
   }

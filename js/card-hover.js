@@ -15,6 +15,8 @@
   var hideTimer = null, saveTimer = null;
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（課の札・作業タイプの色） */
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
   /* 今のフェーズに入った時刻(ms)。
      🔴 v1.58.0 **順番を入れ替えた**＝フローの記録が先、写し（phaseAt）は予備（ゆうた指定）。
@@ -188,7 +190,7 @@
     if (c.resNo) h += '<span class="ph-resno">'+esc(c.resNo)+'</span>';
     h += '<span class="ph-pill ph-team '+team+'">'+teamLabel+'</span>';
     /* 課が選ばれていない時は、空の札を出さない（前は必ず「1課」が出ていた） */
-    if (ku) h += '<span class="ph-pill ph-div">'+ku+'</span>';
+    if (ku) h += '<span class="ph-pill ph-div">'+esc(ku)+'</span>';
     if (staff) h += '<span class="ph-staffwrap"><span class="ph-stafflb">担当</span><span class="ph-staff">'+esc(staff)+'</span></span>';
     h += '</div>';
     h += '<div class="ph-name">'+esc((window.pitCustName?pitCustName(c):c.customer)||'（未入力）')+' <small>様</small></div>';
@@ -207,7 +209,8 @@
         var w = (window.state && state.workTypes || []).find(function(x){ return x.id === id; });
         if (w){
           var _cd = ((id==='coat1y'||id==='coat3m') && c.coatingDone) ? ' ph-done' : '';   // コーティング完了＝済スタンプ
-          bd.push('<span class="ph-b'+_cd+'" style="background:'+w.color+'22;color:'+w.color+';border-color:'+w.color+'88">'+esc(w.label)+'</span>');
+          var _wc = pitHex(w.color);
+          bd.push('<span class="ph-b'+_cd+'"'+(_wc?' style="background:'+_wc+'22;color:'+_wc+';border-color:'+_wc+'88"':'')+'>'+esc(w.label)+'</span>');
         }
       });
       /* 🏢 v2.6.0 社内区分（中古／代車車検／内部）＝作業タイプの直後に */

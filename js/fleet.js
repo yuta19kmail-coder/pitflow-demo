@@ -19,7 +19,9 @@ const FL_EVT_TYPES = {
   other:    { label: 'その他',          color: '#3b82f6' }
 };
 
-function _fleetEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _fleetEsc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（_fleetEsc を5記号に・onclick の '…' は jsq。予備の定義＝本体は pit-share.js） */
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _fleetEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
 function _flPd(s){ const p = String(s).split('-'); return new Date(+p[0], +p[1]-1, +p[2]); }
 /* 「2026-10-20」→「10/20」。カレンダーの狭いマスに入れる短い書き方。 */
 function _flMd(s){ const p = String(s||'').split('-'); return p.length===3 ? (+p[1])+'/'+(+p[2]) : String(s||''); }
@@ -128,7 +130,7 @@ function renderFleet(){
         v.width  != null ? '幅 ' + _fleetEsc(v.width)  : '',
         v.height != null ? '高 ' + _fleetEsc(v.height) : ''
       ].filter(Boolean).join(' / ');
-      h += '<div class="fl-row fl-row-click" onclick="fleetOpenDetail(\'' + v.id + '\')" title="クリックで詳細">'
+      h += '<div class="fl-row fl-row-click" onclick="fleetOpenDetail(\'' + jsq(v.id) + '\')" title="クリックで詳細">'
          + '<div class="fl-card-top">'
            + (_no ? '<span class="fl-no">' + _fleetEsc(_no) + '</span>' : '')
            + '<span class="fl-ttl">' + _fleetEsc(v.model || v.name || '（車種未登録）') + '</span>'
@@ -344,11 +346,11 @@ function flMonthCalHtml(){
       if (b && b.span > 1){
         inner += '<div class="fl-bar3 ' + b.it.state + '" style="width:calc(' + FL_COL_M + 'px * ' + b.span + ' - 12px)"'
                + ' title="' + _fleetEsc(b.it.title) + '"'
-               + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
+               + ' onclick="event.stopPropagation();flMaintGoto(\'' + jsq(v.id) + '\',\'' + jsq(ym) + '\')">'
                + _flMbInner(b.it) + '</div>';
       } else if (b){
         inner += '<div class="fl-mb ' + b.it.state + '" title="' + _fleetEsc(b.it.title) + '"'
-               + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
+               + ' onclick="event.stopPropagation();flMaintGoto(\'' + jsq(v.id) + '\',\'' + jsq(ym) + '\')">'
                + _flMbInner(b.it) + '</div>';
       }
       /* ② 1ヶ月ぶんの札（12点・一般・B.P、超過） */
@@ -356,7 +358,7 @@ function flMonthCalHtml(){
         if (it.bar) return;
         if (it.months.indexOf(ym) < 0) return;
         inner += '<div class="fl-mb ' + it.state + '" title="' + _fleetEsc(it.title) + '"'
-               + ' onclick="event.stopPropagation();flMaintGoto(\'' + v.id + '\',\'' + ym + '\')">'
+               + ' onclick="event.stopPropagation();flMaintGoto(\'' + jsq(v.id) + '\',\'' + jsq(ym) + '\')">'
                + _flMbInner(it) + '</div>';
       });
       /* ③ 期限＝札にしない。左に赤い縦線の1行（やること／期限を形で分ける）
@@ -367,17 +369,17 @@ function flMonthCalHtml(){
             ＝ 12点は**2ヶ月ぶんの帯**（やること）だけで出す。日付を主張しない。
          ⚠ 車検の満了日は**本物の期限**なので、ここは残す。 */
       if (v.shakenDate && String(v.shakenDate).slice(0,7) === ym)
-        inner += '<div class="fl-due" title="車検の満了日">満了 ' + _flMd(v.shakenDate) + '</div>';
+        inner += '<div class="fl-due" title="車検の満了日">満了 ' + _fleetEsc(_flMd(v.shakenDate)) + '</div>';
       /* 🏁 v2.106.0（ゆうた指定）**リースアップ日は月ビューに暫定で出す。**過ぎた月のマスはグレー。 */
       const _le = window.pitLeaseEnd ? pitLeaseEnd(v) : '';
       if (_le && _le.slice(0,7) === ym)
         inner += '<div class="fl-due lease' + (v.leaseUpFixed ? '' : ' tbd') + '" title="リースアップ日' + (v.leaseUpFixed ? '（確定）' : '（暫定）') + '">'
-               + '🏁 リースアップ ' + (v.leaseUpFixed ? _flMd(_le) : '（暫定・' + (+_le.slice(5, 7)) + '月）') + '</div>';
+               + '🏁 リースアップ ' + (v.leaseUpFixed ? _fleetEsc(_flMd(_le)) :'（暫定・' + (+_le.slice(5, 7)) + '月）') + '</div>';
       /* 🔴 v2.165.0（ゆうた指定 2026-10-11）空いたマスを押す＝**その月の日ビューへ**（月の見出しと同じ）。
          ⚠ 前は古い「＋ イベントを追加」の窓が開いていた。日を決めるのは日ビュー（なぞる）の仕事。
          ⚠ 自由イベント（fleetEvents）の札は窓ごと廃止＝もう描かない。 */
       h += '<div class="fl-cal-cell' + (padAt[mi] ? ' barpad' : '') + ((_le && ym > _le.slice(0,7)) ? ' fl-leaseout' : '') + '"'
-         + ' onclick="flZoomTo(\'' + v.id + '\',' + m.getFullYear() + ',' + m.getMonth() + ')" title="クリックで日別表示">' + inner + '</div>';
+         + ' onclick="flZoomTo(\'' + jsq(v.id) + '\',' + m.getFullYear() + ',' + m.getMonth() + ')" title="クリックで日別表示">' + inner + '</div>';
     });
    });
   });
@@ -466,13 +468,13 @@ function flDayCalHtml(y, mo){
               + (bb.b.cutL ? ' cutL' : '') + (bb.b.cutR ? ' cutR' : '') + '"'
               + ' style="width:calc(' + FL_COL_D + 'px * ' + bb.span + ' - 12px)"'
               + ' title="' + _fleetEsc(bb.b.title) + '"'
-              + ' onclick="event.stopPropagation();flMaintChip(\'' + bb.b.id + '\')">'
+              + ' onclick="event.stopPropagation();flMaintChip(\'' + jsq(bb.b.id) + '\')">'
               + '<i class="fl-dot ' + bb.b.workDot + '"></i>'
               + (_w >= 2 ? '<b>' + _fleetEsc(bb.b.workShort) + '</b>' : '')
               + (_w >= 4 ? '<span class="st">' + _fleetEsc(bb.b.stateLabel) + '</span>' : '')
               + '</div>' + inner;
       }
-      h += '<div class="' + cls + '" data-fv="' + v.id + '" data-fd="' + ds + '">' + inner + '</div>';
+      h += '<div class="' + cls + '" data-fv="' + _fleetEsc(v.id) + '" data-fd="' + ds + '">' + inner + '</div>';
     });
    });
   });
@@ -643,7 +645,7 @@ function _flLinkRow(x){
     const who = _fleetEsc(window.pitFleetBadgeText ? pitFleetBadgeText(held.kind, held.v) : '別の車');
     return '<div class="fl-link-cand held">'+main+'<span class="fl-link-held">'+who+'に紐づけ済み</span></div>';
   }
-  return '<button type="button" class="fl-link-cand" onclick="flLinkPick(\''+_fleetEsc(x.cust.id)+'\',\''+_fleetEsc(x.veh.id)+'\')">'
+  return '<button type="button" class="fl-link-cand" onclick="flLinkPick(\''+jsq(x.cust.id)+'\',\''+jsq(x.veh.id)+'\')">'
        + main + '<span class="fl-link-go">紐づける</span></button>';
 }
 function _flLinkRender(){
@@ -735,7 +737,7 @@ window.fleetOpenDetail = function (id) {
             /* 🔗 v2.66.0（ゆうた指定）**カルテNo を押すと、そのお客様の車両一覧（顧客詳細）へ飛ぶ。** */
             return '<span class="fd-linked" title="' + e((lk.cust.name || lk.cust.kana || '(無名)') + ' 様') + '">'
                  + '<i data-ic=link data-ics=13></i>済み</span>'
-                 + (kt ? '<button type="button" class="fd-linkkarte" onclick="fleetGoCustomer(\'' + e(v.id) + '\')"'
+                 + (kt ? '<button type="button" class="fd-linkkarte" onclick="fleetGoCustomer(\'' + jsq(v.id) + '\')"'
                        + ' title="押すと、このお客様の車両一覧へ飛びます">' + e(kt) + '</button>' : '');
           })())
         /* v1.14.5：代車／社用車のどちらでも同じ項目を出す */
@@ -752,13 +754,13 @@ window.fleetOpenDetail = function (id) {
            ・作業予定 … **この車でワンタイムの作業予定**を足す窓（作業予定ボードの「＋ 予定を足す」と同じ窓）
            🔴 飛び先はどちらも既存の1本を呼ぶだけ（`custHistory` ／ `flMaintAdd`）。ここで組み立てない。 */
         + '<div class="fd-btns"><button class="vh-btn" onclick="fleetCloseDetail()">閉じる</button>'
-        + '<button class="vh-btn" onclick="fleetGoHistory(\'' + v.id + '\')"'
+        + '<button class="vh-btn" onclick="fleetGoHistory(\'' + jsq(v.id) + '\')"'
           + (window.pitFleetLinked && pitFleetLinked(v) ? ''
              : (v.lease ? ' disabled title="リース車両は顧客と紐づけないので、履歴はありません"'
                         : ' disabled title="先に「顧客車両との紐づけ」で結んでください"'))
           + '><i data-ic=clock data-ics=16></i> 履歴</button>'
-        + '<button class="vh-btn" onclick="fleetCloseDetail();flMaintAdd(\'' + v.id + '\')"><i data-ic=wrench data-ics=16></i> 作業予定</button>'
-        + '<button class="vh-btn primary" onclick="fleetCloseDetail();fleetOpenModal(\'' + v.id + '\')"><i data-ic=pencil data-ics=16></i> 編集</button></div>';
+        + '<button class="vh-btn" onclick="fleetCloseDetail();flMaintAdd(\'' + jsq(v.id) + '\')"><i data-ic=wrench data-ics=16></i> 作業予定</button>'
+        + '<button class="vh-btn primary" onclick="fleetCloseDetail();fleetOpenModal(\'' + jsq(v.id) + '\')"><i data-ic=pencil data-ics=16></i> 編集</button></div>';
   let ov = document.getElementById('fleet-detail');
   if (!ov) {
     ov = document.createElement('div');
@@ -1157,7 +1159,7 @@ function _flHistoryHtml(){
     h += '<div class="fl-hist-row">'
        + '<span class="fl-hist-lo">' + _fleetEsc(_flHistLoName(a.loanerId))
        +   (lo && lo.retired ? '<span class="fl-hist-ret">引退</span>' : '') + '</span>'
-       + '<span class="fl-hist-dt">' + _flHistMD(a.fromDate) + ' 〜 ' + _flHistMD(a.toDate) + '</span>'
+       + '<span class="fl-hist-dt">' + _fleetEsc(_flHistMD(a.fromDate)) + ' 〜 ' + _fleetEsc(_flHistMD(a.toDate)) + '</span>'
        + '<span class="fl-hist-day">' + (d != null ? d + '日' : '') + '</span>'
        + st
        + '<span class="fl-hist-who">' + _fleetEsc(who) + (car ? ' <small>' + _fleetEsc(car) + '</small>' : '') + '</span>'

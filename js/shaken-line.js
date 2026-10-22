@@ -26,6 +26,8 @@
   'use strict';
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の id は jsq） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function num(v){ v=+v; return isFinite(v)?v:0; }
   /* 割合。⚠ 分母が0の時は「0%」と書かない（0%と「まだ無い」は別の意味） */
   function pct(n,d){ return d>0 ? (Math.round(n/d*1000)/10)+'%' : '—'; }
@@ -312,7 +314,7 @@
     if(!ng.length) return h+'<div class="sv-empty">この月は落ちていません。</div></div>';
     h+='<table class="sv-table sln-nglist"><thead><tr><th>日</th><th>お客様</th><th>車</th><th>区分</th><th>回送</th><th>陸運局</th><th>R</th><th>落ちた所</th></tr></thead><tbody>';
     ng.forEach(function(t){
-      h+='<tr onclick="openDetail(\''+t.c.id+'\')">'
+      h+='<tr onclick="openDetail(\''+jsq(t.c.id)+'\')">'
         +'<td>'+fmd(t.iso)+' '+(t.slot==='pm'?'PM':'AM')+'</td>'
         +'<td class="sv-td-name">'+esc(surname(t.c))+'様</td>'
         +'<td>'+esc(carOf(t.c))+'</td>'

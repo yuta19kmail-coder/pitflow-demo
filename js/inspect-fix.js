@@ -36,6 +36,8 @@
 
   function t(v){ return String(v == null ? '' : v).trim(); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した＝onclick の '…' は jsq */
+  var jsq = (typeof w.jsq === 'function') ? w.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function num(v){ v = +String(v==null?'':v).replace(/[^0-9\-]/g,''); return isFinite(v) ? v : 0; }
   function st(){ return (w.state || {}); }
 
@@ -268,7 +270,7 @@
           /* 🔢 v1.178.0 開いた小窓にも、その所見の番号を出す（押すとコピー）。
              ⚠ 番号は所見が持っているものをそのまま出す。**ここで作り直さない。** */
           +   (f.no ? '<button class="ins-no" title="押すと番号をコピーします"'
-                    + ' onclick="pitInspectCopyNo(\'' + esc(f.no) + '\')">' + esc(f.no) + '</button>' : '')
+                    + ' onclick="pitInspectCopyNo(\'' + jsq(f.no) + '\')">' + esc(f.no) + '</button>' : '')
           +   '<div class="ins-fix-t">' + esc(f.title) + '</div>'
           +   '<button class="ins-fix-x" onclick="pitFixClose()" aria-label="閉じる">✕</button>'
           + '</div>'

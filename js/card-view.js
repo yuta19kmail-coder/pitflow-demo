@@ -37,6 +37,9 @@
   const DOW = ['日','月','火','水','木','金','土'];
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の '…' は jsq・作業タイプ/課の色は pitHex・名前やラベルは esc） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   function save(){ try { if (window.PitDB) PitDB.save(); } catch(e){} }
   // 返車日/時間・金額などを直したら、背後で開いている実績ボード等も描き直して反映する（モーダルは別レイヤーなので閉じない）v0.118.1
   function cvRefreshBg(){ try { if (window.showView && window.state && state.currentView) showView(state.currentView); } catch(e){} }
@@ -44,7 +47,7 @@
   function pad(n){ return String(n).padStart(2,'0'); }
   function isoToday(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
   function parseISO(s){ if(!s) return null; const p=String(s).split('-'); if(p.length<3) return null; return new Date(+p[0],+p[1]-1,+p[2]); }
-  function fmtMD(s){ const d=parseISO(s); if(!d) return s||''; return (d.getMonth()+1)+'/'+d.getDate()+'('+DOW[d.getDay()]+')'; }
+  function fmtMD(s){ const d=parseISO(s); if(!d) return esc(s||''); return (d.getMonth()+1)+'/'+d.getDate()+'('+DOW[d.getDay()]+')'; }
   function daysBetween(aISO,bISO){ const a=parseISO(aISO),b=parseISO(bISO); if(!a||!b) return null; return Math.round((b-a)/86400000); }
 
   // ---- 各種マスタ参照 ----
@@ -140,12 +143,12 @@
        　 ⚠ 枠の左の縦線は1本しか無いので、**そこは先頭の色のまま**。 */
     const wts = (window.pitCardWorkTypes ? pitCardWorkTypes(c) : []);
     const wt = wts[0] || null;
-    const wtColor = wt ? wt.color : '#84cc16';
+    const wtColor = wt ? pitHex(wt.color, '#84cc16') : '#84cc16';
     /* 🏷 v2.51.0（A-5）B.P＋保険＝保険板金／一般＋保証＝保証修理。表は pit-share.js の1本 */
     const wtLabel = wts.length
       ? wts.map(function(x){
           var lb = window.pitWtLabel ? pitWtLabel(c, x.id, wts) : x.label;
-          return '<span class="cv-wt1" style="color:' + x.color + '">' + esc(lb) + '</span>';
+          return '<span class="cv-wt1" style="color:' + pitHex(x.color) + '">' + esc(lb) + '</span>';
         }).join('<span class="cv-wtplus">＋</span>')
       : '<span class="cv-wt1">作業</span>';
     const dt = dropType(c);
@@ -154,7 +157,7 @@
     // 1行目：名前＋新規/リピーター＋予約を編集／2行目にフリガナ（v1.56.0）
     h += '<div class="cv-id1"><span class="cv-nm">'+esc((window.pitCustName?pitCustName(c):c.customer)||'（未入力）')+' <small>様</small></span>'
        + repeatBadge(c)
-       + '<span class="cv-editmini cv-idedit" onclick="openCardEditForm(\''+c.id+'\')"><i data-ic=pencil data-ics=16></i> 予約を編集</span></div>';
+       + '<span class="cv-editmini cv-idedit" onclick="openCardEditForm(\''+jsq(c.id)+'\')"><i data-ic=pencil data-ics=16></i> 予約を編集</span></div>';
     h += kanaHtml(c);
     // 2行目：車種＋ナンバー＋カルテNo
     h += '<div class="cv-id2"><span class="cv-car">'+esc(c.car||'（車種未入力）')+'</span>'
@@ -404,7 +407,7 @@
           （車に紐づけば横断できる画面、紐づかなければその1件だけ）。 */
     if (window.custHistoryForCard){
       h += '<div class="cv-wsec cv-histbtn">'
-         +   '<button class="cd-b" onclick="custHistoryForCard(\''+esc(c.id)+'\')">'
+         +   '<button class="cd-b" onclick="custHistoryForCard(\''+jsq(c.id)+'\')">'
          +     '<i data-ic=clock data-ics=14></i> 作業履歴</button></div>';
     }
     return h + '</div>';
@@ -635,7 +638,7 @@
     const dstr = function(v){ return v ? (window.fmtMD ? fmtMD(v) : v) : '—'; };
     let dchain = RKINDS.map(function(k, i){
       const arrow = i>0 ? '<span class="cv-amarr">→</span>' : '';
-      return arrow + '<span class="cv-aseg'+(k[0]===curD?' cur':'')+'" title="'+esc(k[3])+'"><span class="cv-alb">'+k[1]+'</span><span class="cv-aval">'+dstr(k[2])+'</span></span>';
+      return arrow + '<span class="cv-aseg'+(k[0]===curD?' cur':'')+'" title="'+esc(k[3])+'"><span class="cv-alb">'+k[1]+'</span><span class="cv-aval">'+esc(dstr(k[2]))+'</span></span>';
     }).join('');
     if (RD.c && c.returnTime) dchain += '<span class="cv-dtime"><i data-ic=clock data-ics=14></i> '+esc(c.returnTime)+'</span>';
 
@@ -868,7 +871,7 @@
           + '<div class="cv-shact">'
           + (window.pitShakenChoices
               ? pitShakenChoices(_si).items.map(function(it){
-                  return '<button class="cv-shbtn '+(it.tone==='re'?'re':'ok')+'" onclick="cvShakenGo(\''+it.act+'\')" title="'+esc(it.sub)+'">'
+                  return '<button class="cv-shbtn '+(it.tone==='re'?'re':'ok')+'" onclick="cvShakenGo(\''+jsq(it.act)+'\')" title="'+esc(it.sub)+'">'
                     + (it.tone==='re'?'✕ ':'<i data-ic=check data-ics=16></i> ')+esc(it.label)+'</button>';
                 }).join('')
               : '<button class="cv-shbtn ok" onclick="cvShakenGo(\'done\')"><i data-ic=check data-ics=16></i> 車検済にする（一発合格）</button>'
@@ -1088,7 +1091,7 @@
                ? ' <button type="button" class="cv-unlockbtn" onclick="cvUnlockSalesDate()"><i data-ic=pencil data-ics=16></i> 編集</button>'
                : ' <span class="cv-adminonly"><i data-ic=lock data-ics=14></i> 管理のみ</span>')
            + '</div><div class="cv-frb">'
-           + '<span class="cv-fixval" id="cv-sdlock">' + esc(cur ? fmtMD(cur) : '—') + '</span>'
+           + '<span class="cv-fixval" id="cv-sdlock">' + (cur ? fmtMD(cur) : '—') + '</span>'
            + noteHtml;
     if (canSd){
       h2 += '<span class="cv-unlockwrap" id="cv-sdedit" style="display:none">'
@@ -1369,8 +1372,8 @@
       var _oi = (_orig[_i] != null ? _orig[_i] : _i);
       var _gone = !!(e && e.deleted);
       var del = (window.PitFlowLog && PitFlowLog.isManual(e))
-        ? (_gone ? '<button type="button" class="cv-fundel" title="消した記録を戻す" onclick="pitFlowUndel(\''+esc(c.id)+'\','+_oi+')">戻す</button>'
-                 : '<button type="button" class="cv-fdel" title="この記録を消す（打ち消し線で残る）" onclick="pitFlowDel(\''+esc(c.id)+'\','+_oi+')">'+(window.ico?ico('close',15):'×')+'</button>') : '';
+        ? (_gone ? '<button type="button" class="cv-fundel" title="消した記録を戻す" onclick="pitFlowUndel(\''+jsq(c.id)+'\','+Number(_oi)+')">戻す</button>'
+                 : '<button type="button" class="cv-fdel" title="この記録を消す（打ち消し線で残る）" onclick="pitFlowDel(\''+jsq(c.id)+'\','+Number(_oi)+')">'+(window.ico?ico('close',15):'×')+'</button>') : '';
       if (_gone) who = (who ? who + ' ・ ' : '') + '消した：' + (e.deletedBy || '');
       return '<div class="cv-frow done'+(_gone?' cv-fgone':'')+'"><span class="cv-fdot"></span><div class="cv-fmain"><div class="cv-ft">'+title+(amtTxt?'<span class="cv-famt">'+esc(amtTxt)+'</span>':'')+'</div><div class="cv-fd">'+esc(String(when)+(who?' ・ '+who:''))+'</div></div>'+del+'</div>';
     };
@@ -1379,13 +1382,13 @@
       var _groups = (window.pitFlowGroup ? pitFlowGroup(log)
                     : log.map(function(e,i){ return { head:e, i:i, kids:[] }; })).slice().reverse();
       _groups.forEach(function (g, gi) {
-        var gid = 'cvfg-' + esc(c.id) + '-' + g.i;
+        var gid = 'cvfg-' + c.id + '-' + g.i;
         if (g.head) h += _rowOf(g.head, g.i);
         if (!g.kids.length) return;
         var open = !!_cvFlowOpen[gid];
         /* ⚠ 畳んでいる時も**何件あるか**は必ず見せる。数が見えないと「無い」と読まれる。 */
         h += '<div class="cv-fsub' + (open ? ' open' : '') + '">'
-           + '<button type="button" class="cv-fmore" onclick="pitFlowToggle(\'' + gid + '\')">'
+           + '<button type="button" class="cv-fmore" onclick="pitFlowToggle(\'' + jsq(gid) + '\')">'
            + '<i class="cv-fcar"></i>' + (open ? 'この間の記録を閉じる' : 'この間の記録 ' + g.kids.length + '件')
            + '</button>'
            + (open ? '<div class="cv-fkids">'
@@ -1651,7 +1654,7 @@
 
   // ===== トップ（resNo/status/⋮/🗒️/✕） =====
   function topHtml(c){
-    const dt = c.reserveDate ? ('入庫 '+fmtMD(c.reserveDate)+(c.reserveTime?' '+c.reserveTime:'')) : '';
+    const dt = c.reserveDate ? ('入庫 '+fmtMD(c.reserveDate)+(c.reserveTime?' '+esc(c.reserveTime):'')) : '';
     const sc = (window.statusColor ? statusColor(c.status) : '#f59e0b');
     /* 🔴 v1.164.0（ゆうた指摘）状態の札は pit-share.js の `pitCardStatusText` 1本。
        ⚠ 直す前は `statusLabel(c.status)` に**状態の文字だけ**を渡していたので、
@@ -1670,18 +1673,18 @@
       /* 🔴 v1.164.0 言葉は pit-share.js の `pitCancelText` から借りる（見た目だけここで分ける）。 */
       + (c.status==='cancelled'
             ? '<span class="'+(c.cancelled?'cv-cancelbadge':'cv-nosalebadge')+'">'
-              + (window.pitCancelText ? pitCancelText(c) : (c.cancelled ? '予約キャンセル' : '未入庫'))
+              + esc(window.pitCancelText ? pitCancelText(c) : (c.cancelled ? '予約キャンセル' : '未入庫'))
               + '</span>' : '')
       + (dt?'<span class="cv-intake">'+dt+'</span>':'')
       + '<div class="cv-acts">'
       /* 🏢 v2.6.0 社内車両は伝票が無い＝表紙も刷らない（ボタンごと出さない） */
       + ((window.pitCardIntern && pitCardIntern(c)) ? ''
-         : '<button class="cv-iconbtn" title="表紙を印刷" onclick="pitPrintCover(\''+c.id+'\')"><i data-ic=printer data-ics=16></i></button>')
+         : '<button class="cv-iconbtn" title="表紙を印刷" onclick="pitPrintCover(\''+jsq(c.id)+'\')"><i data-ic=printer data-ics=16></i></button>')
       + '<button class="cv-iconbtn" title="この車両に付箋を発行" onclick="cvToggleFusen(event)"><i data-ic=sticky data-ics=16></i></button>'
       /* 📮 v1.175.0 予定依頼（ゆうた指定 2026-08-22）＝**付箋発行の隣**。
          この車の 客名・車種・作業タイプ・担当者 が入った状態で窓が開く。
          🔴 窓の中身は共通部品（CFReq）。MHS の「＋ 予定依頼」とまったく同じものが出る。 */
-      + '<button class="cv-iconbtn" title="この車で予定依頼を出す（日も担当も書かなくてOK）" onclick="pitReqOpen(\''+c.id+'\')"><i data-ic=send data-ics=16></i></button>'
+      + '<button class="cv-iconbtn" title="この車で予定依頼を出す（日も担当も書かなくてOK）" onclick="pitReqOpen(\''+jsq(c.id)+'\')"><i data-ic=send data-ics=16></i></button>'
       + '<div class="cv-optwrap"><button class="cv-iconbtn" title="オプション" onclick="cvToggleOpt(event)">⋮</button>'
       + '<div class="cv-optmenu" id="cv-optmenu">' + optMenuHtml(c) + '</div></div>'
       + '<button class="cv-iconbtn" title="閉じる" onclick="closeDetail()"><i data-ic=close data-ics=16></i></button>'
@@ -2980,7 +2983,7 @@
       if(!st.off){
         html+='<div class="cv-vslots"><div class="cv-slot'+(slots.indexOf('am')>=0?' on':'')+'" onclick="cvToggleSlot(\''+st.iso+'\',\'am\',event)"><span class="cv-bx"></span>AM</div>'
             + '<div class="cv-slot'+(slots.indexOf('pm')>=0?' on':'')+'" onclick="cvToggleSlot(\''+st.iso+'\',\'pm\',event)"><span class="cv-bx"></span>PM</div></div>';
-      } else { html+='<div class="cv-voff">'+st.tag+'</div>'; }
+      } else { html+='<div class="cv-voff">'+esc(st.tag)+'</div>'; }
       html+='</div>';
     }
     track.innerHTML = html;
@@ -3074,7 +3077,7 @@
                 : (kind==='repass') ? '<i data-ic=check data-ics=16></i> 車検済を記録（再検合格）'
                                     : '✕ 不合格を記録';
     const body = '<div class="cv-shpb">'
-      + '<label>行った日</label><input type="date" id="cv-shdate" value="'+defDate+'">'
+      + '<label>行った日</label><input type="date" id="cv-shdate" value="'+esc(defDate)+'">'
       + '<label>時間帯</label><div class="cv-shslot" id="cv-shslot"><button type="button" data-s="am" class="'+(window._cvShSlot==='am'?'on':'')+'" onclick="cvShSlot(this)">AM</button><button type="button" data-s="pm" class="'+(window._cvShSlot==='pm'?'on':'')+'" onclick="cvShSlot(this)">PM</button></div>'
       + '<label>担当（回送＝実際に車検に行った人）</label><select id="cv-shstaff">'+staffOpts+'</select>'
       + _cvS2Html(s.resultStaff2, s.resultStaff2Note)
@@ -3095,7 +3098,7 @@
          ⚠ 済（受かった）には出さない＝書くことが無い。 */
       /* 🔴 v2.56.0 「落ちた所」は**再検合格と不合格の両方**で書ける（一発合格だけ書くことが無い） */
       + ((_it ? !_it.note : kind==='done') ? '' : '<label>落ちた所（1行・空でもOK）</label><input type="text" id="cv-shnote" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">')
-      + '<div class="cv-shpb-act"><button class="cv-shbtn '+(isDone?'ok':'re')+'" onclick="cvShConfirm(\''+kind+'\')">記録する</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
+      + '<div class="cv-shpb-act"><button class="cv-shbtn '+(isDone?'ok':'re')+'" onclick="cvShConfirm(\''+jsq(kind)+'\')">記録する</button><button class="cv-shbtn ghost" onclick="cvShClose()">やめる</button></div>'
       + '</div>';
     let back=document.getElementById('cv-shpop');
     if(!back){ back=document.createElement('div'); back.id='cv-shpop'; back.className='modal-backdrop'; pitModalOutside(back, cvShClose); document.body.appendChild(back); }

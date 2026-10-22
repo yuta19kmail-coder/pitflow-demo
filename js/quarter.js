@@ -43,6 +43,8 @@
      ================================================================ */
 
   function esc(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の id・番号は jsq） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function s(v){ return String(v == null ? '' : v); }
   function t(v){ return s(v).trim(); }
   function yen(n){ return (+n || 0).toLocaleString(); }
@@ -526,7 +528,7 @@
     var ok2  = r && !nok2;
     return '<div class="q-pqwrap">'
       + '<button class="q-pq' + (r ? (ok2 ? ' ok' : ' done') : '') + '"'
-      +   ' onclick="pitQOpenPlan(\'' + x.from + '\',\'' + x.to + '\')">'
+      +   ' onclick="pitQOpenPlan(\'' + jsq(x.from) + '\',\'' + jsq(x.to) + '\')">'
       +   '<span class="q-pq-l"><span class="q-pq-t">' + hd + '</span>'
       +     (r
              /* 🔢 v2.77.0 ここの「+◯円」も消した（いま読んだ組と同じ形にそろえる） */
@@ -539,7 +541,7 @@
       + '</button>'
       /* 🧹 v2.0.0（ゆうた指定）済んだQを「まだ」に戻す。練習のぶんを片づけるため。 */
       + (r ? '<button class="q-pq-x" title="この結果を消して「まだ」に戻す"'
-             + ' onclick="pitQDropRun(\'' + x.from + '\',\'' + x.to + '\')">×</button>' : '')
+             + ' onclick="pitQDropRun(\'' + jsq(x.from) + '\',\'' + jsq(x.to) + '\')">×</button>' : '')
       + '</div>';
   }
 
@@ -603,7 +605,7 @@
       h += '<div class="q-plan-more">このPDFには <b>' + esc(ml) + 'のぶん</b>（'
          + gs.map(function (g) { return esc('Q' + g.no) + (g.全部 ? '' : '一部'); }).join('・')
          + '・' + gs.reduce(function (a, g) { return a + g.soft.length; }, 0) + '枚）も入っています。'
-         + '<button class="q-plan-go" onclick="pitInspectSetYm(\'' + esc(m) + '\')">' + esc(ml) + 'を見る</button></div>';
+         + '<button class="q-plan-go" onclick="pitInspectSetYm(\'' + jsq(m) + '\')">' + esc(ml) + 'を見る</button></div>';
     });
     if (off) h += '<div class="q-plan-off">' + esc(off) + '</div>';
     return h + '</div>';
@@ -878,7 +880,7 @@
         var num = (typeof v === 'number');
         h += '<td' + (num ? ' class="n"' : '') + '>' + esc(num ? yen(v) : s(v)) + '</td>';
       });
-      h += '<td>' + (r.カードid ? '<button class="q-open" onclick="pitInspectGo(\'' + esc(r.カードid) + '\')">開く</button>' : '') + '</td>';
+      h += '<td>' + (r.カードid ? '<button class="q-open" onclick="pitInspectGo(\'' + jsq(r.カードid) + '\')">開く</button>' : '') + '</td>';
       h += '</tr>';
     });
     return h + '</tbody></table>';
@@ -1142,7 +1144,7 @@
       + (先No ? '（' + esc(先No) + '）' : '') + 'なので OK</b><br>'
       + '<em>照合はフロントマンの伝票の日付（' + esc(先 ? 先.売上日 : '—') + '）のQで行っています。変更は要りません。</em></span></div>';
     if (先 && 先.from && !saved){
-      h += '<div class="q-fx"><button class="q-fx-go" onclick="pitQJumpFrom(\'' + esc(先.from) + '\')">' + esc(先Q || '別のQ') + ' のカードを見る</button></div>';
+      h += '<div class="q-fx"><button class="q-fx-go" onclick="pitQJumpFrom(\'' + jsq(先.from) + '\')">' + esc(先Q || '別のQ') + ' のカードを見る</button></div>';
     }
     return h;
   }
@@ -1154,7 +1156,7 @@
   };
 
   function oneFix(x, kind, lv, c, cid, mk){
-    var open = cid ? '<button class="q-fx-go" onclick="pitInspectGo(\'' + esc(cid) + '\')">' : '';
+    var open = cid ? '<button class="q-fx-go" onclick="pitInspectGo(\'' + jsq(cid) + '\')">' : '';
     if (kind === 'pit'){
       /* 🔴🔴 伝票が無いままだと、このあとの伝票の履歴も車体番号も残せない。
          だから**確認しただけの道は作らない**（ゆうた 2026-08-24）。 */
@@ -1162,7 +1164,7 @@
         + '<span class="q-act-ok">フロントマンで<b>伝票を立てて</b>、PDFを出し直す<br>'
         + '<em>（次に出したPDFで消えます）</em></span></div>'
         + '<div class="q-fx"><b class="q-fx-k">②</b>'
-        + (cid ? '<button class="q-fx-go is-heavy" onclick="pitInspectGo(\'' + esc(cid) + '\')">カードを開いて実績を取り消す</button>'
+        + (cid ? '<button class="q-fx-go is-heavy" onclick="pitInspectGo(\'' + jsq(cid) + '\')">カードを開いて実績を取り消す</button>'
                : '<span class="q-act-ok">カードを開いて実績を取り消す</span>') + '</div>'
         + '<div class="q-fx"><span class="q-fx-note"><b>確認しただけでは消えません</b></span></div>';
     }
@@ -1181,8 +1183,8 @@
       + (mk
         ? '<span class="q-fx-done">確認した' + (mk.by ? '<i>' + esc(mk.by) + '</i>' : '')
           + (mk.at ? '<i>' + esc(s(mk.at).slice(5, 10).replace('-', '/')) + '</i>' : '') + '</span>'
-          + '<button class="q-fx-un" onclick="pitQOneMk(\'' + esc(no) + '\',0)">戻す</button>'
-        : '<b class="q-fx-k">答え</b><button class="q-fx-mk" onclick="pitQOneMk(\'' + esc(no) + '\',1)">確認した</button>')
+          + '<button class="q-fx-un" onclick="pitQOneMk(\'' + jsq(no) + '\',0)">戻す</button>'
+        : '<b class="q-fx-k">答え</b><button class="q-fx-mk" onclick="pitQOneMk(\'' + jsq(no) + '\',1)">確認した</button>')
       + '</div>';
   }
 
@@ -1191,7 +1193,7 @@
   function savedAct(p){
     var id = s(p && p.pit && p.pit.生 && p.pit.生.id);
     return '<div class="q-fx">'
-      + (id ? '<button class="q-fx-go" onclick="pitInspectGo(\'' + esc(id) + '\')">カードを開く</button>'
+      + (id ? '<button class="q-fx-go" onclick="pitInspectGo(\'' + jsq(id) + '\')">カードを開く</button>'
             : '<span class="q-act-ok">カードがありません</span>')
       + '</div>'
       + '<div class="q-fx"><span class="q-fx-note">直すときは、'
@@ -1206,7 +1208,7 @@
   function noBtn(no){
     if (!no) return '';
     return '<button class="ins-no" title="押すと番号をコピーします"'
-         + ' onclick="pitInspectCopyNo(\'' + esc(no) + '\')">' + esc(no) + '</button>';
+         + ' onclick="pitInspectCopyNo(\'' + jsq(no) + '\')">' + esc(no) + '</button>';
   }
 
   function fixCell(p){ return '<td class="q-act">' + fixInner(p) + '</td>'; }
@@ -1236,23 +1238,23 @@
            + (mk.by ? '<i>' + esc(mk.by) + '</i>' : '')
            + (mk.at ? '<i>' + esc(s(mk.at).slice(5, 10).replace('-', '/')) + '</i>' : '')
            + '</span>'
-           + '<button class="q-fx-un" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',0)">戻す</button>';
+           + '<button class="q-fx-un" onclick="pitQMk(\'' + jsq(k.kind) + '\',' + i + ',0)">戻す</button>';
       } else if (k.保つ){
         /* 🗓 v2.2.0 実績日＝返車日。ふだんの答えは**これ1つだけ**（直すボタンは出さない） */
         /* ⚠ v2.9.3 文言は物差し（quarter-fix.js の `keepKinds`）が決める。ここで決め打ちしない */
         /* 🆕 v2.158.0 「このままでよい」の行にも直すボタンがある時（客名＝フロントマンの名前にそろえる） */
         if (k.go) h += '<button class="q-fx-go" title="' + esc(k.go.why || '') + '"'
-           + ' onclick="pitQDo(\'' + esc(k.kind) + '\',' + i + ')">' + esc(k.go.label) + '</button>';
+           + ' onclick="pitQDo(\'' + jsq(k.kind) + '\',' + i + ')">' + esc(k.go.label) + '</button>';
         h += '<button class="q-fx-mk q-fx-keep"'
            + ' title="' + esc(k.why || '') + '"'
-           + ' onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">' + esc(k.label || 'このままでよい') + '</button>';
+           + ' onclick="pitQMk(\'' + jsq(k.kind) + '\',' + i + ',1)">' + esc(k.label || 'このままでよい') + '</button>';
       } else if (!k.can){
         h += '<span class="q-fx-lock" title="' + esc(k.why) + '"><i data-ic=lock data-ics=14></i> 管理のみ</span>'
-           + '<button class="q-fx-mk" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">伝票を直した</button>';
+           + '<button class="q-fx-mk" onclick="pitQMk(\'' + jsq(k.kind) + '\',' + i + ',1)">伝票を直した</button>';
       } else {
         h += '<button class="q-fx-go' + (k.重い ? ' is-heavy' : '') + '" title="' + esc(k.why) + '"'
-           + ' onclick="pitQDo(\'' + esc(k.kind) + '\',' + i + ')">' + esc(k.label) + '</button>'
-           + '<button class="q-fx-mk" onclick="pitQMk(\'' + esc(k.kind) + '\',' + i + ',1)">伝票を直した</button>';
+           + ' onclick="pitQDo(\'' + jsq(k.kind) + '\',' + i + ')">' + esc(k.label) + '</button>'
+           + '<button class="q-fx-mk" onclick="pitQMk(\'' + jsq(k.kind) + '\',' + i + ',1)">伝票を直した</button>';
       }
       h += '</div>';
     });

@@ -17,12 +17,15 @@
   var DOW='日月火水木金土', DAYS=12;
   function ymdL(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の id は jsq・data-card-id は esc・課の色は pitHex） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   /* 🔴 v1.108.0 名前・色・車名・車検の判定は **pit-share.js の物差し1本**（MHS・LINEの画像と同じ答え）。
      ⚠ ここに書き戻さないこと。以前ここだけ独自だったせいで、
         ・カナだけのお客様が「（未入力）」になる（Todayボードでは 8/15 に直したのに車検だけ残っていた）
         ・課の色を「輸入車ならピンク」と**車から逆算**していた（8/16 に他画面から追放したやり方） */
   function surname(c){ return (window.pitCustSurname?pitCustSurname(c):(c.customer||''))||'（未入力）'; }
-  function team(c){ return window.pitDivisionColor?pitDivisionColor(c):'#1db97a'; }
+  function team(c){ return pitHex(window.pitDivisionColor?pitDivisionColor(c):'') || '#1db97a'; }
   function carLabel(c){ return window.pitCarLabel?pitCarLabel(c):((c.car||c.maker||c.plate||'').toString()); }
   function isShaken(c){ return window.pitIsShaken?pitIsShaken(c):false; }
   function ins(c){ if(!c.inspSchedule||typeof c.inspSchedule!=='object') c.inspSchedule={mode:'manual',slots:{},cutBefore:''}; if(!c.inspSchedule.slots) c.inspSchedule.slots={}; if(!Array.isArray(c.inspSchedule.history)) c.inspSchedule.history=[]; return c.inspSchedule; }
@@ -41,7 +44,8 @@
   function dayOff(iso){ return window.pitShakenDayOff ? pitShakenDayOff(iso)
                           : { off:false, kind:'', label:'', short:'' }; }
   function isOff(iso){ return !!dayOff(iso).off; }
-  function offLabel(iso){ var o=dayOff(iso); return o.off ? (o.short||'休') : '休'; }
+  /* 🛡 v2.200.0 SEC-07 休みの名前は MHS から配られる値＝HTML に入れる前に esc（ガントの午前／午後の欄に出す） */
+  function offLabel(iso){ var o=dayOff(iso); return o.off ? esc(o.short||'休') : '休'; }
   function fmtMD(iso){ var d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }
   /* 🔴 v1.116.0 入庫待ちの日付は**曜日つき**で出す（ゆうた指定「8/22入 → 8/22(土)」）。
      ⚠ 土日が休みなので、曜日が見えないと「土曜に入庫？」の勘違いが起きる。 */
@@ -213,8 +217,8 @@
      ⚠ 「未定 回送・R」は出さない（kind が 'decided' の時だけ出る作り）＝仮押さえの段階で急かさない。 */
   function tentChip(c){
     var car=carLabel(c);
-    return '<div class="shk-chip shk-tent shk-drag" draggable="false" data-card-id="'+c.id+'"'
-      + ' onclick="event.stopPropagation();shkTentMenu(\''+c.id+'\')"'
+    return '<div class="shk-chip shk-tent shk-drag" draggable="false" data-card-id="'+esc(c.id)+'"'
+      + ' onclick="event.stopPropagation();shkTentMenu(\''+jsq(c.id)+'\')"'
       + ' title="暫定予定（仮押さえ）。上の「決定」へ運ぶと本決まりになります"'
       + ' style="border-left-color:'+team(c)+'">'
       + '<div class="shk-nm"><span class="shk-mk shk-mk-tent">暫定</span>'+esc(surname(c))+'様</div>'
@@ -244,8 +248,8 @@
     var editable=(kind==='decided');
     // v0.124.1 ドラッグはポインタ方式（下の shkPointer…）で行う＝ネイティブdraggableは使わない。タップ(onclick)は従来どおり。
     var cls = 'shk-chip shk-'+kind+(editable?' shk-drag':' locked');
-    var onclick = editable ? 'shkChipMenu(\''+c.id+'\')' : 'openDetail(\''+c.id+'\')';
-    return '<div class="'+cls+'" draggable="false" data-card-id="'+c.id+'"'
+    var onclick = editable ? 'shkChipMenu(\''+jsq(c.id)+'\')' : 'openDetail(\''+jsq(c.id)+'\')';
+    return '<div class="'+cls+'" draggable="false" data-card-id="'+esc(c.id)+'"'
       + ' onclick="'+onclick+'" style="border-left-color:'+team(c)+'">'
       + '<div class="shk-nm">'+(mark?'<span class="shk-mk shk-mk-'+mcls+'"'+(mtip?' title="'+esc(mtip)+'"':'')+'>'+mark+'</span>':'')+esc(surname(c))+'様</div>'
       + '<div class="shk-car">'+(car?esc(car):'<span class="shk-nocar">車種未登録</span>')+'</div>'
@@ -264,7 +268,7 @@
         + '<span class="shk-wgn">'+g.cars.length+'台</span></div>'
         + '<div class="shk-wgb">';
       h+= g.cars.length ? g.cars.map(function(c){
-            return '<span class="shk-uchip" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" style="border-left-color:'+team(c)+'">'
+            return '<span class="shk-uchip" data-card-id="'+esc(c.id)+'" onclick="openDetail(\''+jsq(c.id)+'\')" style="border-left-color:'+team(c)+'">'
               /* 🔴 v1.117.0 日付だけ（ゆうた指定「（金）だけで 入 は外しちゃってOK」）。
                  ⚠ 箱の見出しが「今週入庫分」なので、1つずつに「入」を付けると同じ字が並ぶだけ。 */
               + '<span class="shk-ures">'+(c.reserveDate?fmtMDW(c.reserveDate):'入庫日未定')+'</span>'
@@ -340,8 +344,8 @@
          ⚠ ホバーの情報カードも**ここだけ**に付け替えた（card-hover.js の HOVER_SEL）。
             行ぜんぶに出していた時は、マスを押そうとするたびに大きな情報カードが被っていた。
          ⚠ 行ける枠の入れ替えは**この先の予約詳細だけ**＝この表からは触れない（下のマスの説明を読む）。 */
-      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+c.id+'">'
-        + '<div class="shk-gut gcar clk" data-card-id="'+c.id+'" onclick="openDetail(\''+c.id+'\')" title="押すと予約詳細（行ける枠の入れ替えもここ）">'
+      h+='<div class="shk-row shk-gcar shk-gantt-drop'+(isEmpty?' unset':'')+'" data-card-id="'+esc(c.id)+'">'
+        + '<div class="shk-gut gcar clk" data-card-id="'+esc(c.id)+'" onclick="openDetail(\''+jsq(c.id)+'\')" title="押すと予約詳細（行ける枠の入れ替えもここ）">'
         + '<div class="shk-gcar-nm">'+esc(surname(c))+'様 '+esc(carLabel(c))+'</div><div class="shk-gcar-sub">'+subH+'</div></div>'
         + days.map(function(x,di){ if(x.off) return '<div class="shk-off2"></div>';
             return ['am','pm'].map(function(slot){
@@ -365,11 +369,11 @@
                 return '<div class="shk-gsc tentcell'+pm+(on?' onband':'')+'" data-iso="'+x.iso+'" data-slot="'+slot+'">'+under+tentChip(c)+'</div>';
               }
               var put='押すと '+fmtMDW(x.iso)+' '+ap+' に暫定予定（仮押さえ）を置く';
-              if(!on) return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="'+put+'"></div>';
+              if(!on) return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+jsq(c.id)+'\',\''+x.iso+'\',\''+slot+'\')" title="'+put+'"></div>';
               var pOn = slot==='am'? son(di-1,'pm') : son(di,'am');
               var nOn = slot==='am'? son(di,'pm') : son(di+1,'am');
               /* ⚠ 帯そのものは**見るだけ**（押しても外れない）。掴んで上の「決定」へ運ぶのは今までどおり。 */
-              return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="行ける枠：'+fmtMDW(x.iso)+' '+ap+'（入れ替えは予約詳細から）／'+put+'"><div class="shk-bar'+(c.boardId==='import'?' imp':'')+(pOn?'':' l')+(nOn?'':' r')+'" draggable="false" data-card-id="'+c.id+'" data-iso="'+x.iso+'" data-slot="'+slot+'"></div></div>';
+              return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+jsq(c.id)+'\',\''+x.iso+'\',\''+slot+'\')" title="行ける枠：'+fmtMDW(x.iso)+' '+ap+'（入れ替えは予約詳細から）／'+put+'"><div class="shk-bar'+(c.boardId==='import'?' imp':'')+(pOn?'':' l')+(nOn?'':' r')+'" draggable="false" data-card-id="'+esc(c.id)+'" data-iso="'+x.iso+'" data-slot="'+slot+'"></div></div>';
             }).join('');
           }).join('')+'</div>';
     });
@@ -589,8 +593,8 @@
       + '<div class="shk-pnote">暫定：'+fmtMDW(t.date)+' '+(t.slot==='pm'?'午後':'午前')+'</div>'
       + '<div class="shk-phint">まだ決定ではありません。MHS・当日ビュー・前日LINEには出ません。'
       + '上の「決定」へ運ぶと本決まりになります。</div>'
-      + '<button class="shk-pbtn" onclick="shkTentDrop(\''+id+'\')">この暫定を外す</button>'
-      + '<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>');
+      + '<button class="shk-pbtn" onclick="shkTentDrop(\''+jsq(id)+'\')">この暫定を外す</button>'
+      + '<button class="shk-pbtn ghost" onclick="openDetail(\''+jsq(id)+'\');shkClosePop()">カードを開く</button>');
   };
   window.shkTentDrop=function(id){
     var c=card(id); if(!c) return; var t=tentOf(c); if(!t) return;
@@ -636,7 +640,7 @@
       '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+(c.plate?' / '+esc(c.plate):'')+'</div>'
       + '<div class="shk-pnote">予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
       + fieldsHtml(c)
-      + '<button class="shk-pbtn ok" onclick="shkSaveFields(\''+id+'\')">保存する</button>'
+      + '<button class="shk-pbtn ok" onclick="shkSaveFields(\''+jsq(id)+'\')">保存する</button>'
       + '<button class="shk-pbtn ghost" onclick="shkClosePop()">あとで入れる</button>');
   };
 
@@ -677,7 +681,7 @@
       /* 🔴 v2.112.0 言い方は物差し（pitShakenResultLabel）1本＝再検の車は「再検で合格」 */
       var _rl=window.pitShakenResultLabel?pitShakenResultLabel(s):(_rp?'再検合格':'完了');
       body+='<div class="shk-pnote">'+esc(_rl)+'：'+(s.resultDate?fmtMD(s.resultDate):'')+' '+slName+(s.resultStaff?'・担当 '+esc(window.pitShakenStaffPair?pitShakenStaffPair(s.resultStaff,s.resultStaff2,s.resultStaff2Note,'',true):s.resultStaff):'')
-        +(_rp&&s.repassNote?'<br>落ちた所：'+esc(s.repassNote):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'reopen\')">予定に戻す</button>';
+        +(_rp&&s.repassNote?'<br>落ちた所：'+esc(s.repassNote):'')+'</div><button class="shk-pbtn" onclick="shkAct(\''+jsq(id)+'\',\'reopen\')">予定に戻す</button>';
     } else if(s.decided){
       /* 🔴🔴 v2.57.0（ゆうた指定 2026-09-04）**窓を3つの塊に分けて、線で区切った。**
          🗣「担当者やランド情報があって／この内容で保存／──線──／午後に変更／候補に戻す／
@@ -692,28 +696,28 @@
       var _ch=window.pitShakenChoices?pitShakenChoices(s):null;
       var _res=_ch ? _ch.items.map(function(it){
           var cls=it.tone==='re'?'re':(it.tone==='ok2'?'ok2':'ok');
-          var go=it.note ? 'shkNotePop(\''+id+'\',\''+it.act+'\')' : 'shkAct(\''+id+'\',\''+it.act+'\')';
+          var go=it.note ? 'shkNotePop(\''+jsq(id)+'\',\''+it.act+'\')' : 'shkAct(\''+jsq(id)+'\',\''+it.act+'\')';
           return '<button class="shk-pbtn '+cls+'" onclick="'+go+'" title="'+esc(it.sub)+'">'+(it.tone==='re'?'✕ ':'✓ ')+esc(it.label)+'</button>';
         }).join('')
-        : '<button class="shk-pbtn ok" onclick="shkAct(\''+id+'\',\'done\')">✓ 完了（一発合格）</button>'
-        + '<button class="shk-pbtn ok2" onclick="shkNotePop(\''+id+'\',\'repass\')">✓ 完了（再検合格）</button>'
-        + '<button class="shk-pbtn re" onclick="shkNotePop(\''+id+'\',\'recheck\')">✕ 不合格（記録して候補へ戻す）</button>';
+        : '<button class="shk-pbtn ok" onclick="shkAct(\''+jsq(id)+'\',\'done\')">✓ 完了（一発合格）</button>'
+        + '<button class="shk-pbtn ok2" onclick="shkNotePop(\''+jsq(id)+'\',\'repass\')">✓ 完了（再検合格）</button>'
+        + '<button class="shk-pbtn re" onclick="shkNotePop(\''+jsq(id)+'\',\'recheck\')">✕ 不合格（記録して候補へ戻す）</button>';
       body+='<div class="shk-pnote">'+(_ch&&_ch.retry?'<b>再検</b>（不合格 '+_ch.reNo+'回のあと）　':'')+'予定決定：'+fmtMDW(s.decided)+' '+slName+'</div>'
         + fieldsHtml(c)
-        + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+id+'\')">この内容で保存</button>'
+        + '<button class="shk-pbtn ok2" onclick="shkSaveFields(\''+jsq(id)+'\')">この内容で保存</button>'
         + '<div class="shk-psep"></div>'
         /* 🔴 v2.57.0 時間帯を変えたら、そのままラウンドを選び直す窓に切り替わる（ゆうた指定）
            ＝ 午前と午後でラウンドが変わるのに、変えたあと入れ直す道が無かった。 */
-        + '<button class="shk-pbtn" onclick="shkFlipPop(\''+id+'\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
-        + '<button class="shk-pbtn" onclick="shkAct(\''+id+'\',\'tocand\')">↩ 候補（行ける日）に戻す</button>'
-        + '<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>'
+        + '<button class="shk-pbtn" onclick="shkFlipPop(\''+jsq(id)+'\')">'+(s.decidedSlot==='pm'?'午前':'午後')+'に変更</button>'
+        + '<button class="shk-pbtn" onclick="shkAct(\''+jsq(id)+'\',\'tocand\')">↩ 候補（行ける日）に戻す</button>'
+        + '<button class="shk-pbtn ghost" onclick="openDetail(\''+jsq(id)+'\');shkClosePop()">カードを開く</button>'
         + '<div class="shk-psep"></div>'
         + _res;
       pop('車検の予定', body); return;                      /* ⚠ 下の「カードを開く」は付けない（中の塊に入れた） */
     } else {
       body+='<div class="shk-pnote">この車の不合格の記録です。</div><button class="shk-pbtn" onclick="shkClosePop()">閉じる</button>';
     }
-    body+='<button class="shk-pbtn ghost" onclick="openDetail(\''+id+'\');shkClosePop()">カードを開く</button>';
+    body+='<button class="shk-pbtn ghost" onclick="openDetail(\''+jsq(id)+'\');shkClosePop()">カードを開く</button>';
     pop('車検の予定', body);
   };
   function _slT(sl){ return sl==='pm'?'PM':'AM'; }
@@ -765,14 +769,14 @@
     var now=Number(s.round||0);
     var slName=s.decidedSlot==='pm'?'午後':'午前';
     var btns=[1,2,3,4].map(function(n){
-      return '<button class="shk-pbtn'+(now===n?' ok2':'')+'" onclick="shkSetRound(\''+id+'\','+n+')">'
+      return '<button class="shk-pbtn'+(now===n?' ok2':'')+'" onclick="shkSetRound(\''+jsq(id)+'\','+n+')">'
         + n+'R'+(now===n?'（いま）':'')+'</button>'; }).join('');
     pop('ラウンドを選ぶ',
       '<div class="shk-pinfo">'+esc(surname(c))+'様 / '+esc(c.car||'')+'</div>'
       + '<div class="shk-pnote">'+fmtMDW(s.decided)+' <b>'+slName+'</b> に変えました。ラウンドは？</div>'
       + btns
       + '<div class="shk-psep"></div>'
-      + '<button class="shk-pbtn" onclick="shkSetRound(\''+id+'\',0)">未定にする</button>'
+      + '<button class="shk-pbtn" onclick="shkSetRound(\''+jsq(id)+'\',0)">未定にする</button>'
       + '<button class="shk-pbtn ghost" onclick="shkClosePop()">このまま（あとで入れる）</button>');
   };
   window.shkSetRound=function(id,n){
@@ -804,9 +808,9 @@
       + '<label class="shk-plabel">落ちた所（1行・空でもOK）</label>'
       + '<input id="shk-note" class="shk-pinput" type="text" maxlength="120" placeholder="例：光軸／サイドスリップ／ブーツ切れ">'
       + '<div class="shk-pwords">'+SHK_NG_WORDS().map(function(w){
-          return '<button type="button" class="shk-pw" onclick="shkAddWord(\''+w+'\')">'+w+'</button>'; }).join('')+'</div>'
-      + '<button class="shk-pbtn '+(isNg?'re':'ok2')+'" onclick="shkActNote(\''+id+'\',\''+act+'\')">記録する</button>'
-      + '<button class="shk-pbtn ghost" onclick="shkChipMenu(\''+id+'\')">← 戻る</button>');
+          return '<button type="button" class="shk-pw" onclick="shkAddWord(\''+jsq(w)+'\')">'+esc(w)+'</button>'; }).join('')+'</div>'
+      + '<button class="shk-pbtn '+(isNg?'re':'ok2')+'" onclick="shkActNote(\''+jsq(id)+'\',\''+act+'\')">記録する</button>'
+      + '<button class="shk-pbtn ghost" onclick="shkChipMenu(\''+jsq(id)+'\')">← 戻る</button>');
   };
   /* 札を押した時＝入っていなければ足す／入っていれば外す。区切りは「・」 */
   window.shkAddWord=function(w){

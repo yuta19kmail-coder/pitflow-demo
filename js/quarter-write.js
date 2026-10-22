@@ -40,6 +40,8 @@
   function yen(n){ return (+n || 0).toLocaleString(); }
   function esc(x){ return s(x).replace(/[&<>"']/g, function (m) {
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m]; }); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の伝票番号は jsq） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function Q(){ return (w._insp && w._insp.q) || {}; }
 
   /* ================================================================
@@ -283,7 +285,7 @@
     h += '<div class="vw-pick">';
     a.slice(0, 10).forEach(function (x) {
       h += '<button class="vw-p' + (t(x.soft.伝票) === t(p.soft.伝票) ? ' on' : '') + '"'
-         + ' onclick="pitQWritePick(\'' + esc(t(x.soft.伝票)) + '\')">' + esc(x.soft.顧客名)
+         + ' onclick="pitQWritePick(\'' + jsq(t(x.soft.伝票)) + '\')">' + esc(x.soft.顧客名)
          + ((x.soft.法定 || []).length ? '<i>車検</i>' : '') + '</button>';
     });
     h += '</div>';

@@ -12,6 +12,10 @@
    🔴 並び順も1本（`pitReturnSortMin`）。**返車時間は確定返車日にしか付かない**ので、
       時間がまだ無い車は「終日」として**いちばん後ろ**に置く（入庫時刻で代用しない）。
    ======================================== */
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（月の枠の名前・作業の色・id・暦の札）。部品の本体は pit-share.js（下は単独で読まれた時の予備） */
+var pitEsc = (typeof window.pitEsc === 'function') ? window.pitEsc : function(x){ return String(x==null?'':x).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); };
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return pitEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
 function renderReturn(){
   renderReturnNav();
@@ -72,9 +76,9 @@ function renderReturnDay(){
   html += '<div style="font-size:13px;color:var(--text2);">';
   /* 🔴 v1.90.0 休み＝赤／短縮＝オレンジ／特別営業＝緑（PitCal.tone・予約カレンダーと同じ） */
   const dayTone = (window.PitCal && PitCal.tone) ? PitCal.tone(dateStr) : (isClosed ? 'closed' : '');
-  if (dayNote) html += '<span class="cal-note ' + dayTone + '"><i data-ic=' + (isClosed ? 'ban' : 'clock') + ' data-ics=14></i> ' + dayNote + '</span>　';
+  if (dayNote) html += '<span class="cal-note ' + dayTone + '"><i data-ic=' + (isClosed ? 'ban' : 'clock') + ' data-ics=14></i> ' + pitEsc(dayNote) + '</span>　';
   const holDay = (window.Holidays && Holidays.name(dateStr)) || null;
-  if (holDay) html += '<span class="hol-badge"><i data-ic=flag data-ics=16></i> ' + holDay + '</span>　';
+  if (holDay) html += '<span class="hol-badge"><i data-ic=flag data-ics=16></i> ' + pitEsc(holDay) + '</span>　';
   html += '本日の返車予定 ' + todays.length + ' 件';
   html += '</div></div>';
 
@@ -150,9 +154,9 @@ function renderReturnWeek(){
     html += '<div class="reserve-week-head' + (isToday ? ' today' : '') + (isClosed ? ' closed' : '') + (hol ? ' holiday' : '') + '">';
     html += '<span class="dow">' + dow + '</span>';
     html += '<span class="day">' + (d.getMonth()+1) + '/' + d.getDate() + '</span>';
-    if (hol) html += '<span class="hol" title="' + hol + '">' + hol + '</span>';
+    if (hol) html += '<span class="hol" title="' + pitEsc(hol) + '">' + pitEsc(hol) + '</span>';
     /* ⚠ 週ビューは**札だけ・マスは塗らない**（ゆうた指定） */
-    if (calNote) html += '<span class="cal-chip ' + ((PitCal.tone ? PitCal.tone(dStr) : (isClosed ? 'closed' : ''))) + '" title="' + calNote + '">' + calNote + '</span>';
+    if (calNote) html += '<span class="cal-chip ' + ((PitCal.tone ? PitCal.tone(dStr) : (isClosed ? 'closed' : ''))) + '" title="' + pitEsc(calNote) + '">' + pitEsc(calNote) + '</span>';
     if (cnt > 0) html += '<span style="font-size:10px;color:var(--green);font-weight:600;">' + cnt + '台</span>';
     html += '</div>';
   });
@@ -266,8 +270,8 @@ function _rmlRowsReturn(from, to){
     const calTone = (PitCal.tone ? PitCal.tone(ds) : (isClosed ? 'closed' : ''));
     html += '<div class="rml-row' + (isClosed ? ' closed' : '') + (calTone === 'short' ? ' calshort' : '') + '">';
     html += '<div class="rml-date' + dCls + '">' + (d.getMonth()+1) + '/' + d.getDate() + '<span>' + '日月火水木金土'[dow] + (ds === todayStr ? '・今日' : '') + '</span>'
-         + (hol ? '<span class="rml-hol"><i data-ic=flag data-ics=16></i>' + hol + '</span>' : '')
-         + (calNote ? '<span class="rml-hol rml-cal ' + calTone + '">' + calNote + '</span>' : '') + '</div>';
+         + (hol ? '<span class="rml-hol"><i data-ic=flag data-ics=16></i>' + pitEsc(hol) + '</span>' : '')
+         + (calNote ? '<span class="rml-hol rml-cal ' + calTone + '">' + pitEsc(calNote) + '</span>' : '') + '</div>';
     html += '<div class="rml-cards" data-drop="returnDate" data-drop-val="' + ds + '">';
     if (!cardsOfDay.length){
       html += '<span class="rml-empty">' + (isClosed ? '休' : '—') + '</span>';
@@ -355,8 +359,8 @@ function monthGridCellsReturn(refDate){
     html += '<div class="reserve-month-cell' + (isToday ? ' today' : '') + (isClosed ? ' closed' : '') + (calTone === 'short' ? ' calshort' : '') + (hol ? ' holiday' : '') + dowClass + '" data-drop="returnDate" data-drop-val="' + dateStr + '"'
          + ' onclick="if(!event.target.closest(\'.reserve-month-event\'))pitReserveDayPopup(\'' + dateStr + '\',\'return\')">';
     html += '<div class="day-num">' + dd + '</div>';
-    if (hol) html += '<div class="hol-name" title="' + hol + '">' + hol + '</div>';
-    if (calNote) html += '<div class="cal-chip ' + calTone + '" title="' + calNote + '">' + calNote + '</div>';
+    if (hol) html += '<div class="hol-name" title="' + pitEsc(hol) + '">' + pitEsc(hol) + '</div>';
+    if (calNote) html += '<div class="cal-chip ' + calTone + '" title="' + pitEsc(calNote) + '">' + pitEsc(calNote) + '</div>';
     visible.forEach(c => {
       const teamColor = (c.boardId === 'import') ? '#ec4899' : '#1db97a';   // 国産緑/輸入ピンク
       const nm = (window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）';
@@ -367,11 +371,11 @@ function monthGridCellsReturn(refDate){
       let side = '';
       if (_pd && window.pitPendingBadge) side += pitPendingBadge('mini');
       if (c.needLoaner) side += '<span class="rme-loaner">代</span>';   // 並び＝代→作業
-      if (wt) side += '<span class="rme-wt" style="color:' + wt.color + '">' + wt.label + '</span>';
-      html += '<div class="reserve-month-event return' + (c.urgent ? ' urgent' : '') + (_pd ? ' is-retpend' : '') + '" draggable="' + (_pd ? 'false' : 'true') + '" data-card-id="' + c.id + '"';
+      if (wt) side += '<span class="rme-wt" style="color:' + pitHex(wt.color) + '">' + pitEsc(wt.label) + '</span>';
+      html += '<div class="reserve-month-event return' + (c.urgent ? ' urgent' : '') + (_pd ? ' is-retpend' : '') + '" draggable="' + (_pd ? 'false' : 'true') + '" data-card-id="' + pitEsc(c.id) + '"';
       if (!c.urgent) html += ' style="border-left-color:' + teamColor + '"';
-      html += ' onclick="event.stopPropagation();openDetail(\'' + c.id + '\')">';
-      html += '<span class="rme-txt">' + nm + ' 様' + (c.car ? ' ' + c.car : '') + '</span>';
+      html += ' onclick="event.stopPropagation();openDetail(\'' + jsq(c.id) + '\')">';
+      html += '<span class="rme-txt">' + pitEsc(nm) + ' 様' + (c.car ? ' ' + pitEsc(c.car) : '') + '</span>';
       if (side) html += '<span class="rme-side">' + side + '</span>';
       html += '</div>';
     });

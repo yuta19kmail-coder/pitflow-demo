@@ -22,7 +22,9 @@
   'use strict';
 
   function t(x){ return String(x == null ? '' : x).trim(); }
-  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に・onclick の id は jsq） */
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
   function norm(s){ return String(s==null?'':s).replace(/\s+/g,'').replace(/[ァ-ヶ]/g,function(ch){ return String.fromCharCode(ch.charCodeAt(0)-0x60); }).toLowerCase(); }
   function custs(){ return (w.state && state.customers) || []; }
   function realPlate(p){ return w.pitIsRealPlate ? pitIsRealPlate(p) : !!t(p); }
@@ -169,15 +171,15 @@
          + '<div class="df-okrow">'
          + (ok
              ? '<span class="df-okmsg">✅ 「これでOK」にしてあります（一覧には出ません）</span>'
-               + '<button class="df-ok back" onclick="PitDupFind.ok(\'' + esc(key) + '\',\'' + esc(ids.join(',')) + '\',1)">やっぱり出す</button>'
+               + '<button class="df-ok back" onclick="PitDupFind.ok(\'' + jsq(key) + '\',\'' + jsq(ids.join(',')) + '\',1)">やっぱり出す</button>'
              : '<span class="df-okmsg">見た結果、ダブりではない／このままでよい時は右のボタンを押してください。<b>次からこの組は出ません。</b>あとから戻せます。</span>'
-               + '<button class="df-ok" onclick="PitDupFind.ok(\'' + esc(key) + '\',\'' + esc(ids.join(',')) + '\',0)">これでOK（もう出さない）</button>')
+               + '<button class="df-ok" onclick="PitDupFind.ok(\'' + jsq(key) + '\',\'' + jsq(ids.join(',')) + '\',0)">これでOK（もう出さない）</button>')
          + '</div></div>';
   }
   function _行(key, tag, 見出し, 中身, ボタン, ids, key2, ok){
     var 開 = (_開 === key);
     return '<div class="df-item' + (開?' open':'') + (ok?' okd':'') + '">'
-      + '<div class="df-row" onclick="PitDupFind.toggle(\'' + esc(key) + '\')" title="押すと中身を見られます">'
+      + '<div class="df-row" onclick="PitDupFind.toggle(\'' + jsq(key) + '\')" title="押すと中身を見られます">'
       + '<div class="df-main"><div class="df-t">' + tag + 見出し + '</div><div class="df-sub">' + 中身 + '</div></div>'
       + '<span class="df-chev">' + (開?'▲':'▼') + '</span>' + ボタン + '</div>'
       + (開 ? _展開(ids, key2, ok) : '') + '</div>';
@@ -216,8 +218,8 @@
         h += _行('vin'+i, '<span class="df-tag ng">100%ダブり</span>', '車体番号 <b>' + esc(x.vin) + '</b>',
           x.件.map(function(k){ return esc(disp(k.客)) + ' 様　' + esc(plateOf(k.車)) + '（' + esc(vehName(k.車)) + '）'; }).join('　／　'),
           (x.同じ人
-            ? '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toVeh(\'' + esc(ids[0]) + '\')">車をまとめる</button>'
-            : '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toCust(\'' + esc(ids[0]) + '\',\'' + esc(ids[1]) + '\')">お客様をまとめる</button>'),
+            ? '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toVeh(\'' + jsq(ids[0]) + '\')">車をまとめる</button>'
+            : '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toCust(\'' + jsq(ids[0]) + '\',\'' + jsq(ids[1]) + '\')">お客様をまとめる</button>'),
           ids, x.key, x.ok);
       });
       return h;
@@ -229,7 +231,7 @@
         h += _行('pl'+i, '<span class="df-tag' + (x.同車種?' warn':'') + '">' + esc(x.度) + '</span>', esc(disp(x.客)) + ' 様',
           'ナンバーなし（' + esc(vehName(x.なし)) + '）　と　' + esc(plateOf(x.本物)) + '（' + esc(vehName(x.本物)) + '）'
             + (x.同車種?'　＝ <b>車種まで同じ</b>':''),
-          '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toVeh(\'' + esc(x.客.id) + '\')">車をまとめる</button>',
+          '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toVeh(\'' + jsq(x.客.id) + '\')">車をまとめる</button>',
           [x.客.id], x.key, x.ok);
       });
       return h;
@@ -239,7 +241,7 @@
       if(!!x.ok !== (_tab==='ok')) return;
       h += _行('cu'+i, '<span class="df-tag">' + esc(x.理由) + '</span>', '<b>' + esc(x.値) + '</b>',
         x.客.map(function(c){ return esc(disp(c)) + ' 様（車 ' + 生きた車(c).length + '台）'; }).join('　／　'),
-        '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toCust(\'' + esc(x.客[0].id) + '\',\'' + esc(x.客[1].id) + '\')">お客様をまとめる</button>',
+        '<button class="df-go" onclick="event.stopPropagation();PitDupFind.toCust(\'' + jsq(x.客[0].id) + '\',\'' + jsq(x.客[1].id) + '\')">お客様をまとめる</button>',
         x.ids, x.key, x.ok);
     });
     return h;

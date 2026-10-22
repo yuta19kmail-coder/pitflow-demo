@@ -60,6 +60,9 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（onclick の id は jsq・作業タイプの色は pitHex） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
   /* 🔴 v1.102.0（ゆうた報告「新規予約での検索の結果が薄い」）
      **探し方（文字のならし方・スペース区切りのAND）をここから配る。**
@@ -283,7 +286,8 @@
   function rowBadges(c) {
     let b = '';
     const wt = (state.workTypes || []).find(w => w.id === c.workType);
-    if (wt) b += '<span class="psr-b" style="background:' + wt.color + '22;color:' + wt.color + ';border-color:' + wt.color + '66">' + esc(wt.label) + '</span>';
+    const wc = wt ? pitHex(wt.color) : '';
+    if (wt) b += '<span class="psr-b"' + (wc ? ' style="background:' + wc + '22;color:' + wc + ';border-color:' + wc + '66"' : '') + '>' + esc(wt.label) + '</span>';
     if (c.loanerId || c.needLoaner) b += '<span class="psr-b psr-b-loaner">代車</span>';
     if (c.dropType === 'wait' || c.dropType === 'sameDay') {
       const dt = (state.dropTypes || []).find(d => d.id === c.dropType);
@@ -306,7 +310,7 @@
          + 'に一致</div>';
   }
   function resultRow(c) {
-    const id = esc(c.id);
+    const id = jsq(c.id);
     const no = c.resNo ? '<span class="psr-no">' + markHits(c.resNo, WORDS) + '</span>' : '';
     const st = statusLabel(c);
     const team = c.boardId === 'import' ? '#ec4899' : '#1db97a';
@@ -325,7 +329,7 @@
     }
     const tel = c.tel || ((c.contacts || []).find(x => x.primary) || {}).tel || '';
     // 右に操作ボタン：入庫前(予約)＝予約詳細/予約カレンダー/顧客情報/新規予約
-    const rd = esc(c.reserveDate || '');
+    const rd = jsq(c.reserveDate || '');
     let acts;
     if (c.status === 'reserved') {
       acts = actBtn('予約詳細', "pitOpenCardDetail('" + id + "')")
@@ -335,7 +339,7 @@
     } else if (c.status === 'returned') {
       acts = actBtn('予約詳細', "pitOpenCardDetail('" + id + "')")
            /* 🔎 v2.17.0 カードidも渡す＝飛んだ先でその日とそのカードが光る（来店履歴からと同じ形） */
-           + actBtn('実績カレンダー', "pitGotoResultMonth('" + esc(c.returnDate || c.reserveDate || '') + "','" + id + "')")
+           + actBtn('実績カレンダー', "pitGotoResultMonth('" + jsq(c.returnDate || c.reserveDate || '') + "','" + id + "')")
            + actBtn('顧客情報', "custOpenForCard('" + id + "')");
     } else {
       acts = actBtn('予約詳細', "pitOpenCardDetail('" + id + "')")
@@ -381,8 +385,8 @@
       + hitLine(custFields(cust))
       + '</div>'
       + '<div class="psr-acts">'
-      + actBtn('顧客情報', "pitSearchOpenCust('" + esc(cust.id) + "')")
-      + actBtn('新規予約', "pitSearchClose();custNewReserveFor('" + esc(cust.id) + "','" + esc(v0.id || '') + "')")
+      + actBtn('顧客情報', "pitSearchOpenCust('" + jsq(cust.id) + "')")
+      + actBtn('新規予約', "pitSearchClose();custNewReserveFor('" + jsq(cust.id) + "','" + jsq(v0.id || '') + "')")
       + '</div>'
       + '</div>';
   }

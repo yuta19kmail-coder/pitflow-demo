@@ -152,7 +152,8 @@
   var _selP = '', _selS = '', _selSub = '';
   function symsFor(part) { return cfg().symptoms.filter(function (s) { return s.parts === 'all' || (Array.isArray(s.parts) && s.parts.indexOf(part) >= 0); }); }
   function subsOf(sname) { var s = cfg().symptoms.find(function (x) { return x.name === sname; }); return (s && s.sub) ? s.sub : []; }
-  function _qq(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した＝onclick="…('…')" に入るので \ と ' を逃がしたうえで esc（jsq と同じ形） */
+  function _qq(s) { return esc(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
   function _li(text, on, onclick, dim) { return '<div class="wc-li' + (on ? ' on' : '') + (dim ? ' dim' : '') + '"' + (onclick ? ' onclick="' + onclick + '"' : '') + '>' + esc(text) + '</div>'; }
   function _renderC1() { var el = byId('wc-c1'); if (!el) return; el.innerHTML = cfg().parts.map(function (p) { return _li(p, p === _selP, "WorkContent.pickPart('" + _qq(p) + "')"); }).join(''); }
   function _renderC2() { var el = byId('wc-c2'); if (!el) return; var list = _selP ? symsFor(_selP) : cfg().symptoms; el.innerHTML = list.map(function (s) { return _li(s.name, s.name === _selS, "WorkContent.pickSym('" + _qq(s.name) + "')"); }).join(''); }

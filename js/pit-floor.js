@@ -37,6 +37,9 @@
 
   function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（配置図の id の data-*・カードの id・作業の色）。部品の本体は pit-share.js（下は単独で読まれた時の予備） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
   function uid(p) { return p + Date.now().toString(36) + Math.floor(Math.random() * 1000); }
   function save() { if (window.PitDB) PitDB.save(true); }
   function divColor(d) { return d === 'div1' ? '#1db97a' : (d === 'div2' ? '#ec4899' : '#7b8794'); }
@@ -162,10 +165,10 @@
     var s = '<svg class="pf-walls" width="' + W + '" height="' + H + '">';
     walls().forEach(function (w) {
       var on = isSel('shape', w.id), col = on ? '#f59e0b' : '#94a3b8';
-      s += '<line x1="' + (w.x1 * cell) + '" y1="' + (w.y1 * cell) + '" x2="' + (w.x2 * cell) + '" y2="' + (w.y2 * cell) + '" stroke="' + col + '" stroke-width="6" stroke-linecap="round"' + (w.locked ? '' : ' data-wall="' + w.id + '"') + '/>';
+      s += '<line x1="' + (w.x1 * cell) + '" y1="' + (w.y1 * cell) + '" x2="' + (w.x2 * cell) + '" y2="' + (w.y2 * cell) + '" stroke="' + col + '" stroke-width="6" stroke-linecap="round"' + (w.locked ? '' : ' data-wall="' + esc(w.id) + '"') + '/>';
       if (!w.locked) {
-        s += '<circle cx="' + (w.x1 * cell) + '" cy="' + (w.y1 * cell) + '" r="6" fill="#fff" stroke="' + col + '" stroke-width="2" data-wpt="' + w.id + '|1"/>';
-        s += '<circle cx="' + (w.x2 * cell) + '" cy="' + (w.y2 * cell) + '" r="6" fill="#fff" stroke="' + col + '" stroke-width="2" data-wpt="' + w.id + '|2"/>';
+        s += '<circle cx="' + (w.x1 * cell) + '" cy="' + (w.y1 * cell) + '" r="6" fill="#fff" stroke="' + col + '" stroke-width="2" data-wpt="' + esc(w.id) + '|1"/>';
+        s += '<circle cx="' + (w.x2 * cell) + '" cy="' + (w.y2 * cell) + '" r="6" fill="#fff" stroke="' + col + '" stroke-width="2" data-wpt="' + esc(w.id) + '|2"/>';
       }
     });
     bays().forEach(function (b) { if (b.kind === 'lift') s += liftDeco(b); }); // リフト飾りは枠の外
@@ -190,7 +193,7 @@
     var px = (e.x1 + (e.x2 - e.x1) * a.t) * cell, py = (e.y1 + (e.y2 - e.y1) * a.t) * cell;
     var deg = Math.atan2(e.y2 - e.y1, e.x2 - e.x1) * 180 / Math.PI;
     var on = isSel('shape', a.id), col = on ? '#f59e0b' : (a.type === 'door' ? '#3b82f6' : '#b45309');
-    var attr = a.locked ? '' : ' data-attach="' + a.id + '"';
+    var attr = a.locked ? '' : ' data-attach="' + esc(a.id) + '"';
     var g = '<g transform="translate(' + px + ',' + py + ') rotate(' + deg + ')" style="cursor:pointer"' + attr + '>';
     if (a.type === 'door') {
       var H = cell * 0.5, L = cell * 0.82, dir = (a.doorDir === 'out') ? 1 : -1, hs = (a.doorSide === 'r') ? 1 : -1;
@@ -212,7 +215,7 @@
   }
 
   function pos(el, o) { el.style.left = (o.gx * cell) + 'px'; el.style.top = (o.gy * cell) + 'px'; el.style.width = (o.gw * cell) + 'px'; el.style.height = (o.gh * cell) + 'px'; }
-  function lockChip(kind, o) { return '<span class="pf-lock' + (o.locked ? ' on' : '') + '" data-lock="' + kind + '|' + o.id + '" title="' + (o.locked ? 'ロック中（クリックで解除）' : 'ロックする') + '">' + (o.locked ? '<i data-ic=lock data-ics=16></i>' : '<i data-ic=unlock data-ics=16></i>') + '</span>'; }
+  function lockChip(kind, o) { return '<span class="pf-lock' + (o.locked ? ' on' : '') + '" data-lock="' + kind + '|' + esc(o.id) + '" title="' + (o.locked ? 'ロック中（クリックで解除）' : 'ロックする') + '">' + (o.locked ? '<i data-ic=lock data-ics=16></i>' : '<i data-ic=unlock data-ics=16></i>') + '</span>'; }
   // リフトの飾り（枠の外＝SVG層に描く）。柱＋直線足＋正方形パッド＋内側ブラケット＋外側ピンク出っ張り。
   // 着地状態で外側にはねる。色は課（divisionColor）。
   function liftDeco(b) {
@@ -289,14 +292,14 @@
     }
     h += '</div>';
     h += '<span class="pf-cap" style="background:' + divColor(b.division) + '">' + cap + '枚</span>';
-    if (!b.locked) h += '<span class="pf-resize" data-rz="' + b.id + '"></span>';
+    if (!b.locked) h += '<span class="pf-resize" data-rz="' + esc(b.id) + '"></span>';
     d.innerHTML = h; return d;
   }
   function makeBuildingEl(s) {
     var d = document.createElement('div');
     d.className = 'pf-box pf-building' + (isSel('shape', s.id) ? ' sel' : '') + (s.locked ? ' locked' : '');
     pos(d, s); d.setAttribute('data-shape', s.id);
-    d.innerHTML = '<span class="pf-box-tag">建物</span>' + lockChip('shape', s) + (s.locked ? '' : '<span class="pf-resize" data-rzs="' + s.id + '"></span>');
+    d.innerHTML = '<span class="pf-box-tag">建物</span>' + lockChip('shape', s) + (s.locked ? '' : '<span class="pf-resize" data-rzs="' + esc(s.id) + '"></span>');
     return d;
   }
 
@@ -559,7 +562,8 @@
     // ※古い title（代車期限・預かり日数・担当 等のネイティブtooltip）は撤去。情報はホバー情報カード(card-hover.js)で出す。
     var wts = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType ? [c.workType] : []);
     var wt = (wts.length && window.state && Array.isArray(state.workTypes)) ? state.workTypes.find(function (w) { return w.id === wts[0]; }) : null;
-    var wtBadge = wt ? '<span class="pfv-wt" style="background:' + wt.color + '22;color:' + wt.color + ';border-color:' + wt.color + '66">' + esc(wt.label) + '</span>' : '';
+    var _wc = wt ? pitHex(wt.color) : '';
+    var wtBadge = wt ? '<span class="pfv-wt"' + (_wc ? ' style="background:' + _wc + '22;color:' + _wc + ';border-color:' + _wc + '66"' : '') + '>' + esc(wt.label) + '</span>' : '';
     var DROPC = { wait: '#f59e0b', sameDay: '#3b82f6' };
     var dt = (window.state && Array.isArray(state.dropTypes)) ? state.dropTypes.find(function (d) { return d.id === c.dropType; }) : null;
     var _dc = DROPC[dt && dt.id] || '#64748b';
@@ -579,8 +583,8 @@
     // 基準より小さい(=PiPで縮小)／2行が入らない → 車種だけの簡易表示（フォントは確保）
     var reduced = (slotZoom && fs < slotMaxFont) || ((m.cardH - 4) < fs * 2.4);
     // クリックは常に予約詳細を開く（1クリック拡大→もう1クリックで詳細、の旧挙動は廃止。情報はホバー情報カードで）
-    var clickJs = 'if(window.openDetail)openDetail(\'' + c.id + '\')';
-    var common = 'draggable="true" data-card-id="' + c.id + '" data-drop="baycell" data-drop-val="' + dropVal + '" onclick="' + clickJs + '"';
+    var clickJs = 'if(window.openDetail)openDetail(\'' + jsq(c.id) + '\')';
+    var common = 'draggable="true" data-card-id="' + esc(c.id) + '" data-drop="baycell" data-drop-val="' + esc(dropVal) + '" onclick="' + clickJs + '"';
     if (reduced) {
       var carFont = Math.min(slotMaxFont, Math.max(8, Math.floor((m.cardH - 2) / 1.35)));   // 1行なので文字を確保
       return '<span class="pfv-card pfv-1line" ' + common + ' style="width:' + m.cardW + 'px;height:' + m.cardH + 'px;border-left-color:' + team + ';font-size:' + carFont + 'px">'
@@ -637,7 +641,7 @@
       for (var r = 0; r < m.rows; r++) {
         var card = cards[idx], dv = b.id + '|' + idx;
         h += card ? slotCard(card, m, dv)
-                  : '<span class="pf-cardbar" data-drop="baycell" data-drop-val="' + dv + '" style="width:' + m.cardW + 'px;height:' + m.cardH + 'px"></span>';
+                  : '<span class="pf-cardbar" data-drop="baycell" data-drop-val="' + esc(dv) + '" style="width:' + m.cardW + 'px;height:' + m.cardH + 'px"></span>';
         idx++;
       }
       h += '</div>';

@@ -24,7 +24,9 @@
 
 const CS_INTASK = ['check','estim','contact','parts','work','workDone','outsource'];
 
-function _csEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m];}); }
+function _csEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（_csEsc を5記号に・jsq の予備の定義＝本体は pit-share.js） */
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _csEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
 
 /* 翌営業日（定休・祝日をスキップ） */
 function _csNextBizDay(){
@@ -91,14 +93,14 @@ function _csCard(c, task, extra, sec){
   const dup = _csDupLine(c, sec);
   if (task){
     return '<div class="cs-item"><div class="cs-cardwrap">' + inner + ex + '</div>'
-      + '<button class="cs-done" onclick="event.stopPropagation();csDone(\'' + c.id + '\',\'' + task + '\')">✓ 完了</button>' + dup + '</div>';
+      + '<button class="cs-done" onclick="event.stopPropagation();csDone(\'' + jsq(c.id) + '\',\'' + task + '\')">✓ 完了</button>' + dup + '</div>';
   }
   return '<div class="cs-item"><div class="cs-cardwrap">' + inner + ex + '</div>' + dup + '</div>';
 }
 function _csDoneCard(c, task){
   const inner = (typeof cardHtml === 'function') ? cardHtml(c, { compact:true }) : '';
   return '<div class="cs-item cs-doneitem"><div class="cs-cardwrap">' + inner + '</div>'
-    + '<button class="cs-undo" onclick="event.stopPropagation();csUndo(\'' + c.id + '\',\'' + task + '\')">↩ 戻す</button></div>';
+    + '<button class="cs-undo" onclick="event.stopPropagation();csUndo(\'' + jsq(c.id) + '\',\'' + task + '\')">↩ 戻す</button></div>';
 }
 
 /* ===================================================================
@@ -181,7 +183,7 @@ function _csLoCard(x){
     const pn = (pc && window.pitCustSurname ? pitCustSurname(pc) : (pc ? pc.customer : x.prev.customer)) || '';
     tip += '\n未返却：' + (pn ? pn + '様から ' : '') + _csMDW(x.prev.toDate) + ' 戻り予定';
   }
-  const click = c ? ("openDetail('" + c.id + "')") : "showView('loaner')";
+  const click = c ? ("openDetail('" + jsq(c.id) + "')") : "showView('loaner')";
   let h = '<div class="pit-card pcm cs-lo' + (x.back ? '' : ' is-retpend') + '" onclick="' + click + '" title="' + _csEsc(tip) + '" style="border-left-color:' + CS_LO_COLOR + ';">';
   h += '<div class="pcm-r"><span class="pcm-nm2"><span class="pcm-name">' + _csEsc(lo.name || '代車') + '</span></span>'
      + (x.back ? '' : '<span class="pcm-badges"><span class="cs-lo-back">未返却</span></span>') + '</div>';
@@ -192,16 +194,16 @@ function _csLoCard(x){
 }
 function _csLoItem(x){
   const a = x.a, c = x.card;
-  const tm = (c && c.reserveDate === a.fromDate && c.reserveTime) ? ' ' + c.reserveTime : '';
+  const tm = (c && c.reserveDate === a.fromDate && c.reserveTime) ? ' ' + _csEsc(c.reserveTime) : '';
   const ex = '<div class="cs-extra cs-lo-ex"><i data-ic=calendar data-ics=16></i> ' + (c ? '入庫 ' : '貸出 ') + _csMDW(a.fromDate) + tm + '</div>';
   const btn = x.back
-    ? '<button class="cs-done" onclick="event.stopPropagation();csLoDone(\'' + a.id + '\')">✓ 完了</button>'
+    ? '<button class="cs-done" onclick="event.stopPropagation();csLoDone(\'' + jsq(a.id) + '\')">✓ 完了</button>'
     : '<div class="cs-wait">戻ってから洗車</div>';
   return '<div class="cs-item"><div class="cs-cardwrap">' + _csLoCard(x) + ex + '</div>' + btn + '</div>';
 }
 function _csLoDoneItem(x){
   return '<div class="cs-item cs-doneitem"><div class="cs-cardwrap">' + _csLoCard(x) + '</div>'
-    + '<button class="cs-undo" onclick="event.stopPropagation();csLoUndo(\'' + x.a.id + '\')">↩ 戻す</button></div>';
+    + '<button class="cs-undo" onclick="event.stopPropagation();csLoUndo(\'' + jsq(x.a.id) + '\')">↩ 戻す</button></div>';
 }
 /* 時刻の並び（入庫の時間。無ければ最後） */
 function _csLoSort(p, q){
@@ -374,7 +376,7 @@ window.renderCarSales = renderCarSales;
 function _csRetLabel(c){
   if (c.returnDate){
     const d = new Date(c.returnDate+'T00:00:00');
-    if (!isNaN(d)) return '<i data-ic=car data-ics=16></i> 返車 ' + (d.getMonth()+1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）' + (c.returnTime?' '+c.returnTime:'');
+    if (!isNaN(d)) return '<i data-ic=car data-ics=16></i> 返車 ' + (d.getMonth()+1) + '/' + d.getDate() + '（' + '日月火水木金土'[d.getDay()] + '）' + (c.returnTime?' '+_csEsc(c.returnTime):'');
   }
   return '<i data-ic=car data-ics=16></i> 返車日未定';
 }
@@ -394,7 +396,7 @@ function _csWashLabel(c){
   if (d){
     const dt = new Date(d + 'T00:00:00');
     if (!isNaN(dt)) return badge + '<i data-ic=car data-ics=16></i> 返車 ' + (dt.getMonth()+1) + '/' + dt.getDate()
-      + '（' + '日月火水木金土'[dt.getDay()] + '）' + (c.returnTime ? ' ' + c.returnTime : '');
+      + '（' + '日月火水木金土'[dt.getDay()] + '）' + (c.returnTime ? ' ' + _csEsc(c.returnTime) : '');
   }
   return badge + '<i data-ic=car data-ics=16></i> 返車日未定';
 }

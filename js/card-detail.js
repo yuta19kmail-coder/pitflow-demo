@@ -14,10 +14,15 @@ let _cardMode = 'page';      // 'page'＝新規入庫(全画面) / 'modal'＝各
 let _cardBodyId = 'md-body'; // フォームの描画先（card-tabs.js も参照）
 let _cardCheckOn = false;    // 入力チェックON中＝未入力を赤枠表示（再描画/入力ごとに再評価）
 
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（題・作業内容の textarea・入力欄の value・担当や作業タイプ/課の名前と色・onclick の id）。
+   本文・"…" の属性は _pe（5記号）／onclick の '…' は jsq／style の色は pitHex。 */
+var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return _pe(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
+
 function _cardTitleHtml(card){
-  const no = card.resNo ? '<span title="予約番号" style="font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:1px 8px;margin-left:8px;font-family:ui-monospace,Menlo,Consolas,monospace;">' + card.resNo + '</span>' : '';
+  const no = card.resNo ? '<span title="予約番号" style="font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:1px 8px;margin-left:8px;font-family:ui-monospace,Menlo,Consolas,monospace;">' + _pe(card.resNo) + '</span>' : '';
   return '<span style="font-size:13px;color:var(--text3);font-weight:400;">入庫カード</span>' + no + '<br>' +
-    ((window.pitCustName ? pitCustName(card) : card.customer) || '（未入力）') + ' 様 / ' + (card.car || '（車種未入力）');
+    _pe((window.pitCustName ? pitCustName(card) : card.customer) || '（未入力）') + ' 様 / ' + _pe(card.car || '（車種未入力）');
 }
 
 /* mode: 'page'＝全画面（新規入庫予約） / 'modal'＝ポップアップ（各ビューから開く） */
@@ -870,11 +875,13 @@ const LINE_STATUS_ITEMS = [
 function _lstepUrl(raw){
   raw = String(raw == null ? '' : raw).trim();
   if (!raw) return '';
-  const base = (state.settings && state.settings.lstepBaseUrl) || 'https://manager.linestep.net/line/visual?member=';
+  /* 🛡 v2.200.0 SEC-07 リンク先は https: だけ（設定の土台URLも、貼られたURLも。javascript: などを href に入れない） */
+  const _b0 = (state.settings && state.settings.lstepBaseUrl) || '';
+  const base = /^https:\/\//i.test(String(_b0).trim()) ? String(_b0).trim() : 'https://manager.linestep.net/line/visual?member=';
   const m = raw.match(/member=(\d+)/);
   if (m) return base + m[1];                       // 全文URLを貼った → 数字だけ抜く
   if (/^\d+$/.test(raw)) return base + raw;        // 数字だけ → そのまま付ける
-  if (/^https?:\/\//i.test(raw)) return raw;       // 既に何かのURL → そのまま
+  if (/^https:\/\//i.test(raw)) return raw;        // 既に何かのURL → そのまま（https: だけ）
   return base + encodeURIComponent(raw);
 }
 window.pitLstepUrl = _lstepUrl;   // 予約詳細・顧客ビューでも同じURL生成を使う
@@ -1141,7 +1148,7 @@ function _cfsDayListHtml(c){
     }).join('') + (x.consult ? '<span class="dl-mk dl-mk-consult" title="見積相談">相談</span>' : '');
     return '<div class="dl-ev'+(imp?' imp':'')+(isHl?' hl':'')+'">'
       + '<div class="dl-top"><span class="dl-time">'+_pe(t||'—')+'</span>'
-      + '<span class="dl-badge'+(front?'':(divL?' is-div':' is-none'))+'" style="background:'+_pe(badgeBg)+'"'
+      + '<span class="dl-badge'+(front?'':(divL?' is-div':' is-none'))+'" style="background:'+pitHex(badgeBg, '#8390a6')+'"'
       + (divL ? ' title="担当者はまだ決まっていません（'+_pe(divL)+'）"' : '')
       + '>'+_pe(badge)+'</span>'+marks+'</div>'
       + '<div class="dl-line">'+_pe(nm)+' 様 <span class="dl-car">'+_pe(car)+'</span></div></div>';
@@ -1229,8 +1236,10 @@ function _cfsMhsOffHtml(offs, who){
   if (!others.length) return '';
   const av = others.map(function(m){
     const nm = (m.name || '？');
-    const inner = m.photo ? '<img src="'+_pe(m.photo)+'" alt="" loading="lazy">' : _pe(nm.slice(0, 2));
-    return '<span class="bn-av mhs-av'+(m.photo ? ' has-photo' : '')
+    /* 🛡 SEC-07 顔写真は https:・blob:・data:image/ だけ（members-pit.js の _okSrc と同じ決まり） */
+    const _ph = /^(https:|blob:|data:image\/)/i.test(String(m.photo == null ? '' : m.photo).trim()) ? m.photo : '';
+    const inner = _ph ? '<img src="'+_pe(_ph)+'" alt="" loading="lazy">' : _pe(nm.slice(0, 2));
+    return '<span class="bn-av mhs-av'+(_ph ? ' has-photo' : '')
          + '" title="'+_pe(nm + (m.label ? '（'+m.label+'）' : ''))+'">'+inner+'</span>';
   }).join('');
   return '<div class="mhs-off">'
@@ -1356,11 +1365,11 @@ function _cfsCalHtml(c, team, tStr, ro){
     const shortMk = (calTone === 'short') ? '<span class="cfs-mk-short" aria-hidden="true">◐</span>' : '';
     /* ホバーの中身（改行は &#10;）。「いつもと時間が違う」がここで必ず読める。 */
     let tip = (ym.m + 1) + '/' + dd + '（' + '日月火水木金土'[d.getDay()] + '）';
-    if (hol) tip += '　' + hol;
-    if (calTone === 'closed')      tip += '&#10;🚫 ' + (calNote || '定休') + '（この日は開いていません）';
-    else if (calTone === 'short')  tip += '&#10;🕐 ' + calNote + (calHrs ? '&#10;受付 ' + calHrs : '');
-    else if (calTone === 'open')   tip += '&#10;✅ ' + calNote + (calHrs ? '&#10;受付 ' + calHrs : '');
-    else if (calHrs)               tip += '　' + calHrs;
+    if (hol) tip += '　' + _pe(hol);
+    if (calTone === 'closed')      tip += '&#10;🚫 ' + _pe(calNote || '定休') + '（この日は開いていません）';
+    else if (calTone === 'short')  tip += '&#10;🕐 ' + _pe(calNote) + (calHrs ? '&#10;受付 ' + _pe(calHrs) : '');
+    else if (calTone === 'open')   tip += '&#10;✅ ' + _pe(calNote) + (calHrs ? '&#10;受付 ' + _pe(calHrs) : '');
+    else if (calHrs)               tip += '　' + _pe(calHrs);
     if (num) tip += '&#10;空き ' + num + ' 台';
 
     const dayClick = ro ? '' : ' onclick="cfPickDate(\'' + ds + '\',\'' + team + '\')"';
@@ -1413,7 +1422,7 @@ function _cfsLgRows(from, to, today, tStr, c, ro){
       /* 🔴 v1.35.0 どのマスにも「どの代車の列か」の目印を付ける（貸出中のマスも）。
          列まるごと点線で囲う（エクセルの列選択のような表示）ために要る。
          ⚠ 選択やドラッグに使う data-lgl / data-lgd は**空きマスと soft のマスだけ**。 */
-      const col = ' data-lgcol="' + l.id + '"';
+      const col = ' data-lgcol="' + _pe(l.id) + '"';
       /* soft のマスの色とことば（先頭＝いちばん決まっているもの） */
       let sCls = '', sSty = '', sTtl = '';
       if (soft.length){
@@ -1437,7 +1446,7 @@ function _cfsLgRows(from, to, today, tStr, c, ro){
            🆕 v2.127.0 soft のマスと重なったら赤（cfs-lg-clash） */
         const pick = c && c.loanerId === l.id && c.loanerFrom && c.loanerTo && ds >= c.loanerFrom && ds <= c.loanerTo;
         h += '<td class="cfs-lg-free' + sCls + (pick ? ' cfs-lg-pick' : '') + (pick && soft.length ? ' cfs-lg-clash' : '') + '"'
-           + col + sSty + sTtl + (soft.length ? ' data-soft="1"' : '') + ' data-lgl="' + l.id + '" data-lgd="' + ds + '"></td>';
+           + col + sSty + sTtl + (soft.length ? ' data-soft="1"' : '') + ' data-lgl="' + _pe(l.id) + '" data-lgd="' + ds + '"></td>';
       }
     });
     h += '</tr>';
@@ -1598,10 +1607,10 @@ function _cfsBandNoteInner(c, band){
   return '<span class="cfs-lg-bandsw"></span>'
     + (hits.length ? '⚠ ' : '')
     + (band.fixed ? '決まった貸出の幅' : (c && c.reserveDate ? 'この入庫日で押さえる幅' : 'いま案内している最短の幅'))
-    + '：<b>' + md(band.from) + '〜' + md(band.to) + '</b>'
-    + '<span class="cfs-lg-bandwhy">' + band.why + '</span>'
+    + '：<b>' + _pe(md(band.from)) + '〜' + _pe(md(band.to)) + '</b>'
+    + '<span class="cfs-lg-bandwhy">' + _pe(band.why) + '</span>'
     + (band.ok ? '' : '<span class="cfs-lg-bandng">この幅で丸ごと空く代車はありません</span>')
-    + (hits.length ? '<span class="cfs-lg-bandclash">' + _cfsLoanClashText(c, hits).list.join('／') + ' と重なっています</span>' : '');
+    + (hits.length ? '<span class="cfs-lg-bandclash">' + _pe(_cfsLoanClashText(c, hits).list.join('／')) + ' と重なっています</span>' : '');
 }
 function _cfsBandNoteCls(c, band){
   return 'cfs-lg-bandnote' + (band.fixed ? ' fixed' : '') + ((band.fixed && _cfsLoanClash(c).length) ? ' clash' : '');
@@ -1631,9 +1640,9 @@ function _cfsLoanerGanttHtml(today, tStr, c, ro){
     const mcls = (sortOn && _cfsLgMatches(l, c)) ? ' cfs-lg-match' : '';
     const _no = (l.number != null && l.number !== '') ? String(l.number) : String(l.name || '').replace('代車', '');
     /* v1.35.0 クリックで「この代車を使う」＝列を点線で囲い、使用代車の欄に入れる（ro では押せない） */
-    h += '<th class="cfs-lg-th' + mcls + (ro ? '' : ' cfs-lg-thpick') + '" data-loid="' + l.id + '" data-lgcol="' + l.id + '"'
+    h += '<th class="cfs-lg-th' + mcls + (ro ? '' : ' cfs-lg-thpick') + '" data-loid="' + _pe(l.id) + '" data-lgcol="' + _pe(l.id) + '"'
        + (ro ? '' : ' title="クリックでこの代車を使う（列が青い点線で囲まれます）"')
-       + '><i>' + _no + '</i><b>' + (l.model || '') + '</b></th>';
+       + '><i>' + _pe(_no) + '</i><b>' + _pe(l.model || '') + '</b></th>';
   });
   h += '</tr></thead>';
   h += '<tbody id="cfs-lg-body">' + _cfsLgRows(0, window._cfsLgN, today, tStr, c, ro) + '</tbody>';
@@ -1952,20 +1961,21 @@ function field(label, control){
     control + '</div>';
 }
 
+/* 🛡 v2.200.0 SEC-07 入力欄の value・textarea の中身は _pe（作業内容 menu の </textarea> で抜けていた） */
 function textIn(c, key, attr){
-  const v = c[key] == null ? '' : String(c[key]).replace(/"/g, '&quot;');
+  const v = c[key] == null ? '' : _pe(String(c[key]));
   return '<input type="text" class="cf-input" data-key="' + key + '" value="' + v + '" ' + (attr || '') + '>';
 }
 function numIn(c, key, attr){
-  const v = c[key] == null ? '' : String(c[key]);
+  const v = c[key] == null ? '' : _pe(String(c[key]));
   return '<input type="number" class="cf-input" data-key="' + key + '" value="' + v + '" ' + (attr || '') + '>';
 }
 function dateIn(c, key){
-  const v = c[key] || '';
+  const v = _pe(c[key] || '');
   return '<input type="date" class="cf-input" data-key="' + key + '" value="' + v + '">';
 }
 function textareaIn(c, key, rows){
-  const v = c[key] == null ? '' : String(c[key]);
+  const v = c[key] == null ? '' : _pe(String(c[key]));
   return '<textarea class="cf-input" data-key="' + key + '" rows="' + (rows || 2) + '">' + v + '</textarea>';
 }
 
@@ -1973,13 +1983,14 @@ function chips(c, key, items, allowNone){
   let h = '<div class="cf-chips" data-key="' + key + '">';
   items.forEach(it => {
     const active = c[key] === it.id;
+    const col = pitHex(it.color);   /* 🛡 SEC-07 課などの色は #16進だけ */
     let style = '';
-    if (active && it.color){
-      style = 'style="background:' + it.color + ';color:#fff;border-color:' + it.color + ';"';
-    } else if (it.color){
-      style = 'style="border-color:' + it.color + ';color:' + it.color + ';"';
+    if (active && col){
+      style = 'style="background:' + col + ';color:#fff;border-color:' + col + ';"';
+    } else if (col){
+      style = 'style="border-color:' + col + ';color:' + col + ';"';
     }
-    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + it.id + '" ' + style + '>' + it.label + '</button>';
+    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + _pe(it.id) + '" ' + style + '>' + _pe(it.label) + '</button>';
   });
   h += '</div>';
   return h;
@@ -1991,7 +2002,7 @@ function dropChips(c){
   let h = '<div class="cf-chips cf-dual" data-key="dropType">';
   (state.dropTypes || []).forEach(it => {
     const active = (c.dropType === it.id || c.dropType2 === it.id);
-    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + it.id + '">' + it.label + '</button>';
+    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + _pe(it.id) + '">' + _pe(it.label) + '</button>';
   });
   h += '</div>';
   return h;
@@ -2015,16 +2026,17 @@ function dropChips(c){
 function _chipTitle(id, why){
   var d = (window.pitBadgeDesc ? pitBadgeDesc(id) : '');
   var t = why ? (d ? (why + '\n' + d) : why) : d;
-  return t ? (' title="' + String(t).replace(/"/g, '&quot;') + '"') : '';
+  return t ? (' title="' + _pe(t) + '"') : '';
 }
 function _wtChipBtn(it, active, off, why){
   let style = '';
-  if (active && it.color) style = 'background:' + it.color + ';color:#fff;border-color:' + it.color + ';';
-  else if (it.color)      style = 'border-color:' + it.color + ';color:' + it.color + ';';
+  const col = pitHex(it.color);   /* 🛡 SEC-07 作業タイプの色は #16進だけ */
+  if (active && col) style = 'background:' + col + ';color:#fff;border-color:' + col + ';';
+  else if (col)      style = 'border-color:' + col + ';color:' + col + ';';
   if (off) style += 'opacity:.35;';
   return '<button type="button" class="cf-chip' + (active ? ' active' : '') + (off ? ' cf-chip-off' : '') + '"'
-       + ' data-val="' + it.id + '"' + (off ? ' disabled' : '') + _chipTitle(it.id, off ? why : '')
-       + ' style="' + style + '">' + it.label + '</button>';
+       + ' data-val="' + _pe(it.id) + '"' + (off ? ' disabled' : '') + _chipTitle(it.id, off ? why : '')
+       + ' style="' + style + '">' + _pe(it.label) + '</button>';
 }
 
 /* ===================================================================
@@ -2099,7 +2111,7 @@ function workTypeOtherBtn(c){
   var lb  = sum.length ? ('その他：' + sum.join('・')) : 'その他';
   return '<div class="cf-chips" data-other="1"><button type="button" id="cf-other-btn" class="cf-chip cf-other-btn'
        + (sum.length ? ' active' : '') + '" title="保証・保険・社員／中古・代車・内部">'
-       + lb + ' <span class="cf-other-caret">' + (_cfOtherOpen ? '▲' : '▼') + '</span></button></div>';
+       + _pe(lb) + ' <span class="cf-other-caret">' + (_cfOtherOpen ? '▲' : '▼') + '</span></button></div>';
 }
 /* ================================================================
    🔧🔴 v2.99.0（ゆうた指定 2026-09-13）**作業タイプの3つの欄＝どの画面でも同じ1本。**
@@ -2204,12 +2216,13 @@ function otherPanelHtml(c){
     _draw.forEach(function (it) {
       var active = (c.workType === it.id);
       var off    = !!kind;
-      var style  = active ? ('background:' + it.color + ';color:#04211d;border-color:' + it.color + ';')
-                          : ('border-color:' + it.color + ';color:' + it.color + ';');
+      var _col   = pitHex(it.color);   /* 🛡 SEC-07 */
+      var style  = active ? ('background:' + _col + ';color:#04211d;border-color:' + _col + ';')
+                          : ('border-color:' + _col + ';color:' + _col + ';');
       if (off) style += 'opacity:.35;';
       h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + (off ? ' cf-chip-off' : '') + '"'
-         + ' data-val="' + it.id + '"' + (off ? ' disabled' : '') + _chipTitle(it.id, off ? _wtWhy(c) : '')
-         + ' style="' + style + '">' + it.label + '</button>';
+         + ' data-val="' + _pe(it.id) + '"' + (off ? ' disabled' : '') + _chipTitle(it.id, off ? _wtWhy(c) : '')
+         + ' style="' + style + '">' + _pe(it.label) + '</button>';
     });
     h += '</div>';
     if (goodsOn){
@@ -2267,12 +2280,12 @@ function staffSelect(c, key){
     if (frontOrRcv && !(s.front || s.reception)) return;        // 完TEL＝受付＋フロント（メカのみは出さない）
     const sel = c[key] === s.name ? ' selected' : '';
     if (sel) _curFound = true;
-    h += '<option value="' + s.name + '"' + sel + '>' + s.name + '</option>';
+    h += '<option value="' + _pe(s.name) + '"' + sel + '>' + _pe(s.name) + '</option>';
   });
   if (_cur && !_curFound) {
     const _m = window.pitStaffAny ? pitStaffAny(_cur) : null;
     const _mk = _m && _m.left ? '（退職）' : (_m ? '' : '（名簿外）');
-    h += '<option value="' + _cur + '" selected>' + _cur + _mk + '</option>';
+    h += '<option value="' + _pe(_cur) + '" selected>' + _pe(_cur) + _mk + '</option>';
   }
   h += '</select>';
   return h;
@@ -2365,7 +2378,7 @@ const PLATE_REGIONS = [
   // 九州・沖縄
   '福岡','北九州','久留米','筑豊','佐賀','長崎','佐世保','熊本','大分','宮崎','鹿児島','奄美','沖縄'
 ];
-function _pe(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _pe(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }   /* 🛡 v2.200.0 SEC-07 5記号に */
 /* ひらがな→カタカナ */
 function _toKatakana(s){ return String(s == null ? '' : s).replace(/[ぁ-ゖ]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) + 0x60); }); }
 /* 自動フリガナ：お客様名をIMEで打つと、変換前の読み（ひらがな）を拾ってカナ欄へ。手で直せる。
@@ -2731,7 +2744,7 @@ function loanerSelect(c, key){
   _sel.forEach(l => {
     const sel = c[key] === l.id ? ' selected' : '';
     const gone = l.retired ? '（引退）' : '';
-    h += '<option value="' + l.id + '"' + sel + '>' + (window.pitVehLabel ? pitVehLabel(l) : (l.name + ' ' + l.model)) + gone + '</option>';
+    h += '<option value="' + _pe(l.id) + '"' + sel + '>' + _pe(window.pitVehLabel ? pitVehLabel(l) : (l.name + ' ' + l.model)) + gone + '</option>';
   });
   h += '</select>';
   return h;
@@ -2746,7 +2759,7 @@ function conditionChips(c){
   let h = '<div class="cf-chips" data-key="loanerConditions" data-multi="1">';
   state.loanerConditions.forEach(it => {
     const active = arr.indexOf(it.id) >= 0;
-    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + it.id + '">' + it.label + '</button>';
+    h += '<button type="button" class="cf-chip' + (active ? ' active' : '') + '" data-val="' + _pe(it.id) + '">' + _pe(it.label) + '</button>';
   });
   h += '</div>';
   return h;

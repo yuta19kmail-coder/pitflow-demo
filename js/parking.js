@@ -42,6 +42,9 @@
   /* v1.15.1：保存されている名前を描く時はこちら。esc したうえで、絵文字と
      （古い保存に混ざってしまった）<i data-ic=…> を線画アイコンに読み替える。 */
   function escI(s){ return window.icoText ? icoText(s) : esc(s); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（jsq / pitHex の予備の定義＝本体は pit-share.js） */
+  var jsq = (typeof window.jsq === 'function') ? window.jsq : function(s){ return esc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); };
+  var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 
   // ---- 日付ヘルパ（自己完結） ----
   function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -242,7 +245,7 @@
       const wl=_wts.length?_wts.map(function(x){return x.label;}).join('＋'):'—';
       const wc=wt?wt.color:'#64748b';
       const loa=c.needLoaner?'<span class="pk-lo"><i data-ic=van data-ics=16></i>代車</span>':'';
-      h+='<div class="pk-brkrow" onclick="openDetail(\''+c.id+'\')"><span class="pk-wt" style="background:'+wc+'">'+esc(wl)+'</span><span class="pk-nm">'+esc((window.pitCustName?pitCustName(c):c.customer)||'（未入力）')+' 様</span><span class="pk-meta">'+esc(c.car||'')+(c.plate?' ・ '+esc(c.plate):'')+'</span>'+loa+'</div>';
+      h+='<div class="pk-brkrow" onclick="openDetail(\''+jsq(c.id)+'\')"><span class="pk-wt" style="background:'+pitHex(wc,'#64748b')+'">'+esc(wl)+'</span><span class="pk-nm">'+esc((window.pitCustName?pitCustName(c):c.customer)||'（未入力）')+' 様</span><span class="pk-meta">'+esc(c.car||'')+(c.plate?' ・ '+esc(c.plate):'')+'</span>'+loa+'</div>';
     });
     h+='</div>';
     return h;

@@ -35,6 +35,8 @@ function _hm(min){ return String(Math.floor(min/60)).padStart(2,'0') + ':' + Str
 function _todEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 /* 🔐 2026-10-21 外部監査 SEC-07：onclick の JS の文字列に入れる値は JS 用に逃がしてから HTML 用に（普通の id なら出力は同じ） */
 function _todJsq(s){ return _todEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
+/* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（操作シート・作業/受付バッジ・当日メモの data-id・担当バッジの色） */
+var pitHex = (typeof window.pitHex === 'function') ? window.pitHex : function(c,d){ var s=String(c==null?'':c).trim(); return /^#[0-9a-fA-F]{3,8}$/.test(s)?s:(d==null?'':d); };
 /* 🚗 v1.111.0（2026-08-17 ゆうた確定）**空っぽなら「代車：ハスラー」を出す。**
    ・書いてあればそれを出す ／ 全部消せばまた代車名に戻る（誤って消しても救われる）
    ・🔴 見た目は打ち込んだメモとまったく同じ（薄くしない・点線も付けない）＝ゆうた指定
@@ -46,7 +48,7 @@ function _todNoteText(c){
 }
 function _todNoteSpan(c){
   var v = _todNoteText(c);
-  return '<span class="tr-note' + (v ? '' : ' empty') + '" data-id="' + c.id + '" onclick="event.stopPropagation();pitTodayNoteEdit(this)" title="クリックで当日メモ（例：間に合わないかも）">'
+  return '<span class="tr-note' + (v ? '' : ' empty') + '" data-id="' + _todEsc(c.id) + '" onclick="event.stopPropagation();pitTodayNoteEdit(this)" title="クリックで当日メモ（例：間に合わないかも）">'
        + (v ? _todEsc(v) : '&nbsp;') + '</span>';
 }
 /* クリックで直入力→Enter/フォーカスアウトで確定（Escで取消）。当日ビュー内だけの簡単メモ v0.123.0 */
@@ -307,21 +309,21 @@ window.pitTodayTap = function(id, isReturn){
   const pendWhy = '<span class="ta-why">' + (window.PIT_PENDING_WHY || '') + '</span>';
   back.innerHTML =
     '<div class="ta-sheet">' +
-      '<div class="ta-head"><b>' + ((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</b>　' +
-        (c.maker ? c.maker + ' ' : '') + (c.car || '') + (c.plate ? '<span class="ta-plate">' + c.plate + '</span>' : '') +
-        '<div class="ta-sub">' + team + (wt ? '・' + wt.label : '') + (isReturn ? '・返車' : '・入庫')
+      '<div class="ta-head"><b>' + _todEsc((window.pitCustName?pitCustName(c):c.customer) || '（未入力）') + ' 様</b>　' +
+        (c.maker ? _todEsc(c.maker) + ' ' : '') + _todEsc(c.car || '') + (c.plate ? '<span class="ta-plate">' + _todEsc(c.plate) + '</span>' : '') +
+        '<div class="ta-sub">' + team + (wt ? '・' + _todEsc(wt.label) : '') + (isReturn ? '・返車' : '・入庫')
           + (_pend ? '　<span class="ret-pend ret-pend-row">' + (window.PIT_PENDING_LABEL || '未完') + '</span>' : '') + '</div>' +
       '</div>' +
       (_pend ? '<div class="ta-note">' + (window.PIT_PENDING_TITLE || '') + '</div>' : '') +
       '<button class="ta-btn primary' + (canDone ? '' : ' is-off') + '"' +
-        (canDone ? ' onclick="' + doneFn + '(\'' + id + '\')"' : ' disabled') +
+        (canDone ? ' onclick="' + doneFn + '(\'' + _todJsq(id) + '\')"' : ' disabled') +
         '><b>' + doneLabel + '</b><span>' + doneSub + '</span>' + (canDone ? '' : doneWhy) + '</button>' +
       '<button class="ta-btn' + (_pend ? ' is-off' : '') + '"' +
-        (_pend ? ' disabled' : ' onclick="pitTodayEditDt(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"') +
+        (_pend ? ' disabled' : ' onclick="pitTodayEditDt(\'' + _todJsq(id) + '\',' + (isReturn ? 'true' : 'false') + ')"') +
         '><b><i data-ic=clock data-ics=16></i> 日時変更</b><span>' + (isReturn ? '返車' : '入庫') + 'の日付・時間だけ変更</span>' + (_pend ? pendWhy : '') + '</button>' +
-      '<button class="ta-btn" onclick="pitTodayDetail(\'' + id + '\')"><b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b><span>カードを開いて確認・編集</span></button>' +
+      '<button class="ta-btn" onclick="pitTodayDetail(\'' + _todJsq(id) + '\')"><b><i data-ic=clipboard data-ics=16></i> 詳細を見る</b><span>カードを開いて確認・編集</span></button>' +
       '<button class="ta-btn danger' + (_pend ? ' is-off' : '') + '"' +
-        (_pend ? ' disabled' : ' onclick="pitTodayCancel(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"') +
+        (_pend ? ' disabled' : ' onclick="pitTodayCancel(\'' + _todJsq(id) + '\',' + (isReturn ? 'true' : 'false') + ')"') +
         '><b>' + cancelLabel + '</b><span>' + cancelSub + '</span>' + (_pend ? pendWhy : '') + '</button>' +
       '<button class="ta-cancel" onclick="pitTodayActionClose()">閉じる</button>' +
     '</div>';
@@ -340,11 +342,11 @@ window.pitTodayEditDt = function(id, isReturn){
   back.innerHTML =
     '<div class="ta-sheet">' +
       '<div class="ta-head"><b><i data-ic=clock data-ics=16></i> ' + (isReturn ? '返車' : '入庫') + 'の日時変更</b>' +
-        '<div class="ta-sub">' + ((window.pitCustName?pitCustName(c):c.customer) || '') + ' 様　' + (c.car || '') + '</div></div>' +
-      '<label class="ta-f">日付<input type="date" id="ta-dt-d" value="' + dVal + '"></label>' +
-      '<label class="ta-f">時間<input type="text" id="ta-dt-t" value="' + tVal + '" placeholder="例 09:30 / 09:00-10:00"></label>' +
-      '<button class="ta-btn primary" onclick="pitTodaySaveDt(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')"><b><i data-ic=save data-ics=16></i> 保存</b></button>' +
-      '<button class="ta-cancel" onclick="pitTodayTap(\'' + id + '\',' + (isReturn ? 'true' : 'false') + ')">← 戻る</button>' +
+        '<div class="ta-sub">' + _todEsc((window.pitCustName?pitCustName(c):c.customer) || '') + ' 様　' + _todEsc(c.car || '') + '</div></div>' +
+      '<label class="ta-f">日付<input type="date" id="ta-dt-d" value="' + _todEsc(dVal) + '"></label>' +
+      '<label class="ta-f">時間<input type="text" id="ta-dt-t" value="' + _todEsc(tVal) + '" placeholder="例 09:30 / 09:00-10:00"></label>' +
+      '<button class="ta-btn primary" onclick="pitTodaySaveDt(\'' + _todJsq(id) + '\',' + (isReturn ? 'true' : 'false') + ')"><b><i data-ic=save data-ics=16></i> 保存</b></button>' +
+      '<button class="ta-cancel" onclick="pitTodayTap(\'' + _todJsq(id) + '\',' + (isReturn ? 'true' : 'false') + ')">← 戻る</button>' +
     '</div>';
 };
 /* 🆕 v1.149.0 未完（盤面のまま確定返車日だけ入っている車）は、当日ビューから触らせない。
@@ -664,9 +666,9 @@ function todayRow(c, isReturn, inBreak){
   h += timeHtml;
   // 担当フロント縦書きバッジ（人が無ければ課）
   if (frontName){
-    h += '<div class="tr-front" style="background:' + _todEsc(badgeColor) + '">' + _todEsc(frontName) + '</div>';
+    h += '<div class="tr-front" style="background:' + pitHex(badgeColor, '#8390a6') + '">' + _todEsc(frontName) + '</div>';
   } else if (divLabel){
-    h += '<div class="tr-front is-div" style="background:' + _todEsc(badgeColor) + '" title="担当者はまだ決まっていません（' + _todEsc(divLabel) + '）">' + _todEsc(divLabel) + '</div>';
+    h += '<div class="tr-front is-div" style="background:' + pitHex(badgeColor, '#8390a6') + '" title="担当者はまだ決まっていません（' + _todEsc(divLabel) + '）">' + _todEsc(divLabel) + '</div>';
   } else {
     h += '<div class="tr-front empty"></div>';
   }
@@ -691,13 +693,14 @@ function todayRow(c, isReturn, inBreak){
   if (c.consult)              side += '<span class="tag-side consult">相談</span>';
   if (c.needLoaner)           side += '<span class="tag-side loaner">代車</span>';
   if (isReturn && c.needWash) side += '<span class="tag-side wash'+(c.washSalesDone?' done':'')+'">洗車</span>';   // 入庫に洗車は出さない・済＝他ビューと同じ赤スタンプ v0.123.3
-  const dropTag = dt ? (window.pitDropBadges ? pitDropBadges(c, function(o){ return '<span class="tag-drop tag-drop-' + o.id + '" title="' + o.desc + '">' + o.label + '</span>'; }) : '<span class="tag-drop tag-drop-' + dt.id + '" title="' + dt.desc + '">' + dt.label + '</span>') : '';
+  const dropTag = dt ? (window.pitDropBadges ? pitDropBadges(c, function(o){ return '<span class="tag-drop tag-drop-' + _todEsc(o.id) + '" title="' + _todEsc(o.desc) + '">' + _todEsc(o.label) + '</span>'; }) : '<span class="tag-drop tag-drop-' + _todEsc(dt.id) + '" title="' + _todEsc(dt.desc) + '">' + _todEsc(dt.label) + '</span>') : '';
   // 作業バッジ＝基本＋併用を並べて表示（設定の色のまま）。当日ビューは枠固定なので最大2個・2個時は余白を詰めて1個ぶん幅に横並び。
   const _wts = (Array.isArray(c.workTypes) && c.workTypes.length) ? c.workTypes : (c.workType ? [c.workType] : []);
   let workTag = '';
   _wts.slice(0, 2).forEach(id => {
     const w = state.workTypes.find(x => x.id === id);
-    if (w) workTag += '<span class="tag-work' + (w.label.length >= 4 ? ' long' : '') + '" style="background:' + w.color + '20;color:' + w.color + ';border-color:' + w.color + ';">' + w.label + '</span>';
+    if (w){ const _wc = pitHex(w.color);
+      workTag += '<span class="tag-work' + (String(w.label || '').length >= 4 ? ' long' : '') + '"' + (_wc ? ' style="background:' + _wc + '20;color:' + _wc + ';border-color:' + _wc + ';"' : '') + '>' + _todEsc(w.label) + '</span>'; }
   });
   const workMulti = (workTag.match(/tag-work/g) || []).length >= 2;
   h += '<div class="tr-tags">'

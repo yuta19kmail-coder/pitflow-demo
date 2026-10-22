@@ -76,7 +76,8 @@
         : '下の内容を<b>全部消します</b>。消したものは戻せません。いま開いている全員の画面からも、すぐに消えます。'
     };
   }
-  function esc(s)     { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（esc を5記号に） */
+  function esc(s)     { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 
   function counts() {
     var out = [], total = 0;

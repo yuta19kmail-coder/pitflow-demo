@@ -128,6 +128,7 @@
   }
 
   /* ===== ヘルパー ===== */
+  /* 🛡 v2.200.0 SEC-07（外部監査 2026-10-21）エスケープもれを直した（AI判定の印・枠の数・設定の数を esc） */
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
@@ -479,8 +480,8 @@
     function f1(x) { return (Math.round(x * 10) / 10).toFixed(1); }
     function man(x) { return Math.round(x / 10000); }
     function fxIn(id, val, w, step) {
-      if (!ed) return '<b class="fx-v">' + val + '</b>';
-      return '<input type="number" class="ps-in ps-num fx-in" id="' + id + '" value="' + val + '" style="width:' + (w || 64) + 'px"' + (step ? ' step="' + step + '"' : '') + ' onchange="pitRuleBaseApply()">';
+      if (!ed) return '<b class="fx-v">' + esc(val) + '</b>';
+      return '<input type="number" class="ps-in ps-num fx-in" id="' + id + '" value="' + esc(val) + '" style="width:' + (w || 64) + 'px"' + (step ? ' step="' + step + '"' : '') + ' onchange="pitRuleBaseApply()">';
     }
 
     h += '<div class="ps-card">';
@@ -571,13 +572,13 @@
       h += '<div class="ps-desc">';
       h += Object.keys(DICT_LABEL).map(function (k) {
         const v = dict[k] != null ? dict[k] : 0;
-        return DICT_LABEL[k] + ' <b>' + (v > 0 ? '+' : '') + v + '%</b>';
+        return DICT_LABEL[k] + ' <b>' + (v > 0 ? '+' : '') + esc(v) + '%</b>';
       }).join('　／　');
       h += '</div>';
     } else {
       h += '<div class="ps-grid">';
       Object.keys(DICT_LABEL).forEach(function (k) {
-        h += '<label class="ps-lb">' + DICT_LABEL[k] + ' <input type="number" class="ps-in ps-num" id="rl-dict-' + k + '" value="' + (dict[k] != null ? dict[k] : 0) + '" min="-100" max="100" onchange="pitRuleDictApply()"><span class="ps-unit">%</span></label>';
+        h += '<label class="ps-lb">' + DICT_LABEL[k] + ' <input type="number" class="ps-in ps-num" id="rl-dict-' + k + '" value="' + esc(dict[k] != null ? dict[k] : 0) + '" min="-100" max="100" onchange="pitRuleDictApply()"><span class="ps-unit">%</span></label>';
       });
       h += '</div>';
       h += '<div class="ps-hint">※「無くす」は常に0台。端数は減らす系＝切り捨て・増やす系＝切り上げ。</div>';
@@ -853,13 +854,13 @@
     days.forEach(function (d) {
       const ds = _ds(d);
       const eff = _effC(c, ds, 'capDefault', rc.default != null ? rc.default : 5);
-      g += '<div class="rl-g-c' + (eff.closed ? ' closed' : cellCls(eff)) + (window._rlTestDate === ds ? ' sel' : '') + '" onclick="pitRuleDay(\'' + ds + '\')">' + (eff.closed ? '休' : (eff.zero ? '停' : eff.value)) + '</div>';
+      g += '<div class="rl-g-c' + (eff.closed ? ' closed' : cellCls(eff)) + (window._rlTestDate === ds ? ' sel' : '') + '" onclick="pitRuleDay(\'' + ds + '\')">' + (eff.closed ? '休' : (eff.zero ? '停' : esc(eff.value))) + '</div>';
     });
     g += '<div class="rl-g-n"><i data-ic=globe data-ics=16></i> 輸入枠</div>';
     days.forEach(function (d) {
       const ds = _ds(d);
       const eff = _effC(c, ds, 'capImport', rc.import != null ? rc.import : 3);
-      g += '<div class="rl-g-c' + (eff.closed ? ' closed' : cellCls(eff)) + (window._rlTestDate === ds ? ' sel' : '') + '" onclick="pitRuleDay(\'' + ds + '\')">' + (eff.closed ? '休' : (eff.zero ? '停' : eff.value)) + '</div>';
+      g += '<div class="rl-g-c' + (eff.closed ? ' closed' : cellCls(eff)) + (window._rlTestDate === ds ? ' sel' : '') + '" onclick="pitRuleDay(\'' + ds + '\')">' + (eff.closed ? '休' : (eff.zero ? '停' : esc(eff.value))) + '</div>';
     });
     g += '<div class="rl-g-n"><i data-ic=warn data-ics=16></i> 注意</div>';
     days.forEach(function (d) {
@@ -872,7 +873,7 @@
       const ds = _ds(d);
       const v = _verdictC(c, ds);
       const cls = (v.day === '○') ? ' vd-ok' : (v.day === '△') ? ' vd-mid' : (v.day === '×') ? ' vd-ng' : ' closed';
-      g += '<div class="rl-g-c'+ cls + (window._rlTestDate === ds ? ' sel': '') + '" onclick="pitRuleDay(\''+ ds + '\')"title="'+ v.default.mark + '／'+ v.import.mark + '">'+ v.day + '</div>';
+      g += '<div class="rl-g-c'+ cls + (window._rlTestDate === ds ? ' sel': '') + '" onclick="pitRuleDay(\''+ ds + '\')"title="'+ esc(v.default.mark) + '／'+ esc(v.import.mark) + '">'+ v.day + '</div>';
     });
     g += '</div>';
     box.innerHTML = g;
@@ -896,7 +897,7 @@
       let t = '<div class="rl-tl"><span class="rl-tl-n">' + label + '</span>';
       if (e.closed) t += '<span class="rl-tl-v stop">休（' + esc(e.closed) + '＝受付なし）</span>';
       else if (e.zero) t += '<span class="rl-tl-v stop">停止(0' + unit + ')</span>';
-      else if (e.rules.length) t += '<span class="rl-tl-v">' + base + ' → <b>' + e.value + unit + '</b>(' + (e.pct > 0 ? '+' : '') + e.pct + '%)</span>';
+      else if (e.rules.length) t += '<span class="rl-tl-v">' + base + ' → <b>' + esc(e.value) + unit + '</b>(' + (e.pct > 0 ? '+' : '') + e.pct + '%)</span>';
       else t += '<span class="rl-tl-v">' + base + unit + '(基本のまま)</span>';
       if (e.rules.length) t += '<span class="rl-tl-r">ルール ' + e.rules.map(function (n) { return '#' + n; }).join('・') + ' が効いています</span>';
       return t + '</div>';
@@ -925,7 +926,7 @@
     [{ k: 'default', n: '<i data-ic=phone data-ics=16></i> 受付（国産）' }, { k: 'import', n: '<i data-ic=phone data-ics=16></i> 受付（輸入）' }].forEach(function (t) {
       const tv = vd[t.k];
       const col = (tv.mark === '○') ? '#1db97a' : (tv.mark === '△') ? '#f97316' : '#ef4444';
-      h += '<div class="rl-tl"><span class="rl-tl-n">' + t.n + '</span><span class="rl-tl-v"><b style="color:' + col + '">' + tv.mark + '</b>　' + esc(tv.reason) + '</span><span class="rl-tl-r">' + (tv.by === 'ai' ? '<i data-ic=robot data-ics=16></i> AI判定' : '計算式の仮判定（本番化後はAIが理由を書く）') + '</span></div>';
+      h += '<div class="rl-tl"><span class="rl-tl-n">' + t.n + '</span><span class="rl-tl-v"><b style="color:' + col + '">' + esc(tv.mark) + '</b>　' + esc(tv.reason) + '</span><span class="rl-tl-r">' + (tv.by === 'ai' ? '<i data-ic=robot data-ics=16></i> AI判定' : '計算式の仮判定（本番化後はAIが理由を書く）') + '</span></div>';
     });
     out.innerHTML = h;
     pitRuleGrid();

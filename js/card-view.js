@@ -498,7 +498,9 @@
       + '<button class="cv-tab" data-p="maint" onclick="cvTab(this)"><i data-ic=wrench data-ics=16></i> 整備</button>'
       + '<button class="cv-tab" data-p="office" onclick="cvTab(this)"><i data-ic=folder data-ics=16></i> バックオフィス</button></div>';
     h += '<div class="cv-body">'
-      + '<div class="cv-panel on" id="cv-p-cover">'+coverTab(c)+'</div>'
+      + ((_cvArchCancel(c) && !canEditResultDate())
+          ? '<div class="cv-panel on cv-ro" id="cv-p-cover"><div class="cv-ronote"><i data-ic=lock data-ics=14></i> アーカイブ済みのキャンセル・未入庫です。表紙は読むだけです（直せるのは管理者）。</div>'+coverTab(c)+'</div>'
+          : '<div class="cv-panel on" id="cv-p-cover">'+coverTab(c)+'</div>')   /* 🔒 v2.199.0 C7 */
       + '<div class="cv-panel" id="cv-p-flow">'+flowTab(c)+'</div>'
       + '<div class="cv-panel" id="cv-p-maint">'+maintTab(c)+'</div>'
       + '<div class="cv-panel" id="cv-p-office">'+officeTab(c)+'</div>'
@@ -925,6 +927,23 @@
      ⚠ 売上の数字が動く操作なので、**フローと操作ログに必ず「どこから どこへ」を残す**。
      ⚠ 物差しは `pitIsAdmin()`。サンプルモードでは今までどおり全部さわれる。
      =================================================================== */
+  /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C2「実績のみ権限で」C3「これも実績だけ権限」C4「揃える」）
+     **実績になった車の 車検の記録・整備担当・作業チェック は管理者だけ。** 実績前は今までどおり誰でも。
+     true＝止めた（断りの窓を出した）。呼ぶ側は return するだけ。 */
+  function _cvResultLock(what){
+    if (!_c || _c.status !== 'returned' || canEditResultDate()) return false;
+    if (window.UI && UI.alert) UI.alert('実績になった車の' + what + 'を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+    return true;
+  }
+  /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C7「おすすめで」）**アーカイブ済みのキャンセル・未入庫は、表紙を読むだけ。**
+     売上には効かないが、終わった車の記録なので。管理者は直せる。true＝止めた。 */
+  function _cvArchCancel(c){ return !!(c && c.status === 'cancelled' && c.archived); }
+  function _cvArchLock(){
+    if (!_cvArchCancel(_c) || canEditResultDate()) return false;
+    if (window.UI && UI.alert) UI.alert('アーカイブ済みのキャンセル・未入庫の車は、読むだけです（直せるのは設定権限（管理）のある人だけ）。', { title: '変更できません' });
+    return true;
+  }
+  window.cvResultLocked = function(){ return !!(_c && _c.status === 'returned' && !canEditResultDate()); };
   function canEditResultDate(){
     if (!window.PIT_CLOUD) return true;                 /* 練習用サイトは全部さわれる */
     return !!(window.pitIsAdmin && pitIsAdmin());
@@ -1166,6 +1185,7 @@
     return h;
   }
   window.cvCsDone = function(task, on){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     if (!_c) return;
     if (_c.status === 'returned' && !canEditResultDate()){
       if (window.UI && UI.alert) UI.alert('実績になった車の記録を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
@@ -1178,6 +1198,7 @@
     if (window.renderCardView) renderCardView(_c, 'md-body-modal');
   };
   window.cvThanksSent = function(on){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     if (!_c) return;
     if (_c.status === 'returned' && !canEditResultDate()){
       if (window.UI && UI.alert) UI.alert('実績になった車の記録を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
@@ -1621,7 +1642,10 @@
         +  '<button class="cv-opti" onclick="cvAskCancelResv()"><i data-ic=ban data-ics=16></i> 予約キャンセルにする…</button>'
         +  '<div class="cv-optdiv"></div>';
     }
-    h += '<button class="cv-opti cv-danger" onclick="cvAskDelete()"><i data-ic=trash data-ics=16></i> 消去する…</button>';
+    /* 🔒 v2.199.0 C6 実績の車で管理者でない人には「🔒 管理のみ」（ボタンは消さない＝無いのか押せないのか分かるように） */
+    h += (c && c.status === 'returned' && typeof canEditResultDate === 'function' && !canEditResultDate())   /* ⚠ 見張りは optMenuHtml だけ切り出して動かす＝無い時は今まで通り */
+      ? '<button class="cv-opti cv-danger cv-optlocked" onclick="cvAskDelete()"><i data-ic=trash data-ics=16></i> 消去する…<span class="cv-adminonly"><i data-ic=lock data-ics=14></i> 管理のみ</span></button>'
+      : '<button class="cv-opti cv-danger" onclick="cvAskDelete()"><i data-ic=trash data-ics=16></i> 消去する…</button>';
     return h;
   }
 
@@ -1853,6 +1877,7 @@
     cf.classList.add('show');
   };
   window.cvAmtOK = function(kind){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     /* 🔴 v1.138.0 **ボタンを消しただけにしない。** 実績カードの金額は管理だけ。
        ⚠ 外から呼ばれても（古い画面・別タブ・コンソール）ここで止まる。 */
     if (!canEditMoney()){
@@ -1892,6 +1917,7 @@
         （sales-count.js＝C→B→A の順に見る）。だから必ずフローに残す。
      =================================================================== */
   window.cvChainEdit = function(which){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     if (!_c) return;
     if (!canEditMoney()){   /* 🔴 v1.138.0 実績カードの「表紙の✏編集」も管理だけ */
       if (window.UI && UI.alert) UI.alert('実績になったカードの金額・日付を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
@@ -1996,6 +2022,7 @@
   window.cvUnlockPay = function(){ var e=document.getElementById('cv-payedit'); if(e) e.style.display=(e.style.display==='none'?'':'none'); };
   // 💳 入金日を分ける（売掛）ON/OFF。OFFで入金日クリア。表示切替のため再描画 v0.121.0
   window.cvTogglePaySeparate = function(on){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     /* 🔒 v2.197.0 B2 実績カードの売掛は変えない（上の paymentLockRow と同じ決まり） */
     if (_c && _c.status === 'returned'){
       if (window.UI && UI.alert) UI.alert('実績になったカードの売掛は変えられません（直す時は管理者がマスター入力で）。', { title: '変更できません' });
@@ -2015,6 +2042,7 @@
   };
   // 入金日をセット（予約詳細側）。実績側の入金待ちにも即反映 v0.121.0
   window.cvSetPaymentDate = function(v, _ok){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     /* 🔒 v2.197.0 B2 実績カードは「入金待ちに入金日を入れる」だけ。入っている入金日は変えない・消さない */
     if (_c && _c.status === 'returned' && (_c.paymentDate || !v)){
       if (window.UI && UI.alert) UI.alert('実績になった入金日は変えられません（直す時は管理者がマスター入力で）。', { title: '変更できません' });
@@ -2118,6 +2146,7 @@
     save(); cvRefreshBg();
   };
   window.cvWashNote = function(v){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     /* 🔴 v1.171.0 返車済みの記録は管理だけ（完了アーカイブの編集から来る） */
     if (!_archGuard()) return;
     var _f = (_c.status === 'returned') ? (_c.washNote || '') : null;
@@ -2144,6 +2173,7 @@
 
   // ===== 外注（外注先・メモ・完了予定日＝戻りの日数を詳細モーダルで編集） =====
   window.cvOutPartner = function(v){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     _c.outsourceTo = v || '';
     var need = (v === '各ディーラー' || v === 'その他');
     var row = document.getElementById('cv-outnote-row');
@@ -2151,8 +2181,9 @@
     if (!need) _c.outsourceNote = '';
     save();
   };
-  window.cvOutNote = function(v){ _c.outsourceNote = (v || '').trim(); save(); };
+  window.cvOutNote = function(v){ if (_cvArchLock()) return; _c.outsourceNote = (v || '').trim(); save(); };
   window.cvOutDue = function(v){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     _c.outsourceDue = v || '';
     var info = document.getElementById('cv-outdue-info');
     if (info){
@@ -2230,6 +2261,7 @@
 
   /* 🔴 v2.51.0（H）車検切れのトグル。**印はカードに持つ。車両には保存しない。** */
   window.cvExpiredToggle = function(){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     if (!_archGuard()) return;
     var from = _c.shakenExpired ? 'あり' : 'なし';
     _c.shakenExpired = !_c.shakenExpired;
@@ -2242,6 +2274,7 @@
 
   // ===== 表紙チェック =====
   window.cvPick = function(group, val, el){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     /* 🔴 v1.171.0 返車済みの記録は管理だけ（画面から消しただけにしない） */
     if (!_archGuard()) return;
     var _aFrom = _archWord(group);
@@ -2267,6 +2300,7 @@
     save();
   };
   window.cvSalesMemo = function(v){
+    if (_cvArchLock()) return;   /* 🔒 v2.199.0 C7 */
     if (!_archGuard()) return;
     var _f = (_c.status === 'returned') ? (_c.salesReqMemo || '') : null;
     _c.salesReqMemo = (v||'').trim();
@@ -2288,6 +2322,7 @@
   /* 🔴 v1.100.0 作業チェックは**合言葉（key）**で持つ。書き込みは state.js の pitMaintToggle 1本を通す。 */
   window.cvMaint = function(key, el){
     if(!_c) return;
+    if (_cvResultLock('作業チェック')) return;   /* 🔒 v2.199.0 C4 実績の車は管理者だけ（C3 とそろえる） */
     const on = window.pitMaintToggle ? pitMaintToggle(_c, key) : false;
     el.classList.toggle('on', on); el.querySelector('.cv-box').textContent = on ? '✓' : '';
     const wrap = el.closest('.cv-sec'); const total = wrap.querySelectorAll('.cv-chk').length;
@@ -2318,6 +2353,9 @@
   window.cvAskDelete = function(){
     const m = document.getElementById('cv-optmenu'); if (m) m.classList.remove('show');
     const c = _c; if (!c) return;
+    /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C6）**実績の車の消去は管理者だけ。** 消すとその売上が集計から消えるため。
+       予約・作業中・キャンセルの車は今までどおり誰でも（v1.136.0「消すは誰でもでいい」のまま）。 */
+    if (_cvResultLock('消去（売上が集計から消えます）')) return;
     _cvAsk('消去する前に',
            'このカードを消去すると、データごと無くなります。\n元に戻せません。',
            ['・ふつうは消去ではなく、いずれかの<アーカイブ>に落ち着きます。',
@@ -2849,6 +2887,7 @@
   }
   window.cvDeleteCard = function(){
     if(!_c) return;
+    if (_cvResultLock('消去（売上が集計から消えます）')) return;   /* 🔒 v2.199.0 C6 書く所でも止める */
     var c0 = _c;
     if (window.CFTrash && window.PIT_CLOUD && window.fb && window.fb.db && typeof window.fb.company === 'function'){
       cvTrashCopy(c0).then(function(){ cvDeleteCardNow(c0); }).catch(function(e){
@@ -2981,6 +3020,7 @@
     return [s.getFullYear()+'-'+pad(s.getMonth()+1)+'-'+pad(s.getDate()), e.getFullYear()+'-'+pad(e.getMonth()+1)+'-'+pad(e.getDate())]; }
 
   window.cvCsMode = function(m){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(!_c) return; _c.inspSchedule.mode=m; _c.inspSchedule.cutBefore='';
     const base=new Date(); base.setHours(0,0,0,0); const todayISO=base.getFullYear()+'-'+pad(base.getMonth()+1)+'-'+pad(base.getDate());
     if(m==='manual'){ /* 触らない */ }
@@ -2992,6 +3032,7 @@
     save(); cvBuildCal();
   };
   window.cvToggleSlot = function(iso, ap, ev){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(ev) ev.stopPropagation();
     if(_c.inspSchedule.mode==='asap') return;
     const s=_c.inspSchedule.slots; if(!s[iso]) s[iso]=[];
@@ -3000,6 +3041,7 @@
     save(); cvBuildCal();
   };
   window.cvDayClick = function(cell){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(_c.inspSchedule.mode!=='ask' || cell.classList.contains('off')) return;
     const iso=cell.dataset.iso; _c.inspSchedule.cutBefore = iso;
     const s={}; validEls().forEach(function(v){ if(v.dataset.iso>iso) s[v.dataset.iso]=['am','pm']; });
@@ -3017,6 +3059,7 @@
   }
   function _cvS2Read(){ return window.pitShkStaff2Read ? pitShkStaff2Read('cv-sh') : { staff2:null, staff2Note:null }; }
   window.cvShakenGo = function(kind){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(!_c) return; const s=_c.inspSchedule||{};
     window._cvShSlot = (s.decidedSlot==='pm')?'pm':'am';
     const defDate = s.decided || _isoToday();
@@ -3062,6 +3105,7 @@
   window.cvShSlot = function(btn){ window._cvShSlot = btn.getAttribute('data-s'); const w=document.getElementById('cv-shslot'); if(w) w.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b===btn); }); };
   window.cvShClose = function(){ const b=document.getElementById('cv-shpop'); if(b) b.classList.remove('show'); };
   window.cvShConfirm = function(kind){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(!_c) return; const s=_c.inspSchedule||(_c.inspSchedule={mode:'manual',slots:{}});
     const dEl=document.getElementById('cv-shdate'); const stEl=document.getElementById('cv-shstaff');
     const iso=(dEl&&dEl.value)||_isoToday(); const slot=(window._cvShSlot==='pm')?'pm':'am'; const staff=(stEl&&stEl.value)||'';
@@ -3104,6 +3148,7 @@
         ＝ 出し方が2通りにならない（片方だけ直る、が起きない）。
      ══════════════════════════════════════════════════════════════════════════ */
   window.cvShReOpen = function(i){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(!_c) return;
     const s=_c.inspSchedule||{};
     const h=(Array.isArray(s.history)?s.history:[])[i];
@@ -3152,6 +3197,7 @@
   }
 
   window.cvShReSave = function(){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     const off=(document.getElementById('cv-shoffice')||{}).value||'';
     const s2=_cvS2Read();
     _cvShReApply('reedit', { patch:{
@@ -3167,6 +3213,7 @@
   };
 
   window.cvShReDrop = function(){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     const at=window._cvShReAt; if(!_c||!at) return;
     const s=_c.inspSchedule||{};
     /* 「押す前の姿に戻す」は、いま行く日が決まっていない時だけ（決め直していたら上書きしない） */
@@ -3193,6 +3240,7 @@
      🔴 中身の作り方は pit-share.js の `pitShakenApply('doneedit')` 1本。窓の部品は記録する窓と同じ id。
      ══════════════════════════════════════════════════════════════════════════ */
   window.cvShDoneOpen = function(){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(!_c) return;
     const s=_c.inspSchedule||{};
     if(s.result!=='done') return;
@@ -3239,6 +3287,7 @@
     const row=document.getElementById('cv-shnote-row'); if(row) row.style.display = (window._cvShKind==='repass') ? 'contents' : 'none';
   };
   window.cvShDoneSave = function(){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     const at=window._cvShDoneAt; if(!_c||!at) return;
     const s=_c.inspSchedule||{};
     const off=(document.getElementById('cv-shoffice')||{}).value||'';
@@ -3267,6 +3316,7 @@
     if(window.renderShakenLog && window.state && state.currentView==='shakenlog') renderShakenLog();
   };
   window.cvShDoneDrop = function(){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     const at=window._cvShDoneAt; if(!_c||!at) return;
     const md = window.fmtMD ? fmtMD(at.date) : at.date;
     const go = function(){ cvShClose(); window._cvShDoneAt=null; cvShakenReopen(); };
@@ -3279,6 +3329,7 @@
   };
 
   window.cvShakenReopen = function(){
+    if (_cvResultLock('車検の記録') || _cvArchLock()) return;   /* 🔒 v2.199.0 C2 実績の車は管理者だけ／C7 アーカイブ済みのキャンセルは読むだけ */
     if(!_c) return; const s=_c.inspSchedule||{};
     s.result=''; s.resultDate=''; s.resultSlot=''; s.resultStaff='';
     s.resultStaff2=''; s.resultStaff2Note='';   /* 👥 v2.113.0 2人目も一緒に落とす（物差しの reopen と同じ） */

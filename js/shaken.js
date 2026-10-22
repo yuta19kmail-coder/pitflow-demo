@@ -390,7 +390,15 @@
   /* 🔴 v1.118.0 `shkFix`（帯を押したら決定）は**廃止**。
      ゆうた指定「決定車両への移動はドラッグのみ、予定部分をクリックで飛ばないように」。
      ⚠ 押し間違いで陸運局の日が勝手に決まってしまうのを防ぐのが目的。復活させないこと。 */
-  function assign(id,iso,slot){ var c=card(id); if(!c) return; var s=ins(c);
+  /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C2「実績のみ権限で」）**実績になった車の車検の記録は管理者だけ。**
+     予約詳細（card-view.js の _cvResultLock）と同じ決まり。実績前は今までどおり誰でも。true＝止めた。 */
+  function _shkLocked(c){
+    if (!c || c.status !== 'returned') return false;
+    if (!window.PIT_CLOUD || (window.pitIsAdmin && pitIsAdmin())) return false;
+    if (window.UI && UI.alert) UI.alert('実績になった車の車検の記録を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+    return true;
+  }
+  function assign(id,iso,slot){ var c=card(id); if(!c) return; if(_shkLocked(c)) return; var s=ins(c);
     /* 🔴 v1.119.0 **はじめて決めた時だけ**、回送の担当・陸運局・R を聞く窓を出す（ゆうた確定）。
        ⚠ すでに決まっている車を別の日へ動かしただけの時は**出さない**（毎回聞かれると邪魔）。
        ⚠ 担当・陸運局・R は日を動かしても**消さない**（同じ車検の話なので持ち回る）。 */
@@ -406,7 +414,7 @@
   }
 
   /* 決定チップを「予定」エリアへ運ぶ＝決定を解除して候補（行ける日）に戻す（候補の枠は残す）v0.124.0 */
-  function unassign(id){ var c=card(id); if(!c) return; var s=ins(c); if(!s.decided) return;   // 決定中の車だけ候補へ戻す
+  function unassign(id){ var c=card(id); if(!c) return; if(_shkLocked(c)) return; var s=ins(c); if(!s.decided) return;   // 決定中の車だけ候補へ戻す
     var _d0 = s.decided + ' ' + (s.decidedSlot === 'pm' ? '午後' : '午前');
     s.decided=''; s.decidedSlot=''; s.result=''; s.resultDate=''; s.resultSlot='';
     if(window.pitLogDateChange) pitLogDateChange(c, '車検の行く日', _d0, '', { kind: 'shaken', note: '候補に戻した' });   /* 📝 v2.183.0 */
@@ -635,7 +643,7 @@
   /* 3つを保存する。⚠ 陸運局は id で持ち、名前は**後ろ盾の写し**として一緒に控える
      （CoreMembers で場所が消えたり名前が変わっても、過去の記録が空欄にならないように）。 */
   window.shkSaveFields=function(id){
-    var c=card(id); if(!c) return; var s=ins(c);
+    var c=card(id); if(!c) return; if(_shkLocked(c)) return; var s=ins(c);
     var stEl=document.getElementById('shk-staff'), ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');
     var staff=stEl?stEl.value:'', off=ofEl?ofEl.value:'', rd=rdEl?Number(rdEl.value||0):0;
     /* 📝 v2.186.0（⑧）担当・陸運局・R の「前」を控える */
@@ -732,7 +740,7 @@
              round: rd?Number(rd.value||0):null };
   }
   function _applyPend(id, act, note){
-    var c=card(id); if(!c) return null; var s=ins(c);
+    var c=card(id); if(!c) return null; if(_shkLocked(c)) return null; var s=ins(c);
     var o=_shkPend||{staff:null,office:null,officeName:'',round:null};
     var r=window.pitShakenApply ? pitShakenApply(s, act, {
       staff:o.staff, staff2:(o.staff2==null?null:o.staff2), staff2Note:(o.staff2Note==null?null:o.staff2Note),
@@ -768,7 +776,7 @@
       + '<button class="shk-pbtn ghost" onclick="shkClosePop()">このまま（あとで入れる）</button>');
   };
   window.shkSetRound=function(id,n){
-    var c=card(id); if(!c) return; var s=ins(c);
+    var c=card(id); if(!c) return; if(_shkLocked(c)) return; var s=ins(c);
     var _r0=s.round?s.round+'R':'R未定';   /* 📝 v2.186.0（⑧）前の R */
     s.round=(n>=1&&n<=4)?n:0;
     var _lg='車検の予定 '+(s.decided?fmtMD(s.decided):'')+'（'+_slT(s.decidedSlot)+'／'+(s.round?s.round+'R':'R未定')+'）'+'　元は '+_r0;
@@ -825,7 +833,7 @@
            （写しを作った瞬間、片方だけ古くなる。2026-08-15 の食い違い4件と同じ筋）。
      ⚠ 'tocand'（候補＝行ける日に戻す）だけは**ガントの枠を触る操作**なので、ここに残す。
         🔴 ゆうた「候補に戻すは MHS 上だと分からないので要らない」＝MHS には出さない。 */
-  window.shkAct=function(id,act){ var c=card(id); if(!c) return; var s=ins(c);
+  window.shkAct=function(id,act){ var c=card(id); if(!c) return; if(_shkLocked(c)) return; var s=ins(c);
     if(act==='tocand'){ closePop(); unassign(id); return; }   // 候補（行ける日）に戻す＝slotsは残す v0.124.1
     var stEl=document.getElementById('shk-staff'); var staff=stEl?stEl.value:'';
     var ofEl=document.getElementById('shk-office'), rdEl=document.getElementById('shk-round');

@@ -2959,6 +2959,38 @@ function pitWorkTypeBind(root, c, redraw, opt){
       btn.addEventListener('click', () => {
         const v   = btn.dataset.val;
         const now = window.pitInternKind ? pitInternKind(c) : '';
+        /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C1「中古など完全になくなっちゃうやつと確定金額だけを絞って　課だったりは動かせるように」）
+           **実績になった車の社内区分（中古・内部）は、管理者だけ・何が変わるかを見せてから。**
+           社内区分を付けると、その車は売上から丸ごと外れる（pit-share.js の pitCardNoSale）。
+           ⚠ 課・作業タイプ・担当などは今までどおり誰でも（ゆうた指定）。確定金額は実績では前から管理者だけ。 */
+        if (c.status === 'returned'){
+          const admin = !window.PIT_CLOUD || !!(window.pitIsAdmin && pitIsAdmin());
+          if (!admin){
+            if (window.UI && UI.alert) UI.alert('実績になった車の社内区分（中古・内部）を変えられるのは、設定権限（管理）のある人だけです。売上から外れる印のためです。', { title: '変更できません' });
+            return;
+          }
+          const next = (now === v) ? '' : v;
+          const nm = function (k) { const x = (window.PIT_INTERN_KINDS || []).find(function (y) { return y.id === k; }); return x ? x.label : (k || 'なし'); };
+          const amt = (c.amountFinal != null && c.amountFinal !== '') ? '¥' + Number(c.amountFinal).toLocaleString() : '（確定金額なし）';
+          const lines = next
+            ? ['この車は売上から外れます（確定金額 ' + amt + ' を実績に数えなくなります）',
+               '作業タイプ・付加（保証・保険・社員）・概算・代車の印が外れます']
+            : ['この車が売上に戻ります（確定金額 ' + amt + ' で実績に数えます）'];
+          UI.confirm('実績になった車の社内区分を「' + nm(now) + '」→「' + nm(next) + '」にしますか？', {
+            detail: '変わること\n' + lines.map(function (s) { return '・' + s; }).join('\n'), ok: '変える' }).then(function (yes) {
+            if (!yes) return;
+            if (window.pitInternSet) pitInternSet(c, next);
+            _syncWorkTypes(c);
+            const msg = '実績のあとで社内区分を ' + nm(now) + ' → ' + nm(next) + ' にした（' + (next ? '売上から外れた' : '売上に戻った') + '・確定金額 ' + amt + '）';
+            try { if (window.logFlow) logFlow(c, msg); } catch (e) {}
+            try { if (window.pitLog) pitLog('実績のあとで社内区分を変えた', { cardId: c.id, kind: 'result',
+              label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + msg }); } catch (e) {}
+            _cfOtherOpen = true;
+            if (opt.save) _cfSaveFor(c);
+            redraw();
+          });
+          return;
+        }
         if (opt.defer) _cfChipPaintOne(btn, now !== v);   /* ⚡ 先にチェックを見せる */
         if (window.pitInternSet) pitInternSet(c, now === v ? '' : v);
         _syncWorkTypes(c);

@@ -224,6 +224,26 @@
     return h;
   }
 
+  /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C3「これも実績だけ権限」）**実績になった車の担当者は管理者だけ。**
+     作業サマリーの「メカ別の金額」がこの担当で分かれる＝締めた月のメカ別の数字が動くため。実績前は今までどおり誰でも。
+     管理者が実績の車で変えた時は、前→後をフローと操作ログに残す（retLog）。 */
+  function retLocked(c){
+    if (!c || c.status !== 'returned') return false;
+    if (!window.PIT_CLOUD || (window.pitIsAdmin && pitIsAdmin())) return false;
+    if (window.UI && UI.alert) UI.alert('実績になった車の担当者を直せるのは、設定権限（管理）のある人だけです（メカ別の金額が動くため）。', { title: '変更できません' });
+    return true;
+  }
+  function retSnap(c, role){ var A = arrsOf(c, role); return A.arr.length ? A.arr.join('・') : (isNone(c, role) ? 'なし' : '（空）'); }
+  function retLog(c, role, before){
+    if (!c || c.status !== 'returned') return;
+    var after = retSnap(c, role);
+    if (after === before) return;
+    var msg = '実績のあとで' + roleDef(role).label + 'を ' + before + ' → ' + after + ' に変更';
+    try { if (window.logFlow) logFlow(c, msg); } catch (e) {}
+    try { if (window.pitLog) pitLog('実績のあとで担当者を変えた', { cardId: c.id, kind: 'result',
+      label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + msg }); } catch (e) {}
+  }
+
   /* ---------- 押された ---------- */
   function fire(ns, c){ var f = HOOK[ns]; if (typeof f === 'function'){ try { f(c); } catch(e){ if (window.console) console.error(e); } } }
 
@@ -233,31 +253,40 @@
      　 　 ただ押せなくするだけだと**押し間違いを自分で戻せない**ので、2回目は外す動きにした。 */
   function tap(ns, cardId, role, name){
     var c = cardOf(cardId); if (!c || !name) return;
+    if (retLocked(c)) return;
     var A = arrsOf(c, role);
     if (roleDef(role).once){
       if (A.arr.indexOf(name) >= 0){ off(ns, cardId, role, name); return; }
     } else if (A.arr.length >= MAX) return;
+    var _b = retSnap(c, role);
     A.arr.push(name); A.ids.push(idOf(name));
     c[noneKey(role)] = false;      /* 🔴 v1.174.0 人を入れたら「なし」は下りる（両立しない） */
+    retLog(c, role, _b);
     fire(ns, c);
   }
   /* 🔴 v1.174.0 「なし」＝該当者が居ないと決める。もう一度押すと**未入力に戻る**（決めていない状態）。
      ⚠ 人が入っている時に押すと、その人たちは外れる（「居ない」と言い切るので当然） */
   function none(ns, cardId, role){
     var c = cardOf(cardId); if (!c) return;
+    if (retLocked(c)) return;
+    var _b = retSnap(c, role);
     var A = arrsOf(c, role);
     var on = !isNone(c, role);
     c[noneKey(role)] = on;
     if (on){ A.arr.length = 0; A.ids.length = 0; }
+    retLog(c, role, _b);
     fire(ns, c);
   }
   /* ✕ ＝その人を全部外す（×2 でも1回で消える。押し直しの手間を作らない） */
   function off(ns, cardId, role, name){
     var c = cardOf(cardId); if (!c || !name) return;
+    if (retLocked(c)) return;
+    var _b = retSnap(c, role);
     var A = arrsOf(c, role);
     for (var i = A.arr.length - 1; i >= 0; i--){
       if (A.arr[i] === name){ A.arr.splice(i, 1); A.ids.splice(i, 1); }
     }
+    retLog(c, role, _b);
     fire(ns, c);
   }
 

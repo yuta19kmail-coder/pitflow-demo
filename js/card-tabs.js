@@ -149,6 +149,11 @@ function cfMaintHtml(c){
 function cfMaintToggle(key){
   const c = state.cards.find(function(x){ return x.id === _editingCardId; });
   if (!c) return;
+  /* 🔒 v2.199.0（ゆうた指定 2026-10-22・C4「揃える」）実績の車の作業チェックは管理者だけ（予約詳細と同じ） */
+  if (c.status === 'returned' && window.PIT_CLOUD && !(window.pitIsAdmin && pitIsAdmin())){
+    if (window.UI && UI.alert) UI.alert('実績になった車の作業チェックを直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+    return;
+  }
   if (window.pitMaintToggle) pitMaintToggle(c, key);
   if (window.PitDB) PitDB.save();
   renderCardForm(c);

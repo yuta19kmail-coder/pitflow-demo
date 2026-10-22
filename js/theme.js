@@ -126,7 +126,9 @@
         img.alt = '';
         img.onload = function () { av.textContent = ''; av.appendChild(img); };
         img.onerror = function () { av.textContent = u.initial; };
-        img.src = u.photo;
+        /* 🔐 2026-10-20（セキュリティ棚卸し M-2）画面に入れる前の絵＝見張りが届かない。置き場の写真は CFFile が合札で取ってきた中身で読む */
+        if (window.CFFile && CFFile.pathOf(u.photo)) CFFile.url(u.photo).then(function (x) { img.src = x; }, function () { av.textContent = u.initial; });
+        else img.src = u.photo;
       }
     }
     var nm = document.getElementById('tb-username'); if (nm) nm.textContent = u.name;

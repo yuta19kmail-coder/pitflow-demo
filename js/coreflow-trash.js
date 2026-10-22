@@ -89,6 +89,15 @@
     }
     return b.commit().then(function () { return tref.id; });
   }
+  /* 🔐 2026-10-21 外部監査 SEC-05：戻せるのは「ゴミ箱に入れる作りになっている入れ物」だけ。
+     戻す処理はマスターの権限で書き戻すので、ゴミ箱の行に書かれた入れ物の名前をそのまま信じない。
+     ゴミ箱に入れる所を新しく作ったら、ここにも1つ足す（足さないと「戻せない入れ物です」と止まる＝消えはしない） */
+  var RESTORE_OK = {
+    pitCards: 1, pitLoaners: 1, pitCompanyCars: 1,          /* PitFlow：カード・代車・社用車 */
+    scheduleEvents: 1, dutyDefs: 1, routineDefs: 1,         /* MHS：予定・当番・ルーティン */
+    manualNumbers: 1, tentativeCars: 1,                     /* CarFlow：手入力の番号・仮の車 */
+    stockPartners: 1                                        /* StockFlow：取引先 */
+  };
   /* 戻す（マスターがダッシュボードから）。元の場所に同じ書類がもうあれば戻さない */
   function restore(p) {
     var tref = p.co.collection('trash').doc(p.id);
@@ -96,6 +105,9 @@
       if (!s.exists) { var e0 = new Error('ゴミ箱に見つかりません'); e0.code = 'not-found'; throw e0; }
       var t = s.data() || {};
       if (t.state !== 'trash') { var e1 = new Error(t.state === 'purged' ? 'もう消えています（90日を過ぎました）' : 'もう戻してあります'); e1.code = t.state; throw e1; }
+      if (!Object.prototype.hasOwnProperty.call(RESTORE_OK, String(t.col || '')) || !t.docId || String(t.docId).indexOf('/') >= 0) {
+        var e3 = new Error('この入れ物（' + String(t.col || '？').slice(0, 40) + '）はゴミ箱から戻せません'); e3.code = 'not-allowed'; throw e3;
+      }
       var oref = p.co.collection(t.col).doc(t.docId);
       return oref.get({ source: 'server' }).then(function (o) {
         if (o.exists) { var e2 = new Error('元の場所に同じ書類があります（戻すと上書きになるので止めました）'); e2.code = 'exists'; throw e2; }

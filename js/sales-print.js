@@ -432,7 +432,8 @@
       var clone=body.cloneNode(true); clone.querySelectorAll('.sv-tabbar,.sv-head,.sv-viewsw').forEach(function(el){ if(el.parentNode) el.parentNode.removeChild(el); });
       var wrap=document.createElement('div'); wrap.style.cssText='position:fixed;left:-9999px;top:0;width:760px;background:#fff;color:#111;padding:12px;';
       wrap.setAttribute('data-theme','light'); wrap.appendChild(clone); document.body.appendChild(wrap);
-      window.html2canvas(wrap,{scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false}).then(function(canvas){
+      /* 🔐 2026-10-20（セキュリティ棚卸し M-2）画面の外の写しは見張りが届かない＝先に CFFile.ready で顔写真などを取ってくる */
+      (window.CFFile?CFFile.ready(wrap):Promise.resolve()).then(function(){ return window.html2canvas(wrap,{scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false}); }).then(function(canvas){
         var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF('p','mm','a4'); var pw=210-16, ph=297-16; var ratio=Math.min(pw/canvas.width, ph/canvas.height);
         pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',8,8,canvas.width*ratio,canvas.height*ratio); pdf.save(fileBase()+'.pdf'); document.body.removeChild(wrap);
       }).catch(function(){ document.body.removeChild(wrap); pitAlert('PDF出力に失敗しました。', { code:'PF-5002' }); });
@@ -559,7 +560,7 @@
     for (var i=1;i<=n;i++){ pdf.setPage(i); T(pdf,G(90)); pdf.setFontSize(7.5); pdf.text(i+' / '+n, R, 291, {align:'right'}); pdf.setFontSize(6.2); pdf.text(fitTxt(pdf,'金額は税抜。売上ビューと同じ拾い方（実績・実績待＝確定→受注→見積→概算／確定＝受注→確定→見積→概算／予定＝見積→概算／見込＝概算）。', W-14), L, 291); }
   }
   window.svExportListPdf=function(){
-    if(!window.svListModel){ pitAlert('一覧の部品を読み込み中です。少し待ってからもう一度押してください。', { code:'PF-5002' }); return; }
+    if(!window.svListModel){ pitAlert('一覧の部品を読み込み中です。少し待ってからもう一度押してください。', { code:'PF-5004' }); return; }
     ensureJsPDF().then(loadJPFont).then(function(b64){
       var jsPDF=window.jspdf.jsPDF; var pdf=new jsPDF('p','mm','a4');
       pdf.addFileToVFS('svjp.ttf', b64); pdf.addFont('svjp.ttf','JP','normal'); pdf.setFont('JP','normal');

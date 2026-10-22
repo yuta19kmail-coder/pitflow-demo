@@ -61,6 +61,8 @@
     });
   }
   function attr(s) { return esc(s).replace(/\n/g, ' '); }
+  /* 🔐 2026-10-21 外部監査 SEC-07：onclick の JS の文字列に入れる値は、先に JS 用に逃がしてから HTML 用に（coreflow-note-board.js の jsq と同じ） */
+  function jsq(s) { return esc(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
   function call(fn) { try { return fn(); } catch (e) { console.warn('[note-reply]', e); return null; } }
 
   function getNote(id) { return cfg.getNote ? call(function () { return cfg.getNote(id); }) : null; }
@@ -107,13 +109,13 @@
      🔴 回覧かどうかで出し分けない（ゆうた指定「回覧でも返信を入れられるように」）。 */
   function html(note) {
     if (!note || !note.id) return '';
-    var id = attr(note.id);
+    var id = attr(note.id), jid = jsq(note.id);
     var list = Array.isArray(note.replies) ? note.replies : [];
     var rows = list.map(function (r) {
       if (!r) return '';
       var del = canDelete(r)
         ? '<button type="button" class="cfr-del" title="この返信を消す"'
-          + ' onclick="event.stopPropagation();CFNoteReply.del(\'' + id + '\',\'' + attr(r.id) + '\')">×</button>'
+          + ' onclick="event.stopPropagation();CFNoteReply.del(\'' + jid + '\',\'' + jsq(r.id) + '\')">×</button>'
         : '';
       var t = timeText(r.at);
       return '<div class="cfr-item">'
@@ -129,14 +131,14 @@
 
     var form = '<div class="cfr-form">'
       + '<button type="button" class="cfr-open"'
-      +   ' onclick="event.stopPropagation();CFNoteReply.open(event,\'' + id + '\')">'
+      +   ' onclick="event.stopPropagation();CFNoteReply.open(event,\'' + jid + '\')">'
       +   '返信を書く…</button>'
       + '<div class="cfr-edit" onclick="event.stopPropagation()">'
       +   '<textarea class="cfr-ta" rows="2" maxlength="' + MAX + '" placeholder="返信を書く…"'
-      +     ' onkeydown="CFNoteReply.key(event,\'' + id + '\')"></textarea>'
+      +     ' onkeydown="CFNoteReply.key(event,\'' + jid + '\')"></textarea>'
       +   '<div class="cfr-btns">'
-      +     '<button type="button" class="cfr-cancel" onclick="event.stopPropagation();CFNoteReply.cancel(event,\'' + id + '\')">やめる</button>'
-      +     '<button type="button" class="cfr-send" onclick="event.stopPropagation();CFNoteReply.send(event,\'' + id + '\')">返信する</button>'
+      +     '<button type="button" class="cfr-cancel" onclick="event.stopPropagation();CFNoteReply.cancel(event,\'' + jid + '\')">やめる</button>'
+      +     '<button type="button" class="cfr-send" onclick="event.stopPropagation();CFNoteReply.send(event,\'' + jid + '\')">返信する</button>'
       +   '</div>'
       + '</div></div>';
 

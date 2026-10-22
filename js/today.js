@@ -33,6 +33,8 @@ function _hm(min){ return String(Math.floor(min/60)).padStart(2,'0') + ':' + Str
 
 /* 当日メモ（クイック引継ぎ）＝当日ビューのナンバー横に1行。c.todayNote に保持（当日中の共有用に保存はするが、フェーズが変わった後は気にしない）v0.123.0 */
 function _todEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* 🔐 2026-10-21 外部監査 SEC-07：onclick の JS の文字列に入れる値は JS 用に逃がしてから HTML 用に（普通の id なら出力は同じ） */
+function _todJsq(s){ return _todEsc(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")); }
 /* 🚗 v1.111.0（2026-08-17 ゆうた確定）**空っぽなら「代車：ハスラー」を出す。**
    ・書いてあればそれを出す ／ 全部消せばまた代車名に戻る（誤って消しても救われる）
    ・🔴 見た目は打ち込んだメモとまったく同じ（薄くしない・点線も付けない）＝ゆうた指定
@@ -658,11 +660,11 @@ function todayRow(c, isReturn, inBreak){
   const _pend = !!(isReturn && window.pitReturnIsPending && pitReturnIsPending(c));
 
   let h = '';
-  h += '<div class="today-row' + (c.urgent ? ' is-urgent' : '') + (inBreak ? ' in-break' : '') + (_pend ? ' is-retpend' : '') + '" onclick="pitTodayTap(\'' + c.id + '\',' + (isReturn ? 'true' : 'false') + ')" style="--team:' + teamColor + '">';
+  h += '<div class="today-row' + (c.urgent ? ' is-urgent' : '') + (inBreak ? ' in-break' : '') + (_pend ? ' is-retpend' : '') + '" onclick="pitTodayTap(\'' + _todJsq(c.id) + '\',' + (isReturn ? 'true' : 'false') + ')" style="--team:' + teamColor + '">';
   h += timeHtml;
   // 担当フロント縦書きバッジ（人が無ければ課）
   if (frontName){
-    h += '<div class="tr-front" style="background:' + _todEsc(badgeColor) + '">' + frontName + '</div>';
+    h += '<div class="tr-front" style="background:' + _todEsc(badgeColor) + '">' + _todEsc(frontName) + '</div>';
   } else if (divLabel){
     h += '<div class="tr-front is-div" style="background:' + _todEsc(badgeColor) + '" title="担当者はまだ決まっていません（' + _todEsc(divLabel) + '）">' + _todEsc(divLabel) + '</div>';
   } else {
@@ -672,8 +674,8 @@ function todayRow(c, isReturn, inBreak){
   /* 🔴 v2.163.0（ゆうた報告 2026-10-08「13:00入庫が下にズレてる」）名前と車種は**必ず1行**。
      長い法人名で車種が2行目に落ちると、56px 固定の行から3段がはみ出してナンバーが隠れていた。
      入りきらない時は名前・車種の両方を長さに比例して「…」で縮める（CSS）。「様」は縮めない＝tr-sama に分ける。 */
-  h += '<div class="tr-headline"><span class="tr-customer"><span class="tr-cn">' + ((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）') + '</span><span class="tr-sama">様</span></span>'
-     + (c.car ? '<span class="tr-carname">' + c.car + '</span>' : '') + '</div>';
+  h += '<div class="tr-headline"><span class="tr-customer"><span class="tr-cn">' + _todEsc((window.pitCustSurname ? pitCustSurname(c) : (c.customer || '')) || '（未入力）') + '</span><span class="tr-sama">様</span></span>'
+     + (c.car ? '<span class="tr-carname">' + _todEsc(c.car) + '</span>' : '') + '</div>';
   // ナンバー＋当日メモ（クイック引継ぎ）を1行で。メモはクリックで直入力＝当日ビュー内だけの簡単メモ v0.123.0
   /* 🏷 v1.113.0 ナンバーの場所＝初回なら「初回顧客」／リピーターでナンバーが無ければ「初回車両」。
      🔴 判断は pit-share.js の pitTodayPlate 1本。ここで書かない（MHS も同じものを借りる）。 */

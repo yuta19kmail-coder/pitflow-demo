@@ -2586,7 +2586,14 @@
       var data = s.exists ? s.data() : JSON.parse(JSON.stringify(obj));
       var b = window.fb.db.batch();
       CFTrash.put(b, co, { app:'pitflow', col: col, ref: ref, data: data, name: name, from: 'PitFlow', reason: reason });
-      return b.commit().then(function(){ return true; });
+      return b.commit().then(function(){ return true; }, function(e){
+        /* 🩹 2026-10-20（棚卸し 17）前に消す途中で止まった物は、ゴミ箱に同じ行がもう入っている＝社員は書き換えられず断られる。
+           前は「ゴミ箱に入れられなかった」で止まり、その物は二度と消せなかった。
+           ＝断られたら、その物だけを1件で消してみる。ゴミ箱に正しい写しがあればルールが通す（無ければ今までどおり断られて消さない）。
+           ⚠ まとめ書き（PitDB.save）には入れない＝断られても、ほかの札の保存を巻き込まない */
+        if (!e || e.code !== 'permission-denied' || !s.exists) throw e;
+        return ref.delete().then(function(){ return 'already'; }, function(){ throw e; });
+      });
     });
   };
   function cvTrashCopy(c){
@@ -2615,7 +2622,9 @@
        ⚠ 消すこと自体（誰でも消せる）はゆうたの決定のまま。ゴミ箱（30日）は共通の作り（C-05）で */
     if(window.pitLog){
       const _n = (window.pitCustName?pitCustName(_c):_c.customer) || '';
-      const _st = (typeof statusLabel === 'function') ? statusLabel(_c.status) : (_c.status||'');
+      /* 🔧 2026-10-20 状態の言葉は pit-share.js の1本（pitCardStatusText）。前は statusLabel(_c.status)＝キャンセルのカードを消すと
+         「状態 cancelled」と英語で残り、予約キャンセルと未入庫も言い分けられなかった（見張り test_pit_rules ⑤） */
+      const _st = window.pitCardStatusText ? pitCardStatusText(_c) : ((typeof statusLabel === 'function') ? statusLabel(_c.status) : (_c.status||''));
       const _y = function(v){ return (v==null||v==='') ? '' : '¥'+Number(v).toLocaleString(); };
       const _det = [
         '状態 ' + (_st||'—'),

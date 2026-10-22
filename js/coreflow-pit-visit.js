@@ -1,3 +1,10 @@
+/* 🔴🔴 **本体はここ（CoreFlowアプリ\_shared\coreflow-pit-visit.js）だけ。** アプリの中にあるのは配られた写し。
+   直す時は必ずここを直して `sync-shared.ps1` を走らせる（写しを直すと次の配布で消える）。
+   もとは PitFlow の js/sales-visit.js。中身は1文字も変えずにここへ移した（2026-10-20）。
+   売上ビューの共通部品（coreflow-pit-sales.js）の「来店属性」タブの中身。PitFlow と MHS（MH実績）が同じ物を使う。
+   データ＝ CFPitSales.data()（PitFlow では window.state）。数え方の物差しは PitFlow の本物（sales-count.js・sales-date.js ほか）。
+   読む順＝ coreflow-pit-sales.js より前（PitFlow では sales-count.js より後ろ）。
+*/
 /* ========================================
    sales-visit.js  -  来店属性（売上ビューの5つ目のタブ）/ PitFlow v2.59.0
    ----------------------------------------
@@ -73,7 +80,7 @@
 
   /* 実績になったカード全部（期間で切らない＝過去来店を見るために全部要る） */
   function allDone(){
-    return (state.cards||[]).filter(function(c){
+    return (((window.CFPitSales && CFPitSales.data()) || window.state || {}).cards||[]).filter(function(c){
       if(!c) return false;
       if(c.status!=='workDone' && c.status!=='returned') return false;
       if(!c.completedAt) return false;

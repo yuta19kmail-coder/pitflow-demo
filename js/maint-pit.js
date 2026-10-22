@@ -762,7 +762,7 @@
   }
   w.flMaintEdit = function(vehId, gid){
     var r = rowOf(vehId, gid);
-    if (!r){ if (w.pitToast) w.pitToast('この予定が見つかりません（画面を開き直してください）', 'PF-8001'); return; }
+    if (!r){ if (w.pitToast) w.pitToast('この予定が見つかりません（画面を開き直してください）', 'PF-3084'); return; }
     var c = r.card, p = r.plan, manual = !!p.manualId;
     var td = today();
     _mbaWork = (c && c.workType) || r.work;

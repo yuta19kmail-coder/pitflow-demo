@@ -287,7 +287,8 @@
        ⚠ v2.48.0 まではここに `opt.withMonth` という逃げ道があった。月と日が同じ箱に居たため。
           **カードに分けたら要らなくなったので消した。**（逃げ道は要らなくなったら残さない） */
     arr(w.state && w.state.cards).forEach(function (c) {
-      if (!c || c.internKind !== 'loanercar' || !Array.isArray(c.maintSpans)) return;
+      /* 🔧 2026-10-20 整備カードかの見分けは pit-share.js の1本（pitCardMaint）を借りる。前は同じ式の写し（物差しが2本） */
+      if (!c || !(w.pitCardMaint ? w.pitCardMaint(c) : (c.internKind === 'loanercar' && Array.isArray(c.maintSpans)))) return;
       if (c.maintVehId !== loanerId) return;
       if (c.status === 'cancelled' || c.status === 'scrap') return;
       arr(c.maintSpans).forEach(function (sp) {

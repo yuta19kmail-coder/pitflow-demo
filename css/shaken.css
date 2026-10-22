@@ -211,6 +211,16 @@
 .shk-lg.tt{ color:#c9a6f5; }
 .shk-gsc.tentcell{ display:block; padding:4px 5px 5px; }
 .shk-gsc.tentcell .shk-chip{ margin-bottom:0; }
+/* 🟩 v2.195.4 行ける枠の中に置いた暫定＝札の後ろに帯を残す（札が半透明なので薄く透けて、左右の帯とつながって見える。濃さを落とすと札に隠れて見えなかった＝デモで確かめた）。後ろの帯は見るだけ（押せない） */
+.shk-gsc.tentcell.onband{ position:relative; }
+.shk-gsc.tentcell.onband .shk-bar-under{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); width:auto; pointer-events:none; cursor:default; z-index:0; }
+.shk-gsc.tentcell.onband .shk-bar-under.l{ left:2px; margin-left:0; } .shk-gsc.tentcell.onband .shk-bar-under.r{ right:2px; margin-right:0; }
+.shk-gsc.tentcell.onband .shk-chip{ z-index:1; }
+/* 🟩 v2.195.6（2026-10-22 ゆうた「すごい見にくい」→モックの案A「A でいい」）**枠の中の暫定の札は、下を透かさない。**
+   ⚠ v2.195.5 で後ろの帯を 90% にしたら、半透明の札の真ん中に濃い帯が透けて名前・車名が読めなくなった。
+   ＝帯はふつうの濃さに戻し、札は「紫を薄く重ねた地の色」で塗りつぶす（見た目は帯の外の暫定と同じ・下だけ透けない）。
+   ⚠ 地の色は var(--bg2) を重ねる＝テーマ4つとも同じ書き方で効く。紫の濃さは下の .shk-chip.shk-tent と同じ .14 */
+.shk-gsc.tentcell.onband .shk-chip.shk-tent{ background:linear-gradient(rgba(168,120,240,.14),rgba(168,120,240,.14)),var(--bg2); }
 .shk-chip.shk-tent{ background:rgba(168,120,240,.14); border-style:dashed; }
 .shk-chip.shk-tent:hover{ filter:brightness(1.12); }
 .shk-mk-tent{ background:rgba(168,120,240,.28); color:#c9a6f5; }

@@ -1042,6 +1042,17 @@
     ['pointerdown', 'keydown', 'change', 'submit'].forEach(function (t) { d.addEventListener(t, onAct, true); });
     w.addEventListener('error', onErr, true);
     w.addEventListener('unhandledrejection', onRej);
+    /* 🔐 2026-10-21 外部監査 SEC-26：セキュリティの見出し（CSP）を「守らずに違反を記録するだけ」（Report-Only）で入れた。
+       違反をここで拾って調査の記録へ（同じ違反は1画面1回だけ・アプリの動きは変えない）。後で効かせる時の下調べにする */
+    var _cspSeen = {};
+    d.addEventListener('securitypolicyviolation', function (e) {
+      try {
+        var dir = String(e.effectiveDirective || e.violatedDirective || '').slice(0, 60);
+        var url = String(e.blockedURI || '').slice(0, 300);
+        var key = dir + ' ' + url.slice(0, 120); if (_cspSeen[key]) return; _cspSeen[key] = 1;
+        push({ ev: 'err', k: 'csp', dir: dir, url: url, src: String(e.sourceFile || '').slice(0, 200), ln: e.lineNumber || 0, disp: String(e.disposition || '') });
+      } catch (x) {}
+    });
     wrapConsole('error'); wrapConsole('warn');
     w.addEventListener('hashchange', function () { try { push({ ev: 'nav', k: 'hash', h: where() }); } catch (e) {} });
     w.addEventListener('popstate', function () { try { push({ ev: 'nav', k: 'pop', h: where() }); } catch (e) {} });

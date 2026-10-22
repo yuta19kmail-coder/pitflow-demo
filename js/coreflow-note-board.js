@@ -291,6 +291,17 @@
     });
   }
   function jsq(s) { return esc(String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")); }
+  /* 🔐 2026-10-20（セキュリティ棚卸し M-2）添付は鍵つきの住所で直に開かない＝CFFile（_shared\coreflow-file.js）がログインの合札で取ってくる。
+     CFFile が読み込まれていないアプリでは今までどおり（住所で開く）。描いた後に fillFiles(入れ物) を呼ぶ */
+  function fileImg(src, cls, extra) {
+    if (w.CFFile && src && !/^(data|blob):/i.test(src)) return '<img class="' + cls + '" data-cf-src="' + esc(src) + '" alt=""' + (extra ? ' ' + extra : '') + '>';
+    return '<img class="' + cls + '" src="' + esc(src) + '" alt=""' + (extra ? ' ' + extra : '') + '>';
+  }
+  function filePdf(src, name, cls, inner) {
+    if (w.CFFile) return '<a class="' + cls + '" href="#" data-cf-open="' + esc(src) + '" data-cf-name="' + esc(name) + '" onclick="event.stopPropagation()">' + inner + '</a>';
+    return '<a class="' + cls + '" href="' + esc(src) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + inner + '</a>';
+  }
+  function fillFiles(el) { if (w.CFFile && el) { try { w.CFFile.fill(el); } catch (e) {} } }
   function icon(name, fb, px) {
     try { if (typeof w.ic === 'function') return w.ic(name, fb || '', px || 15); } catch (e) {}
     return fb || '';
@@ -373,8 +384,8 @@
     var att = gone
       ? '<div class="bn-att-gone">' + icon('paperclip', '📎', 13) + ' 添付は期限（済から3か月）で消えました</div>'
       : n.imageURL
-      ? '<img class="bn-img" src="' + esc(n.imageURL) + '" alt="" onclick="event.stopPropagation();CFNoteBoard.preview(\'' + jsq(n.imageURL) + '\')">'
-      : (n.pdfURL ? '<a class="bn-pdf" href="' + esc(n.pdfURL) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + icon('fileText', '📄', 15) + ' ' + esc(n.pdfName || 'PDF') + '</a>' : '');
+      ? fileImg(n.imageURL, 'bn-img', 'onclick="event.stopPropagation();CFNoteBoard.preview(\'' + jsq(n.imageURL) + '\')"')
+      : (n.pdfURL ? filePdf(n.pdfURL, n.pdfName || 'PDF', 'bn-pdf', icon('fileText', '📄', 15) + ' ' + esc(n.pdfName || 'PDF')) : '');
     var dl = n.deadline ? '<div class="bn-deadline' + (od ? ' is-overdue' : '') + '">' + (od ? icon('siren', '🚨', 13) : icon('clock', '⏰', 13)) + ' ' + esc(deadlineText(n.deadline)) + '</div>' : '';
     var asg = orderIndex(assignees(n));
     var membersHtml, circRow = '';
@@ -454,7 +465,7 @@
     var ts = (call('targets') || []).filter(Boolean);
     if (!ts.length) return;
     var h = html(A.boardOptions || {});
-    ts.forEach(function (t) { t.innerHTML = h; });
+    ts.forEach(function (t) { t.innerHTML = h; fillFiles(t); });
   }
 
   /* ---------- 画面の上に出す窓（アプリの窓の作りに頼らない） ---------- */
@@ -576,14 +587,14 @@
   }
   function arcSearch(v) {
     _arcQ = v || '';
-    var box = d.getElementById('cfnb-arc-list'); if (box) box.innerHTML = archiveRows(openDone._mode);
+    var box = d.getElementById('cfnb-arc-list'); if (box) { box.innerHTML = archiveRows(openDone._mode); fillFiles(box); }
     var vw = d.getElementById('cfnb-done-view'); if (vw) vw.innerHTML = '';
   }
 
   /* 画像を大きく */
   function preview(url) {
     if (!url) return;
-    overlay('cfnb-image', '<button type="button" class="cfnb-img-x" onclick="CFNoteBoard._close(\'cfnb-image\')">' + icon('close', '✕', 18) + '</button><img src="' + esc(url) + '" alt="" onclick="CFNoteBoard._close(\'cfnb-image\')">', 'is-image');
+    fillFiles(overlay('cfnb-image', '<button type="button" class="cfnb-img-x" onclick="CFNoteBoard._close(\'cfnb-image\')">' + icon('close', '✕', 18) + '</button>' + fileImg(url, '', 'onclick="CFNoteBoard._close(\'cfnb-image\')"'), 'is-image'));
   }
   function peek(e) {
     var t = e && e.target;
@@ -659,7 +670,7 @@
     if (A.attach) {
       var a = ED.att, pv = '';
       if (a.kind === 'pdf' || (!a.changed && a.pdfURL)) pv = '<span class="bn-pdf">' + icon('fileText', '📄', 14) + ' ' + esc(a.name || a.pdfName || 'PDF') + '</span>';
-      else if (a.data || (!a.changed && a.imageURL)) pv = '<img src="' + esc(a.data || a.imageURL) + '" alt="" class="cfnb-att-img">';
+      else if (a.data || (!a.changed && a.imageURL)) pv = fileImg(a.data || a.imageURL, 'cfnb-att-img');
       var accept = A.attach.accept || 'image/*';
       attach = '<div class="cfnb-fld"><label>' + (/pdf/.test(accept) ? '画像・PDF' : '画像') + '（任意・1つの付箋に1つ・10MBまで）</label>' +
         '<label class="bn-file"><span class="ic">' + icon('image', '🖼', 15) + '</span><span>' + (/pdf/.test(accept) ? '画像・PDFを選ぶ' : '画像を選ぶ') + '</span><input type="file" accept="' + esc(accept) + '" onchange="CFNoteBoard._file(this)"></label>' +
@@ -674,6 +685,7 @@
       '<div class="cfnb-fld"><label>担当メンバー（任意・複数選択可）</label><div class="cfnb-quick">' + q + '</div><div class="bn-member-list">' + chips + '</div>' +
         (sec ? '<div class="cfnb-secret">' + icon('lock', '🔒', 13) + ' 自分ひとりだけを担当にしているので、<b>あなただけに見える自分用の付箋</b>になります。</div>' : '') + '</div>' +
       attach;
+    fillFiles(box);
   }
   function edAction(kind, val) {
     if (!ED) return;
@@ -743,14 +755,19 @@
        添付の行を書き戻すと「開けない添付」になった。置き場の名前は付箋ごとに決まっている（{付箋}.jpg／.pdf）＝
        付け直せば同じ名前で上書き・残った物は済から3か月でサーバー（note-retention）が消す */
     if (!a.file) { n.imageURL = ''; n.pdfURL = ''; n.pdfName = ''; return Promise.resolve(); }
+    /* 🔐 2026-10-20（セキュリティ棚卸し M-2）鍵つきの住所（getDownloadURL）は作らない＝欄（imageURL／pdfURL）には**置き場の道**を入れる。
+       見る時は CFFile がログインの合札で取ってくる（前に入れた鍵つきの住所も、CFFile が道を読み取って同じように取る）。
+       ⚠ 欄の名前は今のまま（ダッシュボード・サーバーの片付けが同じ名前を見ている）。中身が道か住所かは CFFile が見分ける */
     if (a.kind === 'pdf') {
-      return pdf.put(a.file, { contentType: 'application/pdf' }).then(function () { return pdf.getDownloadURL(); }).then(function (url) {
-        n.pdfURL = url; n.pdfName = a.name || 'PDF'; n.imageURL = '';
+      return pdf.put(a.file, { contentType: 'application/pdf' }).then(function () {
+        if (w.CFFile && w.CFFile.forget) w.CFFile.forget(pdf.fullPath);
+        n.pdfURL = pdf.fullPath; n.pdfName = a.name || 'PDF'; n.imageURL = '';
       });
     }
     return resizeBlob(a.file, 1200, 0.85).then(function (b) { return img.put(b, { contentType: 'image/jpeg' }); })
-      .then(function () { return img.getDownloadURL(); }).then(function (url) {
-        n.imageURL = url; n.pdfURL = ''; n.pdfName = '';
+      .then(function () {
+        if (w.CFFile && w.CFFile.forget) w.CFFile.forget(img.fullPath);   /* 同じ名前で上書きした＝覚えている古い絵を捨てる */
+        n.imageURL = img.fullPath; n.pdfURL = ''; n.pdfName = '';
       });
   }
   /* 🔴 2026-09-26 付箋を消す道が無くなったので、添付を消すのもサーバー（済から3か月）だけ */
@@ -883,6 +900,6 @@
     _drag: dragStart, _over: dragOver, _drop: dragDrop, _end: dragEnd,
     _arcSearch: arcSearch,
     _doneBack: function (id) { Promise.resolve(markUndone(id)).then(function () { arcSearch(_arcQ); }); },
-    _doneView: function (id) { var n = find(id), v = d.getElementById('cfnb-done-view'); if (n && v) v.innerHTML = '<div class="cfnb-done-card">' + cardHtml(n, { noDrag: true, noMenu: true }) + '</div>'; }
+    _doneView: function (id) { var n = find(id), v = d.getElementById('cfnb-done-view'); if (n && v) { v.innerHTML = '<div class="cfnb-done-card">' + cardHtml(n, { noDrag: true, noMenu: true }) + '</div>'; fillFiles(v); } }
   };
 })(window, document);

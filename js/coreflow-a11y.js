@@ -1,5 +1,5 @@
 /* ============================================================
-   coreflow-a11y.js ── 全アプリ共通「見やすさ」（くっきり／大きさ／拡大鏡）＋「個人設定を端末ごとに」（CFDev）v1.3.0
+   coreflow-a11y.js ── 全アプリ共通「見やすさ」（くっきり／大きさ／拡大鏡）＋「個人設定を端末ごとに」（CFDev）v1.3.1
    ------------------------------------------------------------
    ◎🆕 v1.3.0（2026-10-05・ゆうた指定）**個人設定を端末ごとにする（CFDev）**
      🗣「CoreFlow 管理画面のメンバーに、見やすさ OP を出す出さないと同じように、全アプリにかかる親設定として
@@ -427,6 +427,7 @@
     frameHead(fd);
     var nb = fd.importNode(d.body, true);
     Array.prototype.forEach.call(nb.querySelectorAll('script, #cf-mag, iframe, video, audio'), function (s) { s.remove(); });
+    noStore(nb);
     fd.body.replaceWith(nb);
     var oc = d.body.querySelectorAll('canvas');
     for (var i = 0; i < oc.length; i++) {
@@ -435,6 +436,19 @@
       try { cc.width = oc[i].width; cc.height = oc[i].height; cc.getContext('2d').drawImage(oc[i], 0, 0); } catch (e) {}
     }
     syncScroll();
+  }
+  /* 🔐 v1.3.1（2026-10-20 セキュリティ棚卸し M-2 の残り）写しの中に残った「置き場の住所」の絵は透明な絵に替える。
+     本物の画面では CFFile がログインの合札で取ってきて blob: に差し替える。写しの方は合札なしで読みに行く＝断られて壊れた絵の印が出るため。
+     差し替え済みの絵（blob:）はそのまま映る。まだ差し替わる前の物だけ、写しの中で空にする（本物は触らない） */
+  var MAG_STORE = 'firebasestorage.googleapis.com', MAG_BLANK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  function noStore(nb) {
+    try {
+      Array.prototype.forEach.call(nb.querySelectorAll('img[src*="' + MAG_STORE + '"], img[srcset*="' + MAG_STORE + '"]'), function (im) { im.removeAttribute('srcset'); im.setAttribute('src', MAG_BLANK); });
+      Array.prototype.forEach.call(nb.querySelectorAll('image'), function (im) {
+        ['href', 'xlink:href'].forEach(function (a) { var v = im.getAttribute(a); if (v && v.indexOf(MAG_STORE) >= 0) im.setAttribute(a, MAG_BLANK); });
+      });
+      Array.prototype.forEach.call(nb.querySelectorAll('[style*="' + MAG_STORE + '"]'), function (el) { el.style.backgroundImage = 'none'; });
+    } catch (e) {}
   }
   function syncScroll() {
     var fd = mag.fr && mag.fr.contentDocument; if (!fd || !fd.body) return;

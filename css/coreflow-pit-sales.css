@@ -1,3 +1,6 @@
+/* 🔴🔴 本体はここ（CoreFlowアプリ\_shared）だけ。アプリの中にあるのは配られた写し。直したら sync-shared.ps1。
+   PitFlow の売上ビューと MHS の MH実績（PitFlow タブ）が同じ見た目で描くための共通の見た目（2026-10-20 PitFlow から移した・中身は同じ）。
+   ⚠ 地の色は借りる側の変数（--bg2/--bg3/--text/--text2/--text3/--border/--border2/--r/--brand/--green ほか）に追従。借りる側に無い変数は借りる側で用意する */
 /* ========================================
    sales.css  -  売上ビュー（PitFlow v0.102.0）
    ダーク/ライト両対応：既存の CSS 変数（--bg2/--bg3/--text/--text2/--text3/--border/--border2/--r）に追従

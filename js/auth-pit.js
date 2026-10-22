@@ -171,7 +171,7 @@
     if (!m) return false;
     /* 👤 v2.190.0（C-03・ゆうた決定）PitFlow の管理者は PitFlow の役（管理）で決める。メンバー管理の「管理者」の印は含めない */
     if (window.CFMember) return CFMember.isAppAdmin(m, 'pitflow');
-    if (m.master === true || m.admin === true) return true;
+    if (m.master === true) return true;
     return !!(m.pitflow && m.pitflow.role === '管理');
   }
 

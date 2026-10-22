@@ -8,7 +8,7 @@
        （「CoreFlow でちゃんと俺が設定してある。してないやつはほんとにまだ使えなくていいやつ」）
      ・画面は、まだ一度も保存されていない人にも「初めの値」を出している＝その初めの値もここで決める（DEFAULTS）。
        メンバー管理の画面（ポータル index.html の loadMembers）もこの表を使う＝画面と判定が割れない
-     ・各アプリの管理者は**そのアプリの役**で決める。メンバー管理の「管理者」の印＝メンバー管理ができる人（各アプリの管理者ではない）
+     ・各アプリの管理者は**そのアプリの役**で決める。メンバー管理ができるのはマスターだけ（2026-10-20）
      ・マスター（ゆうた）は全アプリを使える・各アプリで一番上の役
    なぜ：「使えるか」の判定が入口・サーバーの通知・FlowDesk・FlowGo・ダッシュボード・ルールで6通りあり、
          CoreTools・CoreBoard・CoreNote は「入れないのに通知は届く」、MHS・CoreTemplate は「入れるのに通知が届かない」があった（A-49）
@@ -18,12 +18,12 @@
      CFMember.canUse(m, app)      → そのアプリを使えるか（'coreflow'＝ダッシュボード・FlowDesk・FlowGo は在籍だけで可）
      CFMember.role(m, app)        → その人のそのアプリの役（使えなければ null・マスターは一番上）
      CFMember.isAppAdmin(m, app)  → そのアプリの管理者か（役で決める）
-     CFMember.isActive(m) ／ isMaster(m) ／ canManageMembers(m)（メンバー管理ができる＝マスターか「管理者」の印）
+     CFMember.isActive(m) ／ isMaster(m) ／ canManageMembers(m)（メンバー管理ができる＝マスターだけ）
      CFMember.name(m, 'full'|'surname') ／ CFMember.photo(m)
    ========================================================= */
 (function (root) {
   'use strict';
-  var VERSION = '1.1.0';
+  var VERSION = '1.2.0';
   var APPS = ['carflow', 'stockflow', 'pitflow', 'mhs', 'coremembers', 'coretools', 'coretemplate', 'coreboard', 'corenote'];
   /* 画面（メンバー管理）がまだ保存されていない人に出している初めの値。🔴 画面と同じ（ポータル loadMembers がここを使う） */
   var DEFAULTS = {
@@ -31,7 +31,7 @@
     stockflow: function () { return { on: false, role: 'メンバー' }; },
     pitflow: function () { return { on: false, role: 'メンバー' }; },
     mhs: function () { return { on: true, role: '利用' }; },
-    coremembers: function (m) { return { on: true, role: (m.master || m.admin) ? 'オーナー' : '一般' }; },
+    coremembers: function (m) { return { on: true, role: m.master ? 'オーナー' : '一般' }; },
     coretools: function (m) { return { on: !!m.master, role: '利用' }; },
     coretemplate: function (m) { return { on: true, role: m.master ? '管理者' : '利用者' }; },
     coreboard: function (m) { return { on: !!m.master, role: '利用' }; },
@@ -44,7 +44,9 @@
 
   function isActive(m) { return !!m && m.active !== false && !m.removed; }
   function isMaster(m) { return !!m && m.master === true; }
-  function canManageMembers(m) { return isActive(m) && (isMaster(m) || m.admin === true); }
+  /* 🔐 v1.2.0（2026-10-20・ゆうた決定）**メンバー管理に入れる・権限を付けるのはマスターだけ。**各アプリの管理者はそのアプリの中だけ＝必ずマスターより下。
+     名簿の「管理者」の印（admin）は、もう何の力も持たない（ルールも同じ線） */
+  function canManageMembers(m) { return isActive(m) && isMaster(m); }
   function appOf(m, app) {
     if (!m || !app) return { on: false, role: '' };
     var v = m[app];

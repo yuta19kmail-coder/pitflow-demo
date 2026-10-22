@@ -156,7 +156,7 @@
     M04: ['amountQuote', 'amountOrder'],
     M06: ['amountFinal'],
     M07: ['amountFinal', 'amountQuote'],
-    M08: ['amountFinal', 'amountOrder', 'amountQuote'],
+    /* 🔧 2026-10-20 M08（売上なしなのに金額）は v2.9.5（ゆうた 2026-08-25）に規則を止めた＝この表からも外した（上の決まり「規則を消したら、この表からも消す」） */
     /* 💴 v1.185.0 並びは**先に「売上日」**。誰でも直せて、売上の数字が動かないほうを先に出す。
        実績カウント日は管理者だけ＆締めた月が動くので、後ろに置く（勢いで押させない）。 */
     M11: ['salesDate', 'completedAt'],

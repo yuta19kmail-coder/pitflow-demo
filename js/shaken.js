@@ -353,7 +353,16 @@
                     入れ替えは予約詳細だけ＝**この表で数字が変わるのは暫定だけ**。
                  ⚠ 帯（行ける枠）も押せるが、やることは同じ＝暫定を置く。帯は消えない。 */
               if(tnt && tnt.date===x.iso && tnt.slot===slot){
-                return '<div class="shk-gsc tentcell'+pm+'" data-iso="'+x.iso+'" data-slot="'+slot+'">'+tentChip(c)+'</div>';
+                /* 🟩 v2.195.4（2026-10-21 ゆうた「B にしよう」）**行ける枠の中に置いた暫定は、札の後ろに帯を薄く残す。**
+                   前は札のマスだけ帯が切れて、「枠の中に置いたのか外なのか」が見た目で分からなかった。帯の外に置いた札は今までどおり後ろに何もない。
+                   ⚠ 後ろの帯は見るだけ（押せない・掴めない）＝押すのも掴むのも札 */
+                var under='';
+                if(on){
+                  var tp = slot==='am'? son(di-1,'pm') : son(di,'am');
+                  var tn = slot==='am'? son(di,'pm') : son(di+1,'am');
+                  under='<div class="shk-bar shk-bar-under'+(c.boardId==='import'?' imp':'')+(tp?'':' l')+(tn?'':' r')+'" aria-hidden="true"></div>';
+                }
+                return '<div class="shk-gsc tentcell'+pm+(on?' onband':'')+'" data-iso="'+x.iso+'" data-slot="'+slot+'">'+under+tentChip(c)+'</div>';
               }
               var put='押すと '+fmtMDW(x.iso)+' '+ap+' に暫定予定（仮押さえ）を置く';
               if(!on) return '<div class="shk-gsc slotcell'+pm+'" onclick="shkTent(\''+c.id+'\',\''+x.iso+'\',\''+slot+'\')" title="'+put+'"></div>';

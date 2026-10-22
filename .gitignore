@@ -40,3 +40,6 @@ shot_carname.png
 
 # 見張りの書き出し（v2.186.1）＝試しの画面は _tmp_mihari／画面写真は %TEMP%\pitflow_見張り
 _tmp_mihari/
+
+# 見張りを全部回した結果（_見張り/run_all.mjs が回すたびに書き直す出力）
+_見張り/_run_all_結果.json

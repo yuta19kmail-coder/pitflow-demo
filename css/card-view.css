@@ -167,6 +167,9 @@
 /* 🔒 v2.197.0 B2 実績カードの入金＝入金待ちの日付欄は値の横に並べる／入金済みは変えられない旨を1行 */
 .cv-fixlocked .cv-frb .cv-payin{ margin-left:10px; }
 .cv-payfix{ margin-top:4px; font-size:11px; color:var(--text3); }
+/* 📅 v2.198.0 A2・A3 記録の日付（実入庫日・完TEL日） */
+.cv-recdates .cv-frb{ display:flex; gap:14px; flex-wrap:wrap; }
+.cv-recd{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:700; color:var(--text2); }
 /* 🚧 v2.197.0 B7 作り直し中の欄（バックオフィス） */
 .cv-wip{ margin-top:8px; padding:14px 12px; border:1px dashed var(--border2); border-radius:9px; font-size:12.5px; font-weight:700; color:var(--text2); background:var(--bg3); text-align:center; }
 .cv-paychk input:disabled{ cursor:not-allowed; opacity:.6; }

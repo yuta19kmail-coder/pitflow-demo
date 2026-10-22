@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.197.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.198.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="css/work-content.css?v=9">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=2d7b23ed">
-<link rel="stylesheet" href="css/card-view.css?v=48">
+<link rel="stylesheet" href="css/card-view.css?v=49">
 <link rel="stylesheet" href="css/card-hover.css?v=26">
 <link rel="stylesheet" href="css/coreflow-pit-sales.css?v=67f9de76"><!-- 🧩 v2.195.0 売上ビューの見た目＝_shared の共通部品（MHS の MH実績と同じ物）。前の css/sales.css -->
 <link rel="stylesheet" href="css/shaken.css?v=29">
@@ -134,7 +134,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.197.0</div>
+    <div class="login-ver">v2.198.0</div>
   </div>
 </div>
 
@@ -148,7 +148,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver" data-cf-ver>v2.197.0</span>
+    <span class="ver" data-cf-ver>v2.198.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -791,7 +791,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/card-detail.js?v=160"></script>
 <script src="js/flow-pit.js?v=10"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=95"></script>
+<script src="js/card-view.js?v=96"></script>
 <script src="js/cover-print.js?v=20"></script>
 <script src="js/avail.js?v=9"></script>
 <script src="js/card-tabs.js?v=18"></script>
@@ -844,10 +844,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/import-bizcloud.js?v=9"></script>
 <script src="js/rules.js?v=17"></script>
 <script src="js/today.js?v=80"></script>
-<script src="js/undetermined.js?v=28"></script>
+<script src="js/undetermined.js?v=29"></script>
 <script src="js/reserve.js?v=79"></script>
 <script src="js/return.js?v=32"></script>
-<script src="js/car-sales.js?v=13"></script>
+<script src="js/car-sales.js?v=14"></script>
 <script src="js/task.js?v=24"></script>
 <script src="js/work.js?v=14"></script>
 <script src="js/result.js?v=18"></script>
@@ -884,7 +884,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/auto-update.js?v=5fec4b3d"></script>
   <script src="js/coreflow-power.js?v=672ecd85"></script><!-- ⏻ 電源ボタン（全アプリ共通・_shared が本体） -->
   <script src="js/coreflow-a11y.js?v=b7ec2bbb"></script><!-- 👓 見やすさ（全アプリ共通・_shared から配布）。電源の後 -->
-  <script src="js/coreflow-en.js?v=2fa30ac1" data-dict="js/coreflow-en-dict.js?v=155e6c3d"></script><!-- 🌐 2026-10-12 英語表示（メンバー管理の「英語表示」の人だけ。バージョンのバッジ／F2 で英語）。見やすさの後 -->
+  <script src="js/coreflow-en.js?v=2fa30ac1" data-dict="js/coreflow-en-dict.js?v=22ccb8b5"></script><!-- 🌐 2026-10-12 英語表示（メンバー管理の「英語表示」の人だけ。バージョンのバッジ／F2 で英語）。見やすさの後 -->
 
 
 <script src="js/ui-dialog.js?v=7ee165b6"></script><!-- アプリ内ダイアログ（全アプリ共通・_shared から配布）。配られていたのに読み込みが抜けていた -->

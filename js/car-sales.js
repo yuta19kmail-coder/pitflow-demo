@@ -416,14 +416,21 @@ window.csDone = function(id, task){
 };
 /* 🔗 2026-10-17（棚卸し C-07 第2段）完了／戻すの中身と言葉は pit-share.js の pitCarSalesPlan 1本（CarFlow・見る所3つも借りる） */
 function _csApply(c, task, on){
-  const pl = window.pitCarSalesPlan ? pitCarSalesPlan(c, task, on) : null;
-  if (!pl || !pl.ok) return;
-  Object.keys(pl.patch).forEach(function(k){ c[k] = pl.patch[k]; });
-  _csDoneLog(c, task, pl.flow);
-  if (window.PitDB) PitDB.save();
+  const pl = window.pitCarSalesSetDone(c, task, on);
+  if (!pl) return;
   renderCarSales();
   if (on && window.pitToast) pitToast(pl.toast);
 }
+/* 🔗 v2.198.0（ゆうた指定 2026-10-22・A4「お勧めで」）車販の済を書く本体＝車販作業の画面と予約詳細の**同じ1本**。
+   中身（どの印を立てる／外す・言葉）は pit-share.js の pitCarSalesPlan。ここは当てて・記録して・保存するだけ。 */
+window.pitCarSalesSetDone = function(c, task, on){
+  const pl = window.pitCarSalesPlan ? pitCarSalesPlan(c, task, on) : null;
+  if (!pl || !pl.ok) return null;
+  Object.keys(pl.patch).forEach(function(k){ c[k] = pl.patch[k]; });
+  _csDoneLog(c, task, pl.flow);
+  if (window.PitDB) PitDB.save();
+  return pl;
+};
 /* 🚙 v2.173.0 代車の洗車 完了／戻す（印は札の側。値＝洗った代車のid） */
 window.csLoDone = function(aid){
   const a = (state.loanerAssigns||[]).find(x=>x.id===aid); if (!a) return;

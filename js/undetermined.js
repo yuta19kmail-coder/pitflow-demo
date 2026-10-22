@@ -487,6 +487,13 @@ window.pitUndRestoreGo = function(id, forced){
   pitUndRestoreClose();
   renderReserveTbd();
   if (window.pitToast) pitToast('↩ ' + _undFmtMD(d) + 'の予約に戻しました');
+  /* 🚙 v2.198.0（ゆうた指定 2026-10-22・A11「それで」）**外れた代車の予定は戻さず、知らせる。**
+     キャンセル・30日後の自動アーカイブで外した代車の予定は、ほかの車に貸しているかもしれないので自動では戻さない。
+     ⚠ 代車が要る車で、いま予定が1つも無い時だけ出す（予定が残っている車には出さない）。 */
+  const _lo = window.pitLoanerPlanOf ? pitLoanerPlanOf(c.id) : { n: 0 };
+  if (c.needLoaner && !(_lo && _lo.n) && window.UI && UI.alert){
+    UI.alert('代車の予定は外れています。要るなら代車カレンダーで入れ直してください。', { title: '代車の予定' });
+  }
 };
 
 /* 返車・未定 → 完TEL：返車日を入れて返車カレンダーへ */

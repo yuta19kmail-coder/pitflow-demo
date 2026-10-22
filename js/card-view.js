@@ -727,7 +727,7 @@
           + '<input class="cv-fixinput" type="text" value="'+esc(c.returnTime||'')+'" placeholder="時間 未定" onchange="cvReturnTime(this)" style="width:150px;margin-left:8px">'
         + '</span></div></div>';
       h += resultDateRow(c);
-      h += salesDateRow(c);          /* 💴 v1.185.0 実績カウント日のすぐ下に「売上日」（2軸を並べて見せる） */
+      h += salesDateRow(c); h += recDatesRow(c);   /* 📅 v2.198.0 A2・A3 実入庫日・完TEL日 */          /* 💴 v1.185.0 実績カウント日のすぐ下に「売上日」（2軸を並べて見せる） */
       h += '</div>';
     } else if (cvCanFixReturn(c)){
       /* 🔴 v1.66.0（ゆうた指定）**確定返車日（C）と返車時間は「作業完了」に入ってからしか出さない。**
@@ -750,10 +750,10 @@
             ? pitTimeGuideHtml(c.returnTime || '', { list: window.PIT_RETURN_TIME_QUICK, cls: 'cv-timeguide' })
             : '<input class="cv-fixinput" type="text" value="'+esc(c.returnTime||'')+'" placeholder="未定" onchange="cvReturnTime(this)" style="width:210px">')
         + '</span></div></div>';
-      h += salesDateRow(c);          /* 💴 v1.185.0 完TELを通った車は、返車前でも売上日を出す（直せる） */
+      h += salesDateRow(c); h += recDatesRow(c);   /* 📅 v2.198.0 A2・A3 実入庫日・完TEL日 */          /* 💴 v1.185.0 完TELを通った車は、返車前でも売上日を出す（直せる） */
       h += '</div>';
     } else {
-      h += salesDateRow(c);          /* 💴 v1.185.0 完TEL待ちの車もここに来る。売上日があるなら出す */
+      h += salesDateRow(c); h += recDatesRow(c);   /* 📅 v2.198.0 A2・A3 実入庫日・完TEL日 */          /* 💴 v1.185.0 完TEL待ちの車もここに来る。売上日があるなら出す */
       h += '</div>';
     }
     // 💳 入金（売掛）＝実績カードは確定売上金額・返車日と同じロック行テイストで表示（入金済＝🔒確定・入金待ち＝オレンジ）v0.122.0
@@ -907,6 +907,9 @@
       }
       h += pickRow('お礼LINE', [['1','要'],['0','不要']], c.noThanksLine?'0':'1', 'line',
                    (window.pitThanksLineWhy ? pitThanksLineWhy(c) : ''));
+      /* ✅ v2.198.0 A4・A5 車販の済・お礼LINE の送信（頼んでいる物だけ） */
+      { const _ids = (window.pitCardWorkIds ? pitCardWorkIds(c) : [c.workType]);
+        h += doneRowsHtml(c, (c.workType==='shaken' || _ids.indexOf('shaken')>=0), (_ids.indexOf('coat1y')>=0 || _ids.indexOf('coat3m')>=0)); }
       h += '<div class="cv-hint">※ パターン（型）で選ぶ方式。選択肢は将来 <i data-ic=settings data-ics=16></i>設定で増減できる想定。</div></div>';
     }
     return h;
@@ -994,6 +997,38 @@
      ⚠ 比べるのは**実績になった車だけ**。返車前の車は相手が「返車“予定”日」なので、
         ちがって当たり前＝言わない。
      =================================================================== */
+  /* 📅 v2.198.0（ゆうた指定 2026-10-22・A2「完TEL日これは誰でも直せてよい」A3「これもだれでも直せてよい」）
+     **実入庫日（actualInAt）と完TEL日（completeCallAt）を表紙で直す。誰でも。**
+     ◎前は予約詳細では見るだけ（作業履歴の一覧）。完TEL日はどこからも直せず、実入庫日はデータチェックかマスター入力だけだった。
+     ⚠ 空にはできない（実入庫日は「自動で未入庫に落とさない」印を兼ねる・完TEL日は売上日の初めの値になる）。
+     ⚠ 直したら前→後をフローと操作ログに残す。 */
+  function recDatesRow(c){
+    if (!c || c.status === 'reserved' || c.status === 'cancelled') return '';
+    var inAt = String(c.actualInAt || '').slice(0, 10);
+    var call = String(c.completeCallAt || '').slice(0, 10);
+    var showCall = !!call || !!c.returnStage || c.status === 'returned';
+    var h = '<div class="cv-fixrow cv-recdates"><div class="cv-frt">記録の日付 <small>（入庫した日・完TELした日）</small></div><div class="cv-frb">'
+      + '<span class="cv-recd">実入庫日 <input class="cv-fixinput" type="date" value="' + esc(inAt) + '" onchange="cvSetRecDate(\'actualInAt\',this.value)"></span>';
+    if (showCall) h += '<span class="cv-recd">完TEL日 <input class="cv-fixinput" type="date" value="' + esc(call) + '" onchange="cvSetRecDate(\'completeCallAt\',this.value)"></span>';
+    return h + '</div></div>';
+  }
+  window.cvSetRecDate = function(key, v){
+    if (!_c || (key !== 'actualInAt' && key !== 'completeCallAt')) return;
+    var name = key === 'actualInAt' ? '実入庫日' : '完TEL日';
+    var before = String(_c[key] || '').slice(0, 10);
+    if (!v){
+      if (window.UI && UI.alert) UI.alert(name + 'は空にできません。日付を選び直してください。', { title: '空にできません' });
+      if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+      return;
+    }
+    if (before === v) return;
+    _c[key] = v;
+    try { if (window.logFlow) logFlow(_c, name + 'を ' + (before || '（なし）') + ' → ' + v + ' に変更'); } catch(e){}
+    try { if (window.pitLog) pitLog(name + 'を変更', { cardId: _c.id, kind: 'edit',
+      label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + (before || '（なし）') + ' → ' + v }); } catch(e){}
+    save(); cvRefreshBg();
+    if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+  };
   function salesDateRow(c){
     if (!c || !window.pitSalesDate) return '';
     var cur = pitSalesDate(c);
@@ -1099,6 +1134,60 @@
     if (window.renderCardView) renderCardView(_c, 'md-body-modal');
   };
 
+  /* ✅ v2.198.0（ゆうた指定 2026-10-22・A4「お勧めで」A5「足す」）**車販の済・お礼LINE の「送った」を予約詳細でも押せる。**
+     ◎前は予約詳細では見るだけ（済＝車販作業の画面だけ・送った＝マイダッシュと FlowDesk だけ）。
+     🔴 書き込みは同じ1本＝車販の済は car-sales.js の pitCarSalesSetDone、送ったは pit-share.js の pitThanksSetSent。
+     ⚠ 頼んでいる作業だけ出す（洗車＝要・ライト＝車検でする・コーティング＝受注OK・車販依頼＝あり）。お礼LINE は送る対象の車だけ。
+     ⚠ 実績のあとは管理者の「完了アーカイブの編集」の中でだけ出す（呼ぶ側で分ける）。 */
+  function doneRowsHtml(c, csShaken, csCoat){
+    var F = window.PIT_CS_DONEFLAG || {}, T = window.PIT_CS_TASK_W || {};
+    var now = function(task){ return (task === 'coating' || task === 'salesReq') ? !!(c.coatingDone || c.salesReqDone) : !!c[F[task]]; };
+    var tasks = [];
+    if (c.needWash && !(window.pitCardGoods && pitCardGoods(c))) tasks.push('wash');
+    if (csShaken && c.headlight) tasks.push('headlight');
+    if (csCoat && c.coatingOK) tasks.push('coating');
+    if (c.salesReq) tasks.push('salesReq');
+    var h = '';
+    tasks.forEach(function(task){
+      var on = now(task);
+      h += '<div class="cv-pickrow"><span class="cv-pk">' + esc((T[task] || task) + 'の済') + '</span><div class="cv-chips">'
+         + '<span class="cv-chip' + (on ? ' on' : '') + '" onclick="cvCsDone(\'' + task + '\',true)">済</span>'
+         + '<span class="cv-chip' + (on ? '' : ' on') + '" onclick="cvCsDone(\'' + task + '\',false)">未</span>'
+         + '<span class="cv-offwhy">車販作業の画面と同じ印です</span></div></div>';
+    });
+    if (window.pitThanksNeeded && pitThanksNeeded(c)){
+      var sent = !!c.thanksLineSent;
+      h += '<div class="cv-pickrow"><span class="cv-pk">お礼LINE 送信</span><div class="cv-chips">'
+         + '<span class="cv-chip' + (sent ? ' on' : '') + '" onclick="cvThanksSent(true)">送った</span>'
+         + '<span class="cv-chip' + (sent ? '' : ' on') + '" onclick="cvThanksSent(false)">未送</span>'
+         + (sent && c.thanksLineSentAt ? '<span class="cv-offwhy">' + esc(c.thanksLineSentAt + (c.thanksLineSentBy ? '・' + c.thanksLineSentBy : '')) + '</span>' : '')
+         + '</div></div>';
+    }
+    return h;
+  }
+  window.cvCsDone = function(task, on){
+    if (!_c) return;
+    if (_c.status === 'returned' && !canEditResultDate()){
+      if (window.UI && UI.alert) UI.alert('実績になった車の記録を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+      return;
+    }
+    var cur = (task === 'coating' || task === 'salesReq') ? !!(_c.coatingDone || _c.salesReqDone) : !!_c[(window.PIT_CS_DONEFLAG || {})[task]];
+    if (cur === !!on) return;
+    if (!window.pitCarSalesSetDone || !pitCarSalesSetDone(_c, task, !!on)) return;
+    cvRefreshBg();
+    if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+  };
+  window.cvThanksSent = function(on){
+    if (!_c) return;
+    if (_c.status === 'returned' && !canEditResultDate()){
+      if (window.UI && UI.alert) UI.alert('実績になった車の記録を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+      return;
+    }
+    if (!!_c.thanksLineSent === !!on) return;
+    if (!window.pitThanksSetSent || !pitThanksSetSent(_c, !!on)) return;
+    save(); cvRefreshBg();
+    if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+  };
   function archiveHtml(c, csShaken, csCoat){
     function row(label, valueHtml){ return '<div class="cv-arow"><span class="cv-ak">'+esc(label)+'</span><span class="cv-av">'+valueHtml+'</span></div>'; }
     function done(on){ return on ? '<span class="cv-adone">済</span>' : ''; }
@@ -1113,7 +1202,8 @@
     /* 💬 v2.13.3 LINEが繋がっていない車は「要／不要」ではなく**なぜ無いか**を出す */
     var _lw = (window.pitThanksLineWhy ? pitThanksLineWhy(c) : '');
     rows += row('お礼LINE', _lw ? ('<span class="cv-amuted">' + esc(_lw) + '</span>')
-                                : (c.noThanksLine ? '<span class="cv-amuted">不要</span>' : '要'));
+                                : (c.noThanksLine ? '<span class="cv-amuted">不要</span>'
+                                   : '要' + (c.thanksLineSent ? ' <span class="cv-adone">送った</span>' + (c.thanksLineSentAt ? ' <span class="cv-asub">' + esc(c.thanksLineSentAt) + '</span>' : '') : '')));
     var sales = [];
     if (csShaken && c.headlight) sales.push('ヘッドライト磨き'+(c.headlightDone?'（済）':''));
     if (csCoat && c.coatingOK)  sales.push('コーティング受注'+(c.coatingDone?'（済）':''));
@@ -1152,6 +1242,7 @@
     h += pickRow('車販依頼', [['1','あり'],['0','なし']], c.salesReq?'1':'0', 'salesreq');
     h += '<div class="cv-pickrow"><span class="cv-pk">依頼メモ</span><div class="cv-chips" style="flex:1">'
        + '<input class="cv-fixinput" type="text" value="'+esc(c.salesReqMemo||'')+'" placeholder="車販への依頼（1行・任意）" onchange="cvSalesMemo(this.value)" style="flex:1;min-width:180px"></div></div>';
+    h += doneRowsHtml(c, csShaken, csCoat);   /* ✅ v2.198.0 A4・A5 済の印・お礼LINE の送信（管理者・編集中だけ） */
     return h + '</div>';
   }
   /* 💳 入金（売掛）のロック行＝確定売上金額・返車日と同じテイスト。入金済＝🔒確定＋日付／入金待ち＝オレンジ／分けない＝返車時。✏️で編集 v0.122.0 */
@@ -1472,6 +1563,9 @@
         h += '<button class="cv-opti cv-apopt" onclick="cvUnapproval()"><i data-ic=undo data-ics=16></i> 承認に回すのをやめる…</button>';
       }
       h += '<button class="cv-opti" onclick="cvCheckIn()"><i data-ic=download data-ics=16></i> 入庫中にする</button>'
+        /* 📅 v2.198.0（ゆうた指定 2026-10-22・A12「入庫日を未定にするをたそう」）パーツ待ちなどで入庫日が決まらない予約を
+           予約ビュー「未定」タブの「未定（パーツ待ち）」へ。入庫日が決まったら、その列の「入庫日を入れる」で戻る。 */
+        +  (c.intakeTbd ? '' : '<button class="cv-opti" onclick="cvAskIntakeTbd()"><i data-ic=calendar data-ics=16></i> 入庫日を未定にする…</button>')
         +  '<button class="cv-opti" onclick="cvAskCancelResv()"><i data-ic=ban data-ics=16></i> 予約キャンセルにする…</button>'
         +  '<div class="cv-optdiv"></div>';
     } else if (archived){
@@ -1508,10 +1602,23 @@
             「入庫を取り消して予約に戻す」は**出さない**（ゆうた指定）。
          ⚠ まだタスクボードに乗っている車（`returnStage` なし）は今までどおり
             「入庫を取り消して予約に戻す」。 */
+      /* ☎ v2.198.0（ゆうた指定 2026-10-22・A1「それで」）**完TEL済 → 完TEL待ち に1段だけ戻す。**
+         前は戻す道が無く、タスクボードに戻してからドラッグし直すしかなかった。 */
+      if (c.returnStage === 'returnWait')
+        h += '<button class="cv-opti" onclick="cvAskBackToCallWait()"><i data-ic=undo data-ics=16></i> 完TEL待ちに戻す…</button>';
       h += (c.returnStage
         ? '<button class="cv-opti" onclick="cvAskBackToBoard()"><i data-ic=undo data-ics=16></i> タスクボードに戻す…</button>'
         : '<button class="cv-opti" onclick="cvAskBackToReserve()"><i data-ic=undo data-ics=16></i> 入庫を取り消して予約に戻す…</button>');
       h += '<button class="cv-opti" onclick="cvAskNoSale()"><i data-ic=box data-ics=16></i> 売上なしでアーカイブする…</button>'
+        +  '<div class="cv-optdiv"></div>';
+    } else if (c.status === 'cancelled' && !c.cancelled){
+      /* 🚫 v2.198.0（ゆうた指定 2026-10-22・A6「それで」）**未入庫（来店なし・30日前）の車にも、戻す道とキャンセルへの付け替え。**
+         前は ⋮ が「消去」だけ＝戻すのは予約ビューの未入庫の箱からしかできず、
+         「来店なし」ではなく「お客様の都合でやめた」に付け替える道が無かった。
+         ・予約に戻す… … 未入庫の箱の「↩ 予約に戻す」と同じ1本（undetermined.js の pitUndRestore）
+         ・予約キャンセルにする… … 予約の ⋮ と同じ1本（cvAskCancelResv）。押すとアーカイブ（戻せるのは管理者） */
+      h += '<button class="cv-opti" onclick="cvNoShowRestore()"><i data-ic=undo data-ics=16></i> 予約に戻す…</button>'
+        +  '<button class="cv-opti" onclick="cvAskCancelResv()"><i data-ic=ban data-ics=16></i> 予約キャンセルにする…</button>'
         +  '<div class="cv-optdiv"></div>';
     }
     h += '<button class="cv-opti cv-danger" onclick="cvAskDelete()"><i data-ic=trash data-ics=16></i> 消去する…</button>';
@@ -2512,6 +2619,61 @@
            det, 'タスクボードに戻す')
       .then(function(yes){ if (yes) cvBackToBoard(); });
   };
+  /* ☎ v2.198.0（A1）完TEL済 → 完TEL待ち。**返車の日時だけ外す**（電話の約束がまだ、に戻すので）。
+     ◎残すもの … 確定金額・洗車・お礼LINE・完TEL日（最初に通った日の記録）
+     ⚠ 誰でも（アーカイブ前・タスクボードに戻すと同じ扱い）。 */
+  window.cvAskBackToCallWait = function(){
+    if (!_c) return; closeAllPop();
+    const c = _c;
+    if (c.returnStage !== 'returnWait'){ if (window.pitToast) pitToast('この車は完TEL済ではありません'); return; }
+    const when = (c.returnDate ? fmtMD(c.returnDate) : '日付未定') + (c.returnTime ? ' ' + c.returnTime : '');
+    const det = ['・返車の日時（' + when + '）を外して、「完TEL待ち」に戻します',
+                 '・返車カレンダーからは外れます。電話して日時が決まったら、また入れてください',
+                 '・確定金額・洗車・お礼LINE はそのまま残します'].join('\n');
+    _cvAsk('完TEL待ちに戻す', '完TEL済を取り消して、完TEL待ちに戻しますか？\n' + _cvLabel(c), det, '完TEL待ちに戻す')
+      .then(function(yes){ if (yes) cvBackToCallWait(); });
+  };
+  window.cvBackToCallWait = function(){
+    const c = _c; if (!c || c.returnStage !== 'returnWait') return;
+    const was = (c.returnDate || '日付未定') + (c.returnTime ? ' ' + c.returnTime : '');
+    c.returnStage = 'callWait';
+    c.returnDate = ''; c.returnTime = ''; c.returnDateFinal = null;
+    if (window.logFlow) logFlow(c, '完TEL済を取り消して完TEL待ちに戻した（返車 ' + was + ' を外した）');
+    if (window.pitLog) pitLog('完TEL待ちに戻した', { cardId: c.id, kind: 'phase', label: _cvLabel(c) + '　返車 ' + was + ' を外した' });
+    save(); cvRefreshBg();
+    if (window.pitToast) pitToast('完TEL待ちに戻しました');
+    if (window.closeDetail) closeDetail();
+  };
+  /* 📅 v2.198.0 A12 入庫日を未定にする＝入庫日・時刻を外して intakeTbd（社用車の整備と同じ形）。
+     ⚠ 代車の予定は触らない（先に押さえているかもしれない）＝窓で言う。 */
+  window.cvAskIntakeTbd = function(){
+    if (!_c) return; closeAllPop();
+    const c = _c;
+    if (c.status !== 'reserved' || c.intakeTbd) return;
+    const det = ['・入庫日（' + (c.reserveDate ? fmtMD(c.reserveDate) : 'なし') + (c.reserveTime ? ' ' + c.reserveTime : '') + '）を外して、予約ビュー「未定」タブの「未定（パーツ待ち）」に移します',
+                 '・予約カレンダーと今日の入庫リストからは外れます',
+                 '・入庫日が決まったら、その列の「入庫日を入れる」で予約に戻せます',
+                 (c.needLoaner ? '・代車の予定はそのまま残ります（外すなら代車カレンダーから）' : '')].filter(Boolean).join('\n');
+    _cvAsk('入庫日を未定にする', '入庫日を未定にしますか？\n' + _cvLabel(c), det, '未定にする')
+      .then(function(yes){ if (yes) cvIntakeTbd(); });
+  };
+  window.cvIntakeTbd = function(){
+    const c = _c; if (!c || c.status !== 'reserved' || c.intakeTbd) return;
+    const was = (c.reserveDate || 'なし') + (c.reserveTime ? ' ' + c.reserveTime : '');
+    c.reserveDate = ''; c.reserveTime = ''; c.intakeTbd = true;
+    if (window.logFlow) logFlow(c, '入庫日を未定にした（' + was + ' を外した）');
+    if (window.pitLog) pitLog('入庫日を未定にした', { cardId: c.id, kind: 'phase', label: _cvLabel(c) + '　' + was + ' を外した' });
+    save(); cvRefreshBg();
+    if (window.pitToast) pitToast('入庫日を未定にしました（予約の「未定」タブ）');
+    if (window.closeDetail) closeDetail();
+  };
+  /* 🚫 v2.198.0 A6 未入庫 → 予約に戻す（中身は未入庫の箱と同じ pitUndRestore。入庫日を選ぶ窓が出る） */
+  window.cvNoShowRestore = function(){
+    if (!_c) return; closeAllPop();
+    const id = _c.id;
+    if (window.closeDetail) closeDetail();
+    if (window.pitUndRestore) pitUndRestore(id);
+  };
   window.cvBackToBoard = function(){
     const c = _c; if (!c) return;
     if (!c.returnStage) return;
@@ -2622,7 +2784,9 @@
     const det = ['・フロー（進捗ログ）・作業内容・担当者は、いつもどおり残ります',
                  '・お客様の来店履歴には「売上なし」で残ります',
                  '🔴 実績カレンダー・売上・台数には一切入りません',
-                 '・戻したい時は、この画面の ⋮ →「予約に戻す」で入庫の状態に戻せます'].join('\n');
+                 /* 📝 v2.198.0（ゆうた指定 2026-10-22・A13）実際の戻し方に合わせた。売上なしは押した瞬間にアーカイブされるので、
+                    戻すのは管理者の「アーカイブから戻す」（cvUnarchiveToBoardGo＝タスクボードの作業完了済へ）。 */
+                 '・戻したい時は、管理者が ⋮ →「アーカイブから戻す」でタスクボードに戻せます'].join('\n');
     _cvAsk('売上なしでアーカイブする', '売上なしでアーカイブしますか？\n' + _cvLabel(c), det, '売上なしでアーカイブ')
       .then(function(yes){ if (yes) cvNoSaleArchive(); });
   };

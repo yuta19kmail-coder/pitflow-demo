@@ -44,12 +44,22 @@
       + '<button class="modal-close" onclick="PitReturnPopup.close(false)"><i data-ic=close data-ics=16></i></button></div>'
       + '<div class="modal-body">'
       + '  <div class="pp-move" id="rp-move"></div>'
+      /* 🤝 v2.196.0（ゆうた指定 2026-10-22・モック「保険の協定待ち」案A）保険の車だけ＝**保険会社との協定がまだか、すんだか。**
+         「協定まだ」＝確定金額を入れずに進む（売上・AIレポートは見積などで数える＝insurance-pit.js の pitInsAgreeWait）。
+         ⚠ 見た目は保証の「通常／売掛」と同じ部品（rp-chips / rp-chip）。新しい見た目を作らない。 */
+      + '  <div class="pp-field" id="rp-agree-field" style="display:none">'
+      + '    <label class="pp-lb">保険会社との協定</label>'
+      + '    <div class="rp-chips">'
+      + '      <button type="button" class="rp-chip" id="rp-agree-0" onclick="PitReturnPopup.onAgree(0)">協定まだ（金額はあとで）</button>'
+      + '      <button type="button" class="rp-chip" id="rp-agree-1" onclick="PitReturnPopup.onAgree(1)">協定ずみ</button></div>'
+      + '  </div>'
       + '  <div class="pp-field">'
       + '    <label class="pp-lb">確定金額（請求額）</label>'
       + '    <div class="pp-moneywrap"><span class="pp-yen">¥</span>'
       + '      <input class="pp-money" id="rp-amt" type="text" inputmode="numeric" placeholder="0" oninput="PitReturnPopup.onAmt(this)"></div>'
       /* 🧾 v1.65.1 打つたびに税込を出す（確認用）。物差しは state.js の pitTaxHint 1本。 */
       + '    <div class="pt-tax" id="rp-tax"></div>'
+      + '    <div class="pp-ref" id="rp-amt-ref" style="display:none"></div>'
       + '  </div>'
       /* 💴 v1.185.0（ゆうた指定 2026-08-23）**売上日を、金額と一緒にここで入れる。**
          🗣「完TEL時のポップアップに金額と共に出るイメージ」
@@ -131,6 +141,35 @@
         : '';
     }
   }
+  /* 🤝 v2.196.0 保険の車の「協定まだ（0）／協定ずみ（1）」。null＝保険ではない（選ばせない） */
+  var _agree = null, _agreeAmt = '';
+  function paintAgree(){
+    var a = el('rp-agree-0'), b = el('rp-agree-1'), f = el('rp-agree-field');
+    if (f) f.style.display = (_agree == null) ? 'none' : '';
+    if (a) a.classList.toggle('on', _agree === 0);
+    if (b) b.classList.toggle('on', _agree === 1);
+    var inp = el('rp-amt'), ref = el('rp-amt-ref'), tax = el('rp-tax');
+    if (!inp) return;
+    var wait = (_agree === 0);
+    /* 協定まだ＝金額の欄は押せない・空。見積などを「参考」で出すだけ（売上・AIレポートはその金額で数える） */
+    if (wait){
+      if (inp.value) _agreeAmt = inp.value;   /* 協定ずみへ戻した時に、打っていた金額を戻す */
+      inp.value = ''; inp.disabled = true;
+      var k = (window.pitInsAgreeKari && pending) ? pitInsAgreeKari(pending.card) : null;
+      if (ref){
+        ref.style.display = '';
+        ref.textContent = (k && k.amt ? k.kind + ' ¥' + k.amt.toLocaleString() + '（参考）。売上の予定はこの金額で数えます。' : '')
+                        + '協定額が決まったら「入金待ち」で入れてください';
+      }
+      if (tax) tax.style.display = 'none';
+    } else {
+      inp.disabled = false;
+      if (!inp.value && _agreeAmt) inp.value = _agreeAmt;
+      if (ref) ref.style.display = 'none';
+      if (tax) tax.style.display = '';
+      if (window.pitTaxHintSync) pitTaxHintSync(inp, tax);
+    }
+  }
   var _lineWhy = '';      /* 💬 v2.13.3 押せない理由（空＝押せる） */
   function setLine(on){   // on=お礼LINE「要」
     var a = el('rp-line-1'), b = el('rp-line-0');
@@ -174,6 +213,12 @@
     var amt = [card.amountFinal, card.amountOrder, card.amountQuote, card.estAmount].find(function(v){ return v!=null && v!==''; });
     el('rp-amt').value = (amt!=null && amt!=='') ? Number(amt).toLocaleString() : '';
     if (window.pitTaxHintSync) pitTaxHintSync(el('rp-amt'), el('rp-tax'));   /* 🧾 開いた時点のぶんも出す */
+    /* 🤝 v2.196.0 保険の車＝協定まだ／協定ずみ。**最初は「協定まだ」**（協定前のほうが多い・モック案A）。
+       ⚠ もう確定金額が入っている車（協定額を入れてから完TELし直す時など）は「協定ずみ」で開く＝入れた金額を消さない。 */
+    _agreeAmt = '';
+    _agree = (window.pitCardInsurance && pitCardInsurance(card))
+      ? ((card.amountFinal != null && card.amountFinal !== '') ? 1 : 0) : null;
+    paintAgree();
 
     /* 💴 v1.185.0 売上日＝初期値は sales-date.js の1本。
        ⚠ 「借り物（完TEL日から引っ張っただけ）」なのか「もう決まっている」のかを、一言で出す。
@@ -338,6 +383,7 @@
     onDateTbd: function(){ syncDateTbd(); },
     onWash: function(v){ setWash(v === '1'); },
     onPay: function(v){ if (_payPick == null) return; _payPick = v ? 1 : 0; paintPay(); },
+    onAgree: function(v){ if (_agree == null) return; _agree = v ? 1 : 0; paintAgree(); },
     onLine: function(v){ setLine(v === '1'); },
     close: function(ok){
       var p = pending;
@@ -393,7 +439,13 @@
 
       // 確定金額
       var amt = digits(el('rp-amt') ? el('rp-amt').value : '');
-      if (amt !== '') c.amountFinal = Number(amt);
+      /* 🤝 v2.196.0 保険で「協定まだ」＝確定金額は入れない（入っていたら外す＝協定待ちに戻す）。記録は insurance-pit.js の1本。 */
+      if (_agree === 0){
+        if (window.pitInsSetAgree) pitInsSetAgree(c, '', '完TELの窓');
+        else c.amountFinal = null;
+      } else if (_agree === 1 && amt !== '' && window.pitInsSetAgree){
+        pitInsSetAgree(c, amt, '完TELの窓（協定ずみ）');
+      } else if (amt !== '') c.amountFinal = Number(amt);
       // 洗車（要/不要）＋備考（不要でも備考は保存）
       c.needWash = !!(el('rp-wash-1') && el('rp-wash-1').classList.contains('on'));
       c.washNote = (el('rp-washnote') && el('rp-washnote').value.trim()) || '';
@@ -460,7 +512,8 @@
         if (!(window.pitInsOnReturn && pitInsOnReturn(c, rd))) c.completedAt = rd;
         /* 🔴 拾う順番は当日ビューの「返車済みにする」と同じ＝確定→受注→見積→概算 */
         /* 🔴 v1.103.0 拾う順番は pit-share.js の1本（当日ビューの「返車済みにする」と同じ道）。 */
-        if (c.amountFinal == null || c.amountFinal === ''){
+        /* 🤝 v2.196.0 保険の協定待ちは**埋めない**（埋めると協定ずみに見える。売上・AIレポートは空なら見積などで数える） */
+        if ((c.amountFinal == null || c.amountFinal === '') && !(window.pitCardInsurance && pitCardInsurance(c))){
           c.amountFinal = window.pitFinalAmountOf ? pitFinalAmountOf(c) : 0;
         }
         if (window.logFlow) logFlow(c, (isDone ? '完TEL済' : '完TEL依頼') + ' → 実績化（返車済み・' + rd + '）');

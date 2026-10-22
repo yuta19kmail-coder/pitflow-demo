@@ -119,9 +119,57 @@
     return true;
   }
 
+  /* 🤝 v2.196.0（ゆうた指定 2026-10-22・モック「保険の協定待ち」案A）**協定待ち＝保険会社との協定がまだで、金額が決まっていない。**
+     🗣「正確な売上金額が決まってない（保険会社との協定）場合がおおい」
+     ◎新しい欄は作らない。**保険のバッジ ＋ 完TELを通った（作業完了・返車済み）＋ 確定金額が空** ＝ 協定待ち。
+       ＝ 完TELの窓で「協定まだ」を選ぶと、確定金額を入れずに進む（return-popup.js）。
+     ⚠ 完TELより前は、どの車も確定金額が空なのがふつう＝ここで「協定待ち」と呼ばない。
+     🗣「協定まだの場合、売上の予定とかAIレポート的には見積もり金額を使用するようにして」
+       ＝ 売上・AIレポートは pitFinalAmountOf（確定→受注→見積→概算）で拾う作りなので、**確定金額が空なら見積などで数える**。
+          ⚠ だから返車を終える時に、協定待ちの車の確定金額を見積で**埋めないこと**（埋めると「協定ずみ」に見えて、どこで止まっているか分からなくなる）。 */
+  function hasAmt(v){ return v != null && v !== ''; }
+  function agreeWait(c){
+    if (!isInsurance(c)) return false;
+    var st = s(c.status);
+    if (st !== 'workDone' && st !== 'returned') return false;
+    return !hasAmt(c.amountFinal);
+  }
+  /* 協定待ちの間の「仮の金額」と、どの欄から拾ったか（売上・AIレポートと同じ順＝pitFinalAmountOf）。 */
+  function agreeKari(c){
+    if (!c) return { amt: 0, kind: '' };
+    var kind = hasAmt(c.amountOrder) ? '受注' : hasAmt(c.amountQuote) ? '見積' : '概算';
+    var amt = w.pitFinalAmountOf ? Number(w.pitFinalAmountOf(c)) || 0
+            : Number(c.amountOrder || c.amountQuote || c.estAmount || 0) || 0;
+    return { amt: amt, kind: kind };
+  }
+  /* 協定額（＝確定金額）を入れる／消す。**記録（前→後）はここ1本で残す。**
+     ⚠ 空にすると、また協定待ちに戻る（完TELの窓で「協定まだ」を選び直した時など）。 */
+  function setAgree(c, v, why){
+    if (!c) return false;
+    var before = hasAmt(c.amountFinal) ? Number(c.amountFinal) : null;
+    var d = String(v == null ? '' : v).replace(/[^\d]/g, '');
+    var after = d === '' ? null : Number(d);
+    if (before === after) return false;
+    c.amountFinal = after;
+    var y = function (n) { return n == null ? '（なし）' : '¥' + Number(n).toLocaleString(); };
+    var msg = (after == null ? '協定まだにした（確定金額 ' + y(before) + ' を外した）'
+                             : '協定額を入れた（確定金額 ' + y(before) + ' → ' + y(after) + '）') + (why ? '・' + why : '');
+    if (w.logFlow) { try { logFlow(c, msg); } catch (e) {} }
+    if (w.pitLog) {
+      try { pitLog(after == null ? '協定まだにした' : '協定額を入れた', { cardId: c.id, kind: 'result',
+        label: ((w.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + ' / ' + y(before) + ' → ' + y(after) }); } catch (e) {}
+    }
+    return true;
+  }
+
   /* 画面に出す1行。⚠ 言葉はここ1本。各画面で言い換えない。 */
   function note(c){
     if (!isInsurance(c)) return '';
+    if (agreeWait(c)) {
+      var k = agreeKari(c), rd0 = t(c.returnDateFinal) || t(c.returnDate);
+      return '保険：協定待ち（仮 ¥' + k.amt.toLocaleString() + '・' + k.kind + '）'
+           + (payWait(c) ? '・入金待ち（' + (rd0 ? '返車 ' + rd0 + '・' : '') + '協定額と入金日を入れるとその日で実績になります）' : '');
+    }
     if (payWait(c)) {
       var rd = t(c.returnDateFinal) || t(c.returnDate);
       return '保険：入金待ち（' + (rd ? '返車 ' + rd + '・' : '') + '入金日を入れるとその日で実績になります）';
@@ -140,4 +188,7 @@
   w.pitInsOnReturn   = onReturn;
   w.pitInsSetPaid    = setPaid;
   w.pitInsNote       = note;
+  w.pitInsAgreeWait  = agreeWait;   /* 🤝 v2.196.0 協定待ちか */
+  w.pitInsAgreeKari  = agreeKari;   /* 🤝 協定待ちの間の仮の金額 { amt, kind } */
+  w.pitInsSetAgree   = setAgree;    /* 🤝 協定額を入れる／消す（記録つき） */
 })(window);

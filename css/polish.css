@@ -2276,6 +2276,14 @@ th.cfs-lg-d{ z-index:3; }
 .rp-insnote b{ display:block; color:#c4b5fd; }
 .rp-insnote span{ color:var(--text2); font-size:11.5px; }
 [data-theme="light"] .rp-insnote b{ color:#6d28d9; }
+/* 🤝 v2.196.0 保険の協定待ち（ゆうた指定 2026-10-22・モック「保険の協定待ち」）
+   完TELの窓＝「協定まだ」の時は金額の欄を薄く・押せない。入金待ちの列＝黄色の「協定待ち」＋仮の金額。
+   ⚠ 黄色は車両注意と同じ塗り（#f59e0b＋濃い字）＝「まだ決まっていない・気にして」の色。 */
+#rp-amt:disabled{ opacity:.4; cursor:not-allowed; }
+.rtbd-agree{ display:inline-block; font-size:10px; font-weight:800; background:#f59e0b; color:#1c1300; border-radius:5px; padding:0 6px; margin-right:5px; vertical-align:1px; }
+.rtbd-kari{ color:#f8a866; }
+[data-theme="light"] .rtbd-kari, [data-theme="light-liquid"] .rtbd-kari{ color:#b45309; }
+.rtbd-pay .rtbd-agreebtn{ width:auto; flex:1 1 100%; }
 
 /* ========== v1.99.0 「売上なしでアーカイブ」 ==========
    🔴 ゆうた確定＝**¥0 とは書かず「売上なし」と言い切る**（0円だと「入れ忘れ」と見分けが付かない）。

@@ -251,13 +251,24 @@ function renderReturnTbd(){
   const _fmd = d => d ? (window.fmtMD ? fmtMD(d) : d) : '—';
   const _yen = n => (n != null && n !== '') ? '¥' + Number(n).toLocaleString() : '—';
   h += '<div class="ret-tbd-col"><div class="ret-tbd-h"><i data-ic=money data-ics=16></i> 入金待ち <small>（売掛・返車済）</small><span class="und-cnt">' + payWait.length + '</span></div>';
+  /* 🤝 v2.196.0（ゆうた指定 2026-10-22）保険の**協定待ち**（確定金額が空）は、黄色の札＋仮の金額＋「協定額を入れる」。
+     物差しは insurance-pit.js の pitInsAgreeWait／pitInsAgreeKari 1本。 */
+  const _agreeInfo = c => {
+    if (!(window.pitInsAgreeWait && pitInsAgreeWait(c))) return _yen(c.amountFinal);
+    const k = window.pitInsAgreeKari ? pitInsAgreeKari(c) : { amt: 0, kind: '' };
+    return '<span class="rtbd-agree">協定待ち</span><span class="rtbd-kari">仮 ¥' + Number(k.amt || 0).toLocaleString() + '（' + k.kind + '）</span>';
+  };
+  const _agreeBtn = c => (window.pitInsAgreeWait && pitInsAgreeWait(c))
+    ? '<button type="button" class="rtbd-act warn rtbd-agreebtn" onclick="event.stopPropagation();pitSetAgreeAmount(\'' + c.id + '\')">協定額を入れる</button>' : '';
   h += '<div class="ret-tbd-body">' + (payWait.length ? payWait.map(c =>
         '<div class="rtbd-item">' + card(c)
-        + '<div class="rtbd-pay"><span class="rtbd-payinfo">返車 ' + _fmd(c.returnDateFinal || c.returnDate) + ' ・ ' + _yen(c.amountFinal) + '</span>'
-        + '<label class="rtbd-paylb">入金日 <input type="date" class="rtbd-paydate" value="" onclick="event.stopPropagation()" onchange="pitSetPaymentDate(\'' + c.id + '\',this.value)"></label></div>'
+        + '<div class="rtbd-pay"><span class="rtbd-payinfo">返車 ' + _fmd(c.returnDateFinal || c.returnDate) + ' ・ ' + _agreeInfo(c) + '</span>'
+        + _agreeBtn(c)
+        + '<label class="rtbd-paylb">入金日 <input type="date" class="rtbd-paydate" value="" onclick="event.stopPropagation()" onchange="pitSetPaymentDate(\'' + c.id + '\',this.value,this)"></label></div>'
         + '</div>'
       ).join('') : '<div class="today-empty">なし</div>') + '</div>';
-  h += '<div class="und-note">入金日を入れると、入金待ちから消えます。<b>保険の車はその日で実績に計上</b>されます（返車日ではなく入金日）。</div></div>';
+  h += '<div class="und-note">入金日を入れると、確かめてから入金待ちから消えます。<b>保険の車はその日で実績に計上</b>されます（返車日ではなく入金日）。<br>'
+     + '<b>協定待ち</b>の車は、協定額が入るまで売上の予定を見積などの金額で数えます。</div></div>';
 
   h += '</div>';
   wrap.innerHTML = h;
@@ -265,18 +276,74 @@ function renderReturnTbd(){
 window.renderReturnTbd = renderReturnTbd;
 
 /* 💰 入金待ち → 入金日を確定（実績カードの入金日も同時に埋まる）v0.121.0 */
-window.pitSetPaymentDate = function(id, v){
+/* ✅ v2.196.0（ゆうた指定 2026-10-22）**入金日は、確かめてから入れる。**
+   🗣「入金日を入れると今入れた瞬間に決定されてカード自体がきえる挙動　これでいいですか？のポップアップを出すようにして」
+   ◎前まで＝日付を選んだ瞬間に入って、カードが入金待ちから消えていた（日付の押し間違いに気づけない）。
+   ◎保険の**協定待ち**（確定金額が空）は、同じ窓で**協定額も一緒に聞く**＝入金日と協定額がそろって初めて実績に乗る。
+   ⚠ やめたら日付の欄を空に戻す（入れたように見えて、実は入っていない、を作らない）。 */
+window.pitSetPaymentDate = function(id, v, inp){
   const c = state.cards.find(x => x.id === id);
   if (!c || !v) return;
-  /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**。書き込みは insurance-pit.js の1本。 */
-  var ins = !!(window.pitInsSetPaid && pitInsSetPaid(c, v));
-  if (!ins){
-    c.paymentDate = v;
-    if (window.logFlow) logFlow(c, '入金日を記録（' + v + '）');
+  const reset = () => { if (inp) inp.value = ''; };
+  const md = window.fmtMD ? fmtMD(v) : v;
+  const who = ((window.pitCustName ? pitCustName(c) : c.customer) || '（未入力）') + ' 様' + (c.car ? '（' + c.car + '）' : '');
+  const ins = !!(window.pitCardInsurance && pitCardInsurance(c));
+  const commit = () => {
+    /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**。書き込みは insurance-pit.js の1本。 */
+    var done = !!(window.pitInsSetPaid && pitInsSetPaid(c, v));
+    if (!done){
+      c.paymentDate = v;
+      if (window.logFlow) logFlow(c, '入金日を記録（' + v + '）');
+    }
+    if (window.PitDB) PitDB.save();
+    renderReturnTbd();
+    if (window.pitToast) pitToast(done ? ('入金日 ' + v + ' で実績に計上しました') : ('入金日 '+ v + 'を記録しました'));
+  };
+  /* 🤝 協定待ち＝協定額も一緒に */
+  if (window.pitInsAgreeWait && pitInsAgreeWait(c)){
+    const k = window.pitInsAgreeKari ? pitInsAgreeKari(c) : { amt: 0, kind: '' };
+    const det = who + '\n入金日 ' + md + '\n\nまだ協定額（確定金額）が入っていません。協定書・入金の明細の金額（税抜）を入れてください。\n'
+              + '参考：' + k.kind + ' ¥' + Number(k.amt || 0).toLocaleString() + '\n\n入れると、入金待ちから消えて、この日・この金額で実績に計上します。';
+    UI.prompt('協定額を入れて、実績に計上しますか？', '', { detail: det, placeholder: '協定額（税抜）', ok: '実績に計上' }).then(val => {
+      if (val == null){ reset(); if (window.pitToast) pitToast('やめました（入金日は入れていません）'); return; }
+      const d = String(val).replace(/[^\d]/g, '');
+      if (!d){
+        reset();
+        UI.alert('協定額が入っていないので、入金日も入れませんでした', { title: '入れていません' });
+        return;
+      }
+      if (window.pitInsSetAgree) pitInsSetAgree(c, d, '入金日を入れる時');
+      commit();
+    });
+    return;
   }
-  if (window.PitDB) PitDB.save();
-  renderReturnTbd();
-  if (window.pitToast) pitToast(ins ? ('入金日 ' + v + ' で実績に計上しました') : ('入金日 '+ v + 'を記録しました'));
+  const amtTxt = (c.amountFinal != null && c.amountFinal !== '') ? '¥' + Number(c.amountFinal).toLocaleString() : '（金額なし）';
+  const det2 = who + '\n入金日 ' + md + '・' + amtTxt + '\n\n'
+             + (ins ? '入れると、入金待ちから消えて、この日で実績に計上します（保険＝入金日で実績）。'
+                    : '入れると、入金待ちから消えます。');
+  /* ⚠ 窓は UI（ui-dialog.js）だけ＝純正の confirm は使わない（見張り test_no_native_dialog） */
+  UI.confirm('入金日 ' + md + ' で入れますか？', { detail: det2, ok: '入れる' })
+    .then(ok => { if (!ok){ reset(); return; } commit(); });
+};
+
+/* 🤝 v2.196.0 入金待ちの「協定額を入れる」（入金日より先に協定が決まった時）。記録は insurance-pit.js の1本。 */
+window.pitSetAgreeAmount = function(id){
+  const c = state.cards.find(x => x.id === id);
+  if (!c) return;
+  const k = window.pitInsAgreeKari ? pitInsAgreeKari(c) : { amt: 0, kind: '' };
+  const who = ((window.pitCustName ? pitCustName(c) : c.customer) || '（未入力）') + ' 様' + (c.car ? '（' + c.car + '）' : '');
+  const det = who + '\n参考：' + k.kind + ' ¥' + Number(k.amt || 0).toLocaleString()
+            + '\n\n入れると「協定待ち」が消えて、売上の予定もこの金額で数えます。入金日はあとで入れます。';
+  UI.prompt('協定額（確定金額）を入れてください', '', { detail: det, placeholder: '協定額（税抜）', ok: '入れる' }).then(val => {
+    if (val == null) return;
+    const d = String(val).replace(/[^\d]/g, '');
+    if (!d) return;
+    if (window.pitInsSetAgree && pitInsSetAgree(c, d, '入金待ち')){
+      if (window.PitDB) PitDB.save();
+      renderReturnTbd();
+      if (window.pitToast) pitToast('協定額 ¥' + Number(d).toLocaleString() + ' を入れました');
+    }
+  });
 };
 
 function _undRow(c, kind){

@@ -1864,6 +1864,21 @@
   };
   // 入金日をセット（予約詳細側）。実績側の入金待ちにも即反映 v0.121.0
   window.cvSetPaymentDate = function(v){
+    /* 🤝 v2.196.0 保険の**協定待ち**（確定金額が空）に入金日を入れる時は、協定額も一緒に聞く（入金待ちの列と同じ決まり）。
+       ⚠ やめたら入金日も入れない＝描き直して欄を空に戻す。 */
+    if (v && window.pitInsAgreeWait && pitInsAgreeWait(_c) && window.UI && UI.prompt){
+      var _cc = _c, _k = window.pitInsAgreeKari ? pitInsAgreeKari(_cc) : { amt: 0, kind: '' };
+      UI.prompt('協定額を入れて、実績に計上しますか？', '', {
+        detail: '入金日 ' + v + '\n\nまだ協定額（確定金額）が入っていません。協定書・入金の明細の金額（税抜）を入れてください。\n参考：'
+              + _k.kind + ' ¥' + Number(_k.amt || 0).toLocaleString(),
+        placeholder: '協定額（税抜）', ok: '実績に計上' }).then(function (val) {
+        var d = String(val == null ? '' : val).replace(/[^\d]/g, '');
+        if (!d){ if (window.renderCardView && _c === _cc) renderCardView(_c, 'md-body-modal'); return; }
+        if (window.pitInsSetAgree) pitInsSetAgree(_cc, d, '予約詳細で入金日を入れる時');
+        if (_c === _cc) window.cvSetPaymentDate(v);
+      });
+      return;
+    }
     /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**になる。書き込みは insurance-pit.js の1本。
        ⚠ 保険でない車は今までどおり（入金日はメモ。実績日は動かさない）。 */
     if (window.pitInsSetPaid && pitInsSetPaid(_c, v)){

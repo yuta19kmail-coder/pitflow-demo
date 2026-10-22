@@ -2554,12 +2554,16 @@ w.pitDivisionColor = pitDivisionColor;
       flow = '返車完了（実績へ）';
     }
     var amt = (c.amountFinal == null || c.amountFinal === '') ? pitFinalAmountOf(c) : c.amountFinal;
-    if (c.amountFinal == null || c.amountFinal === '') patch.amountFinal = amt;
+    /* 🤝 v2.196.0 保険で確定金額が空＝**協定待ち。埋めない**（insurance-pit.js の pitInsAgreeWait。埋めると協定ずみに見える）。
+       ⚠ 売上・AIレポートは空なら見積などで数える作り（pitFinalAmountOf）なので、数字はそのまま出る。 */
+    var _agreeWait = _isInsCard(c) && (c.amountFinal == null || c.amountFinal === '');
+    if ((c.amountFinal == null || c.amountFinal === '') && !_agreeWait) patch.amountFinal = amt;
     var md = (+td.slice(5, 7)) + '/' + (+td.slice(8, 10));
     return {
       ok: true, code: '', why: '',
       ask: { title: '返車済みにする', msg: '返車済みにして、実績（確定売上）に固めますか？', ok: '返車済みにする',
-             detail: '確定売上 ¥' + Number(amt || 0).toLocaleString() + '\n\n'
+             detail: (_agreeWait ? '協定待ち（仮 ¥' + Number(amt || 0).toLocaleString() + '）＝協定額は入金待ちで入れます'
+                                 : '確定売上 ¥' + Number(amt || 0).toLocaleString()) + '\n\n'
                    + (_isInsCard(c) ? '・保険の車：入金日を入れた日に実績として数えます\n' : '・' + md + ' の実績として数えます（実績カレンダー・月次の売上・メカの配分）\n')
                    + '・お客様の来店履歴に残ります\n'
                    + '🔴 ここから先はアーカイブです。戻せるのは管理者だけです' },

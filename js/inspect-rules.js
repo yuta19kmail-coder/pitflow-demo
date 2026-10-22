@@ -399,6 +399,10 @@
       each: function(c){
         if (!isDone(c)) return '';
         if (t(c.amountFinal)) return '';
+        /* 🤝 v2.196.0（ゆうた指定 2026-10-22）保険の**協定待ち**（入金待ちで確定金額が空）は、空が正しい姿＝言わない。
+           協定額は入金待ちの列で入れる。⚠ 入金日まで入ったのに空、は今までどおり拾う（実績に乗っているので）。
+           ⚠ 判定は insurance-pit.js の1本（pitInsAgreeWait／pitInsPayWait）。 */
+        if (w.pitInsAgreeWait && pitInsAgreeWait(c) && w.pitInsPayWait && pitInsPayWait(c)) return '';
         return '確定金額が空です。いまは ' + man(amountOf(c)) + ' で実績に数えています';
       } },
 

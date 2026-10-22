@@ -70,9 +70,14 @@
     { id:'menu',       label:'作業内容',        type:'textarea' },
     { id:'resNo',      label:'予約番号',        type:'text' },
     { id:'repeat',     label:'初回／リピーター', type:'pick', opts: optsRepeat },
-    { id:'boardId',    label:'国産車／輸入車',   type:'pick', opts: optsBoard },
+    /* 🔗 v2.197.0（ゆうた指定 2026-10-22・B5「揃うように」）国産／輸入を直したら、課もそろえる（予約を編集と同じ＝国→1課・輸→2課・別の課の担当は外す） */
+    { id:'boardId',    label:'国産車／輸入車',   type:'pick', opts: optsBoard,
+      set: function(c, v){ c.boardId = v; c.division = (v === 'import') ? 'div2' : 'div1'; if (typeof w._syncStaffToDivision === 'function') w._syncStaffToDivision(c); } },
     { id:'dropType',   label:'受付タイプ',      type:'pick',  opts: optsDrop },
-    { id:'workType',   label:'作業タイプ',      type:'pick',  opts: optsWork },
+    /* 🔗 v2.197.0 B5 作業タイプを直したら、作業のならび（workTypes＝バッジが見る）もそろえる（予約を編集の _syncWorkTypes と同じ） */
+    { id:'workType',   label:'作業タイプ',      type:'pick',  opts: optsWork,
+      set: function(c, v){ c.workType = v; if (typeof w._syncWorkTypes === 'function') w._syncWorkTypes(c);
+        else { var ids = v ? [v] : []; (Array.isArray(c.workAddons) ? c.workAddons : []).forEach(function(a){ if (a && ids.indexOf(a) < 0) ids.push(a); }); c.workTypes = ids; } } },
     { id:'frontStaff', label:'フロント担当',    type:'pick',  opts: optsFront,
       hint:'フロント別の売上は、ここで決まります' },
 
@@ -80,9 +85,16 @@
     { id:'reserveDate', label:'入庫日',        type:'date' },
     { id:'actualInAt',  label:'実入庫日',      type:'date' },   /* 📅 v2.105.0 T10 で直せるように */
     { id:'reserveTime', label:'入庫時刻',      type:'time' },
-    { id:'returnDate',  label:'返車予定日',    type:'date' },
+    /* 🔗 v2.197.0 B5 返車日は唯一の入口（return-slot.js）を通す＝確定返車日・返車カレンダーの位置・完TEL待ち→済がそろう */
+    { id:'returnDate',  label:'返車予定日',    type:'date',
+      set: function(c, v){
+        if (w.pitReturnSetDateTime){ var r = w.pitReturnSetDateTime(c, v || '', undefined);
+          if (w.pitReturnCommit && c.status !== 'returned') w.pitReturnCommit(c, r, { silent: true }); }
+        else c.returnDate = v; } },
     { id:'returnTime',  label:'返車時間',      type:'time' },
-    { id:'paymentDate', label:'入金予定日',    type:'date' },
+    /* 🔗 v2.197.0 B5 入金日は insurance-pit.js の1本を通す＝保険なら実績カウント日も一緒に動く（前はそのまま書いて食い違っていた） */
+    { id:'paymentDate', label:'入金予定日',    type:'date',
+      set: function(c, v){ if (w.pitInsSetPaid) w.pitInsSetPaid(c, v); else c.paymentDate = v || null; } },
     /* 💴 v1.185.0 売上日＝整備ソフトの伝票が立った日。
        🔴🔴 v2.0.0（ゆうた指定 2026-08-23）**ここは「特例」。admin を付けない。**
        🗣「売上日も同様に基本はアーカイブはロック管理者のみ修正可能、

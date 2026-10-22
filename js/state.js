@@ -343,7 +343,9 @@ window.PIT_WORK_TYPES_VER = '2.51.0';   /* v2.51.0 物販を足した・車販�
    ・表示は予約詳細・ホバー詳細・印刷表紙のみ。画面はグレー、印刷は黒字・黒枠（アウトライン）。 */
 window.PIT_WORK_SPECIALS = [
   { id: 'warranty',  label: '保証',
-    desc: '保証会社による整備保証の際に追加で付与（売掛がデフォルトで入る）' },
+    /* 📝 v2.197.0（ゆうた指定 2026-10-22・B4「保証は売掛は入らなくていい　説明を修正」）
+       前の説明は「売掛がデフォルトで入る」だったが、そう動くコードは無かった。v2.142.0（2026-10-05）からは完TELの窓で選ぶ形。 */
+    desc: '保証会社による整備保証の際に追加で付与（売掛にするかは完TELの時に「通常／売掛」で選ぶ）' },
   { id: 'insurance', label: '保険',
     desc: '保険会社による板金等の保険作業に付与（保険専用の入金日による実績化挙動）' },
   /* 👤 v2.6.0（ゆうた指定）社員＝社員販売・社員整備。値引きや原価で社割が効くので、
@@ -432,6 +434,25 @@ function pitTaxHint(v){
   return '<span class="pt-tax-l">税抜で入力</span><span class="pt-tax-v">税込 ¥' + t.toLocaleString() + '</span>';
 }
 window.pitTaxHint = pitTaxHint;
+
+/* 📝 v2.197.0（ゆうた指定 2026-10-22・B6「記載するように」）**確定金額が変わったら、前→後を必ず残す。**
+   ◎前は予約詳細のその場の入力・実績の解錠・タスクボードのホバーで確定金額を直しても、フローに1行も残らなかった
+     （確定金額は保存の差分の対象外＝pit-share.js の _DIFF_SKIP）。誰がいくらからいくらに変えたか追えなかった。
+   ◎書く中身はここ1本。where＝どこから直したか（「表紙」「ホバー」など）。変わっていなければ何もしない。 */
+function pitLogAmountFinal(c, before, after, where){
+  if (!c) return false;
+  var k = function (x) { return (x == null || x === '') ? '' : String(Number(x)); };
+  if (k(before) === k(after)) return false;
+  var y = function (x) { return k(x) === '' ? '未入力' : '¥' + Number(x).toLocaleString(); };
+  var msg = '確定金額を ' + y(before) + ' → ' + y(after) + ' に変更' + (where ? '（' + where + '）' : '');
+  try { if (window.logFlow) logFlow(c, msg); } catch (e) {}
+  try {
+    if (window.pitLog) pitLog('確定金額を変更', { cardId: c.id, kind: 'result',
+      label: ((window.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + y(before) + ' → ' + y(after) + (where ? '（' + where + '）' : '') });
+  } catch (e) {}
+  return true;
+}
+window.pitLogAmountFinal = pitLogAmountFinal;
 
 /* 入力欄と表示欄をつなぐ。打つたびに書き替わる（ライブ）。
    el＝input／hint＝表示する入れ物。どちらか無ければ何もしない。 */

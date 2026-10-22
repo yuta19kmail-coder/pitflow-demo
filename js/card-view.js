@@ -1155,32 +1155,40 @@
     return h + '</div>';
   }
   /* 💳 入金（売掛）のロック行＝確定売上金額・返車日と同じテイスト。入金済＝🔒確定＋日付／入金待ち＝オレンジ／分けない＝返車時。✏️で編集 v0.122.0 */
+  /* 🔒 v2.197.0（ゆうた指定 2026-10-22・B2「実績になった場合は変更不可」）**実績カードの入金は、入金待ちの日付を入れるだけ。**
+     ◎前は実績カードでも「編集」から誰でも売掛を外したり入金日を消したりできた。
+       保険で入金済みの車の売掛を外すと、入金日は消えるのに実績カウント日が残り、**どの月の売上にも出なくなっていた**。
+     ◎いまは …
+       ・入金済み（入金日あり）＝🔒確定。変えられない（直す時は管理者がマスター入力で）
+       ・入金待ち（売掛・入金日なし）＝入金日を入れる欄だけ（売掛は外せない）
+       ・返車時に入金＝そのまま（あとから売掛にはしない）
+     ⚠ 書く側（cvTogglePaySeparate／cvSetPaymentDate）でも同じ物差しで止める＝画面を消しただけにしない。 */
   function paymentLockRow(c){
-    var tag='', val, btn;
+    var tag='', val, foot = '';
     if (c.paymentSeparate && c.paymentDate){
       tag = '<span class="cv-locktag"><i data-ic=lock data-ics=16></i> 確定</span>';
       val = '<span class="cv-fixval" id="cv-paylock">'+fmtMD(c.paymentDate)+'</span>';
-      btn = '<i data-ic=pencil data-ics=16></i> 編集';
+      foot = '<div class="cv-payfix">実績になった入金日は変えられません（直す時は管理者がマスター入力で）</div>';
     } else if (c.paymentSeparate){
-      val = '<span class="cv-fixval" id="cv-paylock"><span class="cv-paywait"><i data-ic=hourglass data-ics=15></i> 入金待ち</span></span>';
-      btn = '<i data-ic=pencil data-ics=16></i> 編集';
+      val = '<span class="cv-fixval" id="cv-paylock"><span class="cv-paywait"><i data-ic=hourglass data-ics=15></i> 入金待ち</span></span>'
+          + '<span class="cv-payin">入金日 <input class="cv-fixinput" type="date" value="" onchange="cvSetPaymentDate(this.value)"></span>';
     } else {
       val = '<span class="cv-fixval" id="cv-paylock"><span class="cv-amuted">返車時に入金</span></span>';
-      btn = '<i data-ic=pencil data-ics=16></i> 売掛にする';
     }
     var label = (c.paymentSeparate && c.paymentDate) ? '入金日' : '入金';
     /* 🛡 v2.9.0 保険は**入金日がそのまま実績カウント日**。本当の返車日も一緒に出す。
        ⚠ 言葉は `insurance-pit.js` の1本。ここで書き分けない。 */
     var insNote = (window.pitCardInsurance && pitCardInsurance(c) && window.pitInsNote)
       ? '<div class="cv-insnote"><i data-ic=shield data-ics=14></i> ' + esc(pitInsNote(c)) + '</div>' : '';
-    return '<div class="cv-fixrow cv-fixlocked"><div class="cv-frt">'+label+' '+tag+' <button type="button" class="cv-unlockbtn" onclick="cvUnlockPay()">'+btn+'</button></div><div class="cv-frb">'
-      + val
-      + '<span class="cv-unlockwrap" id="cv-payedit" style="display:none">'+paymentControlHtml(c)+'</span></div>'
+    return '<div class="cv-fixrow cv-fixlocked"><div class="cv-frt">'+label+' '+tag+'</div><div class="cv-frb">'
+      + val + '</div>' + foot
       + insNote + '</div>';
   }
   /* 💳 入金日を分ける（売掛）コントロール＝チェック＋（ON時）入金日ピッカー。金額欄と完了アーカイブで共用 v0.121.0 */
   function paymentControlHtml(c){
-    var h = '<div class="cv-payctl"><label class="cv-paychk"><input type="checkbox" '+(c.paymentSeparate?'checked':'')+' onchange="cvTogglePaySeparate(this.checked)"> 入金日を分ける（売掛）</label>';
+    /* 🛡 v2.197.0 保険は売掛のまま＝チェックは外せない（灰色＋理由。消さない） */
+    var _insPay = !!(window.pitCardInsurance && pitCardInsurance(c));
+    var h = '<div class="cv-payctl"><label class="cv-paychk"'+(_insPay?' title="保険の車は売掛のままです（入金日で実績）"':'')+'><input type="checkbox" '+(c.paymentSeparate?'checked':'')+(_insPay?' disabled':'')+' onchange="cvTogglePaySeparate(this.checked)"> 入金日を分ける（売掛）'+(_insPay?'<span class="cv-amuted">（保険は売掛のまま）</span>':'')+'</label>';
     if (c.paymentSeparate){
       h += '<span class="cv-payin">入金日 <input class="cv-fixinput" type="date" value="'+esc(c.paymentDate||'')+'" onchange="cvSetPaymentDate(this.value)">'
          + (c.paymentDate ? '' : ' <span class="cv-paywait">入金待ち</span>') + '</span>';
@@ -1389,6 +1397,12 @@
   window.cvMechToggleEdit = function(id){ _mechEditOpen[id] = !_mechEditOpen[id]; _mechRerender(); };
 
   function officeTab(c){
+    /* 🚧 v2.197.0（ゆうた指定 2026-10-22・B7「バックオフィスはタブだけ残して本体は非表示　工事中とかでも書いといて」）
+       ◎予約詳細の3項目（c.office.checks）と予約を編集の5項目（c.office[i]）が別々に保存されていて、どちらもほかで使っていなかった。
+       ⚠ 中身を作り直すまで**見せない**。付いている印は消さない（カードに残したまま）＝作り直す時に使える。
+       ⚠ 下の古い描き方は残してある（作り直す時の参考）。 */
+    if (true) return '<div class="cv-sec"><div class="cv-sect"><i data-ic=folder data-ics=16></i> バックオフィス（事務の締め）</div>'
+      + '<div class="cv-wip">🚧 工事中です。中身を作り直しています（いまは使えません）。</div></div>';
     const items = ['入金処理','原価チェック','ファイルバラシ'];
     const done = (c.office && c.office.checks) || {};
     let n=0; const h2 = items.map(function(it,i){
@@ -1747,7 +1761,10 @@
     /* 🆕 v1.73.0 「編集」から**あとで直した**ときは、誰がいつ直したか辿れるようにフローへ残す。
        ⚠ いまの工程の直接入力（ふだんの入力）は今までどおり残さない＝フローが金額の打ち直しで埋まらないように。 */
     const _n = v ? +v : null;
-    if (_chainEditMoney && window.logFlow && String(_bef == null ? '' : _bef) !== String(_n == null ? '' : _n)){
+    /* 📝 v2.197.0 B6 確定金額は**どの道から直しても**前→後を残す（ふだんの直接入力・実績の解錠も）。中身は state.js の1本 */
+    if (kind === 'final' && window.pitLogAmountFinal){
+      pitLogAmountFinal(_c, _bef, _n, _c.status === 'returned' ? '実績の確定売上を解錠して' : '表紙');
+    } else if (_chainEditMoney && window.logFlow && String(_bef == null ? '' : _bef) !== String(_n == null ? '' : _n)){
       const _s = function(x){ return (x != null && x !== '') ? '¥' + Number(x).toLocaleString() : '未入力'; };
       try { logFlow(_c, AMT_LABEL[kind] + 'を ' + _s(_bef) + ' → ' + _s(_n) + ' に変更（表紙の編集）'); } catch(e){}
     }
@@ -1828,6 +1845,21 @@
       _c.returnDateFinal = v || null;
       if (v) _c.returnDate = v;
     }
+    /* 🛡 v2.197.0（ゆうた指定 2026-10-22・B1「それでいい　かつ管理者のみ」）**保険の実績カードは、返車日だけ動かす。**
+       ◎保険の実績カウント日＝入金日（insurance-pit.js）。前はここで返車日に書き換えていて、
+         入金日で数えていた売上が返車日の月に動き、入金日とも食い違っていた。
+       ⚠ 管理者だけ＝上の canEditResultDate で止めている。 */
+    if (v && _c.status === 'returned' && window.pitCardInsurance && pitCardInsurance(_c)){
+      _c.returnDate = v;
+      if (_retShown !== v){
+        var _pd = _c.paymentDate || '（入金待ち）';
+        try { if (window.logFlow) logFlow(_c, '確定返車日を ' + (_retShown || '（なし）') + ' → ' + v + ' に変更（保険：実績カウント日は入金日 ' + _pd + ' のまま）'); } catch(e){}
+        try { if (window.pitLog) pitLog('確定返車日を変更（保険・実績日は入金日のまま）', { cardId: _c.id, kind: 'result',
+          label: ((window.pitCustName?pitCustName(_c):_c.customer) || '') + ' 様' + (_c.car ? ' / ' + _c.car : '') + '　' + (_retShown || '（なし）') + ' → ' + v }); } catch(e){}
+      }
+      save(); cvRefreshBg();
+      return;
+    }
     // 実績（返車完了）カードで返車日を直したら、確定返車日＝実績カレンダーの表示日(completedAt)も合わせて動かす v0.118.1
     if(v && _c.status === 'returned'){
       _c.returnDate = v; _c.completedAt = v;
@@ -1857,13 +1889,43 @@
   window.cvUnlockPay = function(){ var e=document.getElementById('cv-payedit'); if(e) e.style.display=(e.style.display==='none'?'':'none'); };
   // 💳 入金日を分ける（売掛）ON/OFF。OFFで入金日クリア。表示切替のため再描画 v0.121.0
   window.cvTogglePaySeparate = function(on){
+    /* 🔒 v2.197.0 B2 実績カードの売掛は変えない（上の paymentLockRow と同じ決まり） */
+    if (_c && _c.status === 'returned'){
+      if (window.UI && UI.alert) UI.alert('実績になったカードの売掛は変えられません（直す時は管理者がマスター入力で）。', { title: '変更できません' });
+      if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+      return;
+    }
+    /* 🛡 v2.197.0 保険は売掛のまま（保険＝入金日で実績。外すと数える日が無くなる） */
+    if (!on && window.pitCardInsurance && pitCardInsurance(_c)){
+      if (window.UI && UI.alert) UI.alert('保険の車は売掛のままです（保険は入金日で実績になります）。', { title: '変更できません' });
+      if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+      return;
+    }
     _c.paymentSeparate = !!on;
     if(!on) _c.paymentDate = null;
     save(); cvRefreshBg();
     if(window.renderCardView) renderCardView(_c,'md-body-modal');
   };
   // 入金日をセット（予約詳細側）。実績側の入金待ちにも即反映 v0.121.0
-  window.cvSetPaymentDate = function(v){
+  window.cvSetPaymentDate = function(v, _ok){
+    /* 🔒 v2.197.0 B2 実績カードは「入金待ちに入金日を入れる」だけ。入っている入金日は変えない・消さない */
+    if (_c && _c.status === 'returned' && (_c.paymentDate || !v)){
+      if (window.UI && UI.alert) UI.alert('実績になった入金日は変えられません（直す時は管理者がマスター入力で）。', { title: '変更できません' });
+      if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+      return;
+    }
+    /* ✅ v2.197.0 実績カードの入金待ちに入金日を入れる時も、入金待ちの列と同じく確かめてから（協定待ちは下で協定額を聞く） */
+    if (v && !_ok && _c && _c.status === 'returned' && !(window.pitInsAgreeWait && pitInsAgreeWait(_c)) && window.UI && UI.confirm){
+      var _cc0 = _c, _ins0 = !!(window.pitCardInsurance && pitCardInsurance(_c));
+      UI.confirm('入金日 ' + v + ' で入れますか？', { ok: '入れる',
+        detail: _ins0 ? '入れると、入金待ちから外れて、この日で実績に計上します（保険＝入金日で実績）。\n入れたあとは変えられません。'
+                      : '入れると、入金待ちから外れます。入れたあとは変えられません。' }).then(function (yes) {
+        if (_c !== _cc0) return;
+        if (!yes){ if (window.renderCardView) renderCardView(_c, 'md-body-modal'); return; }
+        window.cvSetPaymentDate(v, true);
+      });
+      return;
+    }
     /* 🤝 v2.196.0 保険の**協定待ち**（確定金額が空）に入金日を入れる時は、協定額も一緒に聞く（入金待ちの列と同じ決まり）。
        ⚠ やめたら入金日も入れない＝描き直して欄を空に戻す。 */
     if (v && window.pitInsAgreeWait && pitInsAgreeWait(_c) && window.UI && UI.prompt){
@@ -1875,7 +1937,7 @@
         var d = String(val == null ? '' : val).replace(/[^\d]/g, '');
         if (!d){ if (window.renderCardView && _c === _cc) renderCardView(_c, 'md-body-modal'); return; }
         if (window.pitInsSetAgree) pitInsSetAgree(_cc, d, '予約詳細で入金日を入れる時');
-        if (_c === _cc) window.cvSetPaymentDate(v);
+        if (_c === _cc) window.cvSetPaymentDate(v, true);
       });
       return;
     }
@@ -1928,6 +1990,12 @@
 
   // 返車時間（スマート入力で正規化）／洗車備考／お礼LINE不要＝完TELポップアップと同じ項目（相互反映）
   window.cvReturnTime = function(input){
+    /* 🔒 v2.197.0（B1「管理者のみ」）実績カードの返車時間も、返車日と同じく管理だけ（前は入力欄を隠していただけ） */
+    if (_c && _c.status === 'returned' && !canEditResultDate()){
+      if (window.UI && UI.alert) UI.alert('実績になったカードの返車日時を直せるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+      if (window.renderCardView) renderCardView(_c, 'md-body-modal');
+      return;
+    }
     var v = (input && typeof input === 'object') ? input.value : input;
     v = (window._normTime ? _normTime(v) : v) || '';
     if (input && typeof input === 'object') input.value = v;

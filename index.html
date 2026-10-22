@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="app-version" content="2.196.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
+<meta name="app-version" content="2.197.0"><!-- 自動更新の基準（auto-update.js が参照）。リリース毎に上げる -->
 <title>PitFlow - 整備入庫管理システム</title>
 <link rel="icon" type="image/png" href="favicon.png?v=1">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
@@ -24,7 +24,7 @@
 <link rel="stylesheet" href="css/work-content.css?v=9">
 <link rel="stylesheet" href="css/parking.css?v=3">
 <link rel="stylesheet" href="css/launcher.css?v=2d7b23ed">
-<link rel="stylesheet" href="css/card-view.css?v=47">
+<link rel="stylesheet" href="css/card-view.css?v=48">
 <link rel="stylesheet" href="css/card-hover.css?v=26">
 <link rel="stylesheet" href="css/coreflow-pit-sales.css?v=67f9de76"><!-- 🧩 v2.195.0 売上ビューの見た目＝_shared の共通部品（MHS の MH実績と同じ物）。前の css/sales.css -->
 <link rel="stylesheet" href="css/shaken.css?v=29">
@@ -134,7 +134,7 @@
     </button>
     <div class="pl-error" id="pl-error" style="display:none"></div>
     <div class="pl-note pl-note-sample">※ この端末だけで動くサンプルです（保存もこの端末の中だけ）</div>
-    <div class="login-ver">v2.196.0</div>
+    <div class="login-ver">v2.197.0</div>
   </div>
 </div>
 
@@ -148,7 +148,7 @@
       <img class="tb-logo-img logo-dark" src="images/pitflow-logo-dark.png" alt="PitFlow">
       <img class="tb-logo-img logo-light" src="images/pitflow-logo-light.png" alt="PitFlow">
     </div>
-    <span class="ver" data-cf-ver>v2.196.0</span>
+    <span class="ver" data-cf-ver>v2.197.0</span>
     <!-- 🔴 2026-10-03 AAA（文字サイズ3つ）は無くした＝見やすさ（CoreFlow でチェックした人だけ）に置き換え -->
     <span id="cf-a11y-slot"></span><!-- 👓 見やすさ（くっきり／大きさ／拡大鏡）。CoreFlow のメンバー管理でチェックがある人だけ出る（coreflow-a11y.js） -->
     <!-- テーマ4パターン循環（ダーク→ライト→ダーク・リキッド→ライト・リキッド） -->
@@ -762,7 +762,7 @@
 <script src="js/coreflow-errcode.js?v=8d7c4b2d"></script><!-- 🔢 エラー番号の出し方（全アプリ共通・_shared から配られたコピー）。台帳より前に読む -->
 <script src="js/errcode-pit.js?v=30"></script><!-- 🔴 v1.110.0 エラー番号の台帳（PF-0412）。トースト・窓より前に読む -->
 <script src="js/modal-outside.js?v=1"></script><!-- 🔴 v1.110.0 窓の「外側を押したらやめる」1本。押し始めが外側の時だけやめる（使う側より前に読む） -->
-<script src="js/state.js?v=80"></script>
+<script src="js/state.js?v=81"></script>
 <script src="js/intern-pit.js?v=4"></script><!-- 🏢 v2.6.0 社内車両（中古・代車・内部）の物差し1本（区分マスター・実績化・参考の台数）。**card-detail.js / card-miss.js より前** -->
 <script src="js/sales-date.js?v=2"></script><!-- 💴 v1.185.0 「売上日」（整備ソフトの伝票が立った日）の物差し1本。完TEL日（ログ）とは別物・数字だけ引っ張る。state.js より後ろ、使う側（return-slot / card-view / return-popup / inspect-rules / quarter-match）より前 -->
 <script src="js/coreflow-loaner-remain.js?v=608d586a"></script><!-- 🚙 代車の残り日数と色（全アプリ共通・_shared から配布）。loaner-free.js より **前** に読むこと -->
@@ -788,13 +788,13 @@ window.PIT_DEMO = true;</script>
 <script src="js/views.js?v=63"></script>
 <script src="js/work-content.js?v=15"></script>
 <script src="js/card-miss.js?v=3"></script><!-- 🔴 v1.168.0 カードの「入っていない項目」の表1本（🔴必須／🟡推奨）。card-detail.js（赤枠を塗る）・inspect-rules.js（データチェック）・inspect-fix.js（ここを直す）が見る。**card-detail.js より前** -->
-<script src="js/card-detail.js?v=159"></script>
+<script src="js/card-detail.js?v=160"></script>
 <script src="js/flow-pit.js?v=10"></script><!-- フロー（進捗ログ）の「足す／直す」。card-view.js（詳細）と card-tabs.js（編集）の両方から呼ぶので先に読む -->
 <script src="js/mech-pick.js?v=5"></script><!-- 🔧 点検・整備の担当者チップ（カード詳細の整備タブと、作業完了の注意ポップアップで共用）。使う側より前に読む -->
-<script src="js/card-view.js?v=94"></script>
+<script src="js/card-view.js?v=95"></script>
 <script src="js/cover-print.js?v=20"></script>
 <script src="js/avail.js?v=9"></script>
-<script src="js/card-tabs.js?v=17"></script>
+<script src="js/card-tabs.js?v=18"></script>
 <script src="js/archive-pit.js?v=6"></script><!-- 顧客・車両のアーカイブ（customers.js / search.js / card-detail.js から呼ばれるので先に読む） -->
 <script src="js/customers.js?v=80"></script>
 <script src="js/veh-merge.js?v=4"></script><!-- 🚗 v2.31.0→v2.32.0 同じ車が2件に分かれている時に1台にまとめる（顧客はまたがない・入口は顧客詳細の編集の横だけ）。customers.js の器（custShowModal）を借りるので後ろに読む -->
@@ -811,7 +811,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/coreflow-note-board.js?v=d70f047e"></script><!-- 📌 付箋ボード本体（全アプリ共通・_shared から配布）。board-notes.js より **前** に読む -->
 <script src="js/board-notes.js?v=18"></script>
 <script src="js/search.js?v=21"></script>
-<script src="js/insurance-pit.js?v=2"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
+<script src="js/insurance-pit.js?v=3"></script><!-- 🛡 v2.9.0 保険＝入金日で実績に乗せる物差し1本。**sales-count.js より前**に読む -->
 <script src="js/sales-count.js?v=9"></script><!-- 🔴 v1.61.0 「売上をどの月に数えるか」の物差し1本（実績＝実績カウント日／まだ返していない車＝返車予定日）。使う側（maintdash / sales / mech-summary / mydash）より前に読む -->
 <script src="js/maintdash.js?v=6"></script>
 <script src="js/coreflow-pit-visit.js?v=18fd07d7"></script><!-- 🔍 v2.59.0 来店属性（売上ビューの5つ目のタブ）。**sales-date.js（売上日）と sales-count.js より後ろ／sales.js より前** --><!-- 🧩 v2.195.0 本体は _shared（前の js/sales-visit.js・中身は同じ） -->
@@ -825,7 +825,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/mech-summary.js?v=8"></script>
 <script src="js/inspect-rules.js?v=36"></script>
 <script src="js/master-pit.js?v=9"></script><!-- 🗂 v2.86.0 マスター入力。card-miss / intern-pit / pit-share / customers より後ろ --><!-- 🩺 v1.168.0 データチェックの規則表（判定はここ1本）。pit-share / sales-count / return-slot / loaner-free / card-miss より後ろ -->
-<script src="js/inspect-fix.js?v=7"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
+<script src="js/inspect-fix.js?v=8"></script><!-- 🩺 v1.170.0 「ここを直す」＝規則→直せる欄の表1本＋小窓。card-miss / card-view（pitCanEditFinal）より後ろ、inspect.js より前 -->
 <script src="js/quarter-match.js?v=14"></script><!-- 🧾 v1.181.0 突き合わせの物差し（画面を持たない）。sales.js（pitQuarterOf）/ sales-count.js より後ろ -->
 <script src="js/quarter-store.js?v=16"></script><!-- 🗄 v1.184.0 突き合わせた結果を残す／読む（pitSettings の中。ルールは無改修） -->
 <script src="js/quarter-pdf.js?v=8"></script><!-- 🧾 v1.181.0 売上チェックリストPDFの読み取り（自己検証つき） -->
@@ -871,10 +871,10 @@ window.PIT_DEMO = true;</script>
 <script src="js/board-line.js?v=11"></script><!-- タスクボードの区切りライン（task.js / ctxmenu-pit.js から呼ばれる） -->
 <script src="js/myonly-pit.js?v=8"></script><!-- タスクボードの「担当車両」スイッチ（task.js から呼ばれる・views.js より後ろ） -->
 <script src="js/pit-pip.js?v=9"></script>
-<script src="js/card-hover.js?v=49"></script>
+<script src="js/card-hover.js?v=50"></script>
 <script src="js/mech-guard.js?v=7"></script><!-- ⚠ 作業完了に入れる時、担当者が空なら1回聞く。phase-popup.js から呼ばれるので前に読む -->
 <script src="js/phase-popup.js?v=21"></script>
-<script src="js/return-popup.js?v=19"></script>
+<script src="js/return-popup.js?v=20"></script>
 <script src="js/help-content.js?v=67"></script>
 <script src="js/help.js?v=2"></script>
 <script src="js/mydash.js?v=30"></script>
@@ -884,7 +884,7 @@ window.PIT_DEMO = true;</script>
 <script src="js/auto-update.js?v=5fec4b3d"></script>
   <script src="js/coreflow-power.js?v=672ecd85"></script><!-- ⏻ 電源ボタン（全アプリ共通・_shared が本体） -->
   <script src="js/coreflow-a11y.js?v=b7ec2bbb"></script><!-- 👓 見やすさ（全アプリ共通・_shared から配布）。電源の後 -->
-  <script src="js/coreflow-en.js?v=2fa30ac1" data-dict="js/coreflow-en-dict.js?v=2bd75af8"></script><!-- 🌐 2026-10-12 英語表示（メンバー管理の「英語表示」の人だけ。バージョンのバッジ／F2 で英語）。見やすさの後 -->
+  <script src="js/coreflow-en.js?v=2fa30ac1" data-dict="js/coreflow-en-dict.js?v=155e6c3d"></script><!-- 🌐 2026-10-12 英語表示（メンバー管理の「英語表示」の人だけ。バージョンのバッジ／F2 で英語）。見やすさの後 -->
 
 
 <script src="js/ui-dialog.js?v=7ee165b6"></script><!-- アプリ内ダイアログ（全アプリ共通・_shared から配布）。配られていたのに読み込みが抜けていた -->

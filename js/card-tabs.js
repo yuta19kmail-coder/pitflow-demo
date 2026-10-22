@@ -157,6 +157,10 @@ function cfMaintToggle(key){
 /* ===== バックオフィス（返車後の後処理） ===== */
 const CF_OFFICE_STEPS = ['カルテ（点検結果）最終確認','原価チェック（部品・外注）','請求発行','入金確認','後処理 完了（締め）'];
 function cfOfficeHtml(c){
+  /* 🚧 v2.197.0（ゆうた指定 2026-10-22・B7）予約詳細のバックオフィスと別々の印を持っていた＝作り直すまで「工事中」。
+     ⚠ 付いている印（c.office[i]）は消さない。⚠ ここで c.office を作らない（中身を触らない）。 */
+  if (true) return sec('バックオフィス（返車後の後処理）', '<i data-ic=folder data-ics=16></i>')
+    + '<div class="cf-hint">🚧 工事中です。中身を作り直しています（いまは使えません）。</div>' + secEnd();
   c.office = c.office || {};
   let h = sec('バックオフィス（返車後の後処理）', '<i data-ic=folder data-ics=16></i>');
   h += '<div class="cf-checks">';

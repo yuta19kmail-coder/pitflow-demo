@@ -2005,7 +2005,7 @@ function dropChips(c){
    🗣「新規予約や予約詳細から編集に入った場合、作業タイプのバッチを
      　**マウスオーバーしたらバッチの持つ意味を表示して間違えないように**したい」
    ◎とくに取りちがえると**あとの数字が変わる**印がある。
-     ・保証 … 売掛がデフォルトで入る
+     ・保証 … 売掛にするかは完TELの時に選ぶ（v2.197.0 で説明を直した。売掛は自動では入らない）
      ・保険 … 保険専用の入金日で実績化する
      ・中古／代車／内部 … 売上に数えない
    🔴 意味は `pitBadgeDesc(id)` 1本に聞く。ここで文を書かない。
@@ -2876,15 +2876,40 @@ function pitWorkTypeBind(root, c, redraw, opt){
       btn.addEventListener('click', () => {
         const v = btn.dataset.val;
         const idx = c[key].indexOf(v);
-        if (idx >= 0){
-          c[key].splice(idx, 1);   // 解除はいつでも可
-        } else {
+        const adding = idx < 0;
+        if (adding){
           const hasWork = !!c.workType || (Array.isArray(c.workAddons) && c.workAddons.length > 0);
           if (!hasWork){
             if (window.pitToast) pitToast('保証・保険は作業タイプとセットで選んでください', 'PF-1004');
             return;   // 単体では付けない
           }
-          c[key].push(v);
+        }
+        /* 🏷 v2.197.0（ゆうた指定 2026-10-22・B3）**実績になった車の付加は、管理者だけ・何が変わるかを見せてから。**
+           前は誰でも付け外しできて、保険を付け外ししても実績カウント日が計算し直されなかった。
+           中身（警告の文・実績日の直し・記録）は insurance-pit.js の pitSpecialEffectReturned 1本。 */
+        if (c.status === 'returned'){
+          const admin = !window.PIT_CLOUD || !!(window.pitIsAdmin && pitIsAdmin());
+          if (!admin){
+            if (window.UI && UI.alert) UI.alert('実績になった車の「保険・保証・社員」を変えられるのは、設定権限（管理）のある人だけです。', { title: '変更できません' });
+            return;
+          }
+          const ef = window.pitSpecialEffectReturned ? pitSpecialEffectReturned(c, v, adding) : null;
+          if (!ef) return;
+          const nm = btn.textContent.trim();
+          UI.confirm('実績になった車に「' + nm + '」を' + (adding ? '付けますか？' : '外しますか？'), {
+            detail: '変わること\n' + ef.lines.map(function (s) { return '・' + s; }).join('\n'),
+            ok: adding ? '付ける' : '外す' }).then(function (yes) {
+            if (!yes) return;
+            ef.apply();
+            if (opt.save) _cfSaveFor(c);
+            redraw();
+          });
+          return;
+        }
+        if (!adding){
+          c[key].splice(idx, 1);   // 解除はいつでも可
+        } else {
+          c[key].push(v);          // 作業タイプがあることは上で確かめた
         }
         if (opt.defer) btn.classList.toggle('active', c[key].indexOf(v) >= 0);   /* ⚡ 先にチェックを見せる */
         /* 🛡 v2.9.0 保険を付けたら**自動で売掛チェックが入る**（ゆうた指定 2026-08-25）。

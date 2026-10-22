@@ -162,6 +162,56 @@
     return true;
   }
 
+  /* 🏷 v2.197.0（ゆうた指定 2026-10-22・B3「提案通り（ただ何が変わるか警告してほしい）」）
+     **実績になった車の付加（保険・保証・社員）を付け外しした時に、何が変わるか（lines）と、その直し（apply）。**
+     ◎前は「予約を編集」から付け外しできても、実績カウント日は計算し直されなかった
+       （保険を外しても入金日のまま・保険を付けても返車日のまま）。
+     ◎ここが返すもの … { lines:[警告の文], apply:function(){ 付け外し＋実績日の直し＋記録 } }
+     ⚠ 管理者だけ・確かめてから＝呼ぶ側（card-detail.js）で止める。ここは中身だけ。 */
+  function specialEffect(c, v, adding){
+    var lines = [], name = { insurance: '保険', warranty: '保証', employee: '社員' }[v] || v;
+    var cd = t(c.completedAt), rf = t(c.returnDateFinal) || t(c.returnDate), pd = t(c.paymentDate);
+    var nextCd = cd;
+    if (v === 'insurance' && adding){
+      nextCd = pd;
+      lines.push('数え方が「入金日で実績」に変わります');
+      lines.push('実績カウント日 ' + (cd || '（なし）') + ' → ' + (pd ? pd + '（入金日）' : '（なし）'));
+      if (!pd) lines.push('入金日が無いので「入金待ち」に戻り、売上から外れます');
+      if (!c.paymentSeparate) lines.push('売掛が入ります');
+    } else if (v === 'insurance' && !adding){
+      nextCd = rf;
+      lines.push('数え方が「返車日で実績」に戻ります');
+      lines.push('実績カウント日 ' + (cd || '（なし）') + ' → ' + (rf ? rf + '（確定返車日）' : '（なし）'));
+      lines.push('売掛・入金日はそのまま残ります（メモとして）');
+      if (!hasAmt(c.amountFinal)) lines.push('確定金額が空です（協定待ちだった）。返車日で数えるので、確定金額を入れてください');
+    } else if (v === 'warranty'){
+      lines.push('売上・実績の数字は変わりません（作業名の見え方が' + (adding ? '「保証修理」になります' : '元に戻ります') + '）');
+    } else if (v === 'employee'){
+      lines.push('売上・実績の数字は変わりません');
+      lines.push(adding ? 'データチェックの金額の確かめ（一部）から外れます' : 'データチェックの金額の確かめ（一部）の対象に戻ります');
+    }
+    return {
+      lines: lines,
+      apply: function(){
+        if (!Array.isArray(c.workSpecials)) c.workSpecials = [];
+        var i = c.workSpecials.indexOf(v);
+        if (adding && i < 0) c.workSpecials.push(v);
+        if (!adding && i >= 0) c.workSpecials.splice(i, 1);
+        if (v === 'insurance'){
+          if (adding) c.paymentSeparate = true;
+          c.completedAt = nextCd || '';
+        }
+        var msg = '実績のあとで「' + name + '」を' + (adding ? '付けた' : '外した')
+                + (v === 'insurance' ? '（実績カウント日 ' + (cd || '（なし）') + ' → ' + (nextCd || '（なし）') + '）' : '');
+        if (w.logFlow) { try { logFlow(c, msg); } catch (e) {} }
+        if (w.pitLog) {
+          try { pitLog('実績のあとで付加を' + (adding ? '付けた' : '外した'), { cardId: c.id, kind: 'result',
+            label: ((w.pitCustName ? pitCustName(c) : c.customer) || '') + ' 様' + (c.car ? ' / ' + c.car : '') + '　' + msg }); } catch (e) {}
+        }
+      }
+    };
+  }
+
   /* 画面に出す1行。⚠ 言葉はここ1本。各画面で言い換えない。 */
   function note(c){
     if (!isInsurance(c)) return '';
@@ -191,4 +241,5 @@
   w.pitInsAgreeWait  = agreeWait;   /* 🤝 v2.196.0 協定待ちか */
   w.pitInsAgreeKari  = agreeKari;   /* 🤝 協定待ちの間の仮の金額 { amt, kind } */
   w.pitInsSetAgree   = setAgree;    /* 🤝 協定額を入れる／消す（記録つき） */
+  w.pitSpecialEffectReturned = specialEffect;   /* 🏷 v2.197.0 実績の車の付加の付け外し＝警告の文と直し */
 })(window);

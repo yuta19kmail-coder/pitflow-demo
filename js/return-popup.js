@@ -445,7 +445,12 @@
         else c.amountFinal = null;
       } else if (_agree === 1 && amt !== '' && window.pitInsSetAgree){
         pitInsSetAgree(c, amt, '完TELの窓（協定ずみ）');
-      } else if (amt !== '') c.amountFinal = Number(amt);
+      } else if (amt !== ''){
+        /* 📝 v2.197.0 B6 入っていた確定金額を完TELの窓で打ち直した時は前→後を残す（初めて入れる時は「完TEL済」の行で足りる） */
+        var _amtBf = c.amountFinal;
+        c.amountFinal = Number(amt);
+        if (_amtBf != null && _amtBf !== '' && window.pitLogAmountFinal) pitLogAmountFinal(c, _amtBf, c.amountFinal, '完TELの窓');
+      }
       // 洗車（要/不要）＋備考（不要でも備考は保存）
       c.needWash = !!(el('rp-wash-1') && el('rp-wash-1').classList.contains('on'));
       c.washNote = (el('rp-washnote') && el('rp-washnote').value.trim()) || '';

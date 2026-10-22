@@ -78,6 +78,8 @@
       if (t.classList.contains('ph-rt-amt')){
         var d = String(t.value).replace(/[^\d]/g,'').replace(/^0+(?=\d)/,'').slice(0,9);
         t.value = d ? Number(d).toLocaleString() : '';
+        /* 📝 v2.197.0 B6 打ち始める前の金額を覚えておく（記録は打ち終わり＝change で1回だけ。1文字ごとに残さない） */
+        if (t.dataset.amtBefore == null) t.dataset.amtBefore = (c.amountFinal == null ? '' : String(c.amountFinal));
         c.amountFinal = d ? Number(d) : '';
         saveDebounced();
       } else if (t.classList.contains('ph-rt-washnote')){
@@ -90,6 +92,12 @@
     el.addEventListener('change', function(e){
       var t = e.target; if (!t || !t.classList) return;
       var c = curCard(); if (!c) return;
+      /* 📝 v2.197.0 B6 確定金額を打ち終えたら、前→後を1回だけ残す（中身は state.js の pitLogAmountFinal 1本） */
+      if (t.classList.contains('ph-rt-amt')){
+        if (t.dataset.amtBefore != null && window.pitLogAmountFinal) pitLogAmountFinal(c, t.dataset.amtBefore, c.amountFinal, 'タスクボードのホバー');
+        delete t.dataset.amtBefore;
+        return;
+      }
       if (t.classList.contains('ph-rt-date')){
         var cb1 = el.querySelector('.ph-rt-datetbd');
         if (cb1) cb1.checked = !t.value;
